@@ -1,0 +1,9 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="All Applications" type="CompoundRunConfigurationType">
+    <toRun name="ChatApiApplication" type="SpringBootApplicationConfigurationType" />
+    <toRun name="ChatWebSocketApplication" type="SpringBootApplicationConfigurationType" />
+    <toRun name="ChatWorkerApplication" type="SpringBootApplicationConfigurationType" />
+    <toRun name="ChatAdminApplication" type="SpringBootApplicationConfigurationType" />
+    <method v="2" />
+  </configuration>
+</component>

@@ -1,0 +1,10 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="ChatAdminApplication" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot">
+    <module name="chatting-service.chat-admin-application.main" />
+    <option name="SPRING_BOOT_MAIN_CLASS" value="com.chat.admin.application.ChatAdminApplicationKt" />
+    <option name="ACTIVE_PROFILES" value="" />
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>

@@ -1,0 +1,10 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="ChatWorkerApplication" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot">
+    <module name="chatting-service.chat-worker-application.main" />
+    <option name="SPRING_BOOT_MAIN_CLASS" value="com.chat.worker.application.ChatWorkerApplicationKt" />
+    <option name="ACTIVE_PROFILES" value="" />
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>

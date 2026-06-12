@@ -1,0 +1,14 @@
+# 개인 로컬 설정 (Git 추적 제외)
+/shelf/
+/workspace.xml
+# HTTP Client 요청 기록
+/httpRequests/
+# Query 파일
+/queries/
+# 데이터소스 로컬 저장소
+/dataSources/
+/dataSources.local.xml
+# 사용 통계
+/usage.statistics.xml
+# 테마 설정 (개인 취향)
+/material_theme_project_new.xml

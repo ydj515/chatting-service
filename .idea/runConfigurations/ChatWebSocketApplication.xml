@@ -1,0 +1,10 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="ChatWebSocketApplication" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot">
+    <module name="chatting-service.chat-websocket-application.main" />
+    <option name="SPRING_BOOT_MAIN_CLASS" value="com.chat.websocket.application.ChatWebSocketApplicationKt" />
+    <option name="ACTIVE_PROFILES" value="" />
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="CompilerConfiguration">
+    <bytecodeTargetLevel target="21" />
+  </component>
+  <component name="JavacSettings">
+    <option name="ADDITIONAL_OPTIONS_OVERRIDE">
+      <module name="chatting-service.chat-admin-application" options="-parameters" />
+      <module name="chatting-service.chat-admin-application.main" options="-parameters" />
+      <module name="chatting-service.chat-admin-application.test" options="-parameters" />
+      <module name="chatting-service.chat-api-application" options="-parameters" />
+      <module name="chatting-service.chat-api-application.main" options="-parameters" />
+      <module name="chatting-service.chat-api-application.test" options="-parameters" />
+      <module name="chatting-service.chat-application" options="-parameters" />
+      <module name="chatting-service.chat-application.main" options="-parameters" />
+      <module name="chatting-service.chat-application.test" options="-parameters" />
+      <module name="chatting-service.chat-websocket-application" options="-parameters" />
+      <module name="chatting-service.chat-websocket-application.main" options="-parameters" />
+      <module name="chatting-service.chat-websocket-application.test" options="-parameters" />
+      <module name="chatting-service.chat-worker-application" options="-parameters" />
+      <module name="chatting-service.chat-worker-application.main" options="-parameters" />
+      <module name="chatting-service.chat-worker-application.test" options="-parameters" />
+    </option>
+  </component>
+</project>
