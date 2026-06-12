@@ -1,0 +1,634 @@
+openapi: 3.0.3
+info:
+  title: Chatting Service API
+  description: API documentation for the Chatting Service including Users, Chat Rooms, and Messages.
+  version: 1.0.0
+servers:
+  - url: http://localhost/api
+    description: Local Docker Compose via Nginx
+
+paths:
+  /users/register:
+    post:
+      summary: Register a new user
+      tags:
+        - Users
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUserRequest'
+      responses:
+        '200':
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserDto'
+
+  /users/login:
+    post:
+      summary: Login user
+      tags:
+        - Users
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserDto'
+
+  /users/{id}:
+    get:
+      summary: Get user by ID
+      tags:
+        - Users
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            example: 1
+      responses:
+        '200':
+          description: User details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserDto'
+
+  /users/me:
+    get:
+      summary: Get current user
+      tags:
+        - Users
+      parameters:
+        - name: userId
+          in: query
+          required: true
+          schema:
+            type: integer
+            example: 1
+      responses:
+        '200':
+          description: Current user details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserDto'
+
+  /users/search:
+    get:
+      summary: Search users by username
+      tags:
+        - Users
+      parameters:
+        - name: username
+          in: query
+          required: true
+          schema:
+            type: string
+            example: "john"
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: Paged user results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PageUserDto'
+
+  /chat-rooms:
+    post:
+      summary: Create a new chat room
+      tags:
+        - Chat Rooms
+      parameters:
+        - name: createdBy
+          in: query
+          required: true
+          schema:
+            type: integer
+            example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateChatRoomRequest'
+      responses:
+        '200':
+          description: Chat room created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatRoomDto'
+    get:
+      summary: Get user's chat rooms
+      tags:
+        - Chat Rooms
+      parameters:
+        - name: userId
+          in: query
+          required: true
+          schema:
+            type: integer
+            example: 1
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Paged chat room results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PageChatRoomDto'
+
+  /chat-rooms/{id}:
+    get:
+      summary: Get chat room by ID
+      tags:
+        - Chat Rooms
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            example: 1
+      responses:
+        '200':
+          description: Chat room details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatRoomDto'
+
+  /chat-rooms/{id}/members:
+    post:
+      summary: Join a chat room
+      tags:
+        - Chat Rooms
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                userId:
+                  type: integer
+                  example: 2
+      responses:
+        '200':
+          description: Successfully joined the chat room
+    get:
+      summary: Get chat room members
+      tags:
+        - Chat Rooms
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            example: 1
+      responses:
+        '200':
+          description: List of members
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ChatRoomMemberDto'
+
+  /chat-rooms/{id}/members/me:
+    delete:
+      summary: Leave a chat room
+      tags:
+        - Chat Rooms
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            example: 1
+        - name: userId
+          in: query
+          required: true
+          schema:
+            type: integer
+            example: 1
+      responses:
+        '200':
+          description: Successfully left the chat room
+
+  /chat-rooms/{id}/messages:
+    get:
+      summary: Get chat room messages (Offset Pagination)
+      tags:
+        - Messages
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            example: 1
+        - name: userId
+          in: query
+          required: true
+          schema:
+            type: integer
+            example: 1
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 50
+      responses:
+        '200':
+          description: Paged messages
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PageMessageDto'
+
+  /chat-rooms/{id}/messages/cursor:
+    get:
+      summary: Get chat room messages (Cursor Pagination)
+      tags:
+        - Messages
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            example: 1
+        - name: userId
+          in: query
+          required: true
+          schema:
+            type: integer
+            example: 1
+        - name: cursor
+          in: query
+          description: Last message ID
+          schema:
+            type: integer
+            example: 100
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+        - name: direction
+          in: query
+          schema:
+            type: string
+            enum: [BEFORE, AFTER]
+            default: BEFORE
+      responses:
+        '200':
+          description: Cursor based messages response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessagePageResponse'
+
+  /chat-rooms/search:
+    get:
+      summary: Search chat rooms
+      tags:
+        - Chat Rooms
+      parameters:
+        - name: q
+          in: query
+          schema:
+            type: string
+            example: "General"
+        - name: userId
+          in: query
+          required: true
+          schema:
+            type: integer
+            example: 1
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ChatRoomDto'
+
+components:
+  schemas:
+    CreateUserRequest:
+      type: object
+      required:
+        - username
+        - password
+        - displayName
+      properties:
+        username:
+          type: string
+          example: "johndoe123"
+        password:
+          type: string
+          example: "securePassword!12"
+        displayName:
+          type: string
+          example: "John Doe"
+
+    LoginRequest:
+      type: object
+      required:
+        - username
+        - password
+      properties:
+        username:
+          type: string
+          example: "johndoe123"
+        password:
+          type: string
+          example: "securePassword!12"
+
+    UserDto:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        username:
+          type: string
+          example: "johndoe123"
+        displayName:
+          type: string
+          example: "John Doe"
+        profileImageUrl:
+          type: string
+          example: "https://example.com/profile/1.jpg"
+        status:
+          type: string
+          example: "Online"
+        isActive:
+          type: boolean
+          example: true
+        lastSeenAt:
+          type: string
+          format: date-time
+          example: "2026-06-11T12:00:00Z"
+        createdAt:
+          type: string
+          format: date-time
+          example: "2026-01-01T10:00:00Z"
+
+    CreateChatRoomRequest:
+      type: object
+      required:
+        - name
+        - type
+      properties:
+        name:
+          type: string
+          example: "General Discussion"
+        description:
+          type: string
+          example: "A place for general chatter."
+        type:
+          type: string
+          example: "GROUP"
+          enum: [PRIVATE, GROUP]
+        imageUrl:
+          type: string
+          example: "https://example.com/room/1.png"
+        maxMembers:
+          type: integer
+          example: 100
+
+    ChatRoomDto:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: "General Discussion"
+        description:
+          type: string
+          example: "A place for general chatter."
+        type:
+          type: string
+          example: "GROUP"
+        imageUrl:
+          type: string
+          example: "https://example.com/room/1.png"
+        isActive:
+          type: boolean
+          example: true
+        maxMembers:
+          type: integer
+          example: 100
+        memberCount:
+          type: integer
+          example: 5
+        createdBy:
+          $ref: '#/components/schemas/UserDto'
+        createdAt:
+          type: string
+          format: date-time
+          example: "2026-06-11T10:00:00Z"
+        lastMessage:
+          $ref: '#/components/schemas/MessageDto'
+
+    MessageDto:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 105
+        chatRoomId:
+          type: integer
+          example: 1
+        sender:
+          $ref: '#/components/schemas/UserDto'
+        type:
+          type: string
+          example: "TEXT"
+          enum: [TEXT, IMAGE, FILE, SYSTEM]
+        content:
+          type: string
+          example: "Hello everyone!"
+        isEdited:
+          type: boolean
+          example: false
+        isDeleted:
+          type: boolean
+          example: false
+        createdAt:
+          type: string
+          format: date-time
+          example: "2026-06-11T12:05:00Z"
+        editedAt:
+          type: string
+          format: date-time
+        sequenceNumber:
+          type: integer
+          example: 1005
+
+    ChatRoomMemberDto:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        user:
+          $ref: '#/components/schemas/UserDto'
+        role:
+          type: string
+          example: "MEMBER"
+          enum: [OWNER, ADMIN, MEMBER]
+        isActive:
+          type: boolean
+          example: true
+        lastReadMessageId:
+          type: integer
+          example: 105
+        joinedAt:
+          type: string
+          format: date-time
+          example: "2026-06-11T10:05:00Z"
+        leftAt:
+          type: string
+          format: date-time
+
+    MessagePageResponse:
+      type: object
+      properties:
+        messages:
+          type: array
+          items:
+            $ref: '#/components/schemas/MessageDto'
+        nextCursor:
+          type: integer
+          example: 55
+        prevCursor:
+          type: integer
+          example: 105
+        hasNext:
+          type: boolean
+          example: true
+        hasPrev:
+          type: boolean
+          example: false
+
+    # Pagination generic wrappers
+    PageUserDto:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserDto'
+        pageable:
+          type: object
+        totalElements:
+          type: integer
+          example: 100
+        totalPages:
+          type: integer
+          example: 10
+        size:
+          type: integer
+          example: 10
+        number:
+          type: integer
+          example: 0
+
+    PageChatRoomDto:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/ChatRoomDto'
+        pageable:
+          type: object
+        totalElements:
+          type: integer
+          example: 50
+        totalPages:
+          type: integer
+          example: 3
+        size:
+          type: integer
+          example: 20
+        number:
+          type: integer
+          example: 0
+
+    PageMessageDto:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/MessageDto'
+        pageable:
+          type: object
+        totalElements:
+          type: integer
+          example: 500
+        totalPages:
+          type: integer
+          example: 10
+        size:
+          type: integer
+          example: 50
+        number:
+          type: integer
+          example: 0

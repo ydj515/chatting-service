@@ -1,0 +1,96 @@
+[tools]
+java = "21.0.2"
+gradle = "8.14.5"
+node = "24.12.0"
+
+[tasks.default]
+description = "사용 가능한 mise 태스크 목록을 출력한다."
+run = "mise tasks"
+
+[tasks.setup]
+description = "프로젝트 도구와 클라이언트 의존성을 설치한다."
+depends = ["setup:tools", "setup:client"]
+
+[tasks."setup:tools"]
+description = "mise.toml에 정의된 개발 도구를 설치한다."
+run = "mise install"
+
+[tasks."setup:client"]
+description = "React 클라이언트 npm 의존성을 설치한다."
+dir = "client"
+run = "npm ci"
+
+[tasks.build]
+description = "백엔드와 클라이언트를 모두 빌드한다."
+depends = ["build:backend", "build:client"]
+
+[tasks."build:backend"]
+description = "Gradle 백엔드 전체 빌드를 실행한다."
+run = "./gradlew clean build --no-daemon"
+
+[tasks."build:client"]
+description = "React 클라이언트 프로덕션 빌드를 실행한다."
+dir = "client"
+run = "npm run build"
+
+[tasks.test]
+description = "백엔드 테스트를 실행한다."
+depends = ["test:backend"]
+
+[tasks."test:backend"]
+description = "Gradle 백엔드 테스트를 실행한다."
+run = "./gradlew test --no-daemon"
+
+[tasks.check]
+description = "빌드와 Docker Compose 설정 검증을 실행한다."
+depends = ["build", "verify:compose"]
+
+[tasks."verify:compose"]
+description = "Docker Compose 설정 파일을 검증한다."
+run = "docker compose config --quiet"
+
+[tasks."verify:postgres-replica"]
+description = "PostgreSQL primary/read-replica와 partition archive worker 구성을 검증한다."
+run = """
+docker compose up -d postgres postgres-primary-setup postgres-replica postgres-partition-archive
+docker compose exec -T postgres psql -U ${DB_USERNAME:-chatuser} -d ${DB_NAME:-chatdb} -Atc "select usename,state,sync_state from pg_stat_replication;"
+docker compose exec -T postgres-replica psql -U ${DB_USERNAME:-chatuser} -d ${DB_NAME:-chatdb} -Atc "select pg_is_in_recovery(), to_regclass('public.chat_messages') is not null;"
+docker compose run --rm -e CHAT_PARTITION_ARCHIVE_RUN_ONCE=true postgres-partition-archive
+"""
+
+[tasks."verify:chat"]
+description = "실행 중인 채팅 클러스터의 REST, WebSocket, 메시지 저장 흐름을 검증한다."
+run = "node scripts/verify-chat.mjs"
+
+[tasks.start]
+description = "전체 채팅 클러스터를 백그라운드로 기동한다."
+depends = ["start:all"]
+
+[tasks."start:all"]
+description = "PostgreSQL, Redis, 애플리케이션 3대, nginx를 모두 빌드 및 기동한다."
+run = "docker compose up -d --build"
+
+[tasks."start:infra"]
+description = "로컬 개발용 PostgreSQL primary/read-replica, partition archive worker, Redis를 기동한다."
+run = "docker compose up -d postgres postgres-primary-setup postgres-replica postgres-partition-archive redis"
+
+[tasks."start:client"]
+description = "React 클라이언트 개발 서버를 기동한다."
+dir = "client"
+run = "npm start"
+
+[tasks.ps]
+description = "Docker Compose 서비스 상태를 확인한다."
+run = "docker compose ps"
+
+[tasks.logs]
+description = "전체 Docker Compose 로그를 팔로우한다."
+run = "docker compose logs -f --tail=200"
+
+[tasks.stop]
+description = "Docker Compose 서비스를 중지한다."
+run = "docker compose down"
+
+[tasks."clean:infra"]
+description = "Docker Compose 서비스와 볼륨을 함께 제거한다."
+run = "docker compose down --volumes --remove-orphans"

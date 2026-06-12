@@ -1,0 +1,10 @@
+.git
+.gradle
+.idea
+.DS_Store
+build
+**/build
+client/node_modules
+client/build
+logs
+*.log
