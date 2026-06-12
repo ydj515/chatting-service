@@ -15,6 +15,23 @@ data class UserDto(
     val createdAt: LocalDateTime
 )
 
+data class LoginResponse(
+    val user: UserDto,
+    val sessionToken: String,
+    val tokenType: String = "Bearer",
+    val expiresAt: LocalDateTime,
+)
+
+data class SessionToken(
+    val token: String,
+    val expiresAt: LocalDateTime,
+)
+
+data class AuthenticatedSession(
+    val userId: Long,
+    val expiresAt: LocalDateTime,
+)
+
 data class CreateUserRequest(
     @field:NotBlank(message = "사용자명은 필수입니다")
     @field:Size(min = 3, max = 20, message = "사용자명은 3-20자 사이여야 합니다")

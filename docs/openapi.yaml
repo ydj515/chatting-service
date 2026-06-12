@@ -44,7 +44,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UserDto'
+                $ref: '#/components/schemas/LoginResponse'
 
   /users/{id}:
     get:
@@ -121,13 +121,8 @@ paths:
       summary: Create a new chat room
       tags:
         - Chat Rooms
-      parameters:
-        - name: createdBy
-          in: query
-          required: true
-          schema:
-            type: integer
-            example: 1
+      security:
+        - bearerAuth: []
       requestBody:
         required: true
         content:
@@ -145,13 +140,9 @@ paths:
       summary: Get user's chat rooms
       tags:
         - Chat Rooms
+      security:
+        - bearerAuth: []
       parameters:
-        - name: userId
-          in: query
-          required: true
-          schema:
-            type: integer
-            example: 1
         - name: page
           in: query
           schema:
@@ -195,6 +186,8 @@ paths:
       summary: Join a chat room
       tags:
         - Chat Rooms
+      security:
+        - bearerAuth: []
       parameters:
         - name: id
           in: path
@@ -202,16 +195,6 @@ paths:
           schema:
             type: integer
             example: 1
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                userId:
-                  type: integer
-                  example: 2
       responses:
         '200':
           description: Successfully joined the chat room
@@ -241,15 +224,11 @@ paths:
       summary: Leave a chat room
       tags:
         - Chat Rooms
+      security:
+        - bearerAuth: []
       parameters:
         - name: id
           in: path
-          required: true
-          schema:
-            type: integer
-            example: 1
-        - name: userId
-          in: query
           required: true
           schema:
             type: integer
@@ -263,15 +242,11 @@ paths:
       summary: Get chat room messages (Offset Pagination)
       tags:
         - Messages
+      security:
+        - bearerAuth: []
       parameters:
         - name: id
           in: path
-          required: true
-          schema:
-            type: integer
-            example: 1
-        - name: userId
-          in: query
           required: true
           schema:
             type: integer
@@ -299,15 +274,11 @@ paths:
       summary: Get chat room messages (Cursor Pagination)
       tags:
         - Messages
+      security:
+        - bearerAuth: []
       parameters:
         - name: id
           in: path
-          required: true
-          schema:
-            type: integer
-            example: 1
-        - name: userId
-          in: query
           required: true
           schema:
             type: integer
@@ -342,18 +313,14 @@ paths:
       summary: Search chat rooms
       tags:
         - Chat Rooms
+      security:
+        - bearerAuth: []
       parameters:
         - name: q
           in: query
           schema:
             type: string
             example: "General"
-        - name: userId
-          in: query
-          required: true
-          schema:
-            type: integer
-            example: 1
       responses:
         '200':
           description: Search results
@@ -365,6 +332,11 @@ paths:
                   $ref: '#/components/schemas/ChatRoomDto'
 
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: SessionToken
   schemas:
     CreateUserRequest:
       type: object
@@ -395,6 +367,27 @@ components:
         password:
           type: string
           example: "securePassword!12"
+
+    LoginResponse:
+      type: object
+      required:
+        - user
+        - sessionToken
+        - tokenType
+        - expiresAt
+      properties:
+        user:
+          $ref: '#/components/schemas/UserDto'
+        sessionToken:
+          type: string
+          example: "v1.eyJzdWIiOiIxIn0.signature"
+        tokenType:
+          type: string
+          example: "Bearer"
+        expiresAt:
+          type: string
+          format: date-time
+          example: "2026-06-12T12:30:00"
 
     UserDto:
       type: object

@@ -27,7 +27,9 @@ export interface RegisterRequest {
 
 export interface LoginResponse {
   user: User;
-  token?: string;
+  sessionToken: string;
+  tokenType: 'Bearer';
+  expiresAt: string;
 }
 
 // 채팅방 관련 타입
@@ -276,4 +278,4 @@ export interface InputProps extends BaseComponentProps {
   type?: 'text' | 'email' | 'password' | 'search' | 'number';
   maxLength?: number;
   autoFocus?: boolean;
-} 
+}

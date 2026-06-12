@@ -1788,6 +1788,7 @@ node scripts/load-chat.mjs --room hot --viewers 10000 --messages-per-sec 10000 -
 - Compose role 서비스가 동일 role 내에서 이미지 태그를 공유하도록 설정 완료.
 - Nginx 설정을 template mount로 전환해 `SERVER_PORT` 변경 시 upstream 포트도 같이 반영되도록 완료.
 - REST create/join 결과를 Redis membership topic으로 전파해 이미 연결된 WebSocket 노드의 room 구독을 갱신하도록 완료.
+- Phase 1 기반 구현 완료: 로그인 session token, token 기반 WebSocket handshake, REST token 우선 사용자 추출, Gateway local room/session/user index, session별 bounded outbound queue를 추가했다.
 - 각 실행 모듈별 `bootJar` 산출물 검증 완료.
 - PostgreSQL primary/read replica Compose 구성 추가 완료.
 - PostgreSQL partition archive worker Compose 구성 추가 완료.
@@ -1800,7 +1801,6 @@ node scripts/load-chat.mjs --room hot --viewers 10000 --messages-per-sec 10000 -
 
 | Phase | 주요 변경 | 핵심 파일 |
 | --- | --- | --- |
-| Phase 1 | WebSocket token 인증, local room session index, bounded outbound queue | `chat-websocket`, `chat-persistence`, `client`, `scripts/verify-chat.mjs` |
 | Phase 2 | `messageId`, `clientMessageId`, `roomSeq`, idempotency, ACK/batch 계약 | `chat-domain`, `chat-persistence`, `chat-websocket`, `client` |
 | Phase 3 | Redis Streams producer/consumer, fanout worker, JPA compatibility writer | `chat-persistence`, `chat-worker-application`, `chat-runtime-config` |
 | Phase 4 | partitioned `chat_messages` canonical store, read replica history, gap fill | `infra/postgres`, `chat-persistence`, `chat-api` |

@@ -16,6 +16,12 @@ import {
 } from '../types';
 import { appConfig } from '../config/appConfig.ts';
 
+let sessionToken: string | null = null;
+
+export const setSessionToken = (token: string | null) => {
+  sessionToken = token;
+};
+
 // Axios 기본 설정
 const api = axios.create({
   baseURL: appConfig.api.baseUrl,
@@ -29,6 +35,9 @@ const api = axios.create({
 api.interceptors.request.use(
   (config) => {
     // console.log(`[API Request] ${config.method?.toUpperCase()} ${config.url}`);
+    if (sessionToken) {
+      config.headers.Authorization = `Bearer ${sessionToken}`;
+    }
     return config;
   },
   (error) => {
@@ -71,8 +80,8 @@ export const userApi = {
 
   // 사용자 로그인
   login: async (data: LoginRequest): Promise<LoginResponse> => {
-    const response: AxiosResponse<User> = await api.post('/users/login', data);
-    return { user: response.data };
+    const response: AxiosResponse<LoginResponse> = await api.post('/users/login', data);
+    return response.data;
   },
 
   // 사용자 정보 조회
@@ -114,18 +123,18 @@ export const userApi = {
 // 채팅방 관련 API
 export const chatRoomApi = {
   // 채팅방 생성
-  create: async (data: CreateChatRoomRequest, createdBy: number): Promise<ChatRoom> => {
+  create: async (data: CreateChatRoomRequest): Promise<ChatRoom> => {
     const response: AxiosResponse<ChatRoom> = await api.post(
-      `/chat-rooms?createdBy=${createdBy}`,
+      '/chat-rooms',
       data
     );
     return response.data;
   },
 
   // 채팅방 목록 조회 (페이지네이션)
-  getChatRooms: async (userId: number, page = 0, size = 20): Promise<PageResponse<ChatRoom>> => {
+  getChatRooms: async (page = 0, size = 20): Promise<PageResponse<ChatRoom>> => {
     const response: AxiosResponse<PageResponse<ChatRoom>> = await api.get(
-      `/chat-rooms?userId=${userId}&page=${page}&size=${size}&sort=createdAt,desc`
+      `/chat-rooms?page=${page}&size=${size}&sort=createdAt,desc`
     );
     return response.data;
   },
@@ -145,13 +154,13 @@ export const chatRoomApi = {
   },
 
   // 채팅방 참여
-  join: async (chatRoomId: number, userId: number): Promise<void> => {
-    await api.post(`/chat-rooms/${chatRoomId}/members`, { userId });
+  join: async (chatRoomId: number): Promise<void> => {
+    await api.post(`/chat-rooms/${chatRoomId}/members`);
   },
 
   // 채팅방 나가기
-  leave: async (chatRoomId: number, userId: number): Promise<void> => {
-    await api.delete(`/chat-rooms/${chatRoomId}/members/me?userId=${userId}`);
+  leave: async (chatRoomId: number): Promise<void> => {
+    await api.delete(`/chat-rooms/${chatRoomId}/members/me`);
   },
 
   // 채팅방 정보 업데이트
@@ -166,9 +175,9 @@ export const chatRoomApi = {
   },
 
   // 채팅방 검색
-  search: async (query: string, userId: number): Promise<ChatRoom[]> => {
+  search: async (query: string): Promise<ChatRoom[]> => {
     const response: AxiosResponse<ChatRoom[]> = await api.get(
-      `/chat-rooms/search?q=${encodeURIComponent(query)}&userId=${userId}`
+      `/chat-rooms/search?q=${encodeURIComponent(query)}`
     );
     return response.data;
   },
@@ -179,12 +188,11 @@ export const messageApi = {
   // 메시지 목록 조회 (페이지네이션)
   getMessages: async (
     chatRoomId: number,
-    userId: number,
     page = 0,
     size = 50
   ): Promise<PageResponse<Message>> => {
     const response: AxiosResponse<PageResponse<Message>> = await api.get(
-      `/chat-rooms/${chatRoomId}/messages?userId=${userId}&page=${page}&size=${size}&sort=sequenceNumber,asc`
+      `/chat-rooms/${chatRoomId}/messages?page=${page}&size=${size}&sort=sequenceNumber,asc`
     );
     return response.data;
   },
@@ -192,13 +200,11 @@ export const messageApi = {
   // 커서 기반 메시지 조회 (성능 최적화)
   getMessagesByCursor: async (
     chatRoomId: number,
-    userId: number,
     cursor?: string,
     limit = 50,
     direction: 'BEFORE' | 'AFTER' = 'BEFORE'
   ): Promise<CursorResponse<Message>> => {
     const params = new URLSearchParams({
-      userId: userId.toString(),
       limit: limit.toString(),
       direction,
     });

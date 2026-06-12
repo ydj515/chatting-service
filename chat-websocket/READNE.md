@@ -36,7 +36,7 @@ Cache-Control: no-cache, no-store, max-age=0, must-revalidate
 <h1> WebSocket Header </h1>
 
 ```
-GET /ws/chat?userId=1 HTTP/1.1
+GET /ws/chat?token={sessionToken} HTTP/1.1
 Host: localhost:8080
 Connection: Upgrade
 Upgrade: websocket

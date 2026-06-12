@@ -46,7 +46,7 @@ const ChatRoomList: React.FC<ChatRoomListProps> = ({
   const loadChatRooms = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await chatRoomApi.getChatRooms(currentUser.id);
+      const response = await chatRoomApi.getChatRooms();
       setChatRooms(response.content);
     } catch (error: any) {
       console.error('Failed to load chat rooms:', error);
@@ -73,7 +73,7 @@ const ChatRoomList: React.FC<ChatRoomListProps> = ({
         return;
       }
 
-      await chatRoomApi.join(roomId, currentUser.id);
+      await chatRoomApi.join(roomId);
       await loadChatRooms(); // 채팅방 목록 새로고침
       setShowJoinModal(false);
       setJoinRoomId('');
@@ -109,7 +109,7 @@ const ChatRoomList: React.FC<ChatRoomListProps> = ({
 
     try {
       setCreateLoading(true);
-      const newRoom = await chatRoomApi.create(newRoomData, currentUser.id);
+      const newRoom = await chatRoomApi.create(newRoomData);
       setChatRooms(prev => [newRoom, ...prev]);
       setShowCreateModal(false);
       setNewRoomData({

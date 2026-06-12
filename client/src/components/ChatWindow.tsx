@@ -5,12 +5,14 @@ import { useWebSocket } from '../hooks/useWebSocket.ts';
 
 interface ChatWindowProps {
   currentUser: User;
+  sessionToken: string;
   chatRoom: ChatRoom;
   onError: (error: string) => void;
 }
 
 export const ChatWindow: React.FC<ChatWindowProps> = ({
   currentUser,
+  sessionToken,
   chatRoom,
   onError,
 }) => {
@@ -28,7 +30,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
     sendMessage: sendWebSocketMessage,
     error: wsError,
   } = useWebSocket({
-    userId: currentUser.id,
+    sessionToken,
     onConnect: () => console.log('🔌 WebSocket 연결됨'),
     onDisconnect: () => console.log('🔌 WebSocket 연결 해제됨'),
     onError: (error) => console.error('🔌 WebSocket 에러:', error),
@@ -101,7 +103,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   const loadMessages = useCallback(async () => {
     setIsLoadingMessages(true);
     try {
-      const response = await messageApi.getMessages(chatRoom.id, currentUser.id, 0, 50);
+      const response = await messageApi.getMessages(chatRoom.id, 0, 50);
       // 메시지를 시간순으로 정렬 (oldest first)
       const sortedMessages = response.content.sort((a, b) => 
         new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()

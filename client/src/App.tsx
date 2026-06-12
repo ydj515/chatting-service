@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { User, ChatRoom, Notification } from './types/index';
+import { User, ChatRoom, LoginResponse, Notification } from './types/index';
 import LoginForm from './components/LoginForm.tsx';
 import ChatRoomList from './components/ChatRoomList.tsx';
 import { ChatWindow } from './components/ChatWindow.tsx';
-import { healthApi } from './services/api.ts';
+import { healthApi, setSessionToken as setApiSessionToken } from './services/api.ts';
 import { appConfig } from './config/appConfig.ts';
 import { 
   AlertCircle, 
@@ -14,8 +14,16 @@ import {
   Sun
 } from 'lucide-react';
 
+const parseSessionExpiryMillis = (expiresAt: string): number => {
+  const hasTimeZone = /(?:z|[+-]\d{2}:\d{2})$/i.test(expiresAt);
+  const normalizedExpiresAt = hasTimeZone ? expiresAt : `${expiresAt}Z`;
+  const parsed = Date.parse(normalizedExpiresAt);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
 function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [sessionToken, setSessionToken] = useState<string | null>(null);
   const [selectedChatRoom, setSelectedChatRoom] = useState<ChatRoom | null>(null);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [serverStatus, setServerStatus] = useState<'checking' | 'online' | 'offline'>('checking');
@@ -31,6 +39,8 @@ function App() {
   // localStorage 키 상수
   const STORAGE_KEYS = {
     USER: 'chat_current_user',
+    SESSION_TOKEN: 'chat_session_token',
+    SESSION_EXPIRES_AT: 'chat_session_expires_at',
     SELECTED_ROOM: 'chat_selected_room'
   };
 
@@ -38,11 +48,15 @@ function App() {
   const loadUserFromStorage = useCallback(() => {
     try {
       const savedUser = localStorage.getItem(STORAGE_KEYS.USER);
+      const savedToken = localStorage.getItem(STORAGE_KEYS.SESSION_TOKEN);
+      const savedTokenExpiresAt = localStorage.getItem(STORAGE_KEYS.SESSION_EXPIRES_AT);
       const savedRoom = localStorage.getItem(STORAGE_KEYS.SELECTED_ROOM);
       
-      if (savedUser) {
+      if (savedUser && savedToken && savedTokenExpiresAt && parseSessionExpiryMillis(savedTokenExpiresAt) > Date.now()) {
         const user = JSON.parse(savedUser);
         setCurrentUser(user);
+        setSessionToken(savedToken);
+        setApiSessionToken(savedToken);
         
         if (savedRoom) {
           const room = JSON.parse(savedRoom);
@@ -53,6 +67,8 @@ function App() {
       console.error('Failed to load user from storage:', error);
       // 손상된 데이터 제거
       localStorage.removeItem(STORAGE_KEYS.USER);
+      localStorage.removeItem(STORAGE_KEYS.SESSION_TOKEN);
+      localStorage.removeItem(STORAGE_KEYS.SESSION_EXPIRES_AT);
       localStorage.removeItem(STORAGE_KEYS.SELECTED_ROOM);
     } finally {
       setIsInitializing(false);
@@ -60,12 +76,16 @@ function App() {
   }, []);
 
   // localStorage에 사용자 정보 저장
-  const saveUserToStorage = useCallback((user: User | null) => {
+  const saveAuthToStorage = useCallback((response: LoginResponse | null) => {
     try {
-      if (user) {
-        localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
+      if (response) {
+        localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(response.user));
+        localStorage.setItem(STORAGE_KEYS.SESSION_TOKEN, response.sessionToken);
+        localStorage.setItem(STORAGE_KEYS.SESSION_EXPIRES_AT, response.expiresAt);
       } else {
         localStorage.removeItem(STORAGE_KEYS.USER);
+        localStorage.removeItem(STORAGE_KEYS.SESSION_TOKEN);
+        localStorage.removeItem(STORAGE_KEYS.SESSION_EXPIRES_AT);
         localStorage.removeItem(STORAGE_KEYS.SELECTED_ROOM);
       }
     } catch (error) {
@@ -201,20 +221,24 @@ function App() {
   }, []);
 
   // 로그인 처리
-  const handleLogin = useCallback((user: User) => {
-    setCurrentUser(user);
-    saveUserToStorage(user);
-    handleSuccess(`${user.displayName}님, 환영합니다!`);
-  }, [saveUserToStorage, handleSuccess]);
+  const handleLogin = useCallback((response: LoginResponse) => {
+    setCurrentUser(response.user);
+    setSessionToken(response.sessionToken);
+    setApiSessionToken(response.sessionToken);
+    saveAuthToStorage(response);
+    handleSuccess(`${response.user.displayName}님, 환영합니다!`);
+  }, [saveAuthToStorage, handleSuccess]);
 
   // 로그아웃 처리
   const handleLogout = useCallback(() => {
     setCurrentUser(null);
+    setSessionToken(null);
+    setApiSessionToken(null);
     setSelectedChatRoom(null);
     setNotifications([]);
-    saveUserToStorage(null);
+    saveAuthToStorage(null);
     handleSuccess('로그아웃되었습니다.');
-  }, [saveUserToStorage, handleSuccess]);
+  }, [saveAuthToStorage, handleSuccess]);
 
   // 채팅방 선택 처리
   const handleChatRoomSelect = useCallback((chatRoom: ChatRoom) => {
@@ -371,10 +395,11 @@ function App() {
             onChatRoomSelect={handleChatRoomSelect}
             onError={handleError}
           />
-          {selectedChatRoom ? (
+          {selectedChatRoom && sessionToken ? (
             <ChatWindow 
               chatRoom={selectedChatRoom}
               currentUser={currentUser}
+              sessionToken={sessionToken}
               onError={handleError}
             />
           ) : (

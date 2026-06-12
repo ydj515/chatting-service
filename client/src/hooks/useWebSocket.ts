@@ -4,7 +4,7 @@ import { appConfig, buildWebSocketUrl } from '../config/appConfig.ts';
 import { shouldIgnoreWebSocketEvent } from '../utils/webSocketLifecycle.ts';
 
 interface UseWebSocketProps {
-  userId: number;
+  sessionToken: string;
   onMessage?: (message: WebSocketMessage) => void;
   onConnect?: () => void;
   onDisconnect?: () => void;
@@ -21,7 +21,7 @@ interface UseWebSocketReturn {
 }
 
 export const useWebSocket = ({
-  userId,
+  sessionToken,
   onMessage,
   onConnect,
   onDisconnect,
@@ -60,8 +60,8 @@ export const useWebSocket = ({
    * 커넥션 연결
    */
   const connect = useCallback(() => {
-    if (!userId) {
-      console.warn("WebSocket connect: userId is missing, connection deferred.");
+    if (!sessionToken) {
+      console.warn("WebSocket connect: session token is missing, connection deferred.");
       return;
     }
 
@@ -81,7 +81,7 @@ export const useWebSocket = ({
     }
 
     try {
-      const wsUrl = buildWebSocketUrl(userId);
+      const wsUrl = buildWebSocketUrl(sessionToken);
       const socket = new WebSocket(wsUrl);
       wsRef.current = socket;
 
@@ -162,7 +162,7 @@ export const useWebSocket = ({
       console.error('Failed to create WebSocket connection:', err);
       setError('WebSocket 연결 생성 실패');
     }
-  }, [userId]);
+  }, [sessionToken]);
 
   const disconnect = useCallback(() => {
     reconnectAttempts.current = 0; // 수동 disconnect 시 재연결 시도 초기화
@@ -197,14 +197,14 @@ export const useWebSocket = ({
     }
   }, []);
 
-  // 컴포넌트 마운트 시 자동 연결 (userId 변경 시에도 재연결)
+  // 컴포넌트 마운트 시 자동 연결 (session token 변경 시에도 재연결)
   useEffect(() => {
     connect();
     
     return () => {
       disconnect();
     };
-  }, [userId, connect, disconnect]); // userId가 변경되면 재연결
+  }, [sessionToken, connect, disconnect]);
 
   // 페이지 언로드 시 정리
   useEffect(() => {

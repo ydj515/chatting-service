@@ -2,8 +2,10 @@ package com.chat.persistence.service
 
 import com.chat.domain.dto.CreateUserRequest
 import com.chat.domain.dto.LoginRequest
+import com.chat.domain.dto.LoginResponse
 import com.chat.domain.dto.UserDto
 import com.chat.domain.model.User
+import com.chat.domain.service.SessionTokenService
 import com.chat.domain.service.UserService
 import com.chat.persistence.repository.UserRepository
 import org.springframework.data.domain.Page
@@ -17,7 +19,8 @@ import java.time.LocalDateTime
 @Service
 @Transactional
 class UserServiceImpl(
-    private val userRepository: UserRepository
+    private val userRepository: UserRepository,
+    private val sessionTokenService: SessionTokenService,
 ) : UserService {
     override fun createUser(request: CreateUserRequest): UserDto {
         // 이미 존재하는 사용자인지 확인
@@ -35,7 +38,7 @@ class UserServiceImpl(
         return userToDto(savedUser)
     }
 
-    override fun login(request: LoginRequest): UserDto {
+    override fun login(request: LoginRequest): LoginResponse {
         val user = userRepository.findByUsername(request.username)
             ?: throw IllegalArgumentException("사용자를 찾을 수 없거나 비밀번호가 일치하지 않습니다.")
 
@@ -43,7 +46,12 @@ class UserServiceImpl(
             throw IllegalArgumentException("사용자를 찾을 수 없거나 비밀번호가 일치하지 않습니다.")
         }
 
-        return userToDto(user)
+        val sessionToken = sessionTokenService.issueToken(user.id)
+        return LoginResponse(
+            user = userToDto(user),
+            sessionToken = sessionToken.token,
+            expiresAt = sessionToken.expiresAt,
+        )
     }
 
     override fun getUserById(userId: Long): UserDto {
