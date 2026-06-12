@@ -594,7 +594,7 @@ GET /chat-rooms/{roomId}/messages/gap?afterSeq=12345&limit=200
 3. 짧은 시간 범위의 정확 조회는 PostgreSQL partition table을 직접 조회한다.
 4. 키워드가 있으면 초기에는 PostgreSQL FTS/trigram index를 조회한다.
 5. OpenSearch 도입 이후에는 OpenSearch 결과의 `messageId` 목록을 기준으로 PostgreSQL canonical store에서 원본을 재조회한다.
-6. 관리자 화면에 pagination cursor와 함께 반환한다.
+6. 관리자 화면에 pagination cursor와 함께 반환한다. (장기적으로 cursor는 DB 식별자 노출 방지 및 유연성 확보를 위해 Long 타입에서 Base64 등 Opaque cursor로 변경을 검토한다)
 
 대량 export:
 
@@ -1642,7 +1642,7 @@ docker compose run --rm -e CHAT_PARTITION_ARCHIVE_RUN_ONCE=true postgres-partiti
 
 완료 기준:
 
-- 방별/시간대별 조회가 cursor pagination으로 동작한다.
+- 방별/시간대별 조회가 cursor pagination으로 동작한다. (장기적으로 cursor는 DB 식별자 노출 방지 및 유연성 확보를 위해 Long 타입에서 Base64 등 Opaque cursor로 변경을 검토한다)
 - 키워드 검색이 `roomId`, `from`, `to`, `senderId` 필터와 함께 동작한다.
 - 1천만 메시지 테스트 데이터에서 관리자 방별/시간대별 조회 p95 1초 목표를 검증한다.
 - 관리자 UI에서 방 상태, bounded live feed 정책, rate limit/slow mode 상태, 검색 latency를 확인할 수 있다.
@@ -1860,3 +1860,7 @@ node scripts/load-chat.mjs --room hot --viewers 10000 --messages-per-sec 10000 -
 - Phase 1을 바로 구현할 것인가?
 - Phase 2.5 WebSocket one-time ticket 보안 gate를 다음 작업으로 진행할 것인가?
 - Phase 3에서 Redis Streams producer/consumer와 fanout worker를 어느 단위로 나눠 구현할 것인가?
+
+## 23. TODO List
+
+- [ ] 장기적으로 cursor API를 Long 타입에서 Base64 등 Opaque cursor 타입으로 변경 검토

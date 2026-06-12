@@ -91,6 +91,7 @@ class ChatController(
     fun getMessagesByCursor(
         @RequestHeader(HttpHeaders.AUTHORIZATION, required = false) authorization: String?,
         @PathVariable id: Long,
+        // TODO: 향후 Long 타입을 Opaque cursor로 변경 검토
         @RequestParam(required = false) cursor: Long?,
         @RequestParam(required = false) limit: Int?,
         @RequestParam(required = false) direction: MessageDirection?,

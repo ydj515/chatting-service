@@ -27,6 +27,7 @@ import org.mockito.Mockito.mock
 import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
+import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.data.redis.core.ValueOperations
 import org.springframework.data.redis.listener.RedisMessageListenerContainer
@@ -47,7 +48,7 @@ class ChatServiceImplMessageContractTest {
                 clientMessageId,
             )
         ).thenReturn(Optional.empty())
-        `when`(fixture.messageRepository.save(any(Message::class.java))).thenAnswer { invocation ->
+        `when`(fixture.messageRepository.saveAndFlush(any(Message::class.java))).thenAnswer { invocation ->
             (invocation.arguments[0] as Message).copy(
                 id = 101L,
                 createdAt = savedAt,
@@ -65,7 +66,7 @@ class ChatServiceImplMessageContractTest {
         )
 
         val savedMessageCaptor = ArgumentCaptor.forClass(Message::class.java)
-        verify(fixture.messageRepository).save(savedMessageCaptor.capture())
+        verify(fixture.messageRepository).saveAndFlush(savedMessageCaptor.capture())
         val savedMessage = savedMessageCaptor.value
         assertNotNull(message.messageId)
         assertTrue(message.messageId.isNotBlank())
@@ -121,7 +122,52 @@ class ChatServiceImplMessageContractTest {
         assertEquals(clientMessageId, message.clientMessageId)
         assertEquals(5L, message.roomSeq)
         assertEquals(5L, message.sequenceNumber)
-        verify(fixture.messageRepository, never()).save(any(Message::class.java))
+        verify(fixture.messageRepository, never()).saveAndFlush(any(Message::class.java))
+    }
+
+    @Test
+    fun `동시 clientMessageId 중복 저장 충돌은 기존 메시지 계약으로 반환한다`() {
+        val fixture = chatServiceFixture()
+        val clientMessageId = "client-message-1"
+        val existingMessage = Message(
+            id = 101L,
+            messageId = "msg-existing",
+            clientMessageId = clientMessageId,
+            chatRoom = fixture.chatRoom,
+            sender = fixture.sender,
+            type = MessageType.TEXT,
+            content = "hello",
+            sequenceNumber = 5L,
+            roomSeq = 5L,
+            streamShard = 1,
+            writeShard = 2,
+            fanoutShard = 3,
+            createdAt = LocalDateTime.parse("2026-06-12T12:00:00"),
+        )
+        `when`(
+            fixture.messageRepository.findByChatRoomIdAndSenderIdAndClientMessageId(
+                10L,
+                7L,
+                clientMessageId,
+            )
+        ).thenReturn(Optional.empty(), Optional.of(existingMessage))
+        `when`(fixture.messageRepository.saveAndFlush(any(Message::class.java)))
+            .thenThrow(DataIntegrityViolationException("duplicate client message"))
+
+        val message = fixture.chatService.sendMessage(
+            SendMessageRequest(
+                chatRoomId = 10L,
+                type = MessageType.TEXT,
+                content = "hello",
+                clientMessageId = clientMessageId,
+            ),
+            senderId = 7L,
+        )
+
+        assertEquals("msg-existing", message.messageId)
+        assertEquals(clientMessageId, message.clientMessageId)
+        assertEquals(5L, message.roomSeq)
+        assertEquals(5L, message.sequenceNumber)
     }
 
     @Suppress("UNCHECKED_CAST")
@@ -179,6 +225,7 @@ class ChatServiceImplMessageContractTest {
                     redisProperties = redisProperties,
                     sequenceProperties = MessageSequenceProperties(),
                 ),
+                messagePersistenceService = MessagePersistenceService(messageRepository),
                 webSocketSessionManager = webSocketSessionManager,
             ),
             messageRepository = messageRepository,

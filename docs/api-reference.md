@@ -34,7 +34,7 @@ OpenAPI 스펙은 [`openapi.yaml`](openapi.yaml)을 참고하세요.
 | 메서드 | 경로 | 설명 |
 | --- | --- | --- |
 | `GET` | `/api/chat-rooms/{id}/messages` | 메시지 조회 |
-| `GET` | `/api/chat-rooms/{id}/messages/cursor?cursor=...&limit=50&direction=BEFORE` | 커서 기반 메시지 페이징 |
+| `GET` | `/api/chat-rooms/{id}/messages/cursor?cursor=...&limit=50&direction=BEFORE` | 커서 기반 메시지 페이징 (장기적으로 cursor는 보안 및 유연성을 위해 Long 대신 Base64 등 Opaque 문자열로 변경 검토) |
 
 ---
 

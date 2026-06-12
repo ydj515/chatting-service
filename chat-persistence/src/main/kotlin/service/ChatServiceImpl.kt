@@ -7,6 +7,7 @@ import com.chat.persistence.repository.*
 import com.chat.persistence.redis.RedisMessageBroker
 import org.slf4j.LoggerFactory
 import org.springframework.cache.annotation.*
+import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Pageable
@@ -33,6 +34,7 @@ class ChatServiceImpl(
     private val userRepository: UserRepository,
     private val redisMessageBroker: RedisMessageBroker,
     private val messageSequenceService: MessageSequenceService,
+    private val messagePersistenceService: MessagePersistenceService,
     private val webSocketSessionManager: WebSocketSessionManager
 ) : ChatService {
 
@@ -253,7 +255,7 @@ class ChatServiceImpl(
         }
 
         val pageable = PageRequest.of(0, request.limit)
-        val cursor = request.cursor // 로컬 변수로 복사하여 스마트 캐스트 가능하게 함
+        val cursor = request.cursor // effective roomSeq cursor
 
         val messages = when {
             cursor == null -> {
@@ -273,9 +275,9 @@ class ChatServiceImpl(
 
         val messageDtos = messages.map { messageToDto(it) }
 
-        // 다음/이전 커서 계산
-        val nextCursor = if (messageDtos.isNotEmpty()) messageDtos.last().id else null
-        val prevCursor = if (messageDtos.isNotEmpty()) messageDtos.first().id else null
+        // 다음/이전 커서는 repository ordering key와 같은 effective roomSeq를 사용한다.
+        val nextCursor = if (messageDtos.isNotEmpty()) messageDtos.last().roomSeq else null
+        val prevCursor = if (messageDtos.isNotEmpty()) messageDtos.first().roomSeq else null
 
         // 추가 데이터 존재 여부 확인
         val hasNext = messages.size == request.limit
@@ -332,7 +334,18 @@ class ChatServiceImpl(
             writeShard = writeShard(messageId),
             fanoutShard = fanoutShard(request.chatRoomId),
         )
-        val savedMessage = messageRepository.save(message)
+        val savedMessage = try {
+            messagePersistenceService.save(message)
+        } catch (e: DataIntegrityViolationException) {
+            if (requestedClientMessageId == null) {
+                throw e
+            }
+            messageRepository.findByChatRoomIdAndSenderIdAndClientMessageId(
+                chatRoomId = request.chatRoomId,
+                senderId = senderId,
+                clientMessageId = requestedClientMessageId,
+            ).orElseThrow { e }
+        }
 
         val chatMessage = messageToChatMessage(savedMessage)
 

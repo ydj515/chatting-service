@@ -16,7 +16,6 @@ import org.springframework.web.socket.TextMessage
 import org.springframework.web.socket.WebSocketHandler
 import org.springframework.web.socket.WebSocketMessage
 import org.springframework.web.socket.WebSocketSession
-import java.io.IOException
 
 @Component
 class ChatWebSocketHandler(
@@ -125,9 +124,11 @@ class ChatWebSocketHandler(
                 message = errorMessage,
                 code = errorCode,
             )
-            val json = objectMapper.writeValueAsString(error)
-            session.sendMessage(TextMessage(json))
-        } catch (e: IOException) {
+            val json = writeWebSocketMessage(error)
+            if (!sessionManager.sendTextToSession(session, json)) {
+                logger.warn("Failed to enqueue error message for session ${session.id}")
+            }
+        } catch (e: Exception) {
             logger.error("Failed to send error message", e)
         }
     }
@@ -187,8 +188,11 @@ class ChatWebSocketHandler(
                 chatRoomId = message.chatRoomId,
                 timestamp = message.createdAt,
             )
-            session.sendMessage(TextMessage(objectMapper.writeValueAsString(accepted)))
-        } catch (e: IOException) {
+            val json = writeWebSocketMessage(accepted)
+            if (!sessionManager.sendTextToSession(session, json)) {
+                logger.warn("Failed to enqueue accepted message for session ${session.id}")
+            }
+        } catch (e: Exception) {
             logger.error("Failed to send accepted message", e)
         }
     }
@@ -207,5 +211,9 @@ class ChatWebSocketHandler(
     private enum class WebSocketErrorCode {
         UNKNOWN_MESSAGE_TYPE,
         INVALID_MESSAGE_FORMAT,
+    }
+
+    private fun writeWebSocketMessage(message: com.chat.domain.dto.WebSocketMessage): String {
+        return objectMapper.writerFor(com.chat.domain.dto.WebSocketMessage::class.java).writeValueAsString(message)
     }
 }

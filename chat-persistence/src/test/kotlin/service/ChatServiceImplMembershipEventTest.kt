@@ -104,6 +104,7 @@ class ChatServiceImplMembershipEventTest {
                 redisProperties = redisProperties,
                 sequenceProperties = MessageSequenceProperties(),
             ),
+            messagePersistenceService = MessagePersistenceService(mock(MessageRepository::class.java)),
             webSocketSessionManager = webSocketSessionManager,
         )
     }
