@@ -1206,6 +1206,7 @@ Phase 0   로컬 PostgreSQL primary/replica/archive
 Phase 0.5 역할별 실행 모듈
 Phase 1   인증/연결/Gateway local fan-out 안정화
 Phase 2   메시지 계약, sequence, idempotency, batch frame 계약
+Phase 2.5 WebSocket one-time ticket 보안 hardening gate
 Phase 3   Redis Streams ingest, fanout worker, compatibility writer
 Phase 4   PostgreSQL partitioned canonical store, read replica history
 Phase 5   Admin API, 검색, 1천만건 테스트 데이터
@@ -1802,6 +1803,7 @@ node scripts/load-chat.mjs --room hot --viewers 10000 --messages-per-sec 10000 -
 | Phase | 주요 변경 | 핵심 파일 |
 | --- | --- | --- |
 | Phase 2 | `messageId`, `clientMessageId`, `roomSeq`, idempotency, ACK/batch 계약 | `chat-domain`, `chat-persistence`, `chat-websocket`, `client` |
+| Phase 2.5 | WebSocket one-time ticket, production token query fallback 제거, 보안 gate | `chat-api`, `chat-websocket`, `chat-persistence`, `client`, `docs/ws_ticket_analysis.md` |
 | Phase 3 | Redis Streams producer/consumer, fanout worker, JPA compatibility writer | `chat-persistence`, `chat-worker-application`, `chat-runtime-config` |
 | Phase 4 | partitioned `chat_messages` canonical store, read replica history, gap fill | `infra/postgres`, `chat-persistence`, `chat-api` |
 | Phase 5 | admin history/search/export, audit log, 1천만건 seed | `chat-admin`, `chat-admin-application`, `chat-persistence`, `admin-web 또는 client` |
@@ -1815,7 +1817,8 @@ node scripts/load-chat.mjs --room hot --viewers 10000 --messages-per-sec 10000 -
 - `chat-admin` 기능 모듈이 `chat-api`와 분리되어 있다.
 - `chat-api-application`, `chat-websocket-application`, `chat-worker-application`, `chat-admin-application`이 각각 독립 JAR로 빌드된다.
 - Docker Compose 또는 Kubernetes에서 API, WebSocket, Worker, Admin을 서로 다른 replica 수로 띄울 수 있다.
-- WebSocket 연결은 인증 token 기반이며, query parameter `userId`를 인증 주체로 신뢰하지 않는다.
+- WebSocket 연결은 인증된 주체 기반이며, query parameter `userId`를 인증 주체로 신뢰하지 않는다.
+- 운영 공개 전에는 reusable session token이 WebSocket URL에 포함되지 않고, one-time ticket 기반 handshake만 허용된다.
 - 여러 Gateway 인스턴스에서 같은 방의 메시지가 정상 전달된다.
 - Gateway 장애 후 재연결하면 누락 메시지를 gap fill로 보정한다.
 - Redis Streams append 성공이 메시지 수락 기준이다.
