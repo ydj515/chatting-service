@@ -1,6 +1,7 @@
 package com.chat.websocket.handler
 
 import com.chat.domain.dto.ErrorMessage
+import com.chat.domain.dto.MessageAccepted
 import com.chat.domain.dto.SendMessageRequest
 import com.chat.domain.model.MessageType
 import com.chat.domain.service.ChatService
@@ -144,7 +145,7 @@ class ChatWebSocketHandler(
             val messageType = extractMessageType(payload)
 
             when (messageType) {
-                ClientMessageType.SEND_MESSAGE.name -> handleSendMessage(userId, payload)
+                ClientMessageType.SEND_MESSAGE.name -> handleSendMessage(session, userId, payload)
 
                 else -> {
                     logger.warn("Unknown message type: $messageType")
@@ -157,25 +158,46 @@ class ChatWebSocketHandler(
         }
     }
 
-    private fun handleSendMessage(userId: Long, payload: String) {
+    private fun handleSendMessage(session: WebSocketSession, userId: Long, payload: String) {
         val request = objectMapper.readValue(payload, ClientSendMessageRequest::class.java)
         val chatRoomId = request.chatRoomId ?: throw IllegalArgumentException("chatRoomId is required")
         val messageType = request.messageType ?: throw IllegalArgumentException("messageType is required")
 
-        chatService.sendMessage(
+        val savedMessage = chatService.sendMessage(
             SendMessageRequest(
                 chatRoomId = chatRoomId,
                 type = messageType,
                 content = request.content,
+                clientMessageId = request.clientMessageId,
             ),
             userId,
         )
+        sendAcceptedMessage(session, savedMessage)
+    }
+
+    private fun sendAcceptedMessage(session: WebSocketSession, message: com.chat.domain.dto.MessageDto) {
+        try {
+            val accepted = MessageAccepted(
+                id = message.id,
+                messageId = message.messageId,
+                clientMessageId = message.clientMessageId,
+                roomId = message.chatRoomId,
+                roomSeq = message.roomSeq,
+                sequenceNumber = message.sequenceNumber,
+                chatRoomId = message.chatRoomId,
+                timestamp = message.createdAt,
+            )
+            session.sendMessage(TextMessage(objectMapper.writeValueAsString(accepted)))
+        } catch (e: IOException) {
+            logger.error("Failed to send accepted message", e)
+        }
     }
 
     private data class ClientSendMessageRequest(
         val chatRoomId: Long?,
         val messageType: MessageType?,
         val content: String?,
+        val clientMessageId: String?,
     )
 
     private enum class ClientMessageType {

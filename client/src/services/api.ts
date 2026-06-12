@@ -192,7 +192,7 @@ export const messageApi = {
     size = 50
   ): Promise<PageResponse<Message>> => {
     const response: AxiosResponse<PageResponse<Message>> = await api.get(
-      `/chat-rooms/${chatRoomId}/messages?page=${page}&size=${size}&sort=sequenceNumber,asc`
+      `/chat-rooms/${chatRoomId}/messages?page=${page}&size=${size}&sort=roomSeq,asc`
     );
     return response.data;
   },

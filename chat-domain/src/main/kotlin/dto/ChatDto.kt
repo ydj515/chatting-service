@@ -39,6 +39,8 @@ data class CreateChatRoomRequest(
 
 data class MessageDto(
     val id: Long,
+    val messageId: String,
+    val clientMessageId: String?,
     val chatRoomId: Long,
     val sender: UserDto,
     val type: MessageType,
@@ -47,7 +49,11 @@ data class MessageDto(
     val isDeleted: Boolean,
     val createdAt: LocalDateTime,
     val editedAt: LocalDateTime?,
-    val sequenceNumber: Long = 0 // 메시지 순서 보장을 위한 시퀀스
+    val sequenceNumber: Long = 0, // 기존 호환 필드
+    val roomSeq: Long = 0,
+    val streamShard: Int = 0,
+    val writeShard: Int = 0,
+    val fanoutShard: Int = 0
 )
 
 data class SendMessageRequest(
@@ -57,7 +63,10 @@ data class SendMessageRequest(
     @field:NotNull(message = "메시지 타입은 필수입니다")
     val type: MessageType,
 
-    val content: String?
+    val content: String?,
+
+    @field:Size(max = 128, message = "clientMessageId는 128자 이하여야 합니다")
+    val clientMessageId: String? = null
 )
 
 // 커서 기반 페이지네이션을 위한 DTO

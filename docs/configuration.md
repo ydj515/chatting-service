@@ -39,6 +39,7 @@
 | `CHAT_WEBSOCKET_GATEWAY_OUTBOUND_SEND_TIME_LIMIT_MILLIS` | `10000` | WebSocket session 단일 send 허용 시간 |
 | `CHAT_WEBSOCKET_GATEWAY_OUTBOUND_SEND_BUFFER_SIZE_LIMIT_BYTES` | `524288` | WebSocket session send buffer 상한 |
 | `CHAT_MESSAGE_SEQUENCE_TTL` | `24h` | Redis 메시지 시퀀스 키 TTL |
+| `CHAT_MESSAGE_SEQUENCE_BLOCK_SIZE` | `1000` | Redis `INCRBY`로 한 번에 할당할 방별 `roomSeq` block 크기 |
 
 ## Client
 

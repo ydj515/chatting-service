@@ -20,7 +20,7 @@ class MessageSequenceServiceTest {
         val valueOperations = valueOperations()
         val ttl = Duration.ofHours(2)
         `when`(redisTemplate.opsForValue()).thenReturn(valueOperations)
-        `when`(valueOperations.increment("custom:sequence:1")).thenReturn(1L)
+        `when`(valueOperations.increment("custom:sequence:1", 1000L)).thenReturn(1000L)
 
         val service = MessageSequenceService(
             redisTemplate = redisTemplate,
@@ -39,7 +39,7 @@ class MessageSequenceServiceTest {
         val redisTemplate = redisTemplate()
         val valueOperations = valueOperations()
         `when`(redisTemplate.opsForValue()).thenReturn(valueOperations)
-        `when`(valueOperations.increment("chat:sequence:1")).thenReturn(2L)
+        `when`(valueOperations.increment("chat:sequence:1", 1000L)).thenReturn(2000L)
 
         val service = MessageSequenceService(
             redisTemplate = redisTemplate,
@@ -49,8 +49,28 @@ class MessageSequenceServiceTest {
 
         val sequence = service.getNextSequence(chatRoomId = 1)
 
-        assertEquals(2L, sequence)
+        assertEquals(1001L, sequence)
         verify(redisTemplate, never()).expire("chat:sequence:1", Duration.ofHours(24))
+    }
+
+    @Test
+    fun `시퀀스는 Redis INCRBY로 block을 할당하고 local block에서 순서대로 반환한다`() {
+        val redisTemplate = redisTemplate()
+        val valueOperations = valueOperations()
+        `when`(redisTemplate.opsForValue()).thenReturn(valueOperations)
+        `when`(valueOperations.increment("chat:sequence:9", 1000L)).thenReturn(1000L)
+
+        val service = MessageSequenceService(
+            redisTemplate = redisTemplate,
+            redisProperties = ChatRedisProperties(),
+            sequenceProperties = MessageSequenceProperties(),
+        )
+
+        assertEquals(1L, service.getNextSequence(chatRoomId = 9))
+        assertEquals(2L, service.getNextSequence(chatRoomId = 9))
+
+        verify(valueOperations).increment("chat:sequence:9", 1000L)
+        verify(redisTemplate).expire("chat:sequence:9", Duration.ofHours(24))
     }
 
     @Suppress("UNCHECKED_CAST")
