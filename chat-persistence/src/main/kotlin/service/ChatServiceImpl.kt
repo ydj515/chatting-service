@@ -12,6 +12,8 @@ import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Pageable
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import org.springframework.transaction.support.TransactionSynchronization
+import org.springframework.transaction.support.TransactionSynchronizationManager
 
 /*
     @CacheEvit
@@ -121,10 +123,7 @@ class ChatServiceImpl(
         )
         chatRoomMemberRepository.save(ownerMember)
 
-        // 생성자 세션 갱신
-        if (webSocketSessionManager.isUserOnlineLocally(creator.id)) {
-            webSocketSessionManager.joinRoom(creator.id, savedRoom.id)
-        }
+        publishMembershipJoinedAfterCommit(creator.id, savedRoom.id)
 
         return chatRoomToDto(savedRoom)
     }
@@ -187,9 +186,7 @@ class ChatServiceImpl(
         )
         chatRoomMemberRepository.save(member)
 
-        if (webSocketSessionManager.isUserOnlineLocally(userId)) {
-            webSocketSessionManager.joinRoom(userId, roomId)
-        }
+        publishMembershipJoinedAfterCommit(userId, roomId)
     }
 
     @Caching(evict = [
@@ -331,5 +328,30 @@ class ChatServiceImpl(
         }
 
         return messageToDto(savedMessage)
+    }
+
+    private fun publishMembershipJoinedAfterCommit(userId: Long, roomId: Long) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            publishMembershipJoined(userId, roomId)
+            return
+        }
+
+        TransactionSynchronizationManager.registerSynchronization(object : TransactionSynchronization {
+            override fun afterCommit() {
+                publishMembershipJoined(userId, roomId)
+            }
+        })
+    }
+
+    private fun publishMembershipJoined(userId: Long, roomId: Long) {
+        if (webSocketSessionManager.isUserOnlineLocally(userId)) {
+            webSocketSessionManager.joinRoom(userId, roomId)
+        }
+
+        redisMessageBroker.publishMembershipChanged(
+            userId = userId,
+            roomId = roomId,
+            action = RedisMessageBroker.MembershipAction.JOIN,
+        )
     }
 }

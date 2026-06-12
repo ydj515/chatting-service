@@ -1,6 +1,6 @@
 spring:
   application:
-    name: chat-application
+    name: ${SPRING_APPLICATION_NAME:chat-application}
 
   jackson:
     time-zone: ${APP_TIME_ZONE:Asia/Seoul}
@@ -114,6 +114,7 @@ chat:
     sequence-key-prefix: ${CHAT_REDIS_SEQUENCE_KEY_PREFIX:chat:sequence}
     server-rooms-key-prefix: ${CHAT_REDIS_SERVER_ROOMS_KEY_PREFIX:chat:server:rooms:}
     room-topic-prefix: ${CHAT_REDIS_ROOM_TOPIC_PREFIX:chat.room.}
+    membership-topic: ${CHAT_REDIS_MEMBERSHIP_TOPIC:chat.membership}
     broker:
       server-id: ${HOSTNAME:}
       cleanup-initial-delay: ${CHAT_REDIS_BROKER_CLEANUP_INITIAL_DELAY:30s}

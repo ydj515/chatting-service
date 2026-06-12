@@ -67,7 +67,7 @@ description = "전체 채팅 클러스터를 백그라운드로 기동한다."
 depends = ["start:all"]
 
 [tasks."start:all"]
-description = "PostgreSQL, Redis, 애플리케이션 3대, nginx를 모두 빌드 및 기동한다."
+description = "PostgreSQL, Redis, 역할별 애플리케이션, nginx를 모두 빌드 및 기동한다."
 run = "docker compose up -d --build"
 
 [tasks."start:infra"]

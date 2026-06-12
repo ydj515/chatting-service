@@ -30,12 +30,15 @@ class RedisMessageBroker(
     private val processedMessages = ConcurrentHashMap<String, Long>()
     private val subscribeRooms = ConcurrentHashMap.newKeySet<Long>()
     private var localMessageHandler: ((Long, ChatMessage) -> Unit)? = null
+    private var localMembershipHandler: ((DistributedMembershipEvent) -> Unit)? = null
 
     fun getServerId() = serverId
 
     @PostConstruct
     fun initialize() {
         logger.info("Initializing RedisMessageListenerContainer")
+        messageListenerContainer.addMessageListener(this, ChannelTopic(redisProperties.membershipTopic))
+        logger.info("Subscribed to membership topic ${redisProperties.membershipTopic}")
 
         Thread {
             try {
@@ -53,6 +56,7 @@ class RedisMessageBroker(
 
     @PreDestroy
     fun cleanup() {
+        messageListenerContainer.removeMessageListener(this, ChannelTopic(redisProperties.membershipTopic))
         subscribeRooms.forEach { roomId ->
             unsubscribeFromRoom(roomId)
         }
@@ -61,6 +65,10 @@ class RedisMessageBroker(
 
     fun setLocalMessageHandler(handler: (Long, ChatMessage) -> Unit) {
         this.localMessageHandler = handler
+    }
+
+    fun setLocalMembershipHandler(handler: (DistributedMembershipEvent) -> Unit) {
+        this.localMembershipHandler = handler
     }
 
     fun subscribeToRoom(roomId: Long) {
@@ -80,6 +88,26 @@ class RedisMessageBroker(
             logger.info("Unsubscribed from $roomId")
         } else {
             logger.error("Room $roomId does not exist")
+        }
+    }
+
+    fun publishMembershipChanged(userId: Long, roomId: Long, action: MembershipAction) {
+        try {
+            val event = DistributedMembershipEvent(
+                id = "$serverId-membership-${System.currentTimeMillis()}-${System.nanoTime()}",
+                serverId = serverId,
+                userId = userId,
+                roomId = roomId,
+                action = action,
+                timestamp = LocalDateTime.now(),
+            )
+
+            val json = objectMapper.writeValueAsString(event)
+            redisTemplate.convertAndSend(redisProperties.membershipTopic, json)
+
+            logger.info("Published membership event $json")
+        } catch (e: Exception) {
+            logger.error("Error publishing membership event for room $roomId and user $userId", e)
         }
     }
 
@@ -106,6 +134,13 @@ class RedisMessageBroker(
     override fun onMessage(message: Message, pattern: ByteArray?) {
         try {
             val json = String(message.body)
+            val channel = String(message.channel)
+
+            if (channel == redisProperties.membershipTopic) {
+                handleMembershipMessage(json)
+                return
+            }
+
             val distributedMessage = objectMapper.readValue(json, DistributedMessage::class.java)
 
             if (distributedMessage.excludeServerId == serverId) {
@@ -137,6 +172,18 @@ class RedisMessageBroker(
         }
     }
 
+    private fun handleMembershipMessage(json: String) {
+        val event = objectMapper.readValue(json, DistributedMembershipEvent::class.java)
+
+        if (event.serverId == serverId) {
+            logger.debug("Ignoring local membership event ${event.id}")
+            return
+        }
+
+        localMembershipHandler?.invoke(event)
+        logger.info("Processed membership event ${event.id}")
+    }
+
     private fun cleanUpProcessedMessages() {
         val now = System.currentTimeMillis()
         val ttlMillis = redisProperties.broker.processedMessageTtl.toMillis()
@@ -162,4 +209,18 @@ class RedisMessageBroker(
         val timestamp: LocalDateTime,
         val payload: ChatMessage,
     )
+
+    data class DistributedMembershipEvent(
+        val id: String,
+        val serverId: String,
+        val userId: Long,
+        val roomId: Long,
+        val action: MembershipAction,
+        val timestamp: LocalDateTime,
+    )
+
+    enum class MembershipAction {
+        JOIN,
+        LEAVE,
+    }
 }

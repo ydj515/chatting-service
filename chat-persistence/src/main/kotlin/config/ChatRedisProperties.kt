@@ -8,6 +8,7 @@ data class ChatRedisProperties(
     val sequenceKeyPrefix: String = "chat:sequence",
     val serverRoomsKeyPrefix: String = "chat:server:rooms:",
     val roomTopicPrefix: String = "chat.room.",
+    val membershipTopic: String = "chat.membership",
     val broker: Broker = Broker(),
 ) {
     data class Broker(

@@ -2,6 +2,7 @@ x-chat-app-build: &chat-app-build
   context: .
   args:
     APP_PORT: ${SERVER_PORT:-8080}
+    APP_MODULE: ${APP_MODULE:-chat-application}
 
 x-chat-app-environment: &chat-app-environment
   TZ: ${TZ:-Asia/Seoul}
@@ -166,37 +167,113 @@ services:
     networks:
       - chat-network
 
-  chat-app-1:
-    build: *chat-app-build
-    container_name: chat-app-1
-    hostname: chat-app-1
-    environment: *chat-app-environment
+  chat-api-app-1:
+    image: ${CHAT_API_IMAGE:-chatting-service-chat-api-application:local}
+    build:
+      context: .
+      args:
+        APP_PORT: ${SERVER_PORT:-8080}
+        APP_MODULE: chat-api-application
+    container_name: chat-api-app-1
+    hostname: chat-api-app-1
+    environment:
+      <<: *chat-app-environment
+      SPRING_APPLICATION_NAME: chat-api-application
+      APP_ROLE: api
     depends_on:
-      postgres: { condition: service_healthy }
+      postgres-primary-setup: { condition: service_completed_successfully }
       redis: { condition: service_healthy }
     healthcheck: *chat-app-healthcheck
     networks:
       - chat-network
 
-  chat-app-2:
-    build: *chat-app-build
-    container_name: chat-app-2
-    hostname: chat-app-2
-    environment: *chat-app-environment
+  chat-api-app-2:
+    image: ${CHAT_API_IMAGE:-chatting-service-chat-api-application:local}
+    container_name: chat-api-app-2
+    hostname: chat-api-app-2
+    environment:
+      <<: *chat-app-environment
+      SPRING_APPLICATION_NAME: chat-api-application
+      APP_ROLE: api
     depends_on:
-      postgres: { condition: service_healthy }
+      postgres-primary-setup: { condition: service_completed_successfully }
       redis: { condition: service_healthy }
     healthcheck: *chat-app-healthcheck
     networks:
       - chat-network
 
-  chat-app-3:
-    build: *chat-app-build
-    container_name: chat-app-3
-    hostname: chat-app-3
-    environment: *chat-app-environment
+  chat-websocket-app-1:
+    image: ${CHAT_WEBSOCKET_IMAGE:-chatting-service-chat-websocket-application:local}
+    build:
+      context: .
+      args:
+        APP_PORT: ${SERVER_PORT:-8080}
+        APP_MODULE: chat-websocket-application
+    container_name: chat-websocket-app-1
+    hostname: chat-websocket-app-1
+    environment:
+      <<: *chat-app-environment
+      SPRING_APPLICATION_NAME: chat-websocket-application
+      APP_ROLE: websocket
     depends_on:
-      postgres: { condition: service_healthy }
+      postgres-primary-setup: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+    healthcheck: *chat-app-healthcheck
+    networks:
+      - chat-network
+
+  chat-websocket-app-2:
+    image: ${CHAT_WEBSOCKET_IMAGE:-chatting-service-chat-websocket-application:local}
+    container_name: chat-websocket-app-2
+    hostname: chat-websocket-app-2
+    environment:
+      <<: *chat-app-environment
+      SPRING_APPLICATION_NAME: chat-websocket-application
+      APP_ROLE: websocket
+    depends_on:
+      postgres-primary-setup: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+    healthcheck: *chat-app-healthcheck
+    networks:
+      - chat-network
+
+  chat-worker-app-1:
+    image: ${CHAT_WORKER_IMAGE:-chatting-service-chat-worker-application:local}
+    build:
+      context: .
+      args:
+        APP_PORT: ${SERVER_PORT:-8080}
+        APP_MODULE: chat-worker-application
+    container_name: chat-worker-app-1
+    hostname: chat-worker-app-1
+    environment:
+      <<: *chat-app-environment
+      SPRING_APPLICATION_NAME: chat-worker-application
+      APP_ROLE: worker
+      WORKER_ROLES: ${WORKER_ROLES:-message-writer,fanout,search-projection,archive}
+    depends_on:
+      postgres-primary-setup: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+    healthcheck: *chat-app-healthcheck
+    networks:
+      - chat-network
+
+  chat-admin-app-1:
+    image: ${CHAT_ADMIN_IMAGE:-chatting-service-chat-admin-application:local}
+    build:
+      context: .
+      args:
+        APP_PORT: ${SERVER_PORT:-8080}
+        APP_MODULE: chat-admin-application
+    container_name: chat-admin-app-1
+    hostname: chat-admin-app-1
+    environment:
+      <<: *chat-app-environment
+      SPRING_APPLICATION_NAME: chat-admin-application
+      APP_ROLE: admin
+    depends_on:
+      postgres-primary-setup: { condition: service_completed_successfully }
+      postgres-replica: { condition: service_healthy }
       redis: { condition: service_healthy }
     healthcheck: *chat-app-healthcheck
     networks:
@@ -208,14 +285,17 @@ services:
     container_name: chat-nginx
     environment:
       TZ: ${TZ:-Asia/Seoul}
+      CHAT_BACKEND_PORT: ${SERVER_PORT:-8080}
     volumes:
-      - ./infra/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./infra/nginx/nginx.conf:/etc/nginx/templates/default.conf.template:ro
     ports:
       - "${NGINX_HTTP_PORT:-80}:80"
     depends_on:
-      - chat-app-1
-      - chat-app-2
-      - chat-app-3
+      - chat-api-app-1
+      - chat-api-app-2
+      - chat-websocket-app-1
+      - chat-websocket-app-2
+      - chat-admin-app-1
     healthcheck:
       test: [ "CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1/health" ]
       interval: ${NGINX_HEALTHCHECK_INTERVAL:-30s}

@@ -10,9 +10,13 @@
 | `TZ` | `Asia/Seoul` | 컨테이너 OS 시간대 |
 | `APP_TIME_ZONE` | `Asia/Seoul` | Spring Jackson 및 Hibernate JDBC 시간대 |
 | `DB_TIMEZONE` | `Asia/Seoul` | PostgreSQL 세션/서버 시간대 |
-| `SERVER_PORT` | `8080` | Spring Boot 내부 포트 |
+| `SERVER_PORT` | `8080` | Spring Boot 내부 포트. Nginx upstream도 이 값을 사용 |
 | `SERVER_CONTEXT_PATH` | `/api` | API context path |
 | `NGINX_HTTP_PORT` | `80` | 호스트에 노출할 Nginx 포트 |
+| `CHAT_API_IMAGE` | `chatting-service-chat-api-application:local` | API role Compose 서비스가 공유할 이미지 태그 |
+| `CHAT_WEBSOCKET_IMAGE` | `chatting-service-chat-websocket-application:local` | WebSocket role Compose 서비스가 공유할 이미지 태그 |
+| `CHAT_WORKER_IMAGE` | `chatting-service-chat-worker-application:local` | Worker role Compose 서비스 이미지 태그 |
+| `CHAT_ADMIN_IMAGE` | `chatting-service-chat-admin-application:local` | Admin role Compose 서비스 이미지 태그 |
 | `DB_NAME` | `chatdb` | PostgreSQL DB 이름 |
 | `DB_USERNAME` | `chatuser` | PostgreSQL 사용자 |
 | `DB_PASSWORD` | `chatpass` | PostgreSQL 비밀번호 |
@@ -22,7 +26,9 @@
 | `CHAT_MESSAGE_RETENTION_DAYS` | `100` | 메시지 파티션 보관 기간 |
 | `CHAT_PARTITION_ARCHIVE_DROP_AFTER_COPY` | `false` | archive 성공 후 partition detach/drop 여부 |
 | `CHAT_PARTITION_ARCHIVE_INTERVAL_SECONDS` | `86400` | archive worker 실행 주기 |
+| `WORKER_ROLES` | `message-writer,fanout,search-projection,archive` | `chat-worker-application`에서 활성화할 worker role 목록 |
 | `REDIS_PORT` | `6379` | Redis 내부 포트 |
+| `CHAT_REDIS_MEMBERSHIP_TOPIC` | `chat.membership` | REST create/join 결과를 WebSocket 노드에 전파하는 Redis 제어 topic |
 | `CHAT_API_CORS_ALLOWED_ORIGINS` | `*` | REST API CORS 허용 origin |
 | `CHAT_WEBSOCKET_ALLOWED_ORIGINS` | `*` | WebSocket 허용 origin |
 | `CHAT_MESSAGE_SEQUENCE_TTL` | `24h` | Redis 메시지 시퀀스 키 TTL |

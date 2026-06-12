@@ -30,6 +30,11 @@ class WebSocketSessionManager(
         redisMessageBroker.setLocalMessageHandler { roomId, msg ->
             sendMessageToLocalRoom(roomId, msg)
         }
+        redisMessageBroker.setLocalMembershipHandler { event ->
+            if (event.action == RedisMessageBroker.MembershipAction.JOIN && isUserOnlineLocally(event.userId)) {
+                joinRoom(event.userId, event.roomId)
+            }
+        }
     }
 
     fun addSession(userId: Long, session: WebSocketSession) {
