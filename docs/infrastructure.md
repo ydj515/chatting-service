@@ -58,8 +58,28 @@ docker compose run --rm \
 
 ## 로드 밸런싱
 
-Nginx가 `chat-app-1~3`으로 라운드로빈 분산합니다.  
-WebSocket 경로 `/api/ws/`도 동일하게 프록시됩니다.
+Nginx는 역할별 upstream으로 트래픽을 분리합니다.
+
+| 경로 | 대상 |
+| --- | --- |
+| `/api/ws/` | `chat-websocket-app-1~2` |
+| `/api/admin/` | `chat-admin-app-1` |
+| `/api/` | `chat-api-app-1~2` |
+
+`chat-worker-app-1`은 외부 HTTP 트래픽을 받지 않고, Redis/DB 기반 비동기 작업을 담당합니다.
+
+---
+
+## 역할별 실행 모듈
+
+| Compose 서비스 | 실행 모듈 | 역할 |
+| --- | --- | --- |
+| `chat-api-app-1~2` | `chat-api-application` | 사용자/방/메시지 REST API |
+| `chat-websocket-app-1~2` | `chat-websocket-application` | WebSocket 연결 유지와 fan-out |
+| `chat-worker-app-1` | `chat-worker-application` | writer/fanout/search/archive worker |
+| `chat-admin-app-1` | `chat-admin-application` | 관리자 API |
+
+로컬 Compose에서는 고정된 서비스 이름으로 replica를 표현합니다. Kubernetes로 옮길 때는 동일 실행 모듈을 Deployment별 replica 수로 조정합니다.
 
 ---
 

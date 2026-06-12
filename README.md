@@ -1,7 +1,7 @@
 # 분산 채팅 시스템
 
 Spring Boot + Redis Pub/Sub + PostgreSQL + Nginx + React로 구성된 분산 채팅 시스템입니다.  
-다중 애플리케이션 인스턴스(3개)를 띄우고, Redis 브로커로 메시지를 브로드캐스트하며, Nginx가 로드 밸런싱을 담당합니다.
+API, WebSocket, Worker, Admin 실행 모듈을 분리해 역할별 수평 확장이 가능하도록 구성합니다.
 
 ## 주요 기능
 
@@ -11,6 +11,7 @@ Spring Boot + Redis Pub/Sub + PostgreSQL + Nginx + React로 구성된 분산 채
 - Redis Pub/Sub으로 다중 서버 간 메시지 동기화
 - 커서 기반 메시지 페이징
 - PostgreSQL streaming read replica 및 파티션 archive
+- Admin 전용 실행 모듈과 관리자 API 확장 기반
 
 ## 기술 스택
 
@@ -38,6 +39,7 @@ mise run start:all
 | --- | --- |
 | REST API | `http://localhost/api` |
 | Health Check | `http://localhost/api/actuator/health` |
+| Admin Health Check | `http://localhost/api/admin/health` |
 | WebSocket | `ws://localhost/api/ws/chat?userId=1` |
 | PostgreSQL Primary | `localhost:5432` |
 | PostgreSQL Replica | `localhost:5433` |
@@ -58,14 +60,19 @@ npm start
 ## 프로젝트 구조
 
 ```
-chat-application/   # Spring Boot 엔트리
-chat-api/           # REST API 컨트롤러
-chat-domain/        # 도메인/DTO/서비스 인터페이스
-chat-persistence/   # JPA/Redis/서비스 구현
-chat-websocket/     # WebSocket 핸들러/설정
-client/             # React 클라이언트
-infra/              # Docker Compose 인프라 설정 (Nginx, Redis, PostgreSQL)
-docs/               # 상세 문서
+chat-application/              # 통합 실행 fallback / 로컬 bootstrap
+chat-api/                      # 사용자 REST API 기능 모듈
+chat-admin/                    # 관리자 API 기능 모듈
+chat-domain/                   # 도메인/DTO/서비스 인터페이스
+chat-persistence/              # JPA/Redis/서비스 구현
+chat-websocket/                # WebSocket 핸들러/설정
+chat-api-application/          # API 실행 모듈
+chat-websocket-application/    # WebSocket Gateway 실행 모듈
+chat-worker-application/       # Worker 실행 모듈
+chat-admin-application/        # Admin 실행 모듈
+client/                        # React 클라이언트
+infra/                         # Docker Compose 인프라 설정 (Nginx, Redis, PostgreSQL)
+docs/                          # 상세 문서
 ```
 
 ## 문서

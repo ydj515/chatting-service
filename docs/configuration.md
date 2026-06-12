@@ -22,6 +22,7 @@
 | `CHAT_MESSAGE_RETENTION_DAYS` | `100` | 메시지 파티션 보관 기간 |
 | `CHAT_PARTITION_ARCHIVE_DROP_AFTER_COPY` | `false` | archive 성공 후 partition detach/drop 여부 |
 | `CHAT_PARTITION_ARCHIVE_INTERVAL_SECONDS` | `86400` | archive worker 실행 주기 |
+| `WORKER_ROLES` | `message-writer,fanout,search-projection,archive` | `chat-worker-application`에서 활성화할 worker role 목록 |
 | `REDIS_PORT` | `6379` | Redis 내부 포트 |
 | `CHAT_API_CORS_ALLOWED_ORIGINS` | `*` | REST API CORS 허용 origin |
 | `CHAT_WEBSOCKET_ALLOWED_ORIGINS` | `*` | WebSocket 허용 origin |

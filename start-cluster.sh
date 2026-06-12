@@ -23,8 +23,8 @@ if [[ "$cleanup" =~ ^[Yy]$ ]]; then
     "${compose[@]}" down --volumes --remove-orphans
 fi
 
-echo "PostgreSQL과 Redis를 시작합니다..."
-"${compose[@]}" up -d postgres redis
+echo "PostgreSQL primary/read-replica, archive worker, Redis를 시작합니다..."
+"${compose[@]}" up -d postgres postgres-primary-setup postgres-replica postgres-partition-archive redis
 
 echo "PostgreSQL 준비를 기다립니다..."
 until "${compose[@]}" exec -T postgres pg_isready -U "$db_username" -d "$db_name" >/dev/null 2>&1; do
@@ -36,8 +36,15 @@ until "${compose[@]}" exec -T redis redis-cli ping >/dev/null 2>&1; do
     sleep 2
 done
 
-echo "애플리케이션과 nginx를 빌드 및 시작합니다..."
-"${compose[@]}" up -d --build chat-app-1 chat-app-2 chat-app-3 nginx
+echo "역할별 애플리케이션과 nginx를 빌드 및 시작합니다..."
+"${compose[@]}" up -d --build \
+    chat-api-app-1 \
+    chat-api-app-2 \
+    chat-websocket-app-1 \
+    chat-websocket-app-2 \
+    chat-worker-app-1 \
+    chat-admin-app-1 \
+    nginx
 
 echo "서비스 상태를 확인합니다..."
 "${compose[@]}" ps
@@ -47,7 +54,9 @@ cat <<'EOF'
 분산 채팅 시스템이 시작되었습니다.
 
 모니터링:
-  docker compose logs -f chat-app-1 chat-app-2 chat-app-3
+  docker compose logs -f chat-api-app-1 chat-api-app-2
+  docker compose logs -f chat-websocket-app-1 chat-websocket-app-2
+  docker compose logs -f chat-worker-app-1 chat-admin-app-1
   docker compose logs -f nginx
   docker stats
 
