@@ -1,0 +1,11 @@
+name: Notify Slack when Gemini review is done
+
+on:
+  workflow_dispatch:
+  pull_request_review:
+    types: [submitted]
+
+jobs:
+  notify-slack:
+    uses: ydj515/ci-workflows/.github/workflows/gemini-pr-review-slack-noti.yml@v1.0.0
+    secrets: inherit

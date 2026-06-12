@@ -1,0 +1,22 @@
+name: Sync Gemini Styleguide
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".gemini/styleguide.yml"
+  schedule:
+    # 매일 09:05 KST = 00:05 UT
+    - cron: "5 0 * * *"
+
+permissions:
+  contents: write
+
+jobs:
+  sync-guide:
+    uses: ydj515/ci-workflows/.github/workflows/build-gemini-styleguide.yml@v1.1.0
+    with:
+      standards_owner: ydj515
+      standards_repo: dev-standards
+      standards_ref: v1.1.0
+      # standards_ref: v1.0.0 (기본값)

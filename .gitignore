@@ -76,6 +76,8 @@ logs/
 
 # ai
 .claude
-.gemini
-.antigravitycli
 .codex
+.antigravitycli
+
+# Playwright
+.playwright-mcp
