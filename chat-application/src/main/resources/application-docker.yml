@@ -1,0 +1,134 @@
+spring:
+  application:
+    name: chat-application
+
+  jackson:
+    time-zone: ${APP_TIME_ZONE:Asia/Seoul}
+
+  # PostgreSQL 데이터베이스
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:postgres}:${DB_PORT:5432}/${DB_NAME:chatdb}?autoCommit=false
+    username: ${DB_USERNAME:chatuser}
+    password: ${DB_PASSWORD:chatpass}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: ${DB_HIKARI_MAXIMUM_POOL_SIZE:30}
+      minimum-idle: ${DB_HIKARI_MINIMUM_IDLE:10}
+      connection-timeout: ${DB_HIKARI_CONNECTION_TIMEOUT:30000}
+      idle-timeout: ${DB_HIKARI_IDLE_TIMEOUT:600000}
+      max-lifetime: ${DB_HIKARI_MAX_LIFETIME:1800000}
+      leak-detection-threshold: ${DB_HIKARI_LEAK_DETECTION_THRESHOLD:60000}
+      auto-commit: false
+
+    # JPA 설정 (성능 최적화)
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: false
+        jdbc:
+          batch_size: 50
+          time_zone: ${APP_TIME_ZONE:Asia/Seoul}
+        order_inserts: true
+        order_updates: true
+        cache:
+          use_second_level_cache: false
+          use_query_cache: false
+
+  data:
+    redis:
+      host: ${REDIS_HOST:redis}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      timeout: ${REDIS_TIMEOUT:2s}
+      lettuce:
+        pool:
+          max-active: ${REDIS_POOL_MAX_ACTIVE:30}
+          max-idle: ${REDIS_POOL_MAX_IDLE:15}
+          min-idle: ${REDIS_POOL_MIN_IDLE:5}
+        shutdown-timeout: ${REDIS_SHUTDOWN_TIMEOUT:100ms}
+
+    # 캐시 설정
+  cache:
+    type: redis
+    redis:
+      time-to-live: ${SPRING_CACHE_REDIS_TTL:30m}
+      cache-null-values: false
+
+server:
+  port: ${SERVER_PORT:8080}
+  servlet:
+    context-path: ${SERVER_CONTEXT_PATH:/api}
+  tomcat:
+    threads:
+      max: ${SERVER_TOMCAT_THREADS_MAX:300}
+      min-spare: ${SERVER_TOMCAT_THREADS_MIN_SPARE:20}
+    connection-timeout: ${SERVER_TOMCAT_CONNECTION_TIMEOUT:20000}
+    max-connections: ${SERVER_TOMCAT_MAX_CONNECTIONS:8192}
+    accept-count: ${SERVER_TOMCAT_ACCEPT_COUNT:100}
+
+# 로깅 설정
+logging:
+  level:
+    com.chat: INFO
+    org.springframework.web: WARN
+    org.hibernate.SQL: WARN
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+    org.springframework.cache: INFO
+  pattern:
+    console: "[%d{HH:mm:ss}] [${HOSTNAME:unknown}] %-5level %logger{36} - %msg%n"
+
+# 액추에이터 설정
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,caches
+      cors:
+        allowed-origins: ${MANAGEMENT_CORS_ALLOWED_ORIGINS:*}
+        allowed-methods: ${MANAGEMENT_CORS_ALLOWED_METHODS:GET,POST,PUT,DELETE,OPTIONS}
+        allowed-headers: ${MANAGEMENT_CORS_ALLOWED_HEADERS:*}
+        max-age: ${MANAGEMENT_CORS_MAX_AGE:3600}
+  endpoint:
+    health:
+      show-details: always
+
+chat:
+  api:
+    cors:
+      mapping: ${CHAT_API_CORS_MAPPING:/**}
+      allowed-origins: ${CHAT_API_CORS_ALLOWED_ORIGINS:*}
+      allowed-methods: ${CHAT_API_CORS_ALLOWED_METHODS:GET,POST,PUT,DELETE,PATCH,OPTIONS}
+      allowed-headers: ${CHAT_API_CORS_ALLOWED_HEADERS:*}
+      max-age: ${CHAT_API_CORS_MAX_AGE:3600}
+  websocket:
+    endpoint: ${CHAT_WEBSOCKET_ENDPOINT:/ws/chat}
+    allowed-origins: ${CHAT_WEBSOCKET_ALLOWED_ORIGINS:*}
+    user-id-query-param: ${CHAT_WEBSOCKET_USER_ID_QUERY_PARAM:userId}
+    user-id-attribute: ${CHAT_WEBSOCKET_USER_ID_ATTRIBUTE:userId}
+    initial-chat-room-page-size: ${CHAT_WEBSOCKET_INITIAL_CHAT_ROOM_PAGE_SIZE:100}
+  redis:
+    sequence-key-prefix: ${CHAT_REDIS_SEQUENCE_KEY_PREFIX:chat:sequence}
+    server-rooms-key-prefix: ${CHAT_REDIS_SERVER_ROOMS_KEY_PREFIX:chat:server:rooms:}
+    room-topic-prefix: ${CHAT_REDIS_ROOM_TOPIC_PREFIX:chat.room.}
+    broker:
+      server-id: ${HOSTNAME:}
+      cleanup-initial-delay: ${CHAT_REDIS_BROKER_CLEANUP_INITIAL_DELAY:30s}
+      processed-message-ttl: ${CHAT_REDIS_BROKER_PROCESSED_MESSAGE_TTL:1m}
+      processed-message-max-size: ${CHAT_REDIS_BROKER_PROCESSED_MESSAGE_MAX_SIZE:10000}
+  message:
+    sequence:
+      ttl: ${CHAT_MESSAGE_SEQUENCE_TTL:24h}
+    pagination:
+      max-limit: ${CHAT_MESSAGE_PAGINATION_MAX_LIMIT:100}
+      default-limit: ${CHAT_MESSAGE_PAGINATION_DEFAULT_LIMIT:50}
+      default-direction: ${CHAT_MESSAGE_PAGINATION_DEFAULT_DIRECTION:BEFORE}
+  cache:
+    default-ttl: ${CHAT_CACHE_DEFAULT_TTL:30m}
+    users-ttl: ${CHAT_CACHE_USERS_TTL:1h}
+    chat-rooms-ttl: ${CHAT_CACHE_CHAT_ROOMS_TTL:15m}
+    chat-room-members-ttl: ${CHAT_CACHE_CHAT_ROOM_MEMBERS_TTL:10m}
+    messages-ttl: ${CHAT_CACHE_MESSAGES_TTL:5m}
