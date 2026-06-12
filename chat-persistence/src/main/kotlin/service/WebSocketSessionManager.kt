@@ -124,7 +124,7 @@ class WebSocketSessionManager(
     }
 
     fun sendMessageToLocalRoom(roomId: Long, message: ChatMessage, excludeUserId: Long? = null) {
-        val json = objectMapper.writeValueAsString(message)
+        val json = objectMapper.writerFor(com.chat.domain.dto.WebSocketMessage::class.java).writeValueAsString(message)
         val sessionIds = sessionIdsByRoomId[roomId]?.toList() ?: return
 
         sessionIds.forEach { sessionId ->
@@ -143,6 +143,17 @@ class WebSocketSessionManager(
                 logger.info("Sending message to local room $roomId")
             }
         }
+    }
+
+    fun sendTextToSession(session: WebSocketSession, payload: String): Boolean {
+        val sessionRef = sessionsById[session.id] ?: return false
+        val outboundSession = sessionRef.session
+        if (!outboundSession.isOpen) {
+            removeSession(sessionRef.userId, outboundSession)
+            return false
+        }
+
+        return sessionRef.outboundQueue.enqueue(payload)
     }
 
     fun isUserOnlineLocally(userId: Long): Boolean {

@@ -1,6 +1,7 @@
 package com.chat.websocket.handler
 
 import com.chat.domain.dto.ErrorMessage
+import com.chat.domain.dto.MessageAccepted
 import com.chat.domain.dto.SendMessageRequest
 import com.chat.domain.model.MessageType
 import com.chat.domain.service.ChatService
@@ -15,7 +16,6 @@ import org.springframework.web.socket.TextMessage
 import org.springframework.web.socket.WebSocketHandler
 import org.springframework.web.socket.WebSocketMessage
 import org.springframework.web.socket.WebSocketSession
-import java.io.IOException
 
 @Component
 class ChatWebSocketHandler(
@@ -124,9 +124,11 @@ class ChatWebSocketHandler(
                 message = errorMessage,
                 code = errorCode,
             )
-            val json = objectMapper.writeValueAsString(error)
-            session.sendMessage(TextMessage(json))
-        } catch (e: IOException) {
+            val json = writeWebSocketMessage(error)
+            if (!sessionManager.sendTextToSession(session, json)) {
+                logger.warn("Failed to enqueue error message for session ${session.id}")
+            }
+        } catch (e: Exception) {
             logger.error("Failed to send error message", e)
         }
     }
@@ -144,7 +146,7 @@ class ChatWebSocketHandler(
             val messageType = extractMessageType(payload)
 
             when (messageType) {
-                ClientMessageType.SEND_MESSAGE.name -> handleSendMessage(userId, payload)
+                ClientMessageType.SEND_MESSAGE.name -> handleSendMessage(session, userId, payload)
 
                 else -> {
                     logger.warn("Unknown message type: $messageType")
@@ -157,25 +159,49 @@ class ChatWebSocketHandler(
         }
     }
 
-    private fun handleSendMessage(userId: Long, payload: String) {
+    private fun handleSendMessage(session: WebSocketSession, userId: Long, payload: String) {
         val request = objectMapper.readValue(payload, ClientSendMessageRequest::class.java)
         val chatRoomId = request.chatRoomId ?: throw IllegalArgumentException("chatRoomId is required")
         val messageType = request.messageType ?: throw IllegalArgumentException("messageType is required")
 
-        chatService.sendMessage(
+        val savedMessage = chatService.sendMessage(
             SendMessageRequest(
                 chatRoomId = chatRoomId,
                 type = messageType,
                 content = request.content,
+                clientMessageId = request.clientMessageId,
             ),
             userId,
         )
+        sendAcceptedMessage(session, savedMessage)
+    }
+
+    private fun sendAcceptedMessage(session: WebSocketSession, message: com.chat.domain.dto.MessageDto) {
+        try {
+            val accepted = MessageAccepted(
+                id = message.id,
+                messageId = message.messageId,
+                clientMessageId = message.clientMessageId,
+                roomId = message.chatRoomId,
+                roomSeq = message.roomSeq,
+                sequenceNumber = message.sequenceNumber,
+                chatRoomId = message.chatRoomId,
+                timestamp = message.createdAt,
+            )
+            val json = writeWebSocketMessage(accepted)
+            if (!sessionManager.sendTextToSession(session, json)) {
+                logger.warn("Failed to enqueue accepted message for session ${session.id}")
+            }
+        } catch (e: Exception) {
+            logger.error("Failed to send accepted message", e)
+        }
     }
 
     private data class ClientSendMessageRequest(
         val chatRoomId: Long?,
         val messageType: MessageType?,
         val content: String?,
+        val clientMessageId: String?,
     )
 
     private enum class ClientMessageType {
@@ -185,5 +211,9 @@ class ChatWebSocketHandler(
     private enum class WebSocketErrorCode {
         UNKNOWN_MESSAGE_TYPE,
         INVALID_MESSAGE_FORMAT,
+    }
+
+    private fun writeWebSocketMessage(message: com.chat.domain.dto.WebSocketMessage): String {
+        return objectMapper.writerFor(com.chat.domain.dto.WebSocketMessage::class.java).writeValueAsString(message)
     }
 }

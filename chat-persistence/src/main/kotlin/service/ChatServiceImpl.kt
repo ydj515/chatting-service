@@ -7,6 +7,7 @@ import com.chat.persistence.repository.*
 import com.chat.persistence.redis.RedisMessageBroker
 import org.slf4j.LoggerFactory
 import org.springframework.cache.annotation.*
+import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Pageable
@@ -14,6 +15,9 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.transaction.support.TransactionSynchronization
 import org.springframework.transaction.support.TransactionSynchronizationManager
+import java.security.SecureRandom
+import java.time.Instant
+import java.util.Base64
 
 /*
     @CacheEvit
@@ -30,10 +34,12 @@ class ChatServiceImpl(
     private val userRepository: UserRepository,
     private val redisMessageBroker: RedisMessageBroker,
     private val messageSequenceService: MessageSequenceService,
+    private val messagePersistenceService: MessagePersistenceService,
     private val webSocketSessionManager: WebSocketSessionManager
 ) : ChatService {
 
     private val logger = LoggerFactory.getLogger(ChatServiceImpl::class.java)
+    private val secureRandom = SecureRandom()
 
 
     @Cacheable(value = ["chatRooms"], key = "#chatRoom.id")
@@ -57,8 +63,11 @@ class ChatServiceImpl(
     }
 
     private fun messageToDto(message: Message): MessageDto {
+        val roomSeq = if (message.roomSeq > 0) message.roomSeq else message.sequenceNumber
         return MessageDto(
             id = message.id,
+            messageId = message.messageId ?: legacyMessageId(message.id),
+            clientMessageId = message.clientMessageId,
             chatRoomId = message.chatRoom.id,
             sender = userToDto(message.sender),
             type = message.type,
@@ -67,7 +76,11 @@ class ChatServiceImpl(
             isDeleted = message.isDeleted,
             createdAt = message.createdAt,
             editedAt = message.editedAt,
-            sequenceNumber = message.sequenceNumber
+            sequenceNumber = message.sequenceNumber,
+            roomSeq = roomSeq,
+            streamShard = message.streamShard,
+            writeShard = message.writeShard,
+            fanoutShard = message.fanoutShard,
         )
     }
 
@@ -242,7 +255,7 @@ class ChatServiceImpl(
         }
 
         val pageable = PageRequest.of(0, request.limit)
-        val cursor = request.cursor // 로컬 변수로 복사하여 스마트 캐스트 가능하게 함
+        val cursor = request.cursor // effective roomSeq cursor
 
         val messages = when {
             cursor == null -> {
@@ -262,9 +275,9 @@ class ChatServiceImpl(
 
         val messageDtos = messages.map { messageToDto(it) }
 
-        // 다음/이전 커서 계산
-        val nextCursor = if (messageDtos.isNotEmpty()) messageDtos.last().id else null
-        val prevCursor = if (messageDtos.isNotEmpty()) messageDtos.first().id else null
+        // 다음/이전 커서는 repository ordering key와 같은 effective roomSeq를 사용한다.
+        val nextCursor = if (messageDtos.isNotEmpty()) messageDtos.last().roomSeq else null
+        val prevCursor = if (messageDtos.isNotEmpty()) messageDtos.first().roomSeq else null
 
         // 추가 데이터 존재 여부 확인
         val hasNext = messages.size == request.limit
@@ -283,6 +296,7 @@ class ChatServiceImpl(
         request: SendMessageRequest,
         senderId: Long,
     ): MessageDto {
+        val requestedClientMessageId = normalizeClientMessageId(request.clientMessageId)
         val chatRoom = chatRoomRepository.findById(request.chatRoomId)
             .orElseThrow { IllegalArgumentException("채팅방을 찾을 수 없습니다: ${request.chatRoomId}") }
 
@@ -292,27 +306,48 @@ class ChatServiceImpl(
         chatRoomMemberRepository.findByChatRoomIdAndUserIdAndIsActiveTrue(request.chatRoomId, senderId)
             .orElseThrow { IllegalArgumentException("채팅방에 참여하지 않은 사용자입니다.") }
 
-        val sequenceNumber = messageSequenceService.getNextSequence(request.chatRoomId)
+        if (requestedClientMessageId != null) {
+            val existingMessage = messageRepository.findByChatRoomIdAndSenderIdAndClientMessageId(
+                chatRoomId = request.chatRoomId,
+                senderId = senderId,
+                clientMessageId = requestedClientMessageId,
+            ).orElse(null)
+            if (existingMessage != null) {
+                return messageToDto(existingMessage)
+            }
+        }
+
+        val messageId = generateMessageId()
+        val clientMessageId = requestedClientMessageId ?: "server:$messageId"
+        val roomSeq = messageSequenceService.getNextSequence(request.chatRoomId)
 
         val message = Message(
+            messageId = messageId,
+            clientMessageId = clientMessageId,
             content = request.content,
             type = request.type ?: MessageType.TEXT,
             chatRoom = chatRoom,
             sender = sender,
-            sequenceNumber = sequenceNumber
+            sequenceNumber = roomSeq,
+            roomSeq = roomSeq,
+            streamShard = streamShard(request.chatRoomId),
+            writeShard = writeShard(messageId),
+            fanoutShard = fanoutShard(request.chatRoomId),
         )
-        val savedMessage = messageRepository.save(message)
+        val savedMessage = try {
+            messagePersistenceService.save(message)
+        } catch (e: DataIntegrityViolationException) {
+            if (requestedClientMessageId == null) {
+                throw e
+            }
+            messageRepository.findByChatRoomIdAndSenderIdAndClientMessageId(
+                chatRoomId = request.chatRoomId,
+                senderId = senderId,
+                clientMessageId = requestedClientMessageId,
+            ).orElseThrow { e }
+        }
 
-        val chatMessage = ChatMessage(
-            id = savedMessage.id,
-            content = savedMessage.content ?: "",
-            type = savedMessage.type,
-            chatRoomId = savedMessage.chatRoom.id,
-            senderId = savedMessage.sender.id,
-            senderName = savedMessage.sender.displayName,
-            sequenceNumber = savedMessage.sequenceNumber,
-            timestamp = savedMessage.createdAt
-        )
+        val chatMessage = messageToChatMessage(savedMessage)
 
         // 1. 로컬 세션에 즉시 전송 (실시간 응답성 보장)
         webSocketSessionManager.sendMessageToLocalRoom(request.chatRoomId, chatMessage)
@@ -329,6 +364,50 @@ class ChatServiceImpl(
         }
 
         return messageToDto(savedMessage)
+    }
+
+    private fun messageToChatMessage(message: Message): ChatMessage {
+        val roomSeq = if (message.roomSeq > 0) message.roomSeq else message.sequenceNumber
+        return ChatMessage(
+            id = message.id,
+            messageId = message.messageId ?: legacyMessageId(message.id),
+            clientMessageId = message.clientMessageId,
+            content = message.content ?: "",
+            messageType = message.type,
+            chatRoomId = message.chatRoom.id,
+            senderId = message.sender.id,
+            senderName = message.sender.displayName,
+            sequenceNumber = message.sequenceNumber,
+            roomSeq = roomSeq,
+            streamShard = message.streamShard,
+            writeShard = message.writeShard,
+            fanoutShard = message.fanoutShard,
+            timestamp = message.createdAt
+        )
+    }
+
+    private fun normalizeClientMessageId(clientMessageId: String?): String? {
+        return clientMessageId?.trim()?.takeIf { it.isNotEmpty() }
+    }
+
+    private fun generateMessageId(): String {
+        val timestamp = Instant.now().toEpochMilli().toString(36).padStart(9, '0')
+        val randomBytes = ByteArray(10)
+        secureRandom.nextBytes(randomBytes)
+        val randomPart = Base64.getUrlEncoder().withoutPadding().encodeToString(randomBytes)
+        return "msg_${timestamp}_$randomPart"
+    }
+
+    private fun legacyMessageId(id: Long): String = "legacy:$id"
+
+    private fun streamShard(roomId: Long): Int = shard(roomId.toString(), SHARD_COUNT)
+
+    private fun writeShard(messageId: String): Int = shard(messageId, SHARD_COUNT)
+
+    private fun fanoutShard(roomId: Long): Int = shard(roomId.toString(), SHARD_COUNT)
+
+    private fun shard(value: String, shardCount: Int): Int {
+        return Math.floorMod(value.hashCode(), shardCount.coerceAtLeast(1))
     }
 
     private fun publishMembershipChangedAfterCommit(
@@ -367,5 +446,9 @@ class ChatServiceImpl(
             roomId = roomId,
             action = action,
         )
+    }
+
+    private companion object {
+        const val SHARD_COUNT = 1
     }
 }

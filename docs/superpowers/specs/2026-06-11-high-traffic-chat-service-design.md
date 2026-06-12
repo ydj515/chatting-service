@@ -594,7 +594,7 @@ GET /chat-rooms/{roomId}/messages/gap?afterSeq=12345&limit=200
 3. 짧은 시간 범위의 정확 조회는 PostgreSQL partition table을 직접 조회한다.
 4. 키워드가 있으면 초기에는 PostgreSQL FTS/trigram index를 조회한다.
 5. OpenSearch 도입 이후에는 OpenSearch 결과의 `messageId` 목록을 기준으로 PostgreSQL canonical store에서 원본을 재조회한다.
-6. 관리자 화면에 pagination cursor와 함께 반환한다.
+6. 관리자 화면에 pagination cursor와 함께 반환한다. (장기적으로 cursor는 DB 식별자 노출 방지 및 유연성 확보를 위해 Long 타입에서 Base64 등 Opaque cursor로 변경을 검토한다)
 
 대량 export:
 
@@ -1642,7 +1642,7 @@ docker compose run --rm -e CHAT_PARTITION_ARCHIVE_RUN_ONCE=true postgres-partiti
 
 완료 기준:
 
-- 방별/시간대별 조회가 cursor pagination으로 동작한다.
+- 방별/시간대별 조회가 cursor pagination으로 동작한다. (장기적으로 cursor는 DB 식별자 노출 방지 및 유연성 확보를 위해 Long 타입에서 Base64 등 Opaque cursor로 변경을 검토한다)
 - 키워드 검색이 `roomId`, `from`, `to`, `senderId` 필터와 함께 동작한다.
 - 1천만 메시지 테스트 데이터에서 관리자 방별/시간대별 조회 p95 1초 목표를 검증한다.
 - 관리자 UI에서 방 상태, bounded live feed 정책, rate limit/slow mode 상태, 검색 latency를 확인할 수 있다.
@@ -1797,12 +1797,12 @@ node scripts/load-chat.mjs --room hot --viewers 10000 --messages-per-sec 10000 -
 - Dockerfile을 `APP_MODULE` 기반으로 특정 실행 모듈을 빌드/복사하도록 변경 완료.
 - Nginx 라우팅을 `/api/ws/` -> `chat-websocket-application`, `/api/admin/` -> `chat-admin-application`, 일반 `/api/` -> `chat-api-application`으로 분리 완료.
 - Compose 서비스를 `chat-api-app-*`, `chat-websocket-app-*`, `chat-worker-app-*`, `chat-admin-app-*`로 분리 완료.
+- Phase 2 구현 완료: 새 메시지는 `messageId`, `clientMessageId`, `roomSeq`, `streamShard`, `writeShard`, `fanoutShard`를 가지며, Redis `INCRBY` sequence block과 `(roomId, senderId, clientMessageId)` idempotency를 사용한다. WebSocket은 `MESSAGE_ACCEPTED`, `CHAT_MESSAGE`, `CHAT_MESSAGE_BATCH` 계약을 갖고, 클라이언트는 `messageId` 중복 제거와 `roomSeq` 정렬을 수행한다.
 
 남은 변경을 Phase별로 정리하면 다음과 같다.
 
 | Phase | 주요 변경 | 핵심 파일 |
 | --- | --- | --- |
-| Phase 2 | `messageId`, `clientMessageId`, `roomSeq`, idempotency, ACK/batch 계약 | `chat-domain`, `chat-persistence`, `chat-websocket`, `client` |
 | Phase 2.5 | WebSocket one-time ticket, production token query fallback 제거, 보안 gate | `chat-api`, `chat-websocket`, `chat-persistence`, `client`, `docs/ws_ticket_analysis.md` |
 | Phase 3 | Redis Streams producer/consumer, fanout worker, JPA compatibility writer | `chat-persistence`, `chat-worker-application`, `chat-runtime-config` |
 | Phase 4 | partitioned `chat_messages` canonical store, read replica history, gap fill | `infra/postgres`, `chat-persistence`, `chat-api` |
@@ -1858,5 +1858,9 @@ node scripts/load-chat.mjs --room hot --viewers 10000 --messages-per-sec 10000 -
 ## 22. 후속 질문(Next Questions)
 
 - Phase 1을 바로 구현할 것인가?
-- Phase 1 구현 전에 JWT와 opaque session token 중 어떤 방식을 우선할 것인가?
-- Phase 2에서 `messageId` 형식은 UUIDv7, ULID, Snowflake 계열 중 무엇으로 갈 것인가?
+- Phase 2.5 WebSocket one-time ticket 보안 gate를 다음 작업으로 진행할 것인가?
+- Phase 3에서 Redis Streams producer/consumer와 fanout worker를 어느 단위로 나눠 구현할 것인가?
+
+## 23. TODO List
+
+- [ ] 장기적으로 cursor API를 Long 타입에서 Base64 등 Opaque cursor 타입으로 변경 검토

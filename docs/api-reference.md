@@ -34,7 +34,7 @@ OpenAPI 스펙은 [`openapi.yaml`](openapi.yaml)을 참고하세요.
 | 메서드 | 경로 | 설명 |
 | --- | --- | --- |
 | `GET` | `/api/chat-rooms/{id}/messages` | 메시지 조회 |
-| `GET` | `/api/chat-rooms/{id}/messages/cursor?cursor=...&limit=50&direction=BEFORE` | 커서 기반 메시지 페이징 |
+| `GET` | `/api/chat-rooms/{id}/messages/cursor?cursor=...&limit=50&direction=BEFORE` | 커서 기반 메시지 페이징 (장기적으로 cursor는 보안 및 유연성을 위해 Long 대신 Base64 등 Opaque 문자열로 변경 검토) |
 
 ---
 
@@ -55,21 +55,78 @@ ws://localhost/api/ws/chat?token={sessionToken}
   "type": "SEND_MESSAGE",
   "chatRoomId": 1,
   "messageType": "TEXT",
-  "content": "hello"
+  "content": "hello",
+  "clientMessageId": "client-generated-id"
 }
 ```
 
 ### 서버 -> 클라이언트
 
+송신자 ACK:
+
+```json
+{
+  "type": "MESSAGE_ACCEPTED",
+  "id": 10,
+  "messageId": "msg_m8abcd123_xYz...",
+  "clientMessageId": "client-generated-id",
+  "roomId": 1,
+  "chatRoomId": 1,
+  "roomSeq": 123,
+  "sequenceNumber": 123,
+  "timestamp": "2026-06-12T12:00:00"
+}
+```
+
+단건 메시지:
+
 ```json
 {
   "type": "CHAT_MESSAGE",
   "id": 10,
+  "messageId": "msg_m8abcd123_xYz...",
+  "clientMessageId": "client-generated-id",
   "content": "hello",
+  "messageType": "TEXT",
   "senderId": 1,
   "senderName": "alice",
   "sequenceNumber": 123,
+  "roomSeq": 123,
+  "streamShard": 0,
+  "writeShard": 0,
+  "fanoutShard": 0,
   "chatRoomId": 1,
-  "timestamp": "2024-01-01T00:00:00"
+  "timestamp": "2026-06-12T12:00:00"
 }
 ```
+
+Batch 메시지:
+
+```json
+{
+  "type": "CHAT_MESSAGE_BATCH",
+  "chatRoomId": 1,
+  "messages": [
+    {
+      "type": "CHAT_MESSAGE",
+      "id": 10,
+      "messageId": "msg_m8abcd123_xYz...",
+      "clientMessageId": "client-generated-id",
+      "content": "hello",
+      "messageType": "TEXT",
+      "senderId": 1,
+      "senderName": "alice",
+      "sequenceNumber": 123,
+      "roomSeq": 123,
+      "streamShard": 0,
+      "writeShard": 0,
+      "fanoutShard": 0,
+      "chatRoomId": 1,
+      "timestamp": "2026-06-12T12:00:00"
+    }
+  ],
+  "timestamp": "2026-06-12T12:00:00"
+}
+```
+
+클라이언트는 `messageId`를 기준으로 중복 제거하고, `roomSeq` 기준으로 방 안의 표시 순서를 정렬합니다. 같은 `clientMessageId`를 재전송하면 서버는 새 메시지를 저장하지 않고 기존 `messageId`, `roomSeq`를 가진 ACK를 반환합니다.

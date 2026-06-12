@@ -132,6 +132,7 @@ chat:
   message:
     sequence:
       ttl: ${CHAT_MESSAGE_SEQUENCE_TTL:24h}
+      block-size: ${CHAT_MESSAGE_SEQUENCE_BLOCK_SIZE:1000}
     pagination:
       max-limit: ${CHAT_MESSAGE_PAGINATION_MAX_LIMIT:100}
       default-limit: ${CHAT_MESSAGE_PAGINATION_DEFAULT_LIMIT:50}

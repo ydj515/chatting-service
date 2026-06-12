@@ -349,10 +349,18 @@ async function main() {
     await sleep(1000);
 
     const content = `verify-message-${Date.now()}`;
+    const clientMessageId = `verify-client-${Date.now()}`;
+    const acceptedPromise = senderWs.waitForJson((message) => (
+      message.type === 'MESSAGE_ACCEPTED' &&
+      message.chatRoomId === room.id &&
+      message.clientMessageId === clientMessageId
+    ));
     const receivedPromise = receiverWs.waitForJson((message) => (
+      message.type === 'CHAT_MESSAGE' &&
       message.chatRoomId === room.id &&
       message.senderId === sender.id &&
-      message.content === content
+      message.content === content &&
+      message.clientMessageId === clientMessageId
     ));
 
     senderWs.sendJson({
@@ -360,23 +368,72 @@ async function main() {
       chatRoomId: room.id,
       messageType: 'TEXT',
       content,
+      clientMessageId,
     });
 
+    const accepted = await acceptedPromise;
     const received = await receivedPromise;
+    if (
+      !accepted.messageId ||
+      accepted.messageId !== received.messageId ||
+      accepted.roomSeq !== received.roomSeq ||
+      accepted.sequenceNumber !== received.sequenceNumber
+    ) {
+      throw new Error('MESSAGE_ACCEPTED and CHAT_MESSAGE have inconsistent message contract fields');
+    }
+
     const history = await requestJson(`/chat-rooms/${room.id}/messages?page=0&size=10`, {
       headers: authorizationHeaders(receiverLogin),
     });
-    const saved = history.content.some((message) => message.id === received.id && message.content === content);
+    const savedMessages = history.content.filter((message) => (
+      message.messageId === received.messageId &&
+      message.clientMessageId === clientMessageId &&
+      message.roomSeq === received.roomSeq &&
+      message.content === content
+    ));
 
-    if (!saved) {
+    if (savedMessages.length !== 1) {
       throw new Error('WebSocket message was received but not found in message history');
     }
 
+    const duplicateAcceptedPromise = senderWs.waitForJson((message) => (
+      message.type === 'MESSAGE_ACCEPTED' &&
+      message.chatRoomId === room.id &&
+      message.clientMessageId === clientMessageId
+    ));
+    senderWs.sendJson({
+      type: 'SEND_MESSAGE',
+      chatRoomId: room.id,
+      messageType: 'TEXT',
+      content,
+      clientMessageId,
+    });
+    const duplicateAccepted = await duplicateAcceptedPromise;
+    if (
+      duplicateAccepted.messageId !== accepted.messageId ||
+      duplicateAccepted.roomSeq !== accepted.roomSeq
+    ) {
+      throw new Error('Duplicate clientMessageId did not return the original message contract');
+    }
+
+    const historyAfterDuplicate = await requestJson(`/chat-rooms/${room.id}/messages?page=0&size=10`, {
+      headers: authorizationHeaders(receiverLogin),
+    });
+    const duplicateSavedMessages = historyAfterDuplicate.content.filter((message) => (
+      message.clientMessageId === clientMessageId
+    ));
+    if (duplicateSavedMessages.length !== 1) {
+      throw new Error('Duplicate clientMessageId created more than one saved message');
+    }
+
     const spoofedUserIdContent = `verify-spoofed-user-id-message-${Date.now()}`;
+    const spoofedClientMessageId = `verify-spoofed-client-${Date.now()}`;
     const spoofedUserIdReceivedPromise = receiverWs.waitForJson((message) => (
+      message.type === 'CHAT_MESSAGE' &&
       message.chatRoomId === room.id &&
       message.senderId === sender.id &&
-      message.content === spoofedUserIdContent
+      message.content === spoofedUserIdContent &&
+      message.clientMessageId === spoofedClientMessageId
     ));
     const spoofedUserIdWs = await connectSession(senderLogin.sessionToken, receiver.id, 'spoofed-user-id');
     try {
@@ -385,6 +442,7 @@ async function main() {
         chatRoomId: room.id,
         messageType: 'TEXT',
         content: spoofedUserIdContent,
+        clientMessageId: spoofedClientMessageId,
       });
       await spoofedUserIdReceivedPromise;
     } finally {
@@ -399,10 +457,13 @@ async function main() {
     await sleep(1000);
 
     const lateJoinContent = `verify-late-join-message-${Date.now()}`;
+    const lateJoinClientMessageId = `verify-late-join-client-${Date.now()}`;
     const lateJoinReceivedPromise = receiverWs.waitForJson((message) => (
+      message.type === 'CHAT_MESSAGE' &&
       message.chatRoomId === lateRoom.id &&
       message.senderId === sender.id &&
-      message.content === lateJoinContent
+      message.content === lateJoinContent &&
+      message.clientMessageId === lateJoinClientMessageId
     ));
 
     senderWs.sendJson({
@@ -410,6 +471,7 @@ async function main() {
       chatRoomId: lateRoom.id,
       messageType: 'TEXT',
       content: lateJoinContent,
+      clientMessageId: lateJoinClientMessageId,
     });
 
     const lateJoinReceived = await lateJoinReceivedPromise;
@@ -421,8 +483,12 @@ async function main() {
       senderId: sender.id,
       receiverId: receiver.id,
       messageId: received.id,
+      serverMessageId: received.messageId,
+      clientMessageId,
+      roomSeq: received.roomSeq,
       spoofedUserIdAcceptedAs: sender.id,
       lateJoinMessageId: lateJoinReceived.id,
+      lateJoinServerMessageId: lateJoinReceived.messageId,
     }, null, 2));
   } finally {
     senderWs.close();

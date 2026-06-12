@@ -72,11 +72,17 @@ export type MemberRole = 'OWNER' | 'ADMIN' | 'MEMBER';
 // 메시지 관련 타입
 export interface Message {
   id: number;
+  messageId?: string;
+  clientMessageId?: string;
   chatRoomId: number;
   sender?: User;
   type: MessageType;
   content: string;
   sequenceNumber: number;
+  roomSeq?: number;
+  streamShard?: number;
+  writeShard?: number;
+  fanoutShard?: number;
   isEdited: boolean;
   isDeleted: boolean;
   createdAt: string;
@@ -109,21 +115,34 @@ export interface TypingIndicator {
 // WebSocket 메시지 타입
 export interface WebSocketMessage {
   type: WebSocketMessageType;
+  id?: number;
+  messageId?: string;
+  clientMessageId?: string;
   chatRoomId?: number;
+  roomId?: number;
+  roomSeq?: number;
+  sequenceNumber?: number;
+  streamShard?: number;
+  writeShard?: number;
+  fanoutShard?: number;
   messageType?: MessageType;
   content?: string;
   isTyping?: boolean;
   message?: string;
+  messages?: WebSocketMessage[];
   senderName?: string;
+  senderId?: number;
   userName?: string;
   userId?: number;
-  timestamp?: number;
+  timestamp?: string | number;
 }
 
 export type WebSocketMessageType = 
   | 'SEND_MESSAGE' 
   | 'TYPING_INDICATOR' 
+  | 'MESSAGE_ACCEPTED'
   | 'CHAT_MESSAGE' 
+  | 'CHAT_MESSAGE_BATCH'
   | 'USER_JOINED' 
   | 'USER_LEFT' 
   | 'USER_STATUS_CHANGED'

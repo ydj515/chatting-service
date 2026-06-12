@@ -2,6 +2,11 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { ChatRoom, Message, User, WebSocketMessage } from '../types/index';
 import { messageApi } from '../services/api.ts';
 import { useWebSocket } from '../hooks/useWebSocket.ts';
+import {
+  applyWebSocketMessageEvent,
+  createClientMessageId,
+  sortMessagesForDisplay,
+} from '../utils/messageEvents.ts';
 
 interface ChatWindowProps {
   currentUser: User;
@@ -38,65 +43,24 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   
   // WebSocket 메시지 도착 시 처리
   useEffect(() => {
-    console.log('--- 📬 WebSocket 메시지 수신 ---', lastMessage);
     if (!lastMessage) return;
 
-    // 'lastMessage'는 서버로부터 받은 다양한 타입의 메시지일 수 있으므로 any로 처리
-    const wsMessage: any = lastMessage;
-
-    console.log(`[디버그] 현재 방 ID: ${chatRoom.id} | 메시지 방 ID: ${wsMessage.chatRoomId}`);
-    // 이 메시지가 현재 열려있는 채팅방의 메시지인지 확인
-    if (wsMessage.chatRoomId && wsMessage.chatRoomId !== chatRoom.id) {
-      console.log('[디버그] 다른 방의 메시지이므로 UI를 업데이트하지 않습니다.');
-      return;
-    }
-
-    // CHAT_MESSAGE 타입 처리 (서버에서 온 ChatMessage DTO는 이런 필드들을 가짐)
-    if (wsMessage && typeof wsMessage.content === 'string' && wsMessage.senderId) {
-      console.log('[디버그] 채팅 메시지 타입 확인. UI 상태 업데이트를 준비합니다.');
-      setMessages(prev => {
-        console.log(`[디버그] setMessages 실행. 이전 메시지 개수: ${prev.length}`);
-        // 이미 메시지 목록에 있는지 확인 (중복 추가 방지)
-        if (prev.some(msg => msg.id === wsMessage.id)) {
-          console.log(`[디버그] 중복 메시지(ID: ${wsMessage.id})이므로 추가하지 않습니다.`);
-          return prev;
-        }
-
-        const newMessage: Message = {
-          id: wsMessage.id,
-          chatRoomId: wsMessage.chatRoomId,
-          sender: {
-            id: wsMessage.senderId,
-            username: wsMessage.senderName,
-            displayName: wsMessage.senderName,
-            isActive: true,
-            createdAt: new Date().toISOString(),
-          },
-          type: wsMessage.type,
-          content: wsMessage.content,
-          sequenceNumber: wsMessage.sequenceNumber,
-          isEdited: false,
-          isDeleted: false,
-          createdAt: new Date(wsMessage.timestamp).toISOString(),
-        };
-        console.log(`[디버그] 새 메시지 추가 완료. 새로운 메시지 개수: ${prev.length + 1}`);
-        return [...prev, newMessage];
-      });
-    } 
-    // TYPING_INDICATOR 타입 처리
-    else if (wsMessage.type === 'TYPING_INDICATOR') {
-      if (wsMessage.userId !== currentUser.id) {
-        setIsTyping(wsMessage.isTyping || false);
-        if (wsMessage.isTyping) {
+    if (lastMessage.type === 'TYPING_INDICATOR') {
+      if (lastMessage.userId !== currentUser.id) {
+        setIsTyping(lastMessage.isTyping || false);
+        if (lastMessage.isTyping) {
           setTimeout(() => setIsTyping(false), 3000);
         }
       }
-    } 
-    // ERROR 타입 처리
-    else if (wsMessage.type === 'ERROR') {
-      console.error('WebSocket 에러 메시지:', wsMessage);
-      onError((wsMessage as any).message || 'WebSocket 에러가 발생했습니다.');
+      return;
     }
+
+    if (lastMessage.type === 'ERROR') {
+      onError(lastMessage.message || 'WebSocket 에러가 발생했습니다.');
+      return;
+    }
+
+    setMessages((prev) => applyWebSocketMessageEvent(prev, lastMessage, chatRoom.id));
   }, [lastMessage, chatRoom.id, currentUser.id, onError]);
 
   // 메시지 목록 로드
@@ -104,10 +68,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
     setIsLoadingMessages(true);
     try {
       const response = await messageApi.getMessages(chatRoom.id, 0, 50);
-      // 메시지를 시간순으로 정렬 (oldest first)
-      const sortedMessages = response.content.sort((a, b) => 
-        new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-      );
+      const sortedMessages = sortMessagesForDisplay(response.content);
       setMessages(sortedMessages);
     } catch (error: any) {
       onError(error.response?.data?.message || '메시지를 불러올 수 없습니다.');
@@ -131,6 +92,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
         chatRoomId: chatRoom.id,
         messageType: 'TEXT',
         content,
+        clientMessageId: createClientMessageId(),
       };
 
       sendWebSocketMessage(wsMessage);

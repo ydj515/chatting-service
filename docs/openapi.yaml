@@ -484,6 +484,13 @@ components:
         id:
           type: integer
           example: 105
+        messageId:
+          type: string
+          example: "msg_m8abcd123_xYz..."
+        clientMessageId:
+          type: string
+          nullable: true
+          example: "client-generated-id"
         chatRoomId:
           type: integer
           example: 1
@@ -512,6 +519,18 @@ components:
         sequenceNumber:
           type: integer
           example: 1005
+        roomSeq:
+          type: integer
+          example: 1005
+        streamShard:
+          type: integer
+          example: 0
+        writeShard:
+          type: integer
+          example: 0
+        fanoutShard:
+          type: integer
+          example: 0
 
     ChatRoomMemberDto:
       type: object

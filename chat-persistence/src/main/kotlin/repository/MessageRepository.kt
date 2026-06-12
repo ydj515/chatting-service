@@ -6,16 +6,31 @@ import org.springframework.data.domain.Pageable
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Query
 import org.springframework.stereotype.Repository
+import java.util.Optional
 
 @Repository
 interface MessageRepository : JpaRepository<Message, Long> {
+
+    @Query("""
+        SELECT m FROM Message m
+        JOIN FETCH m.sender s
+        JOIN FETCH m.chatRoom cr
+        WHERE m.chatRoom.id = :chatRoomId
+        AND m.sender.id = :senderId
+        AND m.clientMessageId = :clientMessageId
+    """)
+    fun findByChatRoomIdAndSenderIdAndClientMessageId(
+        chatRoomId: Long,
+        senderId: Long,
+        clientMessageId: String,
+    ): Optional<Message>
 
     @Query("""
         SELECT m FROM Message m 
         JOIN FETCH m.sender s
         JOIN FETCH m.chatRoom cr
         WHERE m.chatRoom.id = :chatRoomId AND m.isDeleted = false 
-        ORDER BY m.sequenceNumber DESC, m.createdAt DESC
+        ORDER BY CASE WHEN m.roomSeq > 0 THEN m.roomSeq ELSE m.sequenceNumber END DESC
     """)
     fun findByChatRoomId(chatRoomId: Long, pageable: Pageable): Page<Message>
 
@@ -26,8 +41,8 @@ interface MessageRepository : JpaRepository<Message, Long> {
         JOIN FETCH m.chatRoom cr
         WHERE m.chatRoom.id = :chatRoomId 
         AND m.isDeleted = false 
-        AND m.id < :cursor
-        ORDER BY m.sequenceNumber DESC, m.createdAt DESC
+        AND CASE WHEN m.roomSeq > 0 THEN m.roomSeq ELSE m.sequenceNumber END < :cursor
+        ORDER BY CASE WHEN m.roomSeq > 0 THEN m.roomSeq ELSE m.sequenceNumber END DESC
     """)
     fun findMessagesBefore(chatRoomId: Long, cursor: Long, pageable: Pageable): List<Message>
 
@@ -38,8 +53,8 @@ interface MessageRepository : JpaRepository<Message, Long> {
         JOIN FETCH m.chatRoom cr
         WHERE m.chatRoom.id = :chatRoomId 
         AND m.isDeleted = false 
-        AND m.id > :cursor
-        ORDER BY m.sequenceNumber ASC, m.createdAt ASC
+        AND CASE WHEN m.roomSeq > 0 THEN m.roomSeq ELSE m.sequenceNumber END > :cursor
+        ORDER BY CASE WHEN m.roomSeq > 0 THEN m.roomSeq ELSE m.sequenceNumber END ASC
     """)
     fun findMessagesAfter(chatRoomId: Long, cursor: Long, pageable: Pageable): List<Message>
 
@@ -50,7 +65,7 @@ interface MessageRepository : JpaRepository<Message, Long> {
         JOIN FETCH m.chatRoom cr
         WHERE m.chatRoom.id = :chatRoomId 
         AND m.isDeleted = false 
-        ORDER BY m.sequenceNumber DESC, m.createdAt DESC
+        ORDER BY CASE WHEN m.roomSeq > 0 THEN m.roomSeq ELSE m.sequenceNumber END DESC
     """)
     fun findLatestMessages(chatRoomId: Long, pageable: Pageable): List<Message>
 
@@ -58,7 +73,7 @@ interface MessageRepository : JpaRepository<Message, Long> {
     @Query(value = """
         SELECT * FROM messages m 
         WHERE m.chat_room_id = :chatRoomId AND m.is_deleted = false 
-        ORDER BY m.sequence_number DESC, m.created_at DESC 
+        ORDER BY CASE WHEN m.room_seq > 0 THEN m.room_seq ELSE m.sequence_number END DESC
         LIMIT 1
     """, nativeQuery = true)
     fun findLatestMessage(chatRoomId: Long): Message?
