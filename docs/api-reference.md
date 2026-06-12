@@ -10,7 +10,7 @@ OpenAPI 스펙은 [`openapi.yaml`](openapi.yaml)을 참고하세요.
 | 메서드 | 경로 | 설명 |
 | --- | --- | --- |
 | `POST` | `/api/users/register` | 회원가입 |
-| `POST` | `/api/users/login` | 로그인 |
+| `POST` | `/api/users/login` | 로그인. 응답에 `sessionToken`, `tokenType`, `expiresAt` 포함 |
 | `GET` | `/api/users/{id}` | 사용자 조회 |
 | `GET` | `/api/users/me?userId=...` | 내 정보 조회 |
 | `GET` | `/api/users/search?username=...` | 사용자 검색 |
@@ -41,8 +41,10 @@ OpenAPI 스펙은 [`openapi.yaml`](openapi.yaml)을 참고하세요.
 ### 접속
 
 ```
-ws://localhost/api/ws/chat?userId={userId}
+ws://localhost/api/ws/chat?token={sessionToken}
 ```
+
+`sessionToken`은 `/api/users/login` 응답의 값입니다. `userId` query parameter는 인증 주체로 사용하지 않습니다.
 
 ### 클라이언트 -> 서버
 

@@ -6,7 +6,6 @@ import org.springframework.boot.context.properties.ConfigurationProperties
 data class WebSocketProperties(
     val endpoint: String = "/ws/chat",
     val allowedOrigins: List<String> = listOf("*"),
-    val userIdQueryParam: String = "userId",
     val userIdAttribute: String = "userId",
     val initialChatRoomPageSize: Int = 100,
 )

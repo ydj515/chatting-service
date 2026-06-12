@@ -16,6 +16,12 @@ import {
 } from '../types';
 import { appConfig } from '../config/appConfig.ts';
 
+let sessionToken: string | null = null;
+
+export const setSessionToken = (token: string | null) => {
+  sessionToken = token;
+};
+
 // Axios 기본 설정
 const api = axios.create({
   baseURL: appConfig.api.baseUrl,
@@ -29,6 +35,9 @@ const api = axios.create({
 api.interceptors.request.use(
   (config) => {
     // console.log(`[API Request] ${config.method?.toUpperCase()} ${config.url}`);
+    if (sessionToken) {
+      config.headers.Authorization = `Bearer ${sessionToken}`;
+    }
     return config;
   },
   (error) => {
@@ -71,8 +80,8 @@ export const userApi = {
 
   // 사용자 로그인
   login: async (data: LoginRequest): Promise<LoginResponse> => {
-    const response: AxiosResponse<User> = await api.post('/users/login', data);
-    return { user: response.data };
+    const response: AxiosResponse<LoginResponse> = await api.post('/users/login', data);
+    return response.data;
   },
 
   // 사용자 정보 조회

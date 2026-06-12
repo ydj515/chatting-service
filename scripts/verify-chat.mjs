@@ -42,19 +42,36 @@ async function requestJson(path, options = {}) {
 async function registerUser(prefix) {
   const suffix = `${Date.now().toString(36)}${Math.floor(Math.random() * 1000).toString(36)}`;
   const username = `${prefix}_${suffix}`;
-  return requestJson('/users/register', {
+  const password = 'password';
+  const user = await requestJson('/users/register', {
     method: 'POST',
     body: JSON.stringify({
       username,
-      password: 'password',
+      password,
       displayName: username,
+    }),
+  });
+  return { ...user, password };
+}
+
+async function loginUser(user) {
+  return requestJson('/users/login', {
+    method: 'POST',
+    body: JSON.stringify({
+      username: user.username,
+      password: user.password,
     }),
   });
 }
 
-async function createRoom(createdBy, namePrefix) {
+const authorizationHeaders = (login) => ({
+  Authorization: `${login.tokenType} ${login.sessionToken}`,
+});
+
+async function createRoom(createdBy, namePrefix, login) {
   return requestJson(`/chat-rooms?createdBy=${createdBy}`, {
     method: 'POST',
+    headers: authorizationHeaders(login),
     body: JSON.stringify({
       name: `${namePrefix}-${Date.now()}`,
       description: 'chat verification room',
@@ -113,8 +130,10 @@ class RawWebSocket {
 
           const header = handshakeBuffer.subarray(0, headerEnd).toString('utf8');
           if (!header.startsWith('HTTP/1.1 101') && !header.startsWith('HTTP/1.0 101')) {
+            const body = handshakeBuffer.subarray(headerEnd + 4).toString('utf8').trim();
+            const bodySummary = body ? ` body=${body.slice(0, 160)}` : '';
             clearTimeout(timer);
-            reject(new Error(`WebSocket handshake failed: ${header.split('\r\n')[0]}`));
+            reject(new Error(`WebSocket handshake failed: ${header.split('\r\n')[0]}${bodySummary}`));
             this.close();
             return;
           }
@@ -266,26 +285,54 @@ class RawWebSocket {
   }
 }
 
-async function connectUser(userId) {
+async function connectSession(sessionToken, userIdQuery = null, label = 'session') {
+  const url = new URL(wsBaseUrl);
+  url.searchParams.set('token', sessionToken);
+  if (userIdQuery !== null) {
+    url.searchParams.set('userId', String(userIdQuery));
+  }
+  const ws = new RawWebSocket(url.toString());
+  try {
+    await ws.connect();
+  } catch (error) {
+    throw new Error(`${label} WebSocket connection failed: ${error.message}`);
+  }
+  return ws;
+}
+
+async function assertUserIdOnlyHandshakeRejected(userId) {
   const url = new URL(wsBaseUrl);
   url.searchParams.set('userId', String(userId));
   const ws = new RawWebSocket(url.toString());
-  await ws.connect();
-  return ws;
+  try {
+    await ws.connect();
+    throw new Error('WebSocket accepted a userId-only handshake');
+  } catch (error) {
+    if (!String(error.message).includes('WebSocket handshake failed')) {
+      throw error;
+    }
+  } finally {
+    ws.close();
+  }
 }
 
 async function main() {
   const sender = await registerUser('vs');
   const receiver = await registerUser('vr');
-  const room = await createRoom(sender.id, 'verify-room');
+  const senderLogin = await loginUser(sender);
+  const receiverLogin = await loginUser(receiver);
+  const room = await createRoom(sender.id, 'verify-room', senderLogin);
+
+  await assertUserIdOnlyHandshakeRejected(sender.id);
 
   await requestJson(`/chat-rooms/${room.id}/members`, {
     method: 'POST',
+    headers: authorizationHeaders(receiverLogin),
     body: JSON.stringify({ userId: receiver.id }),
   });
 
-  const senderWs = await connectUser(sender.id);
-  const receiverWs = await connectUser(receiver.id);
+  const senderWs = await connectSession(senderLogin.sessionToken, null, 'sender');
+  const receiverWs = await connectSession(receiverLogin.sessionToken, null, 'receiver');
 
   try {
     await sleep(1000);
@@ -305,16 +352,38 @@ async function main() {
     });
 
     const received = await receivedPromise;
-    const history = await requestJson(`/chat-rooms/${room.id}/messages?userId=${receiver.id}&page=0&size=10`);
+    const history = await requestJson(`/chat-rooms/${room.id}/messages?userId=${receiver.id}&page=0&size=10`, {
+      headers: authorizationHeaders(receiverLogin),
+    });
     const saved = history.content.some((message) => message.id === received.id && message.content === content);
 
     if (!saved) {
       throw new Error('WebSocket message was received but not found in message history');
     }
 
-    const lateRoom = await createRoom(sender.id, 'verify-late-join-room');
+    const spoofedUserIdContent = `verify-spoofed-user-id-message-${Date.now()}`;
+    const spoofedUserIdReceivedPromise = receiverWs.waitForJson((message) => (
+      message.chatRoomId === room.id &&
+      message.senderId === sender.id &&
+      message.content === spoofedUserIdContent
+    ));
+    const spoofedUserIdWs = await connectSession(senderLogin.sessionToken, receiver.id, 'spoofed-user-id');
+    try {
+      spoofedUserIdWs.sendJson({
+        type: 'SEND_MESSAGE',
+        chatRoomId: room.id,
+        messageType: 'TEXT',
+        content: spoofedUserIdContent,
+      });
+      await spoofedUserIdReceivedPromise;
+    } finally {
+      spoofedUserIdWs.close();
+    }
+
+    const lateRoom = await createRoom(sender.id, 'verify-late-join-room', senderLogin);
     await requestJson(`/chat-rooms/${lateRoom.id}/members`, {
       method: 'POST',
+      headers: authorizationHeaders(receiverLogin),
       body: JSON.stringify({ userId: receiver.id }),
     });
     await sleep(1000);
@@ -342,6 +411,7 @@ async function main() {
       senderId: sender.id,
       receiverId: receiver.id,
       messageId: received.id,
+      spoofedUserIdAcceptedAs: sender.id,
       lateJoinMessageId: lateJoinReceived.id,
     }, null, 2));
   } finally {

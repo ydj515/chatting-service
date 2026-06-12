@@ -29,8 +29,13 @@
 | `WORKER_ROLES` | `message-writer,fanout,search-projection,archive` | `chat-worker-application`에서 활성화할 worker role 목록 |
 | `REDIS_PORT` | `6379` | Redis 내부 포트 |
 | `CHAT_REDIS_MEMBERSHIP_TOPIC` | `chat.membership` | REST create/join 결과를 WebSocket 노드에 전파하는 Redis 제어 topic |
+| `CHAT_AUTH_SESSION_SECRET` | `local-development-session-secret-change-me` | 로그인 session token HMAC 서명 secret. 운영 환경에서는 반드시 교체 |
+| `CHAT_AUTH_SESSION_TTL` | `12h` | 로그인 session token TTL |
+| `CHAT_AUTH_SESSION_TOKEN_QUERY_PARAM` | `token` | Browser WebSocket handshake에서 사용할 token query parameter |
 | `CHAT_API_CORS_ALLOWED_ORIGINS` | `*` | REST API CORS 허용 origin |
 | `CHAT_WEBSOCKET_ALLOWED_ORIGINS` | `*` | WebSocket 허용 origin |
+| `CHAT_WEBSOCKET_GATEWAY_OUTBOUND_QUEUE_MAX_PENDING_MESSAGES` | `128` | WebSocket session별 outbound pending queue 상한 |
+| `CHAT_WEBSOCKET_GATEWAY_OUTBOUND_EXECUTOR_THREADS` | `4` | WebSocket outbound queue drain executor thread 수 |
 | `CHAT_MESSAGE_SEQUENCE_TTL` | `24h` | Redis 메시지 시퀀스 키 TTL |
 
 ## Client

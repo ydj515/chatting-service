@@ -87,8 +87,8 @@ export const appConfig = {
   },
 };
 
-export const buildWebSocketUrl = (userId: number): string => {
+export const buildWebSocketUrl = (sessionToken: string): string => {
   const url = new URL(appConfig.webSocket.baseUrl);
-  url.searchParams.set('userId', userId.toString());
+  url.searchParams.set('token', sessionToken);
   return url.toString();
 };

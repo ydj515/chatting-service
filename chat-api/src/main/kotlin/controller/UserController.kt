@@ -22,9 +22,9 @@ class UserController(
     }
 
     @PostMapping("/login")
-    fun login(@Valid @RequestBody request: LoginRequest): ResponseEntity<UserDto> {
-        val user = userService.login(request)
-        return ResponseEntity.ok(user)
+    fun login(@Valid @RequestBody request: LoginRequest): ResponseEntity<LoginResponse> {
+        val response = userService.login(request)
+        return ResponseEntity.ok(response)
     }
 
     @GetMapping("/{id}")

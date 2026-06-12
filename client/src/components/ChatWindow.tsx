@@ -5,12 +5,14 @@ import { useWebSocket } from '../hooks/useWebSocket.ts';
 
 interface ChatWindowProps {
   currentUser: User;
+  sessionToken: string;
   chatRoom: ChatRoom;
   onError: (error: string) => void;
 }
 
 export const ChatWindow: React.FC<ChatWindowProps> = ({
   currentUser,
+  sessionToken,
   chatRoom,
   onError,
 }) => {
@@ -28,7 +30,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
     sendMessage: sendWebSocketMessage,
     error: wsError,
   } = useWebSocket({
-    userId: currentUser.id,
+    sessionToken,
     onConnect: () => console.log('🔌 WebSocket 연결됨'),
     onDisconnect: () => console.log('🔌 WebSocket 연결 해제됨'),
     onError: (error) => console.error('🔌 WebSocket 에러:', error),

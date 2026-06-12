@@ -123,7 +123,7 @@ class ChatServiceImpl(
         )
         chatRoomMemberRepository.save(ownerMember)
 
-        publishMembershipJoinedAfterCommit(creator.id, savedRoom.id)
+        publishMembershipChangedAfterCommit(creator.id, savedRoom.id, RedisMessageBroker.MembershipAction.JOIN)
 
         return chatRoomToDto(savedRoom)
     }
@@ -186,7 +186,7 @@ class ChatServiceImpl(
         )
         chatRoomMemberRepository.save(member)
 
-        publishMembershipJoinedAfterCommit(userId, roomId)
+        publishMembershipChangedAfterCommit(userId, roomId, RedisMessageBroker.MembershipAction.JOIN)
     }
 
     @Caching(evict = [
@@ -195,6 +195,7 @@ class ChatServiceImpl(
     ])
     override fun leaveChatRoom(roomId: Long, userId: Long) {
         chatRoomMemberRepository.leaveChatRoom(roomId, userId)
+        publishMembershipChangedAfterCommit(userId, roomId, RedisMessageBroker.MembershipAction.LEAVE)
     }
 
     @Cacheable(value = ["chatRoomMembers"], key = "#roomId")
@@ -330,28 +331,41 @@ class ChatServiceImpl(
         return messageToDto(savedMessage)
     }
 
-    private fun publishMembershipJoinedAfterCommit(userId: Long, roomId: Long) {
+    private fun publishMembershipChangedAfterCommit(
+        userId: Long,
+        roomId: Long,
+        action: RedisMessageBroker.MembershipAction,
+    ) {
         if (!TransactionSynchronizationManager.isSynchronizationActive()) {
-            publishMembershipJoined(userId, roomId)
+            publishMembershipChanged(userId, roomId, action)
             return
         }
 
         TransactionSynchronizationManager.registerSynchronization(object : TransactionSynchronization {
             override fun afterCommit() {
-                publishMembershipJoined(userId, roomId)
+                publishMembershipChanged(userId, roomId, action)
             }
         })
     }
 
-    private fun publishMembershipJoined(userId: Long, roomId: Long) {
-        if (webSocketSessionManager.isUserOnlineLocally(userId)) {
-            webSocketSessionManager.joinRoom(userId, roomId)
+    private fun publishMembershipChanged(
+        userId: Long,
+        roomId: Long,
+        action: RedisMessageBroker.MembershipAction,
+    ) {
+        when (action) {
+            RedisMessageBroker.MembershipAction.JOIN -> {
+                if (webSocketSessionManager.isUserOnlineLocally(userId)) {
+                    webSocketSessionManager.joinRoom(userId, roomId)
+                }
+            }
+            RedisMessageBroker.MembershipAction.LEAVE -> webSocketSessionManager.leaveRoom(userId, roomId)
         }
 
         redisMessageBroker.publishMembershipChanged(
             userId = userId,
             roomId = roomId,
-            action = RedisMessageBroker.MembershipAction.JOIN,
+            action = action,
         )
     }
 }

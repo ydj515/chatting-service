@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { User, LoginRequest, RegisterRequest } from '../types/index';
+import { LoginRequest, LoginResponse, RegisterRequest } from '../types/index';
 import { userApi } from '../services/api.ts';
 import {
   AUTH_FIELD_LIMITS,
@@ -12,7 +12,7 @@ import Input from './ui/Input.tsx';
 import { MessageCircle, UserPlus, LogIn, Lock, User as UserIcon } from 'lucide-react';
 
 interface LoginFormProps {
-  onLogin: (user: User) => void;
+  onLogin: (response: LoginResponse) => void;
   onError: (error: string) => void;
 }
 
@@ -57,7 +57,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLogin, onError }) => {
         };
         
         const response = await userApi.login(loginData);
-        onLogin(response.user);
+        onLogin(response);
       } else {
         const registerData: RegisterRequest = {
           username: formData.username.trim(),
@@ -65,8 +65,12 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLogin, onError }) => {
           displayName: formData.displayName.trim(),
         };
         
-        const user = await userApi.register(registerData);
-        onLogin(user);
+        await userApi.register(registerData);
+        const response = await userApi.login({
+          username: registerData.username,
+          password: registerData.password,
+        });
+        onLogin(response);
       }
     } catch (error: any) {
       console.error('Authentication error:', error);

@@ -44,7 +44,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UserDto'
+                $ref: '#/components/schemas/LoginResponse'
 
   /users/{id}:
     get:
@@ -395,6 +395,27 @@ components:
         password:
           type: string
           example: "securePassword!12"
+
+    LoginResponse:
+      type: object
+      required:
+        - user
+        - sessionToken
+        - tokenType
+        - expiresAt
+      properties:
+        user:
+          $ref: '#/components/schemas/UserDto'
+        sessionToken:
+          type: string
+          example: "v1.eyJzdWIiOiIxIn0.signature"
+        tokenType:
+          type: string
+          example: "Bearer"
+        expiresAt:
+          type: string
+          format: date-time
+          example: "2026-06-12T12:30:00"
 
     UserDto:
       type: object
