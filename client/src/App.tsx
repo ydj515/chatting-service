@@ -14,6 +14,13 @@ import {
   Sun
 } from 'lucide-react';
 
+const parseSessionExpiryMillis = (expiresAt: string): number => {
+  const hasTimeZone = /(?:z|[+-]\d{2}:\d{2})$/i.test(expiresAt);
+  const normalizedExpiresAt = hasTimeZone ? expiresAt : `${expiresAt}Z`;
+  const parsed = Date.parse(normalizedExpiresAt);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
 function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [sessionToken, setSessionToken] = useState<string | null>(null);
@@ -45,7 +52,7 @@ function App() {
       const savedTokenExpiresAt = localStorage.getItem(STORAGE_KEYS.SESSION_EXPIRES_AT);
       const savedRoom = localStorage.getItem(STORAGE_KEYS.SELECTED_ROOM);
       
-      if (savedUser && savedToken && savedTokenExpiresAt && new Date(savedTokenExpiresAt).getTime() > Date.now()) {
+      if (savedUser && savedToken && savedTokenExpiresAt && parseSessionExpiryMillis(savedTokenExpiresAt) > Date.now()) {
         const user = JSON.parse(savedUser);
         setCurrentUser(user);
         setSessionToken(savedToken);

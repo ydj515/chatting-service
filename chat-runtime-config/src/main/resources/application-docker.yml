@@ -116,7 +116,9 @@ chat:
     initial-chat-room-page-size: ${CHAT_WEBSOCKET_INITIAL_CHAT_ROOM_PAGE_SIZE:100}
     gateway:
       outbound-queue-max-pending-messages: ${CHAT_WEBSOCKET_GATEWAY_OUTBOUND_QUEUE_MAX_PENDING_MESSAGES:128}
-      outbound-executor-threads: ${CHAT_WEBSOCKET_GATEWAY_OUTBOUND_EXECUTOR_THREADS:4}
+      outbound-executor-threads: ${CHAT_WEBSOCKET_GATEWAY_OUTBOUND_EXECUTOR_THREADS:32}
+      outbound-send-time-limit-millis: ${CHAT_WEBSOCKET_GATEWAY_OUTBOUND_SEND_TIME_LIMIT_MILLIS:10000}
+      outbound-send-buffer-size-limit-bytes: ${CHAT_WEBSOCKET_GATEWAY_OUTBOUND_SEND_BUFFER_SIZE_LIMIT_BYTES:524288}
   redis:
     sequence-key-prefix: ${CHAT_REDIS_SEQUENCE_KEY_PREFIX:chat:sequence}
     server-rooms-key-prefix: ${CHAT_REDIS_SERVER_ROOMS_KEY_PREFIX:chat:server:rooms:}

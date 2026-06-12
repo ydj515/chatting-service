@@ -14,9 +14,9 @@ import org.springframework.stereotype.Service
 import org.springframework.web.socket.CloseStatus
 import org.springframework.web.socket.TextMessage
 import org.springframework.web.socket.WebSocketSession
+import org.springframework.web.socket.handler.ConcurrentWebSocketSessionDecorator
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executor
-import java.util.concurrent.atomic.AtomicInteger
 
 @Service
 class WebSocketSessionManager(
@@ -34,7 +34,6 @@ class WebSocketSessionManager(
     private val sessionsById = ConcurrentHashMap<String, SessionRef>()
     private val sessionIdsByUserId = ConcurrentHashMap<Long, MutableSet<String>>()
     private val sessionIdsByRoomId = ConcurrentHashMap<Long, MutableSet<String>>()
-    private val localSessionCountByRoomId = ConcurrentHashMap<Long, AtomicInteger>()
 
     @PostConstruct
     fun initialize() {
@@ -58,15 +57,20 @@ class WebSocketSessionManager(
         sessionsById[session.id]?.let { existing ->
             removeSession(existing.userId, existing.session)
         }
+        val outboundSession = ConcurrentWebSocketSessionDecorator(
+            session,
+            gatewayProperties.outboundSendTimeLimitMillis,
+            gatewayProperties.outboundSendBufferSizeLimitBytes,
+        )
 
         val sessionRef = SessionRef(
             userId = userId,
-            session = session,
+            session = outboundSession,
             roomIds = ConcurrentHashMap.newKeySet(),
             outboundQueue = BoundedOutboundSessionQueue(
                 maxPendingMessages = gatewayProperties.outboundQueueMaxPendingMessages,
                 executor = outboundExecutor,
-                sender = { payload -> session.sendMessage(TextMessage(payload)) },
+                sender = { payload -> outboundSession.sendMessage(TextMessage(payload)) },
                 onOverflow = {
                     logger.warn("Closing session ${session.id} because outbound queue is full")
                     closeSession(session, OUTBOUND_QUEUE_FULL_STATUS)
@@ -79,16 +83,13 @@ class WebSocketSessionManager(
             ),
         )
         sessionsById[session.id] = sessionRef
-        sessionIdsByUserId.computeIfAbsent(userId) { ConcurrentHashMap.newKeySet() }.add(session.id)
+        addSessionIdToUser(userId, session.id)
     }
 
     fun removeSession(userId: Long, session: WebSocketSession) {
         val sessionRef = sessionsById.remove(session.id) ?: return
         sessionRef.outboundQueue.close()
-        sessionIdsByUserId[sessionRef.userId]?.remove(session.id)
-        if (sessionIdsByUserId[sessionRef.userId]?.isEmpty() == true) {
-            sessionIdsByUserId.remove(sessionRef.userId)
-        }
+        removeSessionIdFromUser(sessionRef.userId, session.id)
 
         sessionRef.roomIds.toList().forEach { roomId ->
             removeSessionFromRoom(sessionRef, roomId)
@@ -155,7 +156,7 @@ class WebSocketSessionManager(
         sessionIds.forEach { sessionId ->
             val sessionRef = sessionsById[sessionId]
             if (sessionRef == null) {
-                sessionIdsByUserId[userId]?.remove(sessionId)
+                removeSessionIdFromUser(userId, sessionId)
             } else if (sessionRef.session.isOpen) {
                 sessionRefs.add(sessionRef)
             } else {
@@ -163,23 +164,12 @@ class WebSocketSessionManager(
             }
         }
 
-        if (sessionIdsByUserId[userId]?.isEmpty() == true) {
-            sessionIdsByUserId.remove(userId)
-        }
-
         return sessionRefs
     }
 
     private fun addSessionToRoom(sessionRef: SessionRef, roomId: Long) {
         if (sessionRef.roomIds.add(roomId)) {
-            sessionIdsByRoomId.computeIfAbsent(roomId) { ConcurrentHashMap.newKeySet() }.add(sessionRef.session.id)
-
-            val localSessionCount = localSessionCountByRoomId.computeIfAbsent(roomId) { AtomicInteger(0) }
-                .incrementAndGet()
-            if (localSessionCount == 1) {
-                redisMessageBroker.subscribeToRoom(roomId)
-                redisTemplate.opsForSet().add(serverRoomKey(redisMessageBroker.getServerId()), roomId.toString())
-            }
+            addSessionIdToRoom(roomId, sessionRef.session.id)
 
             logger.info("Joined $roomId for ${sessionRef.userId} ${redisMessageBroker.getServerId()}")
         }
@@ -190,16 +180,47 @@ class WebSocketSessionManager(
             return
         }
 
-        sessionIdsByRoomId[roomId]?.remove(sessionRef.session.id)
-        if (sessionIdsByRoomId[roomId]?.isEmpty() == true) {
-            sessionIdsByRoomId.remove(roomId)
-        }
+        removeSessionIdFromRoom(roomId, sessionRef.session.id)
+    }
 
-        val localSessionCount = localSessionCountByRoomId[roomId]?.decrementAndGet() ?: 0
-        if (localSessionCount <= 0) {
-            localSessionCountByRoomId.remove(roomId)
-            redisMessageBroker.unsubscribeFromRoom(roomId)
-            redisTemplate.opsForSet().remove(serverRoomKey(redisMessageBroker.getServerId()), roomId.toString())
+    private fun addSessionIdToUser(userId: Long, sessionId: String) {
+        sessionIdsByUserId.compute(userId) { _, sessionIds ->
+            val nextSessionIds = sessionIds ?: ConcurrentHashMap.newKeySet()
+            nextSessionIds.add(sessionId)
+            nextSessionIds
+        }
+    }
+
+    private fun removeSessionIdFromUser(userId: Long, sessionId: String) {
+        sessionIdsByUserId.computeIfPresent(userId) { _, sessionIds ->
+            sessionIds.remove(sessionId)
+            if (sessionIds.isEmpty()) null else sessionIds
+        }
+    }
+
+    private fun addSessionIdToRoom(roomId: Long, sessionId: String) {
+        sessionIdsByRoomId.compute(roomId) { _, sessionIds ->
+            val nextSessionIds = sessionIds ?: ConcurrentHashMap.newKeySet()
+            val wasEmpty = nextSessionIds.isEmpty()
+            nextSessionIds.add(sessionId)
+            if (wasEmpty) {
+                redisMessageBroker.subscribeToRoom(roomId)
+                redisTemplate.opsForSet().add(serverRoomKey(redisMessageBroker.getServerId()), roomId.toString())
+            }
+            nextSessionIds
+        }
+    }
+
+    private fun removeSessionIdFromRoom(roomId: Long, sessionId: String) {
+        sessionIdsByRoomId.computeIfPresent(roomId) { _, sessionIds ->
+            sessionIds.remove(sessionId)
+            if (sessionIds.isEmpty()) {
+                redisMessageBroker.unsubscribeFromRoom(roomId)
+                redisTemplate.opsForSet().remove(serverRoomKey(redisMessageBroker.getServerId()), roomId.toString())
+                null
+            } else {
+                sessionIds
+            }
         }
     }
 

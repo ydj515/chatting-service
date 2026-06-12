@@ -23,17 +23,19 @@ class AuthenticatedUserResolverTest {
         )
         val resolver = AuthenticatedUserResolver(sessionTokenService)
 
-        val userId = resolver.resolveRequired("Bearer valid-token", explicitUserId = 999L)
+        val userId = resolver.resolveRequired("Bearer valid-token")
 
         assertEquals(42L, userId)
         verify(sessionTokenService).authenticate("valid-token")
     }
 
     @Test
-    fun `token이 없으면 호환성을 위해 명시적 사용자 ID를 사용한다`() {
+    fun `token이 없으면 명시적 사용자 ID로 fallback하지 않는다`() {
         val resolver = AuthenticatedUserResolver(mock(SessionTokenService::class.java))
 
-        assertEquals(999L, resolver.resolveRequired(null, explicitUserId = 999L))
+        assertThrows(IllegalArgumentException::class.java) {
+            resolver.resolveRequired(null)
+        }
     }
 
     @Test
@@ -43,7 +45,7 @@ class AuthenticatedUserResolverTest {
         val resolver = AuthenticatedUserResolver(sessionTokenService)
 
         assertThrows(IllegalArgumentException::class.java) {
-            resolver.resolveRequired("Bearer bad-token", explicitUserId = 999L)
+            resolver.resolveRequired("Bearer bad-token")
         }
     }
 
@@ -52,7 +54,7 @@ class AuthenticatedUserResolverTest {
         val resolver = AuthenticatedUserResolver(mock(SessionTokenService::class.java))
 
         assertThrows(IllegalArgumentException::class.java) {
-            resolver.resolveRequired(null, explicitUserId = null)
+            resolver.resolveRequired(null)
         }
     }
 }

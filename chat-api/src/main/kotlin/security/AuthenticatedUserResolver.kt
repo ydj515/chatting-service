@@ -7,20 +7,16 @@ import org.springframework.stereotype.Component
 class AuthenticatedUserResolver(
     private val sessionTokenService: SessionTokenService,
 ) {
-    fun resolveRequired(authorizationHeader: String?, explicitUserId: Long? = null): Long {
+    fun resolveRequired(authorizationHeader: String?): Long {
         val token = authorizationHeader
             ?.takeIf { it.startsWith(BEARER_PREFIX, ignoreCase = true) }
             ?.substring(BEARER_PREFIX.length)
             ?.trim()
             ?.takeIf { it.isNotBlank() }
+            ?: throw IllegalArgumentException("인증 토큰이 필요합니다.")
 
-        if (token != null) {
-            return sessionTokenService.authenticate(token)?.userId
-                ?: throw IllegalArgumentException("유효하지 않은 인증 토큰입니다.")
-        }
-
-        return explicitUserId
-            ?: throw IllegalArgumentException("인증 사용자 정보가 필요합니다.")
+        return sessionTokenService.authenticate(token)?.userId
+            ?: throw IllegalArgumentException("유효하지 않은 인증 토큰입니다.")
     }
 
     private companion object {

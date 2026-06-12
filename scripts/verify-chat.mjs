@@ -68,8 +68,8 @@ const authorizationHeaders = (login) => ({
   Authorization: `${login.tokenType} ${login.sessionToken}`,
 });
 
-async function createRoom(createdBy, namePrefix, login) {
-  return requestJson(`/chat-rooms?createdBy=${createdBy}`, {
+async function createRoom(namePrefix, login) {
+  return requestJson('/chat-rooms', {
     method: 'POST',
     headers: authorizationHeaders(login),
     body: JSON.stringify({
@@ -80,6 +80,17 @@ async function createRoom(createdBy, namePrefix, login) {
       maxMembers: 10,
     }),
   });
+}
+
+async function assertUserIdOnlyRestRejected(userId) {
+  try {
+    await requestJson(`/chat-rooms?userId=${userId}&page=0&size=1`);
+    throw new Error('REST API accepted a userId-only request');
+  } catch (error) {
+    if (!String(error.message).includes('failed: 400')) {
+      throw error;
+    }
+  }
 }
 
 class RawWebSocket {
@@ -321,14 +332,14 @@ async function main() {
   const receiver = await registerUser('vr');
   const senderLogin = await loginUser(sender);
   const receiverLogin = await loginUser(receiver);
-  const room = await createRoom(sender.id, 'verify-room', senderLogin);
+  const room = await createRoom('verify-room', senderLogin);
 
+  await assertUserIdOnlyRestRejected(sender.id);
   await assertUserIdOnlyHandshakeRejected(sender.id);
 
   await requestJson(`/chat-rooms/${room.id}/members`, {
     method: 'POST',
     headers: authorizationHeaders(receiverLogin),
-    body: JSON.stringify({ userId: receiver.id }),
   });
 
   const senderWs = await connectSession(senderLogin.sessionToken, null, 'sender');
@@ -352,7 +363,7 @@ async function main() {
     });
 
     const received = await receivedPromise;
-    const history = await requestJson(`/chat-rooms/${room.id}/messages?userId=${receiver.id}&page=0&size=10`, {
+    const history = await requestJson(`/chat-rooms/${room.id}/messages?page=0&size=10`, {
       headers: authorizationHeaders(receiverLogin),
     });
     const saved = history.content.some((message) => message.id === received.id && message.content === content);
@@ -380,11 +391,10 @@ async function main() {
       spoofedUserIdWs.close();
     }
 
-    const lateRoom = await createRoom(sender.id, 'verify-late-join-room', senderLogin);
+    const lateRoom = await createRoom('verify-late-join-room', senderLogin);
     await requestJson(`/chat-rooms/${lateRoom.id}/members`, {
       method: 'POST',
       headers: authorizationHeaders(receiverLogin),
-      body: JSON.stringify({ userId: receiver.id }),
     });
     await sleep(1000);
 
