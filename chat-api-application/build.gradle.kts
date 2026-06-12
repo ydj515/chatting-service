@@ -13,6 +13,7 @@ dependencyManagement {
 }
 
 dependencies {
+    implementation(project(":chat-runtime-config"))
     implementation(project(":chat-api"))
     implementation(project(":chat-domain"))
     implementation(project(":chat-persistence"))
@@ -23,10 +24,4 @@ dependencies {
 
     runtimeOnly("org.postgresql:postgresql")
     runtimeOnly("com.h2database:h2")
-}
-
-sourceSets {
-    main {
-        resources.srcDir(project(":chat-application").projectDir.resolve("src/main/resources"))
-    }
 }

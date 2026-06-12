@@ -93,5 +93,5 @@ Nginx는 역할별 upstream으로 트래픽을 분리합니다.
 | `infra/postgres/message-partitions.sql` | 메시지 파티션 DDL |
 | `infra/postgres/archive/` | 파티션 archive worker |
 | `infra/redis/redis.conf` | Redis 설정 |
-| `infra/nginx/nginx.conf` | Nginx 설정 |
+| `infra/nginx/nginx.conf` | Nginx 템플릿 설정. Compose에서 `SERVER_PORT`를 `CHAT_BACKEND_PORT`로 전달해 upstream 포트를 생성 |
 | `start-cluster.sh` | 클러스터 실행 스크립트 |

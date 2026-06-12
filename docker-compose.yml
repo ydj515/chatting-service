@@ -168,6 +168,7 @@ services:
       - chat-network
 
   chat-api-app-1:
+    image: ${CHAT_API_IMAGE:-chatting-service-chat-api-application:local}
     build:
       context: .
       args:
@@ -177,6 +178,7 @@ services:
     hostname: chat-api-app-1
     environment:
       <<: *chat-app-environment
+      SPRING_APPLICATION_NAME: chat-api-application
       APP_ROLE: api
     depends_on:
       postgres-primary-setup: { condition: service_completed_successfully }
@@ -186,15 +188,12 @@ services:
       - chat-network
 
   chat-api-app-2:
-    build:
-      context: .
-      args:
-        APP_PORT: ${SERVER_PORT:-8080}
-        APP_MODULE: chat-api-application
+    image: ${CHAT_API_IMAGE:-chatting-service-chat-api-application:local}
     container_name: chat-api-app-2
     hostname: chat-api-app-2
     environment:
       <<: *chat-app-environment
+      SPRING_APPLICATION_NAME: chat-api-application
       APP_ROLE: api
     depends_on:
       postgres-primary-setup: { condition: service_completed_successfully }
@@ -204,6 +203,7 @@ services:
       - chat-network
 
   chat-websocket-app-1:
+    image: ${CHAT_WEBSOCKET_IMAGE:-chatting-service-chat-websocket-application:local}
     build:
       context: .
       args:
@@ -213,6 +213,7 @@ services:
     hostname: chat-websocket-app-1
     environment:
       <<: *chat-app-environment
+      SPRING_APPLICATION_NAME: chat-websocket-application
       APP_ROLE: websocket
     depends_on:
       postgres-primary-setup: { condition: service_completed_successfully }
@@ -222,15 +223,12 @@ services:
       - chat-network
 
   chat-websocket-app-2:
-    build:
-      context: .
-      args:
-        APP_PORT: ${SERVER_PORT:-8080}
-        APP_MODULE: chat-websocket-application
+    image: ${CHAT_WEBSOCKET_IMAGE:-chatting-service-chat-websocket-application:local}
     container_name: chat-websocket-app-2
     hostname: chat-websocket-app-2
     environment:
       <<: *chat-app-environment
+      SPRING_APPLICATION_NAME: chat-websocket-application
       APP_ROLE: websocket
     depends_on:
       postgres-primary-setup: { condition: service_completed_successfully }
@@ -240,6 +238,7 @@ services:
       - chat-network
 
   chat-worker-app-1:
+    image: ${CHAT_WORKER_IMAGE:-chatting-service-chat-worker-application:local}
     build:
       context: .
       args:
@@ -249,6 +248,7 @@ services:
     hostname: chat-worker-app-1
     environment:
       <<: *chat-app-environment
+      SPRING_APPLICATION_NAME: chat-worker-application
       APP_ROLE: worker
       WORKER_ROLES: ${WORKER_ROLES:-message-writer,fanout,search-projection,archive}
     depends_on:
@@ -259,6 +259,7 @@ services:
       - chat-network
 
   chat-admin-app-1:
+    image: ${CHAT_ADMIN_IMAGE:-chatting-service-chat-admin-application:local}
     build:
       context: .
       args:
@@ -268,6 +269,7 @@ services:
     hostname: chat-admin-app-1
     environment:
       <<: *chat-app-environment
+      SPRING_APPLICATION_NAME: chat-admin-application
       APP_ROLE: admin
     depends_on:
       postgres-primary-setup: { condition: service_completed_successfully }
@@ -283,8 +285,9 @@ services:
     container_name: chat-nginx
     environment:
       TZ: ${TZ:-Asia/Seoul}
+      CHAT_BACKEND_PORT: ${SERVER_PORT:-8080}
     volumes:
-      - ./infra/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./infra/nginx/nginx.conf:/etc/nginx/templates/default.conf.template:ro
     ports:
       - "${NGINX_HTTP_PORT:-80}:80"
     depends_on:

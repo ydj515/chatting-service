@@ -52,6 +52,19 @@ async function registerUser(prefix) {
   });
 }
 
+async function createRoom(createdBy, namePrefix) {
+  return requestJson(`/chat-rooms?createdBy=${createdBy}`, {
+    method: 'POST',
+    body: JSON.stringify({
+      name: `${namePrefix}-${Date.now()}`,
+      description: 'chat verification room',
+      type: 'GROUP',
+      imageUrl: null,
+      maxMembers: 10,
+    }),
+  });
+}
+
 class RawWebSocket {
   constructor(url) {
     this.url = new URL(url);
@@ -264,16 +277,7 @@ async function connectUser(userId) {
 async function main() {
   const sender = await registerUser('vs');
   const receiver = await registerUser('vr');
-  const room = await requestJson(`/chat-rooms?createdBy=${sender.id}`, {
-    method: 'POST',
-    body: JSON.stringify({
-      name: `verify-room-${Date.now()}`,
-      description: 'chat verification room',
-      type: 'GROUP',
-      imageUrl: null,
-      maxMembers: 10,
-    }),
-  });
+  const room = await createRoom(sender.id, 'verify-room');
 
   await requestJson(`/chat-rooms/${room.id}/members`, {
     method: 'POST',
@@ -308,12 +312,37 @@ async function main() {
       throw new Error('WebSocket message was received but not found in message history');
     }
 
+    const lateRoom = await createRoom(sender.id, 'verify-late-join-room');
+    await requestJson(`/chat-rooms/${lateRoom.id}/members`, {
+      method: 'POST',
+      body: JSON.stringify({ userId: receiver.id }),
+    });
+    await sleep(1000);
+
+    const lateJoinContent = `verify-late-join-message-${Date.now()}`;
+    const lateJoinReceivedPromise = receiverWs.waitForJson((message) => (
+      message.chatRoomId === lateRoom.id &&
+      message.senderId === sender.id &&
+      message.content === lateJoinContent
+    ));
+
+    senderWs.sendJson({
+      type: 'SEND_MESSAGE',
+      chatRoomId: lateRoom.id,
+      messageType: 'TEXT',
+      content: lateJoinContent,
+    });
+
+    const lateJoinReceived = await lateJoinReceivedPromise;
+
     console.log(JSON.stringify({
       ok: true,
       roomId: room.id,
+      lateJoinRoomId: lateRoom.id,
       senderId: sender.id,
       receiverId: receiver.id,
       messageId: received.id,
+      lateJoinMessageId: lateJoinReceived.id,
     }, null, 2));
   } finally {
     senderWs.close();

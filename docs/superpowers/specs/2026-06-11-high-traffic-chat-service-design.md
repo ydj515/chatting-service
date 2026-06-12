@@ -1506,7 +1506,7 @@ mise run verify:chat
 - `chat-persistence/src/main/kotlin/service/JpaMessageWriteAdapter.kt`
 - `chat-persistence/src/main/kotlin/config/ChatRedisProperties.kt`
 - `chat-worker-application/src/main/kotlin/com/chat/worker/application/ChatWorkerApplication.kt`
-- `chat-application/src/main/resources/application-docker.yml`
+- `chat-runtime-config/src/main/resources/application-docker.yml`
 
 완료 기준:
 
@@ -1572,7 +1572,7 @@ docker compose logs --tail=200 chat-worker-app-1
 - `chat-persistence/src/main/kotlin/config/DataSourceConfig.kt`
 - `chat-api/src/main/kotlin/controller/ChatController.kt`
 - `chat-domain/src/main/kotlin/service/ChatService.kt`
-- `chat-application/src/main/resources/application-docker.yml`
+- `chat-runtime-config/src/main/resources/application-docker.yml`
 
 완료 기준:
 
@@ -1784,7 +1784,10 @@ node scripts/load-chat.mjs --room hot --viewers 10000 --messages-per-sec 10000 -
 - `chat-websocket-application` 추가 완료.
 - `chat-worker-application` 추가 완료.
 - `chat-admin-application` 추가 완료.
-- 공통 `application-docker.yml` 재사용 완료.
+- `chat-runtime-config` 모듈로 공통 `application-docker.yml` 재사용 완료.
+- Compose role 서비스가 동일 role 내에서 이미지 태그를 공유하도록 설정 완료.
+- Nginx 설정을 template mount로 전환해 `SERVER_PORT` 변경 시 upstream 포트도 같이 반영되도록 완료.
+- REST create/join 결과를 Redis membership topic으로 전파해 이미 연결된 WebSocket 노드의 room 구독을 갱신하도록 완료.
 - 각 실행 모듈별 `bootJar` 산출물 검증 완료.
 - PostgreSQL primary/read replica Compose 구성 추가 완료.
 - PostgreSQL partition archive worker Compose 구성 추가 완료.
@@ -1799,7 +1802,7 @@ node scripts/load-chat.mjs --room hot --viewers 10000 --messages-per-sec 10000 -
 | --- | --- | --- |
 | Phase 1 | WebSocket token 인증, local room session index, bounded outbound queue | `chat-websocket`, `chat-persistence`, `client`, `scripts/verify-chat.mjs` |
 | Phase 2 | `messageId`, `clientMessageId`, `roomSeq`, idempotency, ACK/batch 계약 | `chat-domain`, `chat-persistence`, `chat-websocket`, `client` |
-| Phase 3 | Redis Streams producer/consumer, fanout worker, JPA compatibility writer | `chat-persistence`, `chat-worker-application`, `application-docker.yml` |
+| Phase 3 | Redis Streams producer/consumer, fanout worker, JPA compatibility writer | `chat-persistence`, `chat-worker-application`, `chat-runtime-config` |
 | Phase 4 | partitioned `chat_messages` canonical store, read replica history, gap fill | `infra/postgres`, `chat-persistence`, `chat-api` |
 | Phase 5 | admin history/search/export, audit log, 1천만건 seed | `chat-admin`, `chat-admin-application`, `chat-persistence`, `admin-web 또는 client` |
 | Phase 6 | hot room heat classifier, bounded live feed override, rate limit/slow mode | `chat-domain`, `chat-persistence`, `chat-admin`, `chat-websocket`, `client` |

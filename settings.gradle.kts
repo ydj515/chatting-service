@@ -5,6 +5,7 @@ rootProject.name = "chatting-service"
 
 include(
     "chat-application",
+    "chat-runtime-config",
     "chat-api-application",
     "chat-websocket-application",
     "chat-worker-application",
