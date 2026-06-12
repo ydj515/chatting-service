@@ -9,6 +9,16 @@ const timeoutMs = Number(process.env.CHAT_VERIFY_TIMEOUT_MS ?? 15000);
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+function redactSensitiveUrl(value) {
+  const url = new URL(value.toString());
+  for (const name of ['ticket', 'token']) {
+    if (url.searchParams.has(name)) {
+      url.searchParams.set(name, '[redacted]');
+    }
+  }
+  return url.toString();
+}
+
 async function requestJson(path, options = {}) {
   const base = new URL(httpBaseUrl);
   const basePath = base.pathname.endsWith('/') ? base.pathname : `${base.pathname}/`;
@@ -82,6 +92,13 @@ async function createRoom(namePrefix, login) {
   });
 }
 
+async function issueWebSocketTicket(login) {
+  return requestJson('/ws-tickets', {
+    method: 'POST',
+    headers: authorizationHeaders(login),
+  });
+}
+
 async function assertUserIdOnlyRestRejected(userId) {
   try {
     await requestJson(`/chat-rooms?userId=${userId}&page=0&size=1`);
@@ -127,7 +144,7 @@ class RawWebSocket {
       let handshakeDone = false;
 
       const timer = setTimeout(() => {
-        reject(new Error(`WebSocket handshake timeout: ${this.url}`));
+        reject(new Error(`WebSocket handshake timeout: ${redactSensitiveUrl(this.url)}`));
         this.close();
       }, timeoutMs);
 
@@ -170,7 +187,7 @@ class RawWebSocket {
       });
 
       this.socket.on('close', () => {
-        this.rejectWaiters(new Error(`WebSocket closed: ${this.url}`));
+        this.rejectWaiters(new Error(`WebSocket closed: ${redactSensitiveUrl(this.url)}`));
       });
     });
   }
@@ -252,7 +269,7 @@ class RawWebSocket {
   waitForJson(predicate) {
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
-        reject(new Error(`Timed out waiting for WebSocket message: ${this.url}`));
+        reject(new Error(`Timed out waiting for WebSocket message: ${redactSensitiveUrl(this.url)}`));
       }, timeoutMs);
 
       this.waiters.push({
@@ -296,9 +313,9 @@ class RawWebSocket {
   }
 }
 
-async function connectSession(sessionToken, userIdQuery = null, label = 'session') {
+async function connectTicket(ticket, userIdQuery = null, label = 'session') {
   const url = new URL(wsBaseUrl);
-  url.searchParams.set('token', sessionToken);
+  url.searchParams.set('ticket', ticket);
   if (userIdQuery !== null) {
     url.searchParams.set('userId', String(userIdQuery));
   }
@@ -309,6 +326,43 @@ async function connectSession(sessionToken, userIdQuery = null, label = 'session
     throw new Error(`${label} WebSocket connection failed: ${error.message}`);
   }
   return ws;
+}
+
+async function connectSession(login, userIdQuery = null, label = 'session') {
+  const ticket = await issueWebSocketTicket(login);
+  return connectTicket(ticket.ticket, userIdQuery, label);
+}
+
+async function assertTicketHandshakeRejected(ticket, label) {
+  const url = new URL(wsBaseUrl);
+  url.searchParams.set('ticket', ticket);
+  const ws = new RawWebSocket(url.toString());
+  try {
+    await ws.connect();
+    throw new Error(`WebSocket accepted ${label}`);
+  } catch (error) {
+    if (!String(error.message).includes('WebSocket handshake failed')) {
+      throw error;
+    }
+  } finally {
+    ws.close();
+  }
+}
+
+async function assertSessionTokenHandshakeRejected(sessionToken) {
+  const url = new URL(wsBaseUrl);
+  url.searchParams.set('token', sessionToken);
+  const ws = new RawWebSocket(url.toString());
+  try {
+    await ws.connect();
+    throw new Error('WebSocket accepted session token query fallback');
+  } catch (error) {
+    if (!String(error.message).includes('WebSocket handshake failed')) {
+      throw error;
+    }
+  } finally {
+    ws.close();
+  }
 }
 
 async function assertUserIdOnlyHandshakeRejected(userId) {
@@ -336,14 +390,17 @@ async function main() {
 
   await assertUserIdOnlyRestRejected(sender.id);
   await assertUserIdOnlyHandshakeRejected(sender.id);
+  await assertSessionTokenHandshakeRejected(senderLogin.sessionToken);
 
   await requestJson(`/chat-rooms/${room.id}/members`, {
     method: 'POST',
     headers: authorizationHeaders(receiverLogin),
   });
 
-  const senderWs = await connectSession(senderLogin.sessionToken, null, 'sender');
-  const receiverWs = await connectSession(receiverLogin.sessionToken, null, 'receiver');
+  const senderTicket = await issueWebSocketTicket(senderLogin);
+  const senderWs = await connectTicket(senderTicket.ticket, null, 'sender');
+  await assertTicketHandshakeRejected(senderTicket.ticket, 'a reused ticket');
+  const receiverWs = await connectSession(receiverLogin, null, 'receiver');
 
   try {
     await sleep(1000);
@@ -435,7 +492,7 @@ async function main() {
       message.content === spoofedUserIdContent &&
       message.clientMessageId === spoofedClientMessageId
     ));
-    const spoofedUserIdWs = await connectSession(senderLogin.sessionToken, receiver.id, 'spoofed-user-id');
+    const spoofedUserIdWs = await connectSession(senderLogin, receiver.id, 'spoofed-user-id');
     try {
       spoofedUserIdWs.sendJson({
         type: 'SEND_MESSAGE',

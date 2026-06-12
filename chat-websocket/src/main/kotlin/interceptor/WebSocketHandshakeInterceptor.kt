@@ -1,6 +1,7 @@
 package com.chat.websocket.interceptor
 
 import com.chat.domain.service.SessionTokenService
+import com.chat.domain.service.WebSocketTicketService
 import com.chat.persistence.config.ChatAuthProperties
 import com.chat.websocket.config.WebSocketProperties
 import org.slf4j.Logger
@@ -18,6 +19,7 @@ import org.springframework.web.util.UriComponentsBuilder
 class WebSocketHandshakeInterceptor(
     private val webSocketProperties: WebSocketProperties,
     private val sessionTokenService: SessionTokenService,
+    private val webSocketTicketService: WebSocketTicketService,
     private val authProperties: ChatAuthProperties,
 ) : HandshakeInterceptor {
 
@@ -30,7 +32,19 @@ class WebSocketHandshakeInterceptor(
         attributes: MutableMap<String?, Any?>,
     ): Boolean {
         return try {
-            val token = extractToken(request)
+            val ticket = extractQueryParam(request, authProperties.webSocketTicket.ticketQueryParam)
+            val ticketSession = ticket?.let { webSocketTicketService.consumeTicket(it) }
+            if (ticketSession != null) {
+                attributes[webSocketProperties.userIdAttribute] = ticketSession.userId
+                return true
+            }
+
+            if (!authProperties.webSocketTicket.sessionFallbackEnabled) {
+                response.setStatusCode(HttpStatus.UNAUTHORIZED)
+                return false
+            }
+
+            val token = extractSessionToken(request)
             val authenticated = token?.let { sessionTokenService.authenticate(it) }
 
             if (authenticated == null) {
@@ -47,7 +61,7 @@ class WebSocketHandshakeInterceptor(
         }
     }
 
-    private fun extractToken(request: ServerHttpRequest): String? {
+    private fun extractSessionToken(request: ServerHttpRequest): String? {
         val authorizationHeader = request.headers.getFirst(HttpHeaders.AUTHORIZATION)
         val bearerToken = authorizationHeader
             ?.takeIf { it.startsWith(BEARER_PREFIX, ignoreCase = true) }
@@ -59,10 +73,14 @@ class WebSocketHandshakeInterceptor(
             return bearerToken
         }
 
+        return extractQueryParam(request, authProperties.session.tokenQueryParam)
+    }
+
+    private fun extractQueryParam(request: ServerHttpRequest, name: String): String? {
         return UriComponentsBuilder.fromUri(request.uri)
             .build()
             .queryParams
-            .getFirst(authProperties.session.tokenQueryParam)
+            .getFirst(name)
             ?.takeIf { it.isNotBlank() }
     }
 

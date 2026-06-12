@@ -28,6 +28,7 @@ dependencies {
     // Jackson (Redis 직렬화 및 WebSocket 메시지 처리용)
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310")
+    implementation("io.micrometer:micrometer-core")
 
     // 데이터베이스 드라이버 (런타임)
     runtimeOnly("com.h2database:h2")

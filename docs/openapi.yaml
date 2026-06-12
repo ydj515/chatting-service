@@ -116,6 +116,23 @@ paths:
               schema:
                 $ref: '#/components/schemas/PageUserDto'
 
+  /ws-tickets:
+    post:
+      summary: Issue a WebSocket one-time ticket
+      tags:
+        - WebSocket
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: WebSocket ticket issued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebSocketTicketResponse'
+        '429':
+          description: Ticket issue rate limit exceeded
+
   /chat-rooms:
     post:
       summary: Create a new chat room
@@ -388,6 +405,21 @@ components:
           type: string
           format: date-time
           example: "2026-06-12T12:30:00"
+
+    WebSocketTicketResponse:
+      type: object
+      required:
+        - ticket
+        - expiresAt
+      properties:
+        ticket:
+          type: string
+          description: One-time WebSocket ticket. Do not log this value.
+          example: "base64url-random-256bit"
+        expiresAt:
+          type: string
+          format: date-time
+          example: "2026-06-13T00:00:30"
 
     UserDto:
       type: object

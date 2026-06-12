@@ -17,6 +17,12 @@ OpenAPI 스펙은 [`openapi.yaml`](openapi.yaml)을 참고하세요.
 | `GET` | `/api/users/me` | 내 정보 조회 |
 | `GET` | `/api/users/search?username=...` | 사용자 검색 |
 
+### WebSocket Ticket
+
+| 메서드 | 경로 | 설명 |
+| --- | --- | --- |
+| `POST` | `/api/ws-tickets` | WebSocket one-time ticket 발급. `Authorization: Bearer {sessionToken}` 필요 |
+
 ### 채팅방
 
 | 메서드 | 경로 | 설명 |
@@ -42,11 +48,29 @@ OpenAPI 스펙은 [`openapi.yaml`](openapi.yaml)을 참고하세요.
 
 ### 접속
 
-```
-ws://localhost/api/ws/chat?token={sessionToken}
+먼저 REST API로 WebSocket 전용 ticket을 발급합니다.
+
+```http
+POST /api/ws-tickets
+Authorization: Bearer {sessionToken}
 ```
 
-`sessionToken`은 `/api/users/login` 응답의 값입니다. Browser WebSocket API는 custom header를 설정할 수 없어 query parameter를 사용하지만, Nginx access log는 query string을 기록하지 않도록 구성합니다. `userId` query parameter는 인증 주체로 사용하지 않습니다.
+응답:
+
+```json
+{
+  "ticket": "base64url-random-256bit",
+  "expiresAt": "2026-06-13T00:00:30"
+}
+```
+
+그 다음 발급받은 ticket으로 WebSocket을 연결합니다.
+
+```
+ws://localhost/api/ws/chat?ticket={ticket}
+```
+
+`sessionToken`은 REST API의 Authorization header에만 사용합니다. WebSocket URL에는 짧은 TTL의 단일 사용 ticket만 포함합니다. production/docker 설정에서는 기존 `token` query fallback을 허용하지 않습니다. `userId` query parameter는 인증 주체로 사용하지 않습니다.
 
 ### 클라이언트 -> 서버
 

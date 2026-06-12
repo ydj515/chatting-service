@@ -1798,12 +1798,13 @@ node scripts/load-chat.mjs --room hot --viewers 10000 --messages-per-sec 10000 -
 - Nginx 라우팅을 `/api/ws/` -> `chat-websocket-application`, `/api/admin/` -> `chat-admin-application`, 일반 `/api/` -> `chat-api-application`으로 분리 완료.
 - Compose 서비스를 `chat-api-app-*`, `chat-websocket-app-*`, `chat-worker-app-*`, `chat-admin-app-*`로 분리 완료.
 - Phase 2 구현 완료: 새 메시지는 `messageId`, `clientMessageId`, `roomSeq`, `streamShard`, `writeShard`, `fanoutShard`를 가지며, Redis `INCRBY` sequence block과 `(roomId, senderId, clientMessageId)` idempotency를 사용한다. WebSocket은 `MESSAGE_ACCEPTED`, `CHAT_MESSAGE`, `CHAT_MESSAGE_BATCH` 계약을 갖고, 클라이언트는 `messageId` 중복 제거와 `roomSeq` 정렬을 수행한다.
+- Phase 2.5 구현 완료: `POST /api/ws-tickets`로 WebSocket one-time ticket을 발급하고, Redis에는 `sha256(ticket)` key와 TTL 30초 user context만 저장한다. WebSocket handshake는 ticket을 원자 consume하며, docker/production 설정에서는 reusable session token query fallback을 비활성화한다. 클라이언트와 verify script는 connect/reconnect 직전에 새 ticket을 발급받는다.
 
 남은 변경을 Phase별로 정리하면 다음과 같다.
 
 | Phase | 주요 변경 | 핵심 파일 |
 | --- | --- | --- |
-| Phase 2.5 | WebSocket one-time ticket, production token query fallback 제거, 보안 gate | `chat-api`, `chat-websocket`, `chat-persistence`, `client`, `docs/ws_ticket_analysis.md` |
+| Phase 2.5 | WebSocket one-time ticket, production token query fallback 제거, 보안 gate | 완료 |
 | Phase 3 | Redis Streams producer/consumer, fanout worker, JPA compatibility writer | `chat-persistence`, `chat-worker-application`, `chat-runtime-config` |
 | Phase 4 | partitioned `chat_messages` canonical store, read replica history, gap fill | `infra/postgres`, `chat-persistence`, `chat-api` |
 | Phase 5 | admin history/search/export, audit log, 1천만건 seed | `chat-admin`, `chat-admin-application`, `chat-persistence`, `admin-web 또는 client` |

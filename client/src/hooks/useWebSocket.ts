@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { WebSocketMessage } from '../types';
 import { appConfig, buildWebSocketUrl } from '../config/appConfig.ts';
+import { webSocketTicketApi } from '../services/api.ts';
 import { shouldIgnoreWebSocketEvent } from '../utils/webSocketLifecycle.ts';
 
 interface UseWebSocketProps {
@@ -33,6 +34,8 @@ export const useWebSocket = ({
   const [error, setError] = useState<string | undefined>(undefined);
   const reconnectAttempts = useRef(0);
   const reconnectTimeoutRef = useRef<number>();
+  const isConnectingRef = useRef(false);
+  const connectionAttemptRef = useRef(0);
   const intentionallyClosedSocketsRef = useRef<WeakSet<WebSocket>>(new WeakSet());
 
   // onMessage 콜백을 ref로 관리하여 항상 최신 함수를 참조하도록 함
@@ -65,6 +68,11 @@ export const useWebSocket = ({
       return;
     }
 
+    if (isConnectingRef.current) {
+      console.log('WebSocket connection is already being prepared.');
+      return;
+    }
+
     if (
       wsRef.current?.readyState === WebSocket.OPEN ||
       wsRef.current?.readyState === WebSocket.CONNECTING
@@ -80,92 +88,114 @@ export const useWebSocket = ({
       wsRef.current = null;
     }
 
-    try {
-      const wsUrl = buildWebSocketUrl(sessionToken);
-      const socket = new WebSocket(wsUrl);
-      wsRef.current = socket;
+    const attemptId = ++connectionAttemptRef.current;
+    isConnectingRef.current = true;
 
-      socket.onopen = () => {
-        if (shouldIgnoreWebSocketEvent(wsRef.current, socket, intentionallyClosedSocketsRef.current)) {
+    void (async () => {
+      try {
+        const ticket = await webSocketTicketApi.issue();
+        if (attemptId !== connectionAttemptRef.current) {
           return;
         }
 
-        console.log('✅ WebSocket connected');
-        setIsConnected(true);
-        setError(undefined);
-        reconnectAttempts.current = 0;
-        onConnectRef.current?.();
-      };
+        const wsUrl = buildWebSocketUrl(ticket.ticket);
+        const socket = new WebSocket(wsUrl);
+        wsRef.current = socket;
+        isConnectingRef.current = false;
 
-      socket.onmessage = (event) => {
-        if (shouldIgnoreWebSocketEvent(wsRef.current, socket, intentionallyClosedSocketsRef.current)) {
-          return;
-        }
-
-        console.log('🔌 WebSocket message received:', event.data);
-        try {
-          const message: WebSocketMessage = JSON.parse(event.data);
-          setLastMessage(message);
-          onMessageRef.current?.(message);
-        } catch (err) {
-          console.error('Failed to parse WebSocket message:', err);
-          setError('메시지 파싱 실패');
-        }
-      };
-
-      socket.onclose = (event) => {
-        if (shouldIgnoreWebSocketEvent(wsRef.current, socket, intentionallyClosedSocketsRef.current)) {
-          return;
-        }
-
-        console.log(`🔌 WebSocket disconnected: Code=${event.code}, Reason=${event.reason}`);
-        setIsConnected(false);
-        wsRef.current = null;
-        onDisconnectRef.current?.(); 
-
-        // 정상적인 종료가 아닌 경우만 재연결 시도
-        if (
-          !appConfig.webSocket.normalCloseCodes.includes(event.code) &&
-          reconnectAttempts.current < appConfig.webSocket.maxReconnectAttempts
-        ) {
-          const delay = Math.min(
-            appConfig.webSocket.reconnectBaseDelayMs * Math.pow(2, reconnectAttempts.current),
-            appConfig.webSocket.reconnectMaxDelayMs,
-          );
-          
-          // 기존 타이머 정리
-          if (reconnectTimeoutRef.current) {
-            clearTimeout(reconnectTimeoutRef.current);
+        socket.onopen = () => {
+          if (shouldIgnoreWebSocketEvent(wsRef.current, socket, intentionallyClosedSocketsRef.current)) {
+            return;
           }
-          
-          reconnectTimeoutRef.current = setTimeout(() => {
-            reconnectAttempts.current++;
-            connect();
-          }, delay);
-        } else if (reconnectAttempts.current >= appConfig.webSocket.maxReconnectAttempts) {
-          setError('최대 재연결 시도 횟수를 초과했습니다.');
-        }
-      };
 
-      socket.onerror = (event) => {
-        if (shouldIgnoreWebSocketEvent(wsRef.current, socket, intentionallyClosedSocketsRef.current)) {
+          console.log('✅ WebSocket connected');
+          setIsConnected(true);
+          setError(undefined);
+          reconnectAttempts.current = 0;
+          onConnectRef.current?.();
+        };
+
+        socket.onmessage = (event) => {
+          if (shouldIgnoreWebSocketEvent(wsRef.current, socket, intentionallyClosedSocketsRef.current)) {
+            return;
+          }
+
+          console.log('🔌 WebSocket message received:', event.data);
+          try {
+            const message: WebSocketMessage = JSON.parse(event.data);
+            setLastMessage(message);
+            onMessageRef.current?.(message);
+          } catch (err) {
+            console.error('Failed to parse WebSocket message:', err);
+            setError('메시지 파싱 실패');
+          }
+        };
+
+        socket.onclose = (event) => {
+          if (shouldIgnoreWebSocketEvent(wsRef.current, socket, intentionallyClosedSocketsRef.current)) {
+            return;
+          }
+
+          console.log(`🔌 WebSocket disconnected: Code=${event.code}, Reason=${event.reason}`);
+          setIsConnected(false);
+          wsRef.current = null;
+          onDisconnectRef.current?.();
+
+          // 정상적인 종료가 아닌 경우만 재연결 시도
+          if (
+            !appConfig.webSocket.normalCloseCodes.includes(event.code) &&
+            reconnectAttempts.current < appConfig.webSocket.maxReconnectAttempts
+          ) {
+            const delay = Math.min(
+              appConfig.webSocket.reconnectBaseDelayMs * Math.pow(2, reconnectAttempts.current),
+              appConfig.webSocket.reconnectMaxDelayMs,
+            );
+
+            // 기존 타이머 정리
+            if (reconnectTimeoutRef.current) {
+              clearTimeout(reconnectTimeoutRef.current);
+            }
+
+            reconnectTimeoutRef.current = setTimeout(() => {
+              reconnectAttempts.current++;
+              connect();
+            }, delay);
+          } else if (reconnectAttempts.current >= appConfig.webSocket.maxReconnectAttempts) {
+            setError('최대 재연결 시도 횟수를 초과했습니다.');
+          }
+        };
+
+        socket.onerror = (event) => {
+          if (shouldIgnoreWebSocketEvent(wsRef.current, socket, intentionallyClosedSocketsRef.current)) {
+            return;
+          }
+
+          console.error('💥 WebSocket error:', event);
+          setError('WebSocket 연결 오류');
+          setIsConnected(false);
+          onErrorRef.current?.(event.type);
+        };
+
+      } catch (err) {
+        if (attemptId !== connectionAttemptRef.current) {
           return;
         }
-
-        console.error('💥 WebSocket error:', event);
-        setError('WebSocket 연결 오류');
+        console.error('Failed to create WebSocket connection:', err);
+        setError('WebSocket 연결 생성 실패');
         setIsConnected(false);
-        onErrorRef.current?.(event.type);
-      };
-
-    } catch (err) {
-      console.error('Failed to create WebSocket connection:', err);
-      setError('WebSocket 연결 생성 실패');
-    }
+        onErrorRef.current?.('ticket');
+      } finally {
+        if (attemptId === connectionAttemptRef.current) {
+          isConnectingRef.current = false;
+        }
+      }
+    })();
   }, [sessionToken]);
 
   const disconnect = useCallback(() => {
     reconnectAttempts.current = 0; // 수동 disconnect 시 재연결 시도 초기화
+    connectionAttemptRef.current++;
+    isConnectingRef.current = false;
     if (reconnectTimeoutRef.current) {
       clearTimeout(reconnectTimeoutRef.current);
     }

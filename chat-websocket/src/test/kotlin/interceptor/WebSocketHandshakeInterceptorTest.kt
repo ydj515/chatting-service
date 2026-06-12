@@ -1,7 +1,9 @@
 package com.chat.websocket.interceptor
 
 import com.chat.domain.dto.AuthenticatedSession
+import com.chat.domain.dto.AuthenticatedWebSocketTicket
 import com.chat.domain.service.SessionTokenService
+import com.chat.domain.service.WebSocketTicketService
 import com.chat.persistence.config.ChatAuthProperties
 import com.chat.websocket.config.WebSocketProperties
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -29,11 +31,37 @@ class WebSocketHandshakeInterceptorTest {
         session = ChatAuthProperties.Session(
             secret = "test-secret",
             tokenQueryParam = "token",
-        )
+        ),
     )
 
     @Test
-    fun `핸드셰이크는 token으로 검증한 사용자 ID를 세션 attribute에 저장한다`() {
+    fun `핸드셰이크는 one-time ticket으로 검증한 사용자 ID를 세션 attribute에 저장한다`() {
+        val sessionTokenService = mock(SessionTokenService::class.java)
+        val ticketService = mock(WebSocketTicketService::class.java)
+        `when`(ticketService.consumeTicket("valid-ticket")).thenReturn(
+            AuthenticatedWebSocketTicket(
+                userId = 42L,
+                expiresAt = LocalDateTime.parse("2026-06-12T12:30:00"),
+            ),
+        )
+        val interceptor = interceptor(sessionTokenService, ticketService)
+        val attributes = mutableMapOf<String?, Any?>()
+
+        val accepted = interceptor.beforeHandshake(
+            request("ticket=valid-ticket"),
+            response(),
+            mock(WebSocketHandler::class.java),
+            attributes,
+        )
+
+        assertTrue(accepted)
+        assertEquals(42L, attributes["userId"])
+        verify(ticketService).consumeTicket("valid-ticket")
+        verifyNoInteractions(sessionTokenService)
+    }
+
+    @Test
+    fun `호환 모드 핸드셰이크는 token으로 검증한 사용자 ID를 세션 attribute에 저장한다`() {
         val sessionTokenService = mock(SessionTokenService::class.java)
         `when`(sessionTokenService.authenticate("valid-token")).thenReturn(
             AuthenticatedSession(
@@ -41,11 +69,8 @@ class WebSocketHandshakeInterceptorTest {
                 expiresAt = LocalDateTime.parse("2026-06-12T12:30:00"),
             )
         )
-        val interceptor = WebSocketHandshakeInterceptor(
-            webSocketProperties = webSocketProperties,
-            sessionTokenService = sessionTokenService,
-            authProperties = authProperties,
-        )
+        val ticketService = mock(WebSocketTicketService::class.java)
+        val interceptor = interceptor(sessionTokenService, ticketService)
         val attributes = mutableMapOf<String?, Any?>()
 
         val accepted = interceptor.beforeHandshake(
@@ -61,13 +86,36 @@ class WebSocketHandshakeInterceptorTest {
     }
 
     @Test
+    fun `fallback이 꺼진 핸드셰이크는 session token query를 허용하지 않는다`() {
+        val sessionTokenService = mock(SessionTokenService::class.java)
+        val ticketService = mock(WebSocketTicketService::class.java)
+        val interceptor = interceptor(
+            sessionTokenService = sessionTokenService,
+            ticketService = ticketService,
+            authProperties = authProperties.copy(
+                webSocketTicket = ChatAuthProperties.WebSocketTicket(sessionFallbackEnabled = false),
+            ),
+        )
+        val attributes = mutableMapOf<String?, Any?>()
+
+        val accepted = interceptor.beforeHandshake(
+            request("token=valid-token"),
+            response(),
+            mock(WebSocketHandler::class.java),
+            attributes,
+        )
+
+        assertFalse(accepted)
+        assertNull(attributes["userId"])
+        verifyNoInteractions(sessionTokenService)
+        verifyNoInteractions(ticketService)
+    }
+
+    @Test
     fun `핸드셰이크는 userId query만으로는 연결을 허용하지 않는다`() {
         val sessionTokenService = mock(SessionTokenService::class.java)
-        val interceptor = WebSocketHandshakeInterceptor(
-            webSocketProperties = webSocketProperties,
-            sessionTokenService = sessionTokenService,
-            authProperties = authProperties,
-        )
+        val ticketService = mock(WebSocketTicketService::class.java)
+        val interceptor = interceptor(sessionTokenService, ticketService)
         val attributes = mutableMapOf<String?, Any?>()
 
         val accepted = interceptor.beforeHandshake(
@@ -80,6 +128,19 @@ class WebSocketHandshakeInterceptorTest {
         assertFalse(accepted)
         assertNull(attributes["userId"])
         verifyNoInteractions(sessionTokenService)
+    }
+
+    private fun interceptor(
+        sessionTokenService: SessionTokenService,
+        ticketService: WebSocketTicketService,
+        authProperties: ChatAuthProperties = this.authProperties,
+    ): WebSocketHandshakeInterceptor {
+        return WebSocketHandshakeInterceptor(
+            webSocketProperties = webSocketProperties,
+            sessionTokenService = sessionTokenService,
+            webSocketTicketService = ticketService,
+            authProperties = authProperties,
+        )
     }
 
     private fun request(queryString: String): ServerHttpRequest {

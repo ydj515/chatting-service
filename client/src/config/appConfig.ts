@@ -1,3 +1,5 @@
+import { buildWebSocketTicketUrl } from '../utils/webSocketTicket.ts';
+
 const DEFAULT_API_BASE_PATH = '/api';
 const DEFAULT_WS_PATH = '/api/ws/chat';
 const DEFAULT_API_TIMEOUT_MS = 30_000;
@@ -87,8 +89,6 @@ export const appConfig = {
   },
 };
 
-export const buildWebSocketUrl = (sessionToken: string): string => {
-  const url = new URL(appConfig.webSocket.baseUrl);
-  url.searchParams.set('token', sessionToken);
-  return url.toString();
+export const buildWebSocketUrl = (ticket: string): string => {
+  return buildWebSocketTicketUrl(appConfig.webSocket.baseUrl, ticket);
 };
