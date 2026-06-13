@@ -5,7 +5,9 @@ import com.chat.domain.dto.ChatMessageBatch
 import com.chat.persistence.config.ChatWorkerProperties
 import com.chat.persistence.redis.MessageStreamConsumer
 import com.chat.persistence.redis.MessageStreamEnvelope
+import com.chat.persistence.redis.MessageStreamRecord
 import com.chat.persistence.redis.RedisMessageBroker
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 
 @Service
@@ -14,6 +16,7 @@ class HotRoomFanoutWorker(
     private val redisMessageBroker: RedisMessageBroker,
     private val workerProperties: ChatWorkerProperties,
 ) {
+    private val logger = LoggerFactory.getLogger(HotRoomFanoutWorker::class.java)
 
     fun pollAndFanout(): Int {
         val streamKeys = messageStreamConsumer.listStreamKeys()
@@ -31,6 +34,12 @@ class HotRoomFanoutWorker(
             consumerName = workerProperties.consumerName,
             streamKeys = streamKeys,
             count = workerProperties.fanout.readCount,
+        ) + messageStreamConsumer.claimPending(
+            consumerGroup = consumerGroup,
+            consumerName = workerProperties.consumerName,
+            streamKeys = streamKeys,
+            count = workerProperties.fanout.readCount,
+            minIdleMillis = workerProperties.fanout.minIdleMillis,
         )
 
         var broadcastCount = 0
@@ -43,22 +52,48 @@ class HotRoomFanoutWorker(
                     .map { it.toChatMessage() },
             )
 
-            redisMessageBroker.broadcastToRoom(
-                roomId = roomId,
-                message = batch,
-            )
-            broadcastCount += 1
-
-            roomRecords.forEach { record ->
-                messageStreamConsumer.acknowledge(
-                    streamKey = record.streamKey,
-                    consumerGroup = consumerGroup,
-                    recordId = record.recordId,
+            try {
+                redisMessageBroker.broadcastToRoom(
+                    roomId = roomId,
+                    message = batch,
                 )
+                broadcastCount += 1
+
+                roomRecords.forEach { record ->
+                    messageStreamConsumer.acknowledge(
+                        streamKey = record.streamKey,
+                        consumerGroup = consumerGroup,
+                        recordId = record.recordId,
+                    )
+                }
+            } catch (e: Exception) {
+                roomRecords.forEach { record ->
+                    handleFailure(record, consumerGroup, e)
+                }
             }
         }
 
         return broadcastCount
+    }
+
+    private fun handleFailure(
+        record: MessageStreamRecord,
+        consumerGroup: String,
+        throwable: Exception,
+    ) {
+        val reason = throwable.message ?: throwable.javaClass.simpleName
+        if (record.deliveryCount >= workerProperties.fanout.maxDeliveryCount) {
+            messageStreamConsumer.sendToDeadLetter(record, consumerGroup, reason)
+            messageStreamConsumer.acknowledge(
+                streamKey = record.streamKey,
+                consumerGroup = consumerGroup,
+                recordId = record.recordId,
+            )
+            logger.warn("Moved fanout message ${record.recordId} to dead letter stream: $reason")
+            return
+        }
+
+        logger.warn("Fanout failed for ${record.recordId}; record remains pending: $reason")
     }
 
     private fun MessageStreamEnvelope.toChatMessage(): ChatMessage {

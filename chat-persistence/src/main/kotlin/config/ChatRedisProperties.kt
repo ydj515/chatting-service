@@ -22,6 +22,7 @@ data class ChatRedisProperties(
     data class Streams(
         val roomStreamKeyPrefix: String = "chat:stream:room:",
         val knownStreamsKey: String = "chat:stream:rooms",
+        val deadLetterStreamKeyPrefix: String = "chat:stream:dlq:",
         val shardCount: Int = 1,
     )
 }

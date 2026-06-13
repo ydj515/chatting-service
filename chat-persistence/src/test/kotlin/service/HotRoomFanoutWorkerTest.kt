@@ -112,6 +112,24 @@ class HotRoomFanoutWorkerTest {
         override fun acknowledge(streamKey: String, consumerGroup: String, recordId: String) {
             acked += "$streamKey:$consumerGroup:$recordId"
         }
+
+        override fun claimPending(
+            consumerGroup: String,
+            consumerName: String,
+            streamKeys: Set<String>,
+            count: Long,
+            minIdleMillis: Long,
+        ): List<MessageStreamRecord> {
+            return emptyList()
+        }
+
+        override fun sendToDeadLetter(
+            record: MessageStreamRecord,
+            consumerGroup: String,
+            reason: String,
+        ) {
+            error("dead letter is not expected in this test")
+        }
     }
 
     private fun captureBatch(captor: ArgumentCaptor<ChatMessageBatch>): ChatMessageBatch {

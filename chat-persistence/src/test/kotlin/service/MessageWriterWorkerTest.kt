@@ -94,6 +94,60 @@ class MessageWriterWorkerTest {
         assertEquals(listOf("chat:stream:room:10:shard:0:message-writer:1749790000000-0"), consumer.acked)
     }
 
+    @Test
+    fun `writer worker는 pending record를 claim해 재처리한다`() {
+        val consumer = FakeMessageStreamConsumer(
+            records = emptyList(),
+            claimedRecords = listOf(streamRecord(recordId = "1749790000000-2", deliveryCount = 2)),
+        )
+        val fixture = workerFixture(consumer)
+        `when`(fixture.messageRepository.findByMessageId("msg-1")).thenReturn(Optional.empty())
+        `when`(
+            fixture.messageRepository.findByChatRoomIdAndSenderIdAndClientMessageId(
+                10L,
+                7L,
+                "client-1",
+            )
+        ).thenReturn(Optional.empty())
+        `when`(fixture.chatRoomRepository.getReferenceById(10L)).thenReturn(fixture.chatRoom)
+        `when`(fixture.userRepository.getReferenceById(7L)).thenReturn(fixture.sender)
+        `when`(fixture.messageRepository.saveAndFlush(any(Message::class.java))).thenAnswer { invocation ->
+            (invocation.arguments[0] as Message).copy(id = 101L)
+        }
+
+        val written = fixture.worker.pollAndWrite()
+
+        assertEquals(1, written)
+        assertEquals(listOf("chat:stream:room:10:shard:0:message-writer:worker-1:30000"), consumer.claims)
+        assertEquals(listOf("chat:stream:room:10:shard:0:message-writer:1749790000000-2"), consumer.acked)
+    }
+
+    @Test
+    fun `writer worker는 재시도 한계를 넘긴 실패 record를 dead letter stream으로 보내고 ack한다`() {
+        val consumer = FakeMessageStreamConsumer(
+            records = emptyList(),
+            claimedRecords = listOf(streamRecord(recordId = "1749790000000-3", deliveryCount = 5)),
+        )
+        val fixture = workerFixture(consumer)
+        `when`(fixture.messageRepository.findByMessageId("msg-1")).thenReturn(Optional.empty())
+        `when`(
+            fixture.messageRepository.findByChatRoomIdAndSenderIdAndClientMessageId(
+                10L,
+                7L,
+                "client-1",
+            )
+        ).thenReturn(Optional.empty())
+        `when`(fixture.chatRoomRepository.getReferenceById(10L)).thenReturn(fixture.chatRoom)
+        `when`(fixture.userRepository.getReferenceById(7L)).thenThrow(IllegalStateException("missing user"))
+
+        val written = fixture.worker.pollAndWrite()
+
+        assertEquals(0, written)
+        assertEquals(listOf("chat:stream:room:10:shard:0:message-writer:1749790000000-3:missing user"), consumer.deadLetters)
+        assertEquals(listOf("chat:stream:room:10:shard:0:message-writer:1749790000000-3"), consumer.acked)
+        verify(fixture.messageRepository, never()).saveAndFlush(any(Message::class.java))
+    }
+
     private fun workerFixture(consumer: MessageStreamConsumer): Fixture {
         val messageRepository = mock(MessageRepository::class.java)
         val chatRoomRepository = mock(ChatRoomRepository::class.java)
@@ -108,6 +162,8 @@ class MessageWriterWorkerTest {
                 writer = ChatWorkerProperties.StreamConsumer(
                     consumerGroup = "message-writer",
                     readCount = 10,
+                    maxDeliveryCount = 3,
+                    minIdleMillis = 30_000,
                 ),
             ),
         )
@@ -136,10 +192,13 @@ class MessageWriterWorkerTest {
         )
     }
 
-    private fun streamRecord(): MessageStreamRecord {
+    private fun streamRecord(
+        recordId: String = "1749790000000-0",
+        deliveryCount: Long = 1,
+    ): MessageStreamRecord {
         return MessageStreamRecord(
             streamKey = "chat:stream:room:10:shard:0",
-            recordId = "1749790000000-0",
+            recordId = recordId,
             envelope = MessageStreamEnvelope(
                 messageId = "msg-1",
                 clientMessageId = "client-1",
@@ -155,18 +214,22 @@ class MessageWriterWorkerTest {
                 fanoutShard = 2,
                 createdAt = LocalDateTime.parse("2026-06-13T12:00:00"),
             ),
+            deliveryCount = deliveryCount,
         )
     }
 
     private class FakeMessageStreamConsumer(
         private val records: List<MessageStreamRecord>,
+        private val claimedRecords: List<MessageStreamRecord> = emptyList(),
     ) : MessageStreamConsumer {
         val ensuredGroups = mutableListOf<String>()
         val reads = mutableListOf<String>()
+        val claims = mutableListOf<String>()
         val acked = mutableListOf<String>()
+        val deadLetters = mutableListOf<String>()
 
         override fun listStreamKeys(): Set<String> {
-            return records.mapTo(sortedSetOf()) { it.streamKey }
+            return (records + claimedRecords).mapTo(sortedSetOf()) { it.streamKey }
         }
 
         override fun ensureConsumerGroup(streamKey: String, consumerGroup: String) {
@@ -185,6 +248,25 @@ class MessageWriterWorkerTest {
 
         override fun acknowledge(streamKey: String, consumerGroup: String, recordId: String) {
             acked += "$streamKey:$consumerGroup:$recordId"
+        }
+
+        override fun claimPending(
+            consumerGroup: String,
+            consumerName: String,
+            streamKeys: Set<String>,
+            count: Long,
+            minIdleMillis: Long,
+        ): List<MessageStreamRecord> {
+            claims += "${streamKeys.first()}:$consumerGroup:$consumerName:$minIdleMillis"
+            return claimedRecords
+        }
+
+        override fun sendToDeadLetter(
+            record: MessageStreamRecord,
+            consumerGroup: String,
+            reason: String,
+        ) {
+            deadLetters += "${record.streamKey}:$consumerGroup:${record.recordId}:$reason"
         }
     }
 

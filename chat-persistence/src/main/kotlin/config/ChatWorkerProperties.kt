@@ -19,5 +19,7 @@ data class ChatWorkerProperties(
     data class StreamConsumer(
         val consumerGroup: String,
         val readCount: Long = 100,
+        val minIdleMillis: Long = 30_000,
+        val maxDeliveryCount: Long = 5,
     )
 }

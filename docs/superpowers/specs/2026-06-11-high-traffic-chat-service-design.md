@@ -1494,7 +1494,7 @@ mise run verify:chat
 - Fanout Worker는 50~100ms 단위 또는 max batch size 기준으로 `CHAT_MESSAGE_BATCH`를 발행한다.
 - Redis Pub/Sub channel은 `fanout:room:{roomId}:shard:{fanoutShard}` 형식을 사용한다.
 - Gateway는 fanout shard channel을 구독하고 batch를 local room sessions에 전달한다.
-- pending entry claim과 dead letter stream을 구현한다.
+- pending entry claim과 dead letter stream을 구현한다. Writer/Fanout worker는 `minIdleMillis` 이상 idle 상태인 pending entry를 claim하고, `maxDeliveryCount` 이상 실패한 record는 consumer group별 dead letter stream으로 이동한 뒤 ack한다.
 - `WORKER_ROLES=message-writer,fanout`으로 worker role을 선택 실행할 수 있게 한다.
 
 이번 Phase에서 하지 않을 것:
@@ -1522,7 +1522,7 @@ mise run verify:chat
 
 - Redis Streams append 실패 시 메시지를 수락하지 않는다.
 - 수락된 메시지는 Writer Worker를 통해 기존 history 조회에 나타난다.
-- 전체 Phase 3 완료 시 Fanout Worker 장애 후 pending entry가 재처리된다.
+- Fanout Worker 장애 후 pending entry가 재처리된다.
 - hot room에서는 Pub/Sub 발행 수가 메시지 수가 아니라 batch 수에 비례한다.
 - `MESSAGE_ACCEPTED`는 Streams append 성공을 의미하고, 모든 사용자 전달이나 DB 저장 완료를 의미하지 않는다.
 - `mise run verify:chat`은 Streams/worker 경로로 통과한다.
@@ -1821,7 +1821,7 @@ node scripts/load-chat.mjs --room hot --viewers 10000 --messages-per-sec 10000 -
 - Compose 서비스를 `chat-api-app-*`, `chat-websocket-app-*`, `chat-worker-app-*`, `chat-admin-app-*`로 분리 완료.
 - Phase 2 구현 완료: 새 메시지는 `messageId`, `clientMessageId`, `roomSeq`, `streamShard`, `writeShard`, `fanoutShard`를 가지며, Redis `INCRBY` sequence block과 `(roomId, senderId, clientMessageId)` idempotency를 사용한다. WebSocket은 `MESSAGE_ACCEPTED`, `CHAT_MESSAGE`, `CHAT_MESSAGE_BATCH` 계약을 갖고, 클라이언트는 `messageId` 중복 제거와 `roomSeq` 정렬을 수행한다.
 - Phase 2.5 구현 완료: `POST /api/ws-tickets`로 WebSocket one-time ticket을 발급하고, Redis에는 `sha256(ticket)` key와 TTL 30초 user context만 저장한다. WebSocket handshake는 ticket을 원자 consume하며, docker/production 설정에서는 reusable session token query fallback을 비활성화한다. 클라이언트와 verify script는 connect/reconnect 직전에 새 ticket을 발급받는다.
-- Phase 3 1~3차 vertical slice 구현 완료: Redis Streams append gate, stream key index, `MessageWriterWorker` consumer group, `HotRoomFanoutWorker` batch fan-out, 역할 기반 worker scheduler를 도입했다. 메시지 인입 경로는 Streams append 성공 후 동기 JPA 저장이나 직접 Pub/Sub fan-out 없이 수락 DTO를 반환하고, compatibility history 저장과 batch fan-out은 worker가 담당한다.
+- Phase 3 vertical slice 구현 완료: Redis Streams append gate, stream key index, `MessageWriterWorker` consumer group, `HotRoomFanoutWorker` batch fan-out, pending claim, dead letter stream, 역할 기반 worker scheduler를 도입했다. 메시지 인입 경로는 Streams append 성공 후 동기 JPA 저장이나 직접 Pub/Sub fan-out 없이 수락 DTO를 반환하고, compatibility history 저장과 batch fan-out은 worker가 담당한다.
 
 남은 변경을 Phase별로 정리하면 다음과 같다.
 

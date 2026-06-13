@@ -12,4 +12,8 @@ class MessageStreamKeyResolver(
     }
 
     fun knownStreamsKey(): String = redisProperties.streams.knownStreamsKey
+
+    fun deadLetterStreamKey(consumerGroup: String): String {
+        return "${redisProperties.streams.deadLetterStreamKeyPrefix}$consumerGroup"
+    }
 }

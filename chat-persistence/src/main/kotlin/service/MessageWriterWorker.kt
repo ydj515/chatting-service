@@ -8,6 +8,7 @@ import com.chat.persistence.repository.ChatRoomRepository
 import com.chat.persistence.repository.MessageRepository
 import com.chat.persistence.repository.UserRepository
 import org.springframework.dao.DataIntegrityViolationException
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 
 @Service
@@ -18,6 +19,7 @@ class MessageWriterWorker(
     private val userRepository: UserRepository,
     private val workerProperties: ChatWorkerProperties,
 ) {
+    private val logger = LoggerFactory.getLogger(MessageWriterWorker::class.java)
 
     fun pollAndWrite(): Int {
         val streamKeys = messageStreamConsumer.listStreamKeys()
@@ -36,20 +38,60 @@ class MessageWriterWorker(
             consumerName = workerProperties.consumerName,
             streamKeys = streamKeys,
             count = workerProperties.writer.readCount,
+        ) + messageStreamConsumer.claimPending(
+            consumerGroup = consumerGroup,
+            consumerName = workerProperties.consumerName,
+            streamKeys = streamKeys,
+            count = workerProperties.writer.readCount,
+            minIdleMillis = workerProperties.writer.minIdleMillis,
         )
 
         records.forEach { record ->
-            if (write(record.envelope)) {
+            if (processRecord(record, consumerGroup) { write(record.envelope) }) {
                 written += 1
             }
+        }
+
+        return written
+    }
+
+    private fun processRecord(
+        record: com.chat.persistence.redis.MessageStreamRecord,
+        consumerGroup: String,
+        handler: () -> Boolean,
+    ): Boolean {
+        return try {
+            val written = handler()
             messageStreamConsumer.acknowledge(
                 streamKey = record.streamKey,
                 consumerGroup = consumerGroup,
                 recordId = record.recordId,
             )
+            written
+        } catch (e: Exception) {
+            handleFailure(record, consumerGroup, e)
+            false
+        }
+    }
+
+    private fun handleFailure(
+        record: com.chat.persistence.redis.MessageStreamRecord,
+        consumerGroup: String,
+        throwable: Exception,
+    ) {
+        val reason = throwable.message ?: throwable.javaClass.simpleName
+        if (record.deliveryCount >= workerProperties.writer.maxDeliveryCount) {
+            messageStreamConsumer.sendToDeadLetter(record, consumerGroup, reason)
+            messageStreamConsumer.acknowledge(
+                streamKey = record.streamKey,
+                consumerGroup = consumerGroup,
+                recordId = record.recordId,
+            )
+            logger.warn("Moved message ${record.recordId} to writer dead letter stream: $reason")
+            return
         }
 
-        return written
+        logger.warn("Message writer failed for ${record.recordId}; record remains pending: $reason")
     }
 
     private fun write(envelope: MessageStreamEnvelope): Boolean {
