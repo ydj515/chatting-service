@@ -97,6 +97,19 @@ management:
       show-details: always
 
 chat:
+  datasource:
+    read:
+      enabled: ${CHAT_DATASOURCE_READ_ENABLED:true}
+      url: jdbc:postgresql://${DB_READ_HOST:postgres-replica}:${DB_READ_PORT:5432}/${DB_NAME:chatdb}?autoCommit=false
+      username: ${DB_READ_USERNAME:${DB_USERNAME:chatuser}}
+      password: ${DB_READ_PASSWORD:${DB_PASSWORD:chatpass}}
+      driver-class-name: org.postgresql.Driver
+      maximum-pool-size: ${DB_READ_HIKARI_MAXIMUM_POOL_SIZE:10}
+      minimum-idle: ${DB_READ_HIKARI_MINIMUM_IDLE:2}
+      connection-timeout: ${DB_READ_HIKARI_CONNECTION_TIMEOUT:30000}
+      idle-timeout: ${DB_READ_HIKARI_IDLE_TIMEOUT:600000}
+      max-lifetime: ${DB_READ_HIKARI_MAX_LIFETIME:1800000}
+      latest-history-max-replica-lag: ${CHAT_DATASOURCE_READ_LATEST_HISTORY_MAX_REPLICA_LAG:2s}
   auth:
     session:
       secret: ${CHAT_AUTH_SESSION_SECRET:local-development-session-secret-change-me}

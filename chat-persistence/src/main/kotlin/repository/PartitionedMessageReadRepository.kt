@@ -1,6 +1,8 @@
 package com.chat.persistence.repository
 
 import com.chat.domain.model.MessageType
+import com.chat.persistence.service.LatestHistoryReadRoutingPolicy
+import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.PageImpl
 import org.springframework.data.domain.Pageable
@@ -12,22 +14,26 @@ import java.sql.ResultSet
 @Repository
 class PartitionedMessageReadRepository(
     private val jdbcTemplate: JdbcTemplate,
+    @Qualifier("messageReadJdbcTemplate")
+    private val messageReadJdbcTemplate: JdbcTemplate,
+    private val latestHistoryReadRoutingPolicy: LatestHistoryReadRoutingPolicy,
 ) {
 
     fun findPageByRoom(roomId: Long, pageable: Pageable): Page<CanonicalMessageRecord> {
-        val messages = jdbcTemplate.query(
+        val template = latestHistoryTemplate()
+        val messages = template.query(
             "$BASE_SELECT $ROOM_FILTER ORDER BY cm.room_seq DESC, cm.created_at DESC LIMIT ? OFFSET ?",
             rowMapper,
             roomId,
             pageable.pageSize,
             pageable.offset,
         )
-        val total = countByRoom(roomId)
+        val total = countByRoom(roomId, template)
         return PageImpl(messages, pageable, total)
     }
 
     fun findLatestMessages(roomId: Long, limit: Int): List<CanonicalMessageRecord> {
-        return jdbcTemplate.query(
+        return latestHistoryTemplate().query(
             "$BASE_SELECT $ROOM_FILTER ORDER BY cm.room_seq DESC, cm.created_at DESC LIMIT ?",
             rowMapper,
             roomId,
@@ -36,7 +42,7 @@ class PartitionedMessageReadRepository(
     }
 
     fun findMessagesBefore(roomId: Long, cursor: Long, limit: Int): List<CanonicalMessageRecord> {
-        return jdbcTemplate.query(
+        return messageReadJdbcTemplate.query(
             "$BASE_SELECT $ROOM_FILTER AND cm.room_seq < ? ORDER BY cm.room_seq DESC, cm.created_at DESC LIMIT ?",
             rowMapper,
             roomId,
@@ -46,7 +52,7 @@ class PartitionedMessageReadRepository(
     }
 
     fun findMessagesAfter(roomId: Long, cursor: Long, limit: Int): List<CanonicalMessageRecord> {
-        return jdbcTemplate.query(
+        return messageReadJdbcTemplate.query(
             "$BASE_SELECT $ROOM_FILTER AND cm.room_seq > ? ORDER BY cm.room_seq ASC, cm.created_at ASC LIMIT ?",
             rowMapper,
             roomId,
@@ -60,19 +66,27 @@ class PartitionedMessageReadRepository(
     }
 
     fun findLatestMessage(roomId: Long): CanonicalMessageRecord? {
-        return jdbcTemplate.query(
+        return latestHistoryTemplate().query(
             "$BASE_SELECT $ROOM_FILTER ORDER BY cm.room_seq DESC, cm.created_at DESC LIMIT 1",
             rowMapper,
             roomId,
         ).firstOrNull()
     }
 
-    private fun countByRoom(roomId: Long): Long {
-        return jdbcTemplate.queryForObject(
+    private fun countByRoom(roomId: Long, template: JdbcTemplate): Long {
+        return template.queryForObject(
             "SELECT count(*) FROM chat_messages cm WHERE cm.room_id = ? AND cm.is_deleted = false",
             Long::class.java,
             roomId,
         ) ?: 0L
+    }
+
+    private fun latestHistoryTemplate(): JdbcTemplate {
+        return if (latestHistoryReadRoutingPolicy.usePrimaryForLatestHistory()) {
+            jdbcTemplate
+        } else {
+            messageReadJdbcTemplate
+        }
     }
 
     private companion object {

@@ -1565,6 +1565,7 @@ docker compose logs --tail=200 chat-worker-app-1
 - `GET /chat-rooms/{roomId}/messages`, cursor history, gap fill API를 partitioned table 기준으로 바꾼다.
 - read-only 조회 datasource를 `DB_READ_HOST=postgres-replica`로 분리한다.
 - replica lag가 임계치를 넘으면 사용자 최신 history는 primary fallback, 관리자 장기 조회는 지연 안내 또는 다른 replica fallback 정책을 적용한다.
+- 구현 기본값은 `CHAT_DATASOURCE_READ_ENABLED=true`, `DB_READ_HOST=postgres-replica`, `CHAT_DATASOURCE_READ_LATEST_HISTORY_MAX_REPLICA_LAG=2s`다. read datasource가 비활성화된 로컬/테스트 환경은 primary `JdbcTemplate`를 read alias로 사용한다.
 - partition 생성 job을 추가해 오늘/내일 partition을 미리 만든다.
 - archive worker 결과 파일에 checksum metadata를 추가한다.
 - 기존 JPA `messages` 테이블은 migration source 또는 fallback으로만 남긴다.
