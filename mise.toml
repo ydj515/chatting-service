@@ -67,8 +67,16 @@ description = "전체 채팅 클러스터를 백그라운드로 기동한다."
 depends = ["start:all"]
 
 [tasks."start:all"]
-description = "PostgreSQL, Redis, 역할별 애플리케이션, nginx를 모두 빌드 및 기동한다."
-run = "docker compose up -d --build"
+description = "PostgreSQL, Redis, 역할별 애플리케이션, nginx를 모두 빌드 및 기동한 뒤 nginx upstream DNS를 갱신한다."
+run = """
+docker compose up -d --build --wait --wait-timeout 180
+docker compose restart nginx
+docker compose up -d --wait --wait-timeout 60 nginx
+"""
+
+[tasks."restart:nginx"]
+description = "Docker Compose nginx를 재시작해 app 컨테이너 재생성 후 upstream DNS를 갱신한다."
+run = "docker compose restart nginx"
 
 [tasks."start:infra"]
 description = "로컬 개발용 PostgreSQL primary/read-replica, partition archive worker, Redis를 기동한다."
