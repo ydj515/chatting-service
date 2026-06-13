@@ -1739,11 +1739,13 @@ node scripts/load-chat.mjs --room hot --viewers 10000 --messages-per-sec 10000 -
 - k6/Gatling/Node 기반 load test를 추가한다.
 - WebSocket fan-out p95/p99 latency를 계측한다.
 - Redis Streams lag와 pending count를 계측한다.
+- WebSocket ticket 발급 rate limit의 Redis Lua script 기반 원자 처리를 부하/장애 상황에서 검증한다.
 - PostgreSQL writer batch latency를 계측한다.
 - read replica lag를 계측한다.
 - admin search p95 latency를 계측한다.
 - chaos test: Gateway kill, Worker kill, Redis 재시작, replica 지연을 검증한다.
 - archive worker one-shot 실행과 partition detach/drop dry-run을 검증한다.
+- Docker Compose 또는 staging 배포에서 Nginx upstream DNS stale 대응 절차를 검증한다.
 - 장애별 runbook을 작성한다.
 
 검증 시나리오:
@@ -1755,6 +1757,7 @@ node scripts/load-chat.mjs --room hot --viewers 10000 --messages-per-sec 10000 -
 - PostgreSQL replica 중단 후 primary fallback 또는 조회 degrade
 - archive worker one-shot 실행과 partition detach/drop dry-run
 - 관리자 검색 p95, writer lag, replica lag, fanout lag 측정
+- app 컨테이너 재생성 후 `/api/`, `/api/ws/`, `/api/admin/`가 올바른 role로 라우팅되는지 검증
 
 릴리즈 기준:
 
@@ -1763,6 +1766,8 @@ node scripts/load-chat.mjs --room hot --viewers 10000 --messages-per-sec 10000 -
 - replica lag 정상 상황 3초 이하
 - hot room batch fan-out p95 500ms 이하
 - 관리자 방별/시간대별 조회 p95 1초 이하
+- WebSocket ticket issue rate limit이 Lua script 기반 원자 처리로 동작한다.
+- app rebuild/recreate 후 nginx stale upstream으로 인한 오라우팅이 발생하지 않는다.
 - Gateway 장애 후 클라이언트가 gap fill로 복구한다.
 - Writer Worker 장애 후 pending message가 재처리된다.
 

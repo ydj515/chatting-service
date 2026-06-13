@@ -10,6 +10,8 @@ import io.micrometer.core.instrument.MeterRegistry
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.ObjectProvider
 import org.springframework.data.redis.core.RedisTemplate
+import org.springframework.data.redis.core.script.DefaultRedisScript
+import org.springframework.data.redis.core.script.RedisScript
 import org.springframework.stereotype.Service
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
@@ -32,6 +34,10 @@ class RedisWebSocketTicketService(
     private val logger = LoggerFactory.getLogger(javaClass)
     private val secureRandom = SecureRandom()
     private val encoder = Base64.getUrlEncoder().withoutPadding()
+    private val rateLimitScript: RedisScript<Long> = DefaultRedisScript(
+        RATE_LIMIT_SCRIPT,
+        Long::class.javaObjectType,
+    )
 
     override fun issueTicket(userId: Long, clientIp: String?): WebSocketTicketResponse? {
         return try {
@@ -56,7 +62,6 @@ class RedisWebSocketTicketService(
                     userId = userId,
                     issuedAtEpochSecond = issuedAt.epochSecond,
                     expiresAtEpochSecond = expiresAt.epochSecond,
-                    clientIp = normalizedClientIp,
                 )
                 val stored = redisTemplate.opsForValue().setIfAbsent(
                     ticketKey(ticket),
@@ -119,11 +124,19 @@ class RedisWebSocketTicketService(
             return false
         }
 
-        val count = redisTemplate.opsForValue().increment(key) ?: return false
-        if (count == 1L) {
-            redisTemplate.expire(key, authProperties.webSocketTicket.issueRateLimitWindow)
+        val windowMillis = authProperties.webSocketTicket.issueRateLimitWindow.toMillis()
+        if (windowMillis <= 0) {
+            return false
         }
-        return count <= limit
+
+        val allowed = redisTemplate.execute(
+            rateLimitScript,
+            listOf(key),
+            windowMillis.toString(),
+            limit.toString(),
+        ) ?: return false
+
+        return allowed == RATE_LIMIT_ALLOWED
     }
 
     private fun newTicket(): String {
@@ -152,7 +165,6 @@ class RedisWebSocketTicketService(
         val userId: Long = 0,
         val issuedAtEpochSecond: Long = 0,
         val expiresAtEpochSecond: Long = 0,
-        val clientIp: String? = null,
     )
 
     private companion object {
@@ -160,5 +172,20 @@ class RedisWebSocketTicketService(
         const val MIN_TICKET_LENGTH = 32
         const val MAX_TICKET_LENGTH = 512
         const val MAX_TICKET_GENERATION_ATTEMPTS = 3
+        const val RATE_LIMIT_ALLOWED = 1L
+        const val RATE_LIMIT_SCRIPT = """
+            local current = redis.call('INCR', KEYS[1])
+            local ttl = redis.call('PTTL', KEYS[1])
+
+            if current == 1 or ttl == -1 then
+              redis.call('PEXPIRE', KEYS[1], ARGV[1])
+            end
+
+            if current <= tonumber(ARGV[2]) then
+              return 1
+            end
+
+            return 0
+        """
     }
 }

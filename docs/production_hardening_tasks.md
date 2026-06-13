@@ -1,0 +1,161 @@
+# Production Hardening Tasks
+
+이 문서는 Phase 2.5 이후 운영 공개 전 또는 운영 안정화 단계에서 분리했거나 완료한 hardening 항목을 정리한다.
+
+---
+
+## 1. WebSocket Ticket Rate Limit Lua Script 전환
+
+### 상태
+
+- 분류: Security / Reliability Hardening
+- 적용 시점: Phase 2.5 완료 후 Production Hardening Gate
+- 현재 구현 상태: 반영 완료
+- 관련 문서: [ws_ticket_analysis.md](./ws_ticket_analysis.md)
+
+### 문제
+
+WebSocket one-time ticket 발급 API는 Redis rate limit counter를 사용한다. 단순 구현은 다음 두 명령을 순서대로 호출한다.
+
+```text
+INCR rate-limit-key
+EXPIRE rate-limit-key window
+```
+
+이 구조에서 `INCR` 성공 후 `EXPIRE` 전에 애플리케이션 crash, Redis timeout, 네트워크 단절이 발생하면 TTL 없는 rate limit key가 남을 수 있다. 이 key가 계속 증가하거나 남아 있으면 특정 user/IP가 계속 rate limited 상태처럼 보일 수 있고, 사용자는 WebSocket ticket 발급 실패와 재연결 실패를 경험한다.
+
+### 현재 완화책
+
+초기 완화책은 `count == 1`일 때 TTL을 설정하고, 이후 요청에서 `TTL == -1`을 발견하면 같은 window로 TTL을 복구하는 방식이었다. 현재 구현은 이 경로를 Lua script로 승격해 Redis 내부에서 원자 처리한다.
+
+### 목표 구현
+
+Redis Lua script로 `INCR + PEXPIRE + TTL repair`를 Redis 내부에서 원자 처리한다.
+
+예시:
+
+```lua
+local current = redis.call('INCR', KEYS[1])
+local ttl = redis.call('PTTL', KEYS[1])
+
+if current == 1 or ttl == -1 then
+  redis.call('PEXPIRE', KEYS[1], ARGV[1])
+end
+
+if current <= tonumber(ARGV[2]) then
+  return 1
+end
+
+return 0
+```
+
+`ARGV[1]`은 window milliseconds, `ARGV[2]`는 limit이다.
+
+### 완료 기준
+
+- user 기준 ticket issue rate limit이 Lua script 경로를 사용한다.
+- IP 기준 ticket issue rate limit이 Lua script 경로를 사용한다.
+- Lua script 실행 실패 시 ticket 발급은 fail-closed로 실패한다.
+- `INCR` 이후 TTL이 없는 key가 남는 장애 모드가 단위 테스트로 방어된다.
+- Redis Cluster 전환 시 key 하나 단위 script 실행 또는 hash tag 정책이 문서화되어 있다.
+- ticket issue success/failure/rate-limited count가 metric으로 관측된다.
+
+ticket issue latency와 Redis script failure 전용 metric은 Phase 7 observability 검증에서 별도로 보강한다.
+
+### 복잡도
+
+- 시간 복잡도: `O(1)`
+- 공간 복잡도: `O(1)`
+
+### 주의사항
+
+> - Redis Cluster에서 Lua script는 같은 hash slot의 key만 한 번에 다룰 수 있다. user key와 IP key를 하나의 script에서 동시에 처리하지 않는 편이 단순하다.
+> - Lua script 장애 시 fail-open으로 ticket을 발급하면 abuse 방어가 깨질 수 있다. 운영 기본값은 fail-closed가 맞다.
+> - 이전 TTL repair 방식은 임시 완화책이며, 현재 최종 구현은 Lua script 원자 처리다.
+
+### 대안
+
+| 대안 | 장점 | 단점 | 판단 |
+| --- | --- | --- | --- |
+| 현재 TTL repair 유지 | 구현이 단순하고 장애 모드를 일부 완화한다 | `INCR + EXPIRE` 사이 중간 상태 자체는 남는다 | 더 이상 기본안으로 두지 않음 |
+| Lua script 전환 | 원자성, round-trip 감소, 장애 모드 축소 | script 관리와 Redis Cluster 제약 검토 필요 | 적용 완료 |
+| Redis transaction 사용 | 명령 묶음 의도가 명확하다 | Redis transaction은 중간 로직과 조건 처리에 Lua보다 불편하다 | 우선순위 낮음 |
+
+---
+
+## 2. Docker Compose Nginx Upstream DNS Stale 대응
+
+### 상태
+
+- 분류: Infra / Deployment Hardening
+- 적용 시점: 별도 Infra Hardening task
+- 현재 구현 상태: `mise run start`, `mise run start:all`, `start-cluster.sh`에 nginx restart 반영 완료
+- 관련 문서: [infrastructure.md](./infrastructure.md)
+
+### 문제
+
+Docker Compose에서 app 컨테이너를 재생성하면 컨테이너 IP가 바뀔 수 있다. Nginx는 일반적인 `upstream` 설정에서 hostname을 시작 시점에 resolve하고, 재기동 전까지 이전 IP를 계속 사용할 수 있다.
+
+이전 IP가 다른 role의 컨테이너에 재사용되면 다음과 같은 일이 발생할 수 있다.
+
+1. `chat-api-app-*` 컨테이너가 재생성된다.
+2. 기존 API 컨테이너 IP가 `chat-websocket-app-*` 같은 다른 컨테이너에 재사용된다.
+3. nginx는 예전 API upstream IP를 계속 사용한다.
+4. `/api/users/register` 요청이 WebSocket 앱으로 전달된다.
+5. WebSocket 앱에는 REST user controller가 없으므로 `404`가 발생한다.
+
+### 영향
+
+- 로컬 Docker Compose 또는 Compose 기반 스테이징에서 재현 가능하다.
+- Kubernetes 환경에서는 Service/Ingress가 stable virtual endpoint를 제공하므로 같은 형태의 문제가 줄어든다.
+- VM + Docker Compose 운영을 선택한다면 배포 절차에서 반드시 다뤄야 한다.
+
+### 현재 runbook
+
+app 컨테이너 재생성 후 nginx를 재시작해 upstream DNS를 다시 resolve한다.
+
+```bash
+mise run start
+mise run verify:chat
+```
+
+수동으로 app 컨테이너만 재생성한 경우에는 다음 명령을 실행한다.
+
+```bash
+mise run restart:nginx
+mise run verify:chat
+```
+
+### 목표 구현
+
+현재는 첫 번째 방식을 적용했다. 필요해지면 두 번째 또는 세 번째 방식으로 확장한다.
+
+1. Compose 배포 스크립트에 app 재생성 후 `docker compose restart nginx`를 명시적으로 포함한다.
+2. nginx에 Docker DNS resolver(`127.0.0.11`)와 동적 `proxy_pass` 전략을 적용한다.
+3. 운영 배포는 Kubernetes Service/Ingress 기반으로 전환하고 Compose는 local/dev 전용으로 제한한다.
+
+### 완료 기준
+
+- app 컨테이너를 재생성한 뒤에도 `/api/`, `/api/ws/`, `/api/admin/` 요청이 올바른 role로 라우팅된다.
+- `mise run verify:chat`가 app rebuild 직후 안정적으로 통과한다.
+- nginx access log의 `upstream` 주소가 현재 container IP와 일치한다.
+- 배포 runbook 또는 mise task에 nginx stale DNS 대응 절차와 health wait가 포함되어 있다.
+
+### 복잡도
+
+- 요청 처리 시간 복잡도: `O(1)`
+- 추가 공간 복잡도: `O(1)`
+
+### 주의사항
+
+> - `docker compose up -d --build`만으로는 nginx가 기존 upstream IP를 갱신하지 않을 수 있다.
+> - nginx `resolver` 기반 동적 proxy는 설정이 복잡해질 수 있으므로 local/dev와 운영 배포 방식을 분리해서 판단해야 한다.
+> - 이 문제는 애플리케이션 controller mapping 문제가 아니라 배포/라우팅 계층의 stale endpoint 문제다.
+
+### 대안
+
+| 대안 | 장점 | 단점 | 판단 |
+| --- | --- | --- | --- |
+| app 재생성 후 nginx restart | 단순하고 즉시 효과가 있다 | nginx 연결이 재시작된다 | Compose local/staging에 적합 |
+| nginx dynamic DNS 설정 | nginx 재시작 빈도를 줄일 수 있다 | 설정 복잡도와 검증 비용이 늘어난다 | 필요 시 적용 |
+| Kubernetes Service/Ingress | 운영 표준에 가깝고 endpoint 추상화가 강하다 | 클러스터 운영 비용이 있다 | 최종 운영 환경 권장 |

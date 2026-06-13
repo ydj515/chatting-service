@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { WebSocketMessage } from '../types';
 import { appConfig, buildWebSocketUrl } from '../config/appConfig.ts';
 import { webSocketTicketApi } from '../services/api.ts';
-import { shouldIgnoreWebSocketEvent } from '../utils/webSocketLifecycle.ts';
+import { nextReconnectDelayMs, shouldIgnoreWebSocketEvent } from '../utils/webSocketLifecycle.ts';
 
 interface UseWebSocketProps {
   sessionToken: string;
@@ -58,6 +58,31 @@ export const useWebSocket = ({
   useEffect(() => {
     onErrorRef.current = onError;
   }, [onError]);
+
+  const scheduleReconnect = useCallback((connectFn: () => void): boolean => {
+    const delay = nextReconnectDelayMs({
+      reconnectAttempts: reconnectAttempts.current,
+      maxReconnectAttempts: appConfig.webSocket.maxReconnectAttempts,
+      reconnectBaseDelayMs: appConfig.webSocket.reconnectBaseDelayMs,
+      reconnectMaxDelayMs: appConfig.webSocket.reconnectMaxDelayMs,
+    });
+
+    if (delay === null) {
+      setError('최대 재연결 시도 횟수를 초과했습니다.');
+      return false;
+    }
+
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+    }
+
+    reconnectTimeoutRef.current = setTimeout(() => {
+      reconnectAttempts.current++;
+      connectFn();
+    }, delay);
+
+    return true;
+  }, []);
 
   /**
    * 커넥션 연결
@@ -142,26 +167,8 @@ export const useWebSocket = ({
           onDisconnectRef.current?.();
 
           // 정상적인 종료가 아닌 경우만 재연결 시도
-          if (
-            !appConfig.webSocket.normalCloseCodes.includes(event.code) &&
-            reconnectAttempts.current < appConfig.webSocket.maxReconnectAttempts
-          ) {
-            const delay = Math.min(
-              appConfig.webSocket.reconnectBaseDelayMs * Math.pow(2, reconnectAttempts.current),
-              appConfig.webSocket.reconnectMaxDelayMs,
-            );
-
-            // 기존 타이머 정리
-            if (reconnectTimeoutRef.current) {
-              clearTimeout(reconnectTimeoutRef.current);
-            }
-
-            reconnectTimeoutRef.current = setTimeout(() => {
-              reconnectAttempts.current++;
-              connect();
-            }, delay);
-          } else if (reconnectAttempts.current >= appConfig.webSocket.maxReconnectAttempts) {
-            setError('최대 재연결 시도 횟수를 초과했습니다.');
+          if (!appConfig.webSocket.normalCloseCodes.includes(event.code)) {
+            scheduleReconnect(connect);
           }
         };
 
@@ -184,13 +191,14 @@ export const useWebSocket = ({
         setError('WebSocket 연결 생성 실패');
         setIsConnected(false);
         onErrorRef.current?.('ticket');
+        scheduleReconnect(connect);
       } finally {
         if (attemptId === connectionAttemptRef.current) {
           isConnectingRef.current = false;
         }
       }
     })();
-  }, [sessionToken]);
+  }, [scheduleReconnect, sessionToken]);
 
   const disconnect = useCallback(() => {
     reconnectAttempts.current = 0; // 수동 disconnect 시 재연결 시도 초기화
@@ -199,13 +207,13 @@ export const useWebSocket = ({
     if (reconnectTimeoutRef.current) {
       clearTimeout(reconnectTimeoutRef.current);
     }
-    
+
     if (wsRef.current) {
       intentionallyClosedSocketsRef.current.add(wsRef.current);
       wsRef.current.close(1000, 'User disconnected');
       wsRef.current = null;
     }
-    
+
     setIsConnected(false);
   }, []);
 
@@ -230,7 +238,7 @@ export const useWebSocket = ({
   // 컴포넌트 마운트 시 자동 연결 (session token 변경 시에도 재연결)
   useEffect(() => {
     connect();
-    
+
     return () => {
       disconnect();
     };
@@ -256,4 +264,4 @@ export const useWebSocket = ({
     disconnect,
     error,
   };
-}; 
+};
