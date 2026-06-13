@@ -868,7 +868,7 @@ docker compose run --rm \
 
 - 애플리케이션은 아직 `DB_READ_HOST=postgres-replica`를 사용하지 않는다. read/write datasource 분리는 Phase 4 구현 대상이다.
 - 현재 JPA `messages` 테이블과 신규 `chat_messages` partitioned table은 병행 상태다. 신규 table은 Message Writer Worker phase를 위한 준비물이다.
-- archive worker는 로컬 검증용 CSV archive를 수행한다. 운영에서는 S3 호환 object storage와 무결성 checksum 저장을 추가한다.
+- archive worker는 로컬 검증용 CSV archive와 checksum metadata 저장을 수행한다. 운영에서는 S3 호환 object storage 업로드 경로를 추가한다.
 
 ## 11. 관리자 페이지 설계
 
