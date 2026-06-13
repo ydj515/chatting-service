@@ -11,6 +11,8 @@ import java.util.Optional
 @Repository
 interface MessageRepository : JpaRepository<Message, Long> {
 
+    fun findByMessageId(messageId: String): Optional<Message>
+
     @Query("""
         SELECT m FROM Message m
         JOIN FETCH m.sender s

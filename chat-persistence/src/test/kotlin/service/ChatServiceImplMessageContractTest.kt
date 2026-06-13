@@ -41,10 +41,9 @@ import java.util.Optional
 class ChatServiceImplMessageContractTest {
 
     @Test
-    fun `메시지 전송은 Phase 2 envelope 필드를 저장하고 반환한다`() {
+    fun `메시지 전송은 Streams append 이후 동기 저장 없이 수락 계약을 반환한다`() {
         val fixture = chatServiceFixture()
         val clientMessageId = "client-message-1"
-        val savedAt = LocalDateTime.parse("2026-06-12T12:00:00")
         `when`(
             fixture.messageRepository.findByChatRoomIdAndSenderIdAndClientMessageId(
                 10L,
@@ -52,12 +51,6 @@ class ChatServiceImplMessageContractTest {
                 clientMessageId,
             )
         ).thenReturn(Optional.empty())
-        `when`(fixture.messageRepository.saveAndFlush(any(Message::class.java))).thenAnswer { invocation ->
-            (invocation.arguments[0] as Message).copy(
-                id = 101L,
-                createdAt = savedAt,
-            )
-        }
 
         val message = fixture.chatService.sendMessage(
             SendMessageRequest(
@@ -69,24 +62,17 @@ class ChatServiceImplMessageContractTest {
             senderId = 7L,
         )
 
-        val savedMessageCaptor = ArgumentCaptor.forClass(Message::class.java)
-        verify(fixture.messageRepository).saveAndFlush(savedMessageCaptor.capture())
-        val savedMessage = savedMessageCaptor.value
+        verify(fixture.messageRepository, never()).saveAndFlush(any(Message::class.java))
+        assertEquals(0L, message.id)
         assertNotNull(message.messageId)
         assertTrue(message.messageId.isNotBlank())
         assertEquals(clientMessageId, message.clientMessageId)
         assertEquals(1L, message.roomSeq)
         assertEquals(message.roomSeq, message.sequenceNumber)
-        assertEquals(message.messageId, savedMessage.messageId)
-        assertEquals(clientMessageId, savedMessage.clientMessageId)
-        assertEquals(1L, savedMessage.roomSeq)
-        assertEquals(0, savedMessage.streamShard)
-        assertEquals(0, savedMessage.writeShard)
-        assertEquals(0, savedMessage.fanoutShard)
     }
 
     @Test
-    fun `메시지 전송은 Redis Streams append 이후 compatibility 저장을 수행한다`() {
+    fun `메시지 전송은 Redis Streams append 이후 realtime fanout을 수행한다`() {
         val messageStreamProducer = mock(MessageStreamProducer::class.java)
         `when`(messageStreamProducer.append(anyMessageStreamEnvelope()))
             .thenReturn("1749790000000-0")
@@ -99,12 +85,6 @@ class ChatServiceImplMessageContractTest {
                 clientMessageId,
             )
         ).thenReturn(Optional.empty())
-        `when`(fixture.messageRepository.saveAndFlush(any(Message::class.java))).thenAnswer { invocation ->
-            (invocation.arguments[0] as Message).copy(
-                id = 101L,
-                createdAt = LocalDateTime.parse("2026-06-12T12:00:00"),
-            )
-        }
 
         val message = fixture.chatService.sendMessage(
             SendMessageRequest(
@@ -117,10 +97,9 @@ class ChatServiceImplMessageContractTest {
         )
 
         val envelopeCaptor = ArgumentCaptor.forClass(MessageStreamEnvelope::class.java)
-        val saveCaptor = ArgumentCaptor.forClass(Message::class.java)
         val inOrder = inOrder(messageStreamProducer, fixture.messageRepository)
         inOrder.verify(messageStreamProducer).append(captureMessageStreamEnvelope(envelopeCaptor))
-        inOrder.verify(fixture.messageRepository).saveAndFlush(saveCaptor.capture())
+        verify(fixture.messageRepository, never()).saveAndFlush(any(Message::class.java))
 
         val envelope = envelopeCaptor.value
         assertEquals(message.messageId, envelope.messageId)
@@ -135,14 +114,10 @@ class ChatServiceImplMessageContractTest {
         assertEquals(0, envelope.streamShard)
         assertEquals(0, envelope.writeShard)
         assertEquals(0, envelope.fanoutShard)
-
-        val savedMessage = saveCaptor.value
-        assertEquals(envelope.messageId, savedMessage.messageId)
-        assertEquals(envelope.roomSeq, savedMessage.roomSeq)
     }
 
     @Test
-    fun `Redis Streams append 실패 시 메시지를 compatibility 저장하지 않는다`() {
+    fun `Redis Streams append 실패 시 메시지를 저장하거나 fanout하지 않는다`() {
         val messageStreamProducer = mock(MessageStreamProducer::class.java)
         `when`(messageStreamProducer.append(anyMessageStreamEnvelope()))
             .thenThrow(IllegalStateException("stream append failed"))
@@ -213,51 +188,6 @@ class ChatServiceImplMessageContractTest {
         assertEquals(5L, message.roomSeq)
         assertEquals(5L, message.sequenceNumber)
         verify(fixture.messageRepository, never()).saveAndFlush(any(Message::class.java))
-    }
-
-    @Test
-    fun `동시 clientMessageId 중복 저장 충돌은 기존 메시지 계약으로 반환한다`() {
-        val fixture = chatServiceFixture()
-        val clientMessageId = "client-message-1"
-        val existingMessage = Message(
-            id = 101L,
-            messageId = "msg-existing",
-            clientMessageId = clientMessageId,
-            chatRoom = fixture.chatRoom,
-            sender = fixture.sender,
-            type = MessageType.TEXT,
-            content = "hello",
-            sequenceNumber = 5L,
-            roomSeq = 5L,
-            streamShard = 1,
-            writeShard = 2,
-            fanoutShard = 3,
-            createdAt = LocalDateTime.parse("2026-06-12T12:00:00"),
-        )
-        `when`(
-            fixture.messageRepository.findByChatRoomIdAndSenderIdAndClientMessageId(
-                10L,
-                7L,
-                clientMessageId,
-            )
-        ).thenReturn(Optional.empty(), Optional.of(existingMessage))
-        `when`(fixture.messageRepository.saveAndFlush(any(Message::class.java)))
-            .thenThrow(DataIntegrityViolationException("duplicate client message"))
-
-        val message = fixture.chatService.sendMessage(
-            SendMessageRequest(
-                chatRoomId = 10L,
-                type = MessageType.TEXT,
-                content = "hello",
-                clientMessageId = clientMessageId,
-            ),
-            senderId = 7L,
-        )
-
-        assertEquals("msg-existing", message.messageId)
-        assertEquals(clientMessageId, message.clientMessageId)
-        assertEquals(5L, message.roomSeq)
-        assertEquals(5L, message.sequenceNumber)
     }
 
     @Suppress("UNCHECKED_CAST")

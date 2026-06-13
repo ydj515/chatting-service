@@ -10,10 +10,11 @@ class RedisMessageStreamProducer(
     private val redisTemplate: RedisTemplate<String, String>,
     private val objectMapper: ObjectMapper,
     private val redisProperties: ChatRedisProperties,
+    private val keyResolver: MessageStreamKeyResolver,
 ) : MessageStreamProducer {
 
     override fun append(envelope: MessageStreamEnvelope): String {
-        val streamKey = streamKey(envelope.chatRoomId, envelope.streamShard)
+        val streamKey = keyResolver.roomStreamKey(envelope.chatRoomId, envelope.streamShard)
         val fields = linkedMapOf(
             FIELD_MESSAGE_ID to envelope.messageId,
             FIELD_CHAT_ROOM_ID to envelope.chatRoomId.toString(),
@@ -24,11 +25,9 @@ class RedisMessageStreamProducer(
         val recordId = redisTemplate.opsForStream<String, String>().add(streamKey, fields)
             ?: throw IllegalStateException("Redis Streams append returned null: $streamKey")
 
-        return recordId.value
-    }
+        redisTemplate.opsForSet().add(redisProperties.streams.knownStreamsKey, streamKey)
 
-    private fun streamKey(roomId: Long, streamShard: Int): String {
-        return "${redisProperties.streams.roomStreamKeyPrefix}$roomId:shard:$streamShard"
+        return recordId.value
     }
 
     private companion object {

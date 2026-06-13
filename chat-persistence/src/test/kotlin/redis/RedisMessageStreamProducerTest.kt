@@ -15,6 +15,7 @@ import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
 import org.springframework.data.redis.connection.stream.RecordId
 import org.springframework.data.redis.core.RedisTemplate
+import org.springframework.data.redis.core.SetOperations
 import org.springframework.data.redis.core.StreamOperations
 import java.time.LocalDateTime
 
@@ -24,7 +25,9 @@ class RedisMessageStreamProducerTest {
     fun `메시지 envelope를 room stream shard key에 append한다`() {
         val redisTemplate = redisTemplate()
         val streamOperations = streamOperations()
+        val setOperations = setOperations()
         `when`(redisTemplate.opsForStream<String, String>()).thenReturn(streamOperations)
+        `when`(redisTemplate.opsForSet()).thenReturn(setOperations)
         `when`(streamOperations.add(eq("chat:stream:room:42:shard:3"), anyStringMap()))
             .thenReturn(RecordId.of("1749790000000-0"))
 
@@ -35,6 +38,7 @@ class RedisMessageStreamProducerTest {
             redisTemplate = redisTemplate,
             objectMapper = objectMapper,
             redisProperties = ChatRedisProperties(),
+            keyResolver = MessageStreamKeyResolver(ChatRedisProperties()),
         )
 
         val recordId = producer.append(
@@ -66,6 +70,7 @@ class RedisMessageStreamProducerTest {
         assertEquals("3", fields["streamShard"])
         assertTrue(fields["payload"]!!.contains("\"messageId\":\"msg-1\""))
         assertTrue(fields["payload"]!!.contains("\"clientMessageId\":\"client-1\""))
+        verify(setOperations).add("chat:stream:rooms", "chat:stream:room:42:shard:3")
     }
 
     @Suppress("UNCHECKED_CAST")
@@ -76,6 +81,11 @@ class RedisMessageStreamProducerTest {
     @Suppress("UNCHECKED_CAST")
     private fun streamOperations(): StreamOperations<String, String, String> {
         return mock(StreamOperations::class.java) as StreamOperations<String, String, String>
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun setOperations(): SetOperations<String, String> {
+        return mock(SetOperations::class.java) as SetOperations<String, String>
     }
 
     @Suppress("UNCHECKED_CAST")

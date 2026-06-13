@@ -9,7 +9,6 @@ import com.chat.persistence.redis.MessageStreamProducer
 import com.chat.persistence.redis.RedisMessageBroker
 import org.slf4j.LoggerFactory
 import org.springframework.cache.annotation.*
-import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Pageable
@@ -340,20 +339,7 @@ class ChatServiceImpl(
 
         messageStreamProducer.append(messageToStreamEnvelope(message))
 
-        val savedMessage = try {
-            messagePersistenceService.save(message)
-        } catch (e: DataIntegrityViolationException) {
-            if (requestedClientMessageId == null) {
-                throw e
-            }
-            messageRepository.findByChatRoomIdAndSenderIdAndClientMessageId(
-                chatRoomId = request.chatRoomId,
-                senderId = senderId,
-                clientMessageId = requestedClientMessageId,
-            ).orElseThrow { e }
-        }
-
-        val chatMessage = messageToChatMessage(savedMessage)
+        val chatMessage = messageToChatMessage(message)
 
         // 1. 로컬 세션에 즉시 전송 (실시간 응답성 보장)
         webSocketSessionManager.sendMessageToLocalRoom(request.chatRoomId, chatMessage)
@@ -369,7 +355,7 @@ class ChatServiceImpl(
             logger.error("Failed to broadcast message via Redis: ${e.message}", e)
         }
 
-        return messageToDto(savedMessage)
+        return messageToDto(message)
     }
 
     private fun messageToStreamEnvelope(message: Message): MessageStreamEnvelope {
