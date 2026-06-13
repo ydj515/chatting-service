@@ -11,7 +11,7 @@
 - 분류: Security / Reliability Hardening
 - 적용 시점: Phase 2.5 완료 후 Production Hardening Gate
 - 현재 구현 상태: 반영 완료
-- 관련 문서: [ws_ticket_analysis.md](./ws_ticket_analysis.md)
+- 관련 문서: [ws_ticket_analysis.md](./ws_ticket_analysis.md), [redis_cluster_key_naming.md](./redis_cluster_key_naming.md), [observability_metrics.md](./observability_metrics.md)
 
 ### 문제
 
@@ -55,8 +55,8 @@ return 0
 
 현재 Lua script는 Redis Cluster hash slot 문제를 피하도록 **단일 key script**로 유지한다.
 
-- user rate limit script는 `chat:ws-ticket:rate:user:{userId}` 계열 key 1개만 `KEYS[1]`로 받는다.
-- IP rate limit script는 `chat:ws-ticket:rate:ip:{hashedIp}` 계열 key 1개만 `KEYS[1]`로 받는다.
+- user rate limit script는 `chat:ws-ticket:rate:user:<userId>` 계열 key 1개만 `KEYS[1]`로 받는다.
+- IP rate limit script는 `chat:ws-ticket:rate:ip:<hashedIp>` 계열 key 1개만 `KEYS[1]`로 받는다.
 - user key와 IP key를 같은 Lua script에 함께 넘기지 않는다.
 - Lua script 내부에서 `KEYS[1]` 외의 Redis key를 조합하거나 접근하지 않는다.
 
@@ -67,6 +67,26 @@ Redis Cluster에서 Lua script가 여러 key를 받으면 모든 key가 같은 h
 - user/IP를 계속 단일 key script로 분리하고, 두 제한의 완전 원자성은 포기한다.
 - 같은 hash slot이 필요한 범위만 hash tag로 묶되 slot skew와 hot key 위험을 별도 검증한다.
 - Lua script 대신 RedisGears, 별도 rate limit service, 또는 edge/WAF rate limit과 조합한다.
+
+현재 구현의 운영 기준은 **각 제한을 단일 key script로 fail-closed 처리하는 것으로 충분한지 Phase 7에서 판단**하는 것이다. user limit 통과 후 IP limit에서 거부되면 user counter가 보수적으로 소모될 수 있지만, 이는 제한 우회가 아니라 정상 reconnect UX에 영향을 줄 수 있는 문제다. 따라서 완전 원자성 도입 여부는 다음 지표를 보고 결정한다.
+
+- IP limit 거부 중 user counter 소모로 정상 reconnect가 실패하는 비율
+- NAT, corporate proxy, mobile carrier 환경에서 동일 IP 사용자들이 받는 rate limit 영향
+- ticket issue latency p95/p99
+- Redis Lua script failure 발생률
+- ticket issue failure 중 `rate_limited_user`, `rate_limited_ip`, `failure` 비율
+- abuse traffic에서 현재 순차 fail-closed 방식으로 충분히 방어되는지 여부
+
+운영 판단 기준은 다음으로 고정한다.
+
+- 전체 정상 reconnect ticket 발급 성공률이 rolling 15분 기준 `99.9%` 이상이면 현재 단일 key Lua script + fail-closed 방식을 유지한다.
+- rate limit으로 인한 정상 reconnect 실패율이 `0.1%` 이하이면 현재 방식을 유지한다.
+- NAT/proxy/mobile carrier cohort의 정상 reconnect rate limit 실패율 p95가 `0.3%` 이하이면 현재 방식을 유지한다.
+- 위 실패율이 전체 `0.1%` 초과 `0.5%` 이하이거나 cohort p95 `0.3%` 초과 `1.0%` 이하이면 완전 원자성보다 limit/window/burst 정책을 먼저 튜닝한다.
+- 정책 튜닝 후에도 전체 실패율 `0.5%` 초과 또는 cohort p95 `1.0%` 초과가 rolling 15분 기준 2회 이상 반복되면 multi-key 원자 처리 또는 별도 rate limit service를 검토한다.
+- IP limit 거부 후 user counter 보수적 소모로 추정되는 실패가 정상 reconnect 시도 중 `0.2%`를 넘는 구간이 rolling 15분 기준 2회 이상 반복되면 완전 원자성 도입을 검토한다.
+
+상세 Redis key naming, hash tag 정책, 판단 기준표는 [redis_cluster_key_naming.md](./redis_cluster_key_naming.md)를 따른다. Phase 7 dashboard와 alert 연결 기준은 [observability_metrics.md](./observability_metrics.md)를 따른다.
 
 ### 완료 기준
 
