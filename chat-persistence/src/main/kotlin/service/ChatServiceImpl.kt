@@ -318,13 +318,13 @@ class ChatServiceImpl(
             .orElseThrow { IllegalArgumentException("채팅방에 참여하지 않은 사용자입니다.") }
 
         if (requestedClientMessageId != null) {
-            val existingMessage = messageRepository.findByChatRoomIdAndSenderIdAndClientMessageId(
-                chatRoomId = request.chatRoomId,
+            val existingMessage = messageReadPort.findByClientMessageId(
+                roomId = request.chatRoomId,
                 senderId = senderId,
                 clientMessageId = requestedClientMessageId,
-            ).orElse(null)
+            )
             if (existingMessage != null) {
-                return messageToDto(existingMessage)
+                return existingMessage
             }
         }
 

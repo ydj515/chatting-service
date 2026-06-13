@@ -1,12 +1,14 @@
 package com.chat.persistence.repository
 
 import com.chat.persistence.service.RoomStorageConfigReader
+import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.dao.EmptyResultDataAccessException
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
 
 @Repository
 class RoomStorageConfigJdbcRepository(
+    @Qualifier("jdbcTemplate")
     private val jdbcTemplate: JdbcTemplate,
 ) : RoomStorageConfigReader {
 

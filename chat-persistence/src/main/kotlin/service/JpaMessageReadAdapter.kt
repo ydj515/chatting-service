@@ -50,6 +50,14 @@ class JpaMessageReadAdapter(
         return messageRepository.findLatestMessage(roomId)?.toDto()
     }
 
+    override fun findByClientMessageId(roomId: Long, senderId: Long, clientMessageId: String): MessageDto? {
+        return messageRepository.findByChatRoomIdAndSenderIdAndClientMessageId(
+            chatRoomId = roomId,
+            senderId = senderId,
+            clientMessageId = clientMessageId,
+        ).orElse(null)?.toDto()
+    }
+
     private fun Message.toDto(): MessageDto {
         val roomSeq = if (roomSeq > 0) roomSeq else sequenceNumber
         return MessageDto(

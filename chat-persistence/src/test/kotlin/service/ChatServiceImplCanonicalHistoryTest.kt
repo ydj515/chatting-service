@@ -173,6 +173,7 @@ class ChatServiceImplCanonicalHistoryTest {
         private val before: List<MessageDto> = emptyList(),
         private val after: List<MessageDto> = emptyList(),
         private val gap: List<MessageDto> = emptyList(),
+        private val byClientMessageId: MessageDto? = null,
     ) : MessageReadPort {
         val calls = mutableListOf<String>()
 
@@ -202,6 +203,11 @@ class ChatServiceImplCanonicalHistoryTest {
         }
 
         override fun findLatestMessage(roomId: Long): MessageDto? = null
+
+        override fun findByClientMessageId(roomId: Long, senderId: Long, clientMessageId: String): MessageDto? {
+            calls += "client:$roomId:$senderId:$clientMessageId"
+            return byClientMessageId
+        }
     }
 
     private data class Fixture(

@@ -1,6 +1,7 @@
 package com.chat.persistence.redis
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import io.lettuce.core.RedisBusyException
 import org.springframework.data.domain.Range
 import org.springframework.data.redis.connection.stream.Consumer
 import org.springframework.data.redis.connection.stream.ReadOffset
@@ -34,7 +35,7 @@ class RedisMessageStreamConsumer(
             redisTemplate.opsForStream<String, String>()
                 .createGroup(streamKey, ReadOffset.from("0-0"), consumerGroup)
         } catch (e: RuntimeException) {
-            if (e.message?.contains("BUSYGROUP", ignoreCase = true) == true) {
+            if (isBusyGroup(e)) {
                 return
             }
             ensuredConsumerGroups.remove(cacheKey)
@@ -146,5 +147,19 @@ class RedisMessageStreamConsumer(
         const val FIELD_CONSUMER_GROUP = "consumerGroup"
         const val FIELD_DELIVERY_COUNT = "deliveryCount"
         const val FIELD_REASON = "reason"
+
+        fun isBusyGroup(throwable: Throwable): Boolean {
+            var current: Throwable? = throwable
+            while (current != null) {
+                if (current is RedisBusyException) {
+                    return true
+                }
+                if (current.message?.contains("BUSYGROUP", ignoreCase = true) == true) {
+                    return true
+                }
+                current = current.cause
+            }
+            return false
+        }
     }
 }

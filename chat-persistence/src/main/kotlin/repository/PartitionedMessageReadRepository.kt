@@ -13,6 +13,7 @@ import java.sql.ResultSet
 
 @Repository
 class PartitionedMessageReadRepository(
+    @Qualifier("jdbcTemplate")
     private val jdbcTemplate: JdbcTemplate,
     @Qualifier("messageReadJdbcTemplate")
     private val messageReadJdbcTemplate: JdbcTemplate,
@@ -70,6 +71,23 @@ class PartitionedMessageReadRepository(
             "$BASE_SELECT $ROOM_FILTER ORDER BY cm.room_seq DESC, cm.created_at DESC LIMIT 1",
             rowMapper,
             roomId,
+        ).firstOrNull()
+    }
+
+    fun findByClientMessageId(roomId: Long, senderId: Long, clientMessageId: String): CanonicalMessageRecord? {
+        return jdbcTemplate.query(
+            """
+            $BASE_SELECT
+            $ROOM_FILTER
+              AND cm.sender_id = ?
+              AND cm.client_message_id = ?
+            ORDER BY cm.room_seq DESC, cm.created_at DESC
+            LIMIT 1
+            """.trimIndent(),
+            rowMapper,
+            roomId,
+            senderId,
+            clientMessageId,
         ).firstOrNull()
     }
 

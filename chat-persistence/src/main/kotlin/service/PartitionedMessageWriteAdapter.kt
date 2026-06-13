@@ -3,6 +3,7 @@ package com.chat.persistence.service
 import com.chat.persistence.repository.PartitionedMessageRepository
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 
 @Service
 @ConditionalOnProperty(
@@ -15,6 +16,7 @@ class PartitionedMessageWriteAdapter(
     private val writeShardResolver: CanonicalWriteShardResolver,
 ) : MessageWritePort {
 
+    @Transactional
     override fun write(requests: List<MessageWriteRequest>): MessageWriteResult {
         if (requests.isEmpty()) {
             return MessageWriteResult(emptyList())

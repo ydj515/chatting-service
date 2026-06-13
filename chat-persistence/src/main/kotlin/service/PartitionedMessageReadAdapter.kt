@@ -48,6 +48,10 @@ class PartitionedMessageReadAdapter(
         return partitionedMessageReadRepository.findLatestMessage(roomId)?.toDto()
     }
 
+    override fun findByClientMessageId(roomId: Long, senderId: Long, clientMessageId: String): MessageDto? {
+        return partitionedMessageReadRepository.findByClientMessageId(roomId, senderId, clientMessageId)?.toDto()
+    }
+
     private fun CanonicalMessageRecord.toDto(): MessageDto {
         return MessageDto(
             id = roomSeq,

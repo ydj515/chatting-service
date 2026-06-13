@@ -41,6 +41,19 @@ class PartitionedMessageReadAdapterTest {
         assertEquals(0, message.fanoutShard)
     }
 
+    @Test
+    fun `clientMessageId 조회는 canonical record를 MessageDto로 변환한다`() {
+        val repository = mock(PartitionedMessageReadRepository::class.java)
+        val adapter = PartitionedMessageReadAdapter(repository)
+        `when`(repository.findByClientMessageId(10L, 7L, "client-123")).thenReturn(record())
+
+        val message = adapter.findByClientMessageId(10L, 7L, "client-123")
+
+        assertEquals("msg-123", message?.messageId)
+        assertEquals("client-123", message?.clientMessageId)
+        assertEquals(123L, message?.roomSeq)
+    }
+
     private fun record(): CanonicalMessageRecord {
         return CanonicalMessageRecord(
             messageId = "msg-123",

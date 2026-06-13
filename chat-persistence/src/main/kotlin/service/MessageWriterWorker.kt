@@ -4,6 +4,7 @@ import com.chat.persistence.config.ChatWorkerProperties
 import com.chat.persistence.redis.MessageStreamConsumer
 import com.chat.persistence.redis.MessageStreamEnvelope
 import com.chat.persistence.redis.MessageStreamRecord
+import jakarta.annotation.PostConstruct
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 
@@ -15,6 +16,11 @@ class MessageWriterWorker(
 ) {
     private val logger = LoggerFactory.getLogger(MessageWriterWorker::class.java)
     private var lastPendingClaimAtMillis = 0L
+
+    @PostConstruct
+    fun initialize() {
+        logger.info("Message writer initialized with write port ${messageWritePort.javaClass.name}")
+    }
 
     fun pollAndWrite(): Int {
         val streamKeys = messageStreamConsumer.listStreamKeys()
@@ -87,6 +93,11 @@ class MessageWriterWorker(
             if (result.outcomes.size != records.size) {
                 throw IllegalStateException(
                     "MessageWritePort returned ${result.outcomes.size} outcomes for ${records.size} records",
+                )
+            }
+            if (result.writtenCount == 0) {
+                logger.warn(
+                    "Message writer processed ${records.size} records with no inserts using ${messageWritePort.javaClass.name}",
                 )
             }
             records.forEach { record -> acknowledge(record, consumerGroup) }
