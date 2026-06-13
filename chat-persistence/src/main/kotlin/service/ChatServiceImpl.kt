@@ -339,22 +339,6 @@ class ChatServiceImpl(
 
         messageStreamProducer.append(messageToStreamEnvelope(message))
 
-        val chatMessage = messageToChatMessage(message)
-
-        // 1. 로컬 세션에 즉시 전송 (실시간 응답성 보장)
-        webSocketSessionManager.sendMessageToLocalRoom(request.chatRoomId, chatMessage)
-
-        // 2. 다른 서버 인스턴스에 브로드캐스트 (자신을 제외)
-        try {
-            redisMessageBroker.broadcastToRoom(
-                roomId = request.chatRoomId,
-                message = chatMessage,
-                excludeServerId = redisMessageBroker.getServerId()
-            )
-        } catch (e: Exception) {
-            logger.error("Failed to broadcast message via Redis: ${e.message}", e)
-        }
-
         return messageToDto(message)
     }
 

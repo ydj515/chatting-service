@@ -26,6 +26,7 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentCaptor
 import org.mockito.ArgumentMatchers.any
+import org.mockito.ArgumentMatchers.anyString
 import org.mockito.Mockito.inOrder
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.never
@@ -72,7 +73,7 @@ class ChatServiceImplMessageContractTest {
     }
 
     @Test
-    fun `메시지 전송은 Redis Streams append 이후 realtime fanout을 수행한다`() {
+    fun `메시지 전송은 Redis Streams append 이후 API에서 직접 fanout하지 않는다`() {
         val messageStreamProducer = mock(MessageStreamProducer::class.java)
         `when`(messageStreamProducer.append(anyMessageStreamEnvelope()))
             .thenReturn("1749790000000-0")
@@ -100,6 +101,7 @@ class ChatServiceImplMessageContractTest {
         val inOrder = inOrder(messageStreamProducer, fixture.messageRepository)
         inOrder.verify(messageStreamProducer).append(captureMessageStreamEnvelope(envelopeCaptor))
         verify(fixture.messageRepository, never()).saveAndFlush(any(Message::class.java))
+        verify(fixture.redisTemplate, never()).convertAndSend(anyString(), anyString())
 
         val envelope = envelopeCaptor.value
         assertEquals(message.messageId, envelope.messageId)
@@ -144,6 +146,7 @@ class ChatServiceImplMessageContractTest {
         }
 
         verify(fixture.messageRepository, never()).saveAndFlush(any(Message::class.java))
+        verify(fixture.redisTemplate, never()).convertAndSend(anyString(), anyString())
     }
 
     @Test
@@ -254,6 +257,7 @@ class ChatServiceImplMessageContractTest {
             messageRepository = messageRepository,
             chatRoom = chatRoom,
             sender = sender,
+            redisTemplate = redisTemplate,
         )
     }
 
@@ -300,5 +304,6 @@ class ChatServiceImplMessageContractTest {
         val messageRepository: MessageRepository,
         val chatRoom: ChatRoom,
         val sender: User,
+        val redisTemplate: RedisTemplate<String, String>,
     )
 }
