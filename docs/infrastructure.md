@@ -117,3 +117,13 @@ mise run verify:chat
 | `infra/redis/redis.conf` | Redis 설정 |
 | `infra/nginx/nginx.conf` | Nginx 템플릿 설정. Compose에서 `SERVER_PORT`를 `CHAT_BACKEND_PORT`로 전달해 upstream 포트를 생성 |
 | `start-cluster.sh` | 클러스터 실행 스크립트 |
+
+---
+
+## 운영 설계 문서
+
+| 문서 | 설명 |
+| --- | --- |
+| [redis_cluster_key_naming.md](./redis_cluster_key_naming.md) | Redis Cluster key naming, hash slot, hash tag 정책 |
+| [observability_metrics.md](./observability_metrics.md) | Phase 7 dashboard metric, alert, cardinality 정책 |
+| [phase7_reconnect_load_test_scenarios.md](./phase7_reconnect_load_test_scenarios.md) | 정상 reconnect 실패율과 ticket rate limit 원자성 판단용 synthetic load test 시나리오 |
