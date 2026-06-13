@@ -519,7 +519,9 @@ room_storage_configs
 - updated_at
 ```
 
-이 값은 Redis에 캐시한다. hot room으로 승격되면 shard count를 늘린다. 단, 이미 저장된 과거 bucket의 shard count는 유지하고, 새 bucket부터 변경한다.
+Writer는 `room_storage_configs.current_shard_count`를 읽어 insert 직전 `writeShard = hash(messageId) % currentShardCount`를 계산한다. 설정 row가 없거나 `current_shard_count < 1`이면 1 shard로 fallback한다. `writeShard`는 PostgreSQL 저장 분산용 값이며 Redis Streams의 `streamShard`, WebSocket fan-out의 `fanoutShard`와 독립적으로 유지한다.
+
+이 값은 추후 Redis에 캐시한다. hot room으로 승격되면 shard count를 늘린다. 단, 이미 저장된 과거 bucket의 shard count는 유지하고, 새 bucket부터 변경한다.
 
 ### 7.3 PostgreSQL 검색 인덱스
 

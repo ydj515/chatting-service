@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service
 )
 class PartitionedMessageWriteAdapter(
     private val partitionedMessageRepository: PartitionedMessageRepository,
+    private val writeShardResolver: CanonicalWriteShardResolver,
 ) : MessageWritePort {
 
     override fun write(requests: List<MessageWriteRequest>): MessageWriteResult {
@@ -19,15 +20,23 @@ class PartitionedMessageWriteAdapter(
             return MessageWriteResult(emptyList())
         }
 
-        val inserted = partitionedMessageRepository.batchInsert(requests)
-        if (inserted.size != requests.size) {
+        val storageRequests = requests.map { request ->
+            request.copy(
+                writeShard = writeShardResolver.resolve(
+                    roomId = request.chatRoomId,
+                    messageId = request.messageId,
+                ),
+            )
+        }
+        val inserted = partitionedMessageRepository.batchInsert(storageRequests)
+        if (inserted.size != storageRequests.size) {
             throw IllegalStateException(
-                "PartitionedMessageRepository returned ${inserted.size} results for ${requests.size} requests",
+                "PartitionedMessageRepository returned ${inserted.size} results for ${storageRequests.size} requests",
             )
         }
 
         return MessageWriteResult(
-            outcomes = requests.zip(inserted).map { (request, written) ->
+            outcomes = storageRequests.zip(inserted).map { (request, written) ->
                 MessageWriteOutcome(request = request, written = written)
             },
         )
