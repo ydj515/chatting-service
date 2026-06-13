@@ -3,6 +3,7 @@ package com.chat.persistence.service
 import com.chat.persistence.config.ChatRedisProperties
 import com.chat.persistence.config.ChatWebSocketGatewayProperties
 import com.chat.persistence.config.MessageSequenceProperties
+import com.chat.persistence.redis.MessageStreamProducer
 import com.chat.persistence.redis.RedisMessageBroker
 import com.chat.persistence.repository.ChatRoomMemberRepository
 import com.chat.persistence.repository.ChatRoomRepository
@@ -106,6 +107,7 @@ class ChatServiceImplMembershipEventTest {
             ),
             messagePersistenceService = MessagePersistenceService(mock(MessageRepository::class.java)),
             webSocketSessionManager = webSocketSessionManager,
+            messageStreamProducer = mock(MessageStreamProducer::class.java),
         )
     }
 

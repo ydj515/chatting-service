@@ -27,8 +27,23 @@
 | `CHAT_PARTITION_ARCHIVE_DROP_AFTER_COPY` | `false` | archive 성공 후 partition detach/drop 여부 |
 | `CHAT_PARTITION_ARCHIVE_INTERVAL_SECONDS` | `86400` | archive worker 실행 주기 |
 | `WORKER_ROLES` | `message-writer,fanout,search-projection,archive` | `chat-worker-application`에서 활성화할 worker role 목록 |
+| `CHAT_WORKER_POLL_DELAY_MILLIS` | `100` | worker scheduler poll 간격 |
+| `CHAT_WORKER_WRITER_CONSUMER_GROUP` | `message-writer` | Redis Streams writer consumer group 이름 |
+| `CHAT_WORKER_WRITER_READ_COUNT` | `100` | writer worker가 poll 1회에 읽을 최대 stream record 수 |
+| `CHAT_WORKER_WRITER_MIN_IDLE_MILLIS` | `30000` | writer worker가 pending record를 claim하기 전 필요한 최소 idle 시간 |
+| `CHAT_WORKER_WRITER_CLAIM_INTERVAL_MILLIS` | `10000` | writer worker가 pending claim을 수행하는 최소 주기 |
+| `CHAT_WORKER_WRITER_MAX_DELIVERY_COUNT` | `5` | writer worker record 처리 실패 후 DLQ로 보내는 delivery count 임계값 |
+| `CHAT_WORKER_FANOUT_CONSUMER_GROUP` | `fanout` | Redis Streams fanout consumer group 이름 |
+| `CHAT_WORKER_FANOUT_READ_COUNT` | `100` | fanout worker가 poll 1회에 읽을 최대 stream record 수 |
+| `CHAT_WORKER_FANOUT_MIN_IDLE_MILLIS` | `30000` | fanout worker가 pending record를 claim하기 전 필요한 최소 idle 시간 |
+| `CHAT_WORKER_FANOUT_CLAIM_INTERVAL_MILLIS` | `10000` | fanout worker가 pending claim을 수행하는 최소 주기 |
+| `CHAT_WORKER_FANOUT_MAX_DELIVERY_COUNT` | `5` | fanout worker record 처리 실패 후 DLQ로 보내는 delivery count 임계값 |
 | `REDIS_PORT` | `6379` | Redis 내부 포트 |
 | `CHAT_REDIS_MEMBERSHIP_TOPIC` | `chat.membership` | REST create/join 결과를 WebSocket 노드에 전파하는 Redis 제어 topic |
+| `CHAT_REDIS_STREAMS_ROOM_STREAM_KEY_PREFIX` | `chat:stream:room:` | 방별 Redis Streams key prefix |
+| `CHAT_REDIS_STREAMS_KNOWN_STREAMS_KEY` | `chat:stream:rooms` | worker가 poll할 stream key index set |
+| `CHAT_REDIS_STREAMS_DEAD_LETTER_STREAM_KEY_PREFIX` | `chat:stream:dlq:` | worker consumer group별 dead letter stream key prefix |
+| `CHAT_REDIS_STREAMS_SHARD_COUNT` | `1` | room stream shard 개수 |
 | `CHAT_AUTH_SESSION_SECRET` | `local-development-session-secret-change-me` | 로그인 session token HMAC 서명 secret. 운영 환경에서는 반드시 교체 |
 | `CHAT_AUTH_SESSION_TTL` | `12h` | 로그인 session token TTL |
 | `CHAT_AUTH_SESSION_TOKEN_QUERY_PARAM` | `token` | local/dev 호환 모드에서만 허용할 legacy session token query parameter |

@@ -138,6 +138,27 @@ chat:
       cleanup-initial-delay: ${CHAT_REDIS_BROKER_CLEANUP_INITIAL_DELAY:30s}
       processed-message-ttl: ${CHAT_REDIS_BROKER_PROCESSED_MESSAGE_TTL:1m}
       processed-message-max-size: ${CHAT_REDIS_BROKER_PROCESSED_MESSAGE_MAX_SIZE:10000}
+    streams:
+      room-stream-key-prefix: ${CHAT_REDIS_STREAMS_ROOM_STREAM_KEY_PREFIX:chat:stream:room:}
+      known-streams-key: ${CHAT_REDIS_STREAMS_KNOWN_STREAMS_KEY:chat:stream:rooms}
+      dead-letter-stream-key-prefix: ${CHAT_REDIS_STREAMS_DEAD_LETTER_STREAM_KEY_PREFIX:chat:stream:dlq:}
+      shard-count: ${CHAT_REDIS_STREAMS_SHARD_COUNT:1}
+  worker:
+    roles: ${WORKER_ROLES:message-writer,fanout,search-projection,archive}
+    consumer-name: ${HOSTNAME:worker-local}
+    poll-delay-millis: ${CHAT_WORKER_POLL_DELAY_MILLIS:100}
+    writer:
+      consumer-group: ${CHAT_WORKER_WRITER_CONSUMER_GROUP:message-writer}
+      read-count: ${CHAT_WORKER_WRITER_READ_COUNT:100}
+      min-idle-millis: ${CHAT_WORKER_WRITER_MIN_IDLE_MILLIS:30000}
+      claim-interval-millis: ${CHAT_WORKER_WRITER_CLAIM_INTERVAL_MILLIS:10000}
+      max-delivery-count: ${CHAT_WORKER_WRITER_MAX_DELIVERY_COUNT:5}
+    fanout:
+      consumer-group: ${CHAT_WORKER_FANOUT_CONSUMER_GROUP:fanout}
+      read-count: ${CHAT_WORKER_FANOUT_READ_COUNT:100}
+      min-idle-millis: ${CHAT_WORKER_FANOUT_MIN_IDLE_MILLIS:30000}
+      claim-interval-millis: ${CHAT_WORKER_FANOUT_CLAIM_INTERVAL_MILLIS:10000}
+      max-delivery-count: ${CHAT_WORKER_FANOUT_MAX_DELIVERY_COUNT:5}
   message:
     sequence:
       ttl: ${CHAT_MESSAGE_SEQUENCE_TTL:24h}

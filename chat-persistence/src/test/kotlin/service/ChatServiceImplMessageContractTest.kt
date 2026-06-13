@@ -9,6 +9,8 @@ import com.chat.domain.model.User
 import com.chat.persistence.config.ChatRedisProperties
 import com.chat.persistence.config.ChatWebSocketGatewayProperties
 import com.chat.persistence.config.MessageSequenceProperties
+import com.chat.persistence.redis.MessageStreamEnvelope
+import com.chat.persistence.redis.MessageStreamProducer
 import com.chat.persistence.redis.RedisMessageBroker
 import com.chat.persistence.repository.ChatRoomMemberRepository
 import com.chat.persistence.repository.ChatRoomRepository
@@ -19,10 +21,13 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
 import com.fasterxml.jackson.module.kotlin.KotlinModule
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentCaptor
 import org.mockito.ArgumentMatchers.any
+import org.mockito.ArgumentMatchers.anyString
+import org.mockito.Mockito.inOrder
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
@@ -37,10 +42,9 @@ import java.util.Optional
 class ChatServiceImplMessageContractTest {
 
     @Test
-    fun `메시지 전송은 Phase 2 envelope 필드를 저장하고 반환한다`() {
+    fun `메시지 전송은 Streams append 이후 동기 저장 없이 수락 계약을 반환한다`() {
         val fixture = chatServiceFixture()
         val clientMessageId = "client-message-1"
-        val savedAt = LocalDateTime.parse("2026-06-12T12:00:00")
         `when`(
             fixture.messageRepository.findByChatRoomIdAndSenderIdAndClientMessageId(
                 10L,
@@ -48,12 +52,6 @@ class ChatServiceImplMessageContractTest {
                 clientMessageId,
             )
         ).thenReturn(Optional.empty())
-        `when`(fixture.messageRepository.saveAndFlush(any(Message::class.java))).thenAnswer { invocation ->
-            (invocation.arguments[0] as Message).copy(
-                id = 101L,
-                createdAt = savedAt,
-            )
-        }
 
         val message = fixture.chatService.sendMessage(
             SendMessageRequest(
@@ -65,20 +63,90 @@ class ChatServiceImplMessageContractTest {
             senderId = 7L,
         )
 
-        val savedMessageCaptor = ArgumentCaptor.forClass(Message::class.java)
-        verify(fixture.messageRepository).saveAndFlush(savedMessageCaptor.capture())
-        val savedMessage = savedMessageCaptor.value
+        verify(fixture.messageRepository, never()).saveAndFlush(any(Message::class.java))
+        assertEquals(0L, message.id)
         assertNotNull(message.messageId)
         assertTrue(message.messageId.isNotBlank())
         assertEquals(clientMessageId, message.clientMessageId)
         assertEquals(1L, message.roomSeq)
         assertEquals(message.roomSeq, message.sequenceNumber)
-        assertEquals(message.messageId, savedMessage.messageId)
-        assertEquals(clientMessageId, savedMessage.clientMessageId)
-        assertEquals(1L, savedMessage.roomSeq)
-        assertEquals(0, savedMessage.streamShard)
-        assertEquals(0, savedMessage.writeShard)
-        assertEquals(0, savedMessage.fanoutShard)
+    }
+
+    @Test
+    fun `메시지 전송은 Redis Streams append 이후 API에서 직접 fanout하지 않는다`() {
+        val messageStreamProducer = mock(MessageStreamProducer::class.java)
+        `when`(messageStreamProducer.append(anyMessageStreamEnvelope()))
+            .thenReturn("1749790000000-0")
+        val fixture = chatServiceFixture(messageStreamProducer = messageStreamProducer)
+        val clientMessageId = "client-message-1"
+        `when`(
+            fixture.messageRepository.findByChatRoomIdAndSenderIdAndClientMessageId(
+                10L,
+                7L,
+                clientMessageId,
+            )
+        ).thenReturn(Optional.empty())
+
+        val message = fixture.chatService.sendMessage(
+            SendMessageRequest(
+                chatRoomId = 10L,
+                type = MessageType.TEXT,
+                content = "hello",
+                clientMessageId = clientMessageId,
+            ),
+            senderId = 7L,
+        )
+
+        val envelopeCaptor = ArgumentCaptor.forClass(MessageStreamEnvelope::class.java)
+        val inOrder = inOrder(messageStreamProducer, fixture.messageRepository)
+        inOrder.verify(messageStreamProducer).append(captureMessageStreamEnvelope(envelopeCaptor))
+        verify(fixture.messageRepository, never()).saveAndFlush(any(Message::class.java))
+        verify(fixture.redisTemplate, never()).convertAndSend(anyString(), anyString())
+
+        val envelope = envelopeCaptor.value
+        assertEquals(message.messageId, envelope.messageId)
+        assertEquals(clientMessageId, envelope.clientMessageId)
+        assertEquals(10L, envelope.chatRoomId)
+        assertEquals(7L, envelope.senderId)
+        assertEquals("User 7", envelope.senderName)
+        assertEquals(MessageType.TEXT, envelope.messageType)
+        assertEquals("hello", envelope.content)
+        assertEquals(1L, envelope.roomSeq)
+        assertEquals(1L, envelope.sequenceNumber)
+        assertEquals(0, envelope.streamShard)
+        assertEquals(0, envelope.writeShard)
+        assertEquals(0, envelope.fanoutShard)
+    }
+
+    @Test
+    fun `Redis Streams append 실패 시 메시지를 저장하거나 fanout하지 않는다`() {
+        val messageStreamProducer = mock(MessageStreamProducer::class.java)
+        `when`(messageStreamProducer.append(anyMessageStreamEnvelope()))
+            .thenThrow(IllegalStateException("stream append failed"))
+        val fixture = chatServiceFixture(messageStreamProducer = messageStreamProducer)
+        val clientMessageId = "client-message-1"
+        `when`(
+            fixture.messageRepository.findByChatRoomIdAndSenderIdAndClientMessageId(
+                10L,
+                7L,
+                clientMessageId,
+            )
+        ).thenReturn(Optional.empty())
+
+        assertThrows(IllegalStateException::class.java) {
+            fixture.chatService.sendMessage(
+                SendMessageRequest(
+                    chatRoomId = 10L,
+                    type = MessageType.TEXT,
+                    content = "hello",
+                    clientMessageId = clientMessageId,
+                ),
+                senderId = 7L,
+            )
+        }
+
+        verify(fixture.messageRepository, never()).saveAndFlush(any(Message::class.java))
+        verify(fixture.redisTemplate, never()).convertAndSend(anyString(), anyString())
     }
 
     @Test
@@ -125,53 +193,10 @@ class ChatServiceImplMessageContractTest {
         verify(fixture.messageRepository, never()).saveAndFlush(any(Message::class.java))
     }
 
-    @Test
-    fun `동시 clientMessageId 중복 저장 충돌은 기존 메시지 계약으로 반환한다`() {
-        val fixture = chatServiceFixture()
-        val clientMessageId = "client-message-1"
-        val existingMessage = Message(
-            id = 101L,
-            messageId = "msg-existing",
-            clientMessageId = clientMessageId,
-            chatRoom = fixture.chatRoom,
-            sender = fixture.sender,
-            type = MessageType.TEXT,
-            content = "hello",
-            sequenceNumber = 5L,
-            roomSeq = 5L,
-            streamShard = 1,
-            writeShard = 2,
-            fanoutShard = 3,
-            createdAt = LocalDateTime.parse("2026-06-12T12:00:00"),
-        )
-        `when`(
-            fixture.messageRepository.findByChatRoomIdAndSenderIdAndClientMessageId(
-                10L,
-                7L,
-                clientMessageId,
-            )
-        ).thenReturn(Optional.empty(), Optional.of(existingMessage))
-        `when`(fixture.messageRepository.saveAndFlush(any(Message::class.java)))
-            .thenThrow(DataIntegrityViolationException("duplicate client message"))
-
-        val message = fixture.chatService.sendMessage(
-            SendMessageRequest(
-                chatRoomId = 10L,
-                type = MessageType.TEXT,
-                content = "hello",
-                clientMessageId = clientMessageId,
-            ),
-            senderId = 7L,
-        )
-
-        assertEquals("msg-existing", message.messageId)
-        assertEquals(clientMessageId, message.clientMessageId)
-        assertEquals(5L, message.roomSeq)
-        assertEquals(5L, message.sequenceNumber)
-    }
-
     @Suppress("UNCHECKED_CAST")
-    private fun chatServiceFixture(): Fixture {
+    private fun chatServiceFixture(
+        messageStreamProducer: MessageStreamProducer = successfulMessageStreamProducer(),
+    ): Fixture {
         val redisTemplate = mock(RedisTemplate::class.java) as RedisTemplate<String, String>
         val valueOperations = mock(ValueOperations::class.java) as ValueOperations<String, String>
         `when`(redisTemplate.opsForValue()).thenReturn(valueOperations)
@@ -227,10 +252,12 @@ class ChatServiceImplMessageContractTest {
                 ),
                 messagePersistenceService = MessagePersistenceService(messageRepository),
                 webSocketSessionManager = webSocketSessionManager,
+                messageStreamProducer = messageStreamProducer,
             ),
             messageRepository = messageRepository,
             chatRoom = chatRoom,
             sender = sender,
+            redisTemplate = redisTemplate,
         )
     }
 
@@ -251,10 +278,32 @@ class ChatServiceImplMessageContractTest {
         )
     }
 
+    private fun anyMessageStreamEnvelope(): MessageStreamEnvelope {
+        any(MessageStreamEnvelope::class.java)
+        return uninitialized()
+    }
+
+    private fun captureMessageStreamEnvelope(
+        captor: ArgumentCaptor<MessageStreamEnvelope>,
+    ): MessageStreamEnvelope {
+        captor.capture()
+        return uninitialized()
+    }
+
+    private fun successfulMessageStreamProducer(): MessageStreamProducer {
+        val messageStreamProducer = mock(MessageStreamProducer::class.java)
+        `when`(messageStreamProducer.append(anyMessageStreamEnvelope())).thenReturn("1749790000000-0")
+        return messageStreamProducer
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun <T> uninitialized(): T = null as T
+
     private data class Fixture(
         val chatService: ChatServiceImpl,
         val messageRepository: MessageRepository,
         val chatRoom: ChatRoom,
         val sender: User,
+        val redisTemplate: RedisTemplate<String, String>,
     )
 }

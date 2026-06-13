@@ -4,10 +4,11 @@ import com.chat.domain.dto.*
 import com.chat.domain.model.*
 import com.chat.domain.service.ChatService
 import com.chat.persistence.repository.*
+import com.chat.persistence.redis.MessageStreamEnvelope
+import com.chat.persistence.redis.MessageStreamProducer
 import com.chat.persistence.redis.RedisMessageBroker
 import org.slf4j.LoggerFactory
 import org.springframework.cache.annotation.*
-import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Pageable
@@ -35,7 +36,8 @@ class ChatServiceImpl(
     private val redisMessageBroker: RedisMessageBroker,
     private val messageSequenceService: MessageSequenceService,
     private val messagePersistenceService: MessagePersistenceService,
-    private val webSocketSessionManager: WebSocketSessionManager
+    private val webSocketSessionManager: WebSocketSessionManager,
+    private val messageStreamProducer: MessageStreamProducer,
 ) : ChatService {
 
     private val logger = LoggerFactory.getLogger(ChatServiceImpl::class.java)
@@ -334,36 +336,29 @@ class ChatServiceImpl(
             writeShard = writeShard(messageId),
             fanoutShard = fanoutShard(request.chatRoomId),
         )
-        val savedMessage = try {
-            messagePersistenceService.save(message)
-        } catch (e: DataIntegrityViolationException) {
-            if (requestedClientMessageId == null) {
-                throw e
-            }
-            messageRepository.findByChatRoomIdAndSenderIdAndClientMessageId(
-                chatRoomId = request.chatRoomId,
-                senderId = senderId,
-                clientMessageId = requestedClientMessageId,
-            ).orElseThrow { e }
-        }
 
-        val chatMessage = messageToChatMessage(savedMessage)
+        messageStreamProducer.append(messageToStreamEnvelope(message))
 
-        // 1. 로컬 세션에 즉시 전송 (실시간 응답성 보장)
-        webSocketSessionManager.sendMessageToLocalRoom(request.chatRoomId, chatMessage)
+        return messageToDto(message)
+    }
 
-        // 2. 다른 서버 인스턴스에 브로드캐스트 (자신을 제외)
-        try {
-            redisMessageBroker.broadcastToRoom(
-                roomId = request.chatRoomId,
-                message = chatMessage,
-                excludeServerId = redisMessageBroker.getServerId()
-            )
-        } catch (e: Exception) {
-            logger.error("Failed to broadcast message via Redis: ${e.message}", e)
-        }
-
-        return messageToDto(savedMessage)
+    private fun messageToStreamEnvelope(message: Message): MessageStreamEnvelope {
+        val roomSeq = if (message.roomSeq > 0) message.roomSeq else message.sequenceNumber
+        return MessageStreamEnvelope(
+            messageId = message.messageId ?: legacyMessageId(message.id),
+            clientMessageId = message.clientMessageId,
+            chatRoomId = message.chatRoom.id,
+            senderId = message.sender.id,
+            senderName = message.sender.displayName,
+            messageType = message.type,
+            content = message.content,
+            sequenceNumber = message.sequenceNumber,
+            roomSeq = roomSeq,
+            streamShard = message.streamShard,
+            writeShard = message.writeShard,
+            fanoutShard = message.fanoutShard,
+            createdAt = message.createdAt,
+        )
     }
 
     private fun messageToChatMessage(message: Message): ChatMessage {
