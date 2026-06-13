@@ -204,6 +204,12 @@ normalReconnectRateLimitFailureRate =
 
 ## 6. 추가 Metric 제안
 
+아래 3개 metric은 현재 구현되지 않은 **TODO**다. Phase 7 synthetic reconnect/load test를 구현하기 전 또는 같은 작업에서 추가한다. 구현 전까지는 synthetic test runner summary를 기준 데이터로 사용하고, 기존 Micrometer metric은 backend health와 원인 분석에 사용한다.
+
+- `chat.websocket.ticket.issue.outcomes`
+- `chat.websocket.reconnect.attempts`
+- `chat.websocket.ticket.rate_limit.sequential_overcount.suspected`
+
 ### 6.1 Ticket Issue Outcome Metric
 
 ```text

@@ -25,14 +25,20 @@ Reconnect load test 시나리오와 정상 reconnect 실패율 계산 기준은 
 
 ### 3.1 WebSocket Ticket / Security
 
+다음 3개 metric은 아직 구현되지 않은 **TODO**다. Phase 7 synthetic reconnect/load test를 구현하기 전 또는 함께 추가한다.
+
+- `chat.websocket.ticket.issue.outcomes`
+- `chat.websocket.ticket.rate_limit.sequential_overcount.suspected`
+- `chat.websocket.reconnect.attempts`
+
 | Metric | Type | Tags | 목적 |
 | --- | --- | --- | --- |
 | `chat.websocket.ticket.events` | Counter | `event` | ticket issue/consume 성공, 실패, 만료, malformed, rate limit 현황 |
 | `chat.websocket.ticket.issue.latency` | Timer | `outcome` | ticket 발급 latency p50/p95/p99 |
 | `chat.websocket.ticket.rate_limit.script.failures` | Counter | `scope=user|ip` | Redis Lua script 장애 또는 예상 외 결과 감지 |
-| `chat.websocket.ticket.issue.outcomes` | Counter | `intent`, `outcome`, `cohort`, `source` | 정상 reconnect 실패율과 cohort별 rate limit 영향 계산 |
-| `chat.websocket.ticket.rate_limit.sequential_overcount.suspected` | Counter | `cohort` | user 통과 후 IP 거부로 user counter가 보수적으로 소모된 의심 건수 |
-| `chat.websocket.reconnect.attempts` | Counter | `source`, `reason`, `outcome`, `cohort` | reconnect 시도부터 ticket/handshake 결과까지 release gate 계산 |
+| `chat.websocket.ticket.issue.outcomes` | Counter | `intent`, `outcome`, `cohort`, `source` | TODO: 정상 reconnect 실패율과 cohort별 rate limit 영향 계산 |
+| `chat.websocket.ticket.rate_limit.sequential_overcount.suspected` | Counter | `cohort` | TODO: user 통과 후 IP 거부로 user counter가 보수적으로 소모된 의심 건수 |
+| `chat.websocket.reconnect.attempts` | Counter | `source`, `reason`, `outcome`, `cohort` | TODO: reconnect 시도부터 ticket/handshake 결과까지 release gate 계산 |
 | `http.server.requests` | Timer | `uri=/api/ws-tickets`, `status`, `method` | ticket API HTTP latency/error |
 
 권장 패널:
