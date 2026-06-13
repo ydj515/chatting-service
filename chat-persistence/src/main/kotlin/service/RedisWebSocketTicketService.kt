@@ -7,6 +7,7 @@ import com.chat.persistence.config.ChatAuthProperties
 import com.fasterxml.jackson.databind.ObjectMapper
 import io.micrometer.core.instrument.Counter
 import io.micrometer.core.instrument.MeterRegistry
+import io.micrometer.core.instrument.Timer
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.ObjectProvider
 import org.springframework.data.redis.core.RedisTemplate
@@ -21,6 +22,7 @@ import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneOffset
 import java.util.Base64
+import java.util.concurrent.TimeUnit
 
 @Service
 class RedisWebSocketTicketService(
@@ -40,17 +42,31 @@ class RedisWebSocketTicketService(
     )
 
     override fun issueTicket(userId: Long, clientIp: String?): WebSocketTicketResponse? {
+        val startedAtNanos = System.nanoTime()
+        var outcome = ISSUE_OUTCOME_FAILURE
         return try {
-            if (!withinRateLimit(rateLimitUserKey(userId), authProperties.webSocketTicket.issueRateLimitPerUser)) {
+            if (
+                !withinRateLimit(
+                    key = rateLimitUserKey(userId),
+                    limit = authProperties.webSocketTicket.issueRateLimitPerUser,
+                    scope = RATE_LIMIT_SCOPE_USER,
+                )
+            ) {
                 record("issue.rate_limited_user")
+                outcome = ISSUE_OUTCOME_RATE_LIMITED_USER
                 return null
             }
             val normalizedClientIp = clientIp?.takeIf { it.isNotBlank() }
             if (
                 normalizedClientIp != null &&
-                !withinRateLimit(rateLimitIpKey(normalizedClientIp), authProperties.webSocketTicket.issueRateLimitPerIp)
+                !withinRateLimit(
+                    key = rateLimitIpKey(normalizedClientIp),
+                    limit = authProperties.webSocketTicket.issueRateLimitPerIp,
+                    scope = RATE_LIMIT_SCOPE_IP,
+                )
             ) {
                 record("issue.rate_limited_ip")
+                outcome = ISSUE_OUTCOME_RATE_LIMITED_IP
                 return null
             }
 
@@ -70,6 +86,7 @@ class RedisWebSocketTicketService(
                 ) == true
                 if (stored) {
                     record("issue.success")
+                    outcome = ISSUE_OUTCOME_SUCCESS
                     return WebSocketTicketResponse(
                         ticket = ticket,
                         expiresAt = LocalDateTime.ofInstant(expiresAt, ZoneOffset.UTC),
@@ -77,11 +94,15 @@ class RedisWebSocketTicketService(
                 }
             }
             record("issue.collision")
+            outcome = ISSUE_OUTCOME_COLLISION
             null
         } catch (e: Exception) {
             record("issue.failure")
+            outcome = ISSUE_OUTCOME_FAILURE
             logger.warn("Failed to issue WebSocket ticket", e)
             null
+        } finally {
+            recordIssueLatency(outcome, System.nanoTime() - startedAtNanos)
         }
     }
 
@@ -119,7 +140,25 @@ class RedisWebSocketTicketService(
         }
     }
 
-    private fun withinRateLimit(key: String, limit: Long): Boolean {
+    private fun recordIssueLatency(outcome: String, durationNanos: Long) {
+        meterRegistryProvider?.ifAvailable { registry ->
+            Timer.builder("chat.websocket.ticket.issue.latency")
+                .tag("outcome", outcome)
+                .register(registry)
+                .record(maxOf(durationNanos, 0L), TimeUnit.NANOSECONDS)
+        }
+    }
+
+    private fun recordRateLimitScriptFailure(scope: String) {
+        meterRegistryProvider?.ifAvailable { registry ->
+            Counter.builder("chat.websocket.ticket.rate_limit.script.failures")
+                .tag("scope", scope)
+                .register(registry)
+                .increment()
+        }
+    }
+
+    private fun withinRateLimit(key: String, limit: Long, scope: String): Boolean {
         if (limit <= 0) {
             return false
         }
@@ -129,14 +168,26 @@ class RedisWebSocketTicketService(
             return false
         }
 
-        val allowed = redisTemplate.execute(
-            rateLimitScript,
-            listOf(key),
-            windowMillis.toString(),
-            limit.toString(),
-        ) ?: return false
+        val allowed = try {
+            redisTemplate.execute(
+                rateLimitScript,
+                listOf(key),
+                windowMillis.toString(),
+                limit.toString(),
+            )
+        } catch (e: Exception) {
+            recordRateLimitScriptFailure(scope)
+            throw e
+        }
 
-        return allowed == RATE_LIMIT_ALLOWED
+        return when (allowed) {
+            RATE_LIMIT_ALLOWED -> true
+            RATE_LIMIT_REJECTED -> false
+            else -> {
+                recordRateLimitScriptFailure(scope)
+                false
+            }
+        }
     }
 
     private fun newTicket(): String {
@@ -173,6 +224,14 @@ class RedisWebSocketTicketService(
         const val MAX_TICKET_LENGTH = 512
         const val MAX_TICKET_GENERATION_ATTEMPTS = 3
         const val RATE_LIMIT_ALLOWED = 1L
+        const val RATE_LIMIT_REJECTED = 0L
+        const val RATE_LIMIT_SCOPE_USER = "user"
+        const val RATE_LIMIT_SCOPE_IP = "ip"
+        const val ISSUE_OUTCOME_SUCCESS = "success"
+        const val ISSUE_OUTCOME_FAILURE = "failure"
+        const val ISSUE_OUTCOME_COLLISION = "collision"
+        const val ISSUE_OUTCOME_RATE_LIMITED_USER = "rate_limited_user"
+        const val ISSUE_OUTCOME_RATE_LIMITED_IP = "rate_limited_ip"
         const val RATE_LIMIT_SCRIPT = """
             local current = redis.call('INCR', KEYS[1])
             local ttl = redis.call('PTTL', KEYS[1])

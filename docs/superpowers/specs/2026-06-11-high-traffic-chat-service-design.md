@@ -1740,6 +1740,7 @@ node scripts/load-chat.mjs --room hot --viewers 10000 --messages-per-sec 10000 -
 - WebSocket fan-out p95/p99 latency를 계측한다.
 - Redis Streams lag와 pending count를 계측한다.
 - WebSocket ticket 발급 rate limit의 Redis Lua script 기반 원자 처리를 부하/장애 상황에서 검증한다.
+- WebSocket ticket issue latency metric과 Redis Lua script failure metric을 dashboard/alert에 연결한다.
 - PostgreSQL writer batch latency를 계측한다.
 - read replica lag를 계측한다.
 - admin search p95 latency를 계측한다.
@@ -1767,6 +1768,7 @@ node scripts/load-chat.mjs --room hot --viewers 10000 --messages-per-sec 10000 -
 - hot room batch fan-out p95 500ms 이하
 - 관리자 방별/시간대별 조회 p95 1초 이하
 - WebSocket ticket issue rate limit이 Lua script 기반 원자 처리로 동작한다.
+- WebSocket ticket issue latency와 Redis Lua script failure가 운영 metric으로 관측된다.
 - app rebuild/recreate 후 nginx stale upstream으로 인한 오라우팅이 발생하지 않는다.
 - Gateway 장애 후 클라이언트가 gap fill로 복구한다.
 - Writer Worker 장애 후 pending message가 재처리된다.

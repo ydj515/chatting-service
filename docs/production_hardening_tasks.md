@@ -59,8 +59,10 @@ return 0
 - `INCR` 이후 TTL이 없는 key가 남는 장애 모드가 단위 테스트로 방어된다.
 - Redis Cluster 전환 시 key 하나 단위 script 실행 또는 hash tag 정책이 문서화되어 있다.
 - ticket issue success/failure/rate-limited count가 metric으로 관측된다.
-
-ticket issue latency와 Redis script failure 전용 metric은 Phase 7 observability 검증에서 별도로 보강한다.
+- ticket issue latency가 `chat.websocket.ticket.issue.latency` timer로 관측된다.
+- Redis Lua script 실패가 `chat.websocket.ticket.rate_limit.script.failures` counter로 관측된다.
+- Lua script failure metric은 `scope=user|ip` tag를 가진다.
+- Phase 7에서는 위 metric을 dashboard와 alert rule에 연결한다.
 
 ### 복잡도
 
