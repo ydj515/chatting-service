@@ -32,6 +32,11 @@ export interface LoginResponse {
   expiresAt: string;
 }
 
+export interface WebSocketTicketResponse {
+  ticket: string;
+  expiresAt: string;
+}
+
 // 채팅방 관련 타입
 export interface ChatRoom {
   id: number;

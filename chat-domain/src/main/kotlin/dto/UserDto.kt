@@ -32,6 +32,16 @@ data class AuthenticatedSession(
     val expiresAt: LocalDateTime,
 )
 
+data class WebSocketTicketResponse(
+    val ticket: String,
+    val expiresAt: LocalDateTime,
+)
+
+data class AuthenticatedWebSocketTicket(
+    val userId: Long,
+    val expiresAt: LocalDateTime,
+)
+
 data class CreateUserRequest(
     @field:NotBlank(message = "사용자명은 필수입니다")
     @field:Size(min = 3, max = 20, message = "사용자명은 3-20자 사이여야 합니다")

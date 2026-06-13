@@ -31,7 +31,13 @@
 | `CHAT_REDIS_MEMBERSHIP_TOPIC` | `chat.membership` | REST create/join 결과를 WebSocket 노드에 전파하는 Redis 제어 topic |
 | `CHAT_AUTH_SESSION_SECRET` | `local-development-session-secret-change-me` | 로그인 session token HMAC 서명 secret. 운영 환경에서는 반드시 교체 |
 | `CHAT_AUTH_SESSION_TTL` | `12h` | 로그인 session token TTL |
-| `CHAT_AUTH_SESSION_TOKEN_QUERY_PARAM` | `token` | Browser WebSocket handshake에서 사용할 token query parameter |
+| `CHAT_AUTH_SESSION_TOKEN_QUERY_PARAM` | `token` | local/dev 호환 모드에서만 허용할 legacy session token query parameter |
+| `CHAT_AUTH_WEB_SOCKET_TICKET_TTL` | `30s` | WebSocket one-time ticket TTL |
+| `CHAT_AUTH_WEB_SOCKET_TICKET_QUERY_PARAM` | `ticket` | WebSocket handshake ticket query parameter |
+| `CHAT_AUTH_WEB_SOCKET_TICKET_RATE_LIMIT_WINDOW` | `1m` | ticket 발급 rate limit 집계 window |
+| `CHAT_AUTH_WEB_SOCKET_TICKET_RATE_LIMIT_PER_USER` | `10` | 사용자별 ticket 발급 상한 |
+| `CHAT_AUTH_WEB_SOCKET_TICKET_RATE_LIMIT_PER_IP` | `60` | IP별 ticket 발급 상한 |
+| `CHAT_AUTH_WEB_SOCKET_TICKET_SESSION_FALLBACK_ENABLED` | `false` | docker/production에서 legacy session token WebSocket fallback 허용 여부 |
 | `CHAT_API_CORS_ALLOWED_ORIGINS` | `*` | REST API CORS 허용 origin |
 | `CHAT_WEBSOCKET_ALLOWED_ORIGINS` | `*` | WebSocket 허용 origin |
 | `CHAT_WEBSOCKET_GATEWAY_OUTBOUND_QUEUE_MAX_PENDING_MESSAGES` | `128` | WebSocket session별 outbound pending queue 상한 |

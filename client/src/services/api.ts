@@ -13,6 +13,7 @@ import {
   SearchResult,
   SearchQuery,
   UserSettings,
+  WebSocketTicketResponse,
 } from '../types';
 import { appConfig } from '../config/appConfig.ts';
 
@@ -116,6 +117,13 @@ export const userApi = {
   // 사용자 설정 업데이트
   updateSettings: async (userId: number, settings: UserSettings): Promise<UserSettings> => {
     const response: AxiosResponse<UserSettings> = await api.put(`/users/${userId}/settings`, settings);
+    return response.data;
+  },
+};
+
+export const webSocketTicketApi = {
+  issue: async (): Promise<WebSocketTicketResponse> => {
+    const response: AxiosResponse<WebSocketTicketResponse> = await api.post('/ws-tickets');
     return response.data;
   },
 };

@@ -68,6 +68,28 @@ Nginx는 역할별 upstream으로 트래픽을 분리합니다.
 
 `chat-worker-app-1`은 외부 HTTP 트래픽을 받지 않고, Redis/DB 기반 비동기 작업을 담당합니다.
 
+### Docker Compose Nginx DNS Stale
+
+로컬 Compose에서 app 컨테이너를 재생성하면 컨테이너 IP가 바뀔 수 있습니다. Nginx는 일반적인 `upstream` 설정에서 hostname을 시작 시점에 resolve하므로, nginx를 재시작하지 않으면 이전 IP를 계속 바라볼 수 있습니다.
+
+이전 API 컨테이너 IP가 WebSocket 컨테이너 같은 다른 role에 재사용되면 `/api/users/register` 같은 REST 요청이 잘못된 role로 전달되어 `404`가 발생할 수 있습니다. 이는 controller mapping 문제가 아니라 nginx upstream endpoint가 stale 상태가 된 것입니다.
+
+현재 Compose runbook은 app rebuild 후 app health를 기다리고, nginx를 재시작한 뒤 nginx health까지 다시 기다리는 방식입니다. `mise run start`와 `mise run start:all`은 `docker compose up -d --build --wait` 이후 `docker compose restart nginx`를 실행합니다.
+
+```bash
+mise run start
+mise run verify:chat
+```
+
+수동으로 앱 컨테이너를 재생성한 경우에는 다음 명령으로 nginx upstream DNS를 갱신합니다.
+
+```bash
+mise run restart:nginx
+mise run verify:chat
+```
+
+상세 원인, 대안, 완료 기준은 [production_hardening_tasks.md](./production_hardening_tasks.md)의 `Docker Compose Nginx Upstream DNS Stale 대응` 항목을 따릅니다.
+
 ---
 
 ## 역할별 실행 모듈

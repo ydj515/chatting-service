@@ -102,6 +102,15 @@ chat:
       secret: ${CHAT_AUTH_SESSION_SECRET:local-development-session-secret-change-me}
       ttl: ${CHAT_AUTH_SESSION_TTL:12h}
       token-query-param: ${CHAT_AUTH_SESSION_TOKEN_QUERY_PARAM:token}
+    web-socket-ticket:
+      ttl: ${CHAT_AUTH_WEB_SOCKET_TICKET_TTL:30s}
+      ticket-query-param: ${CHAT_AUTH_WEB_SOCKET_TICKET_QUERY_PARAM:ticket}
+      key-prefix: ${CHAT_AUTH_WEB_SOCKET_TICKET_KEY_PREFIX:chat:ws-ticket:}
+      rate-limit-key-prefix: ${CHAT_AUTH_WEB_SOCKET_TICKET_RATE_LIMIT_KEY_PREFIX:chat:ws-ticket:rate:}
+      issue-rate-limit-window: ${CHAT_AUTH_WEB_SOCKET_TICKET_RATE_LIMIT_WINDOW:1m}
+      issue-rate-limit-per-user: ${CHAT_AUTH_WEB_SOCKET_TICKET_RATE_LIMIT_PER_USER:10}
+      issue-rate-limit-per-ip: ${CHAT_AUTH_WEB_SOCKET_TICKET_RATE_LIMIT_PER_IP:60}
+      session-fallback-enabled: ${CHAT_AUTH_WEB_SOCKET_TICKET_SESSION_FALLBACK_ENABLED:false}
   api:
     cors:
       mapping: ${CHAT_API_CORS_MAPPING:/**}

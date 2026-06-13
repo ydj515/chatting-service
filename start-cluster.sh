@@ -36,8 +36,8 @@ until "${compose[@]}" exec -T redis redis-cli ping >/dev/null 2>&1; do
     sleep 2
 done
 
-echo "역할별 애플리케이션과 nginx를 빌드 및 시작합니다..."
-"${compose[@]}" up -d --build \
+echo "역할별 애플리케이션과 nginx를 빌드 및 시작한 뒤 health를 기다립니다..."
+"${compose[@]}" up -d --build --wait --wait-timeout 180 \
     chat-api-app-1 \
     chat-api-app-2 \
     chat-websocket-app-1 \
@@ -45,6 +45,10 @@ echo "역할별 애플리케이션과 nginx를 빌드 및 시작합니다..."
     chat-worker-app-1 \
     chat-admin-app-1 \
     nginx
+
+echo "nginx upstream DNS를 갱신합니다..."
+"${compose[@]}" restart nginx
+"${compose[@]}" up -d --wait --wait-timeout 60 nginx
 
 echo "서비스 상태를 확인합니다..."
 "${compose[@]}" ps

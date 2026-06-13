@@ -1739,11 +1739,14 @@ node scripts/load-chat.mjs --room hot --viewers 10000 --messages-per-sec 10000 -
 - k6/Gatling/Node 기반 load test를 추가한다.
 - WebSocket fan-out p95/p99 latency를 계측한다.
 - Redis Streams lag와 pending count를 계측한다.
+- WebSocket ticket 발급 rate limit의 Redis Lua script 기반 원자 처리를 부하/장애 상황에서 검증한다.
+- WebSocket ticket issue latency metric과 Redis Lua script failure metric을 dashboard/alert에 연결한다.
 - PostgreSQL writer batch latency를 계측한다.
 - read replica lag를 계측한다.
 - admin search p95 latency를 계측한다.
 - chaos test: Gateway kill, Worker kill, Redis 재시작, replica 지연을 검증한다.
 - archive worker one-shot 실행과 partition detach/drop dry-run을 검증한다.
+- Docker Compose 또는 staging 배포에서 Nginx upstream DNS stale 대응 절차를 검증한다.
 - 장애별 runbook을 작성한다.
 
 검증 시나리오:
@@ -1755,6 +1758,7 @@ node scripts/load-chat.mjs --room hot --viewers 10000 --messages-per-sec 10000 -
 - PostgreSQL replica 중단 후 primary fallback 또는 조회 degrade
 - archive worker one-shot 실행과 partition detach/drop dry-run
 - 관리자 검색 p95, writer lag, replica lag, fanout lag 측정
+- app 컨테이너 재생성 후 `/api/`, `/api/ws/`, `/api/admin/`가 올바른 role로 라우팅되는지 검증
 
 릴리즈 기준:
 
@@ -1763,6 +1767,9 @@ node scripts/load-chat.mjs --room hot --viewers 10000 --messages-per-sec 10000 -
 - replica lag 정상 상황 3초 이하
 - hot room batch fan-out p95 500ms 이하
 - 관리자 방별/시간대별 조회 p95 1초 이하
+- WebSocket ticket issue rate limit이 Lua script 기반 원자 처리로 동작한다.
+- WebSocket ticket issue latency와 Redis Lua script failure가 운영 metric으로 관측된다.
+- app rebuild/recreate 후 nginx stale upstream으로 인한 오라우팅이 발생하지 않는다.
 - Gateway 장애 후 클라이언트가 gap fill로 복구한다.
 - Writer Worker 장애 후 pending message가 재처리된다.
 
@@ -1798,12 +1805,13 @@ node scripts/load-chat.mjs --room hot --viewers 10000 --messages-per-sec 10000 -
 - Nginx 라우팅을 `/api/ws/` -> `chat-websocket-application`, `/api/admin/` -> `chat-admin-application`, 일반 `/api/` -> `chat-api-application`으로 분리 완료.
 - Compose 서비스를 `chat-api-app-*`, `chat-websocket-app-*`, `chat-worker-app-*`, `chat-admin-app-*`로 분리 완료.
 - Phase 2 구현 완료: 새 메시지는 `messageId`, `clientMessageId`, `roomSeq`, `streamShard`, `writeShard`, `fanoutShard`를 가지며, Redis `INCRBY` sequence block과 `(roomId, senderId, clientMessageId)` idempotency를 사용한다. WebSocket은 `MESSAGE_ACCEPTED`, `CHAT_MESSAGE`, `CHAT_MESSAGE_BATCH` 계약을 갖고, 클라이언트는 `messageId` 중복 제거와 `roomSeq` 정렬을 수행한다.
+- Phase 2.5 구현 완료: `POST /api/ws-tickets`로 WebSocket one-time ticket을 발급하고, Redis에는 `sha256(ticket)` key와 TTL 30초 user context만 저장한다. WebSocket handshake는 ticket을 원자 consume하며, docker/production 설정에서는 reusable session token query fallback을 비활성화한다. 클라이언트와 verify script는 connect/reconnect 직전에 새 ticket을 발급받는다.
 
 남은 변경을 Phase별로 정리하면 다음과 같다.
 
 | Phase | 주요 변경 | 핵심 파일 |
 | --- | --- | --- |
-| Phase 2.5 | WebSocket one-time ticket, production token query fallback 제거, 보안 gate | `chat-api`, `chat-websocket`, `chat-persistence`, `client`, `docs/ws_ticket_analysis.md` |
+| Phase 2.5 | WebSocket one-time ticket, production token query fallback 제거, 보안 gate | 완료 |
 | Phase 3 | Redis Streams producer/consumer, fanout worker, JPA compatibility writer | `chat-persistence`, `chat-worker-application`, `chat-runtime-config` |
 | Phase 4 | partitioned `chat_messages` canonical store, read replica history, gap fill | `infra/postgres`, `chat-persistence`, `chat-api` |
 | Phase 5 | admin history/search/export, audit log, 1천만건 seed | `chat-admin`, `chat-admin-application`, `chat-persistence`, `admin-web 또는 client` |
