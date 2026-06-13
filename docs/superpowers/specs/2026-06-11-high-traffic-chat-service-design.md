@@ -1484,9 +1484,9 @@ mise run verify:chat
 
 구현 작업:
 
-- Redis Streams producer를 추가한다.
-- `stream:room:{roomId}:shard:{streamShard}` key 전략을 구현한다.
-- `streamShard = hash(roomId 또는 messageId) % streamShardCount` 정책을 명시한다.
+- Redis Streams producer를 추가한다. 1차 vertical slice에서는 `MessageStreamProducer`와 `MessageStreamEnvelope`를 먼저 도입하고, `sendMessage()`가 compatibility JPA 저장 전에 stream append를 수행한다.
+- `chat:stream:room:<roomId>:shard:<streamShard>` key 전략을 구현한다.
+- `streamShard = hash(roomId 또는 messageId) % streamShardCount` 정책을 명시한다. 1차 vertical slice의 기본 shard count는 `1`이며, hot room 분산은 이후 shard count 확장과 worker 병렬화에서 적용한다.
 - `MessageIngestService`를 추가해 인증, 멤버십, rate limit, sequence, idempotency, Streams append를 한 경로로 묶는다.
 - `MessageWriterWorker` consumer group을 추가한다.
 - Phase 3의 writer는 `MessageWritePort`를 통해 기존 JPA `messages` 테이블에 호환 저장한다.
@@ -1502,6 +1502,7 @@ mise run verify:chat
 - `chat_messages` partitioned table을 canonical store로 전환하지 않는다.
 - read replica history 조회를 기본 경로로 쓰지 않는다.
 - 관리자 검색 API를 만들지 않는다.
+- 1차 vertical slice에서는 기존 Pub/Sub fan-out과 JPA compatibility 저장을 동기 경로에 유지한다. Writer Worker와 Hot Room Fanout Worker는 다음 slice에서 consumer group, pending claim, dead letter와 함께 붙인다.
 
 주요 파일:
 
@@ -1518,9 +1519,10 @@ mise run verify:chat
 완료 기준:
 
 - Redis Streams append 실패 시 메시지를 수락하지 않는다.
-- 수락된 메시지는 Writer Worker를 통해 기존 history 조회에 나타난다.
-- Fanout Worker 장애 후 pending entry가 재처리된다.
-- hot room에서는 Pub/Sub 발행 수가 메시지 수가 아니라 batch 수에 비례한다.
+- 1차 vertical slice에서는 append 성공 후 기존 JPA compatibility 저장과 기존 fan-out이 이어진다.
+- 전체 Phase 3 완료 시 수락된 메시지는 Writer Worker를 통해 기존 history 조회에 나타난다.
+- 전체 Phase 3 완료 시 Fanout Worker 장애 후 pending entry가 재처리된다.
+- 전체 Phase 3 완료 시 hot room에서는 Pub/Sub 발행 수가 메시지 수가 아니라 batch 수에 비례한다.
 - `MESSAGE_ACCEPTED`는 Streams append 성공을 의미하고, 모든 사용자 전달이나 DB 저장 완료를 의미하지 않는다.
 - `mise run verify:chat`은 Streams/worker 경로로 통과한다.
 

@@ -4,6 +4,8 @@ import com.chat.domain.dto.*
 import com.chat.domain.model.*
 import com.chat.domain.service.ChatService
 import com.chat.persistence.repository.*
+import com.chat.persistence.redis.MessageStreamEnvelope
+import com.chat.persistence.redis.MessageStreamProducer
 import com.chat.persistence.redis.RedisMessageBroker
 import org.slf4j.LoggerFactory
 import org.springframework.cache.annotation.*
@@ -35,7 +37,8 @@ class ChatServiceImpl(
     private val redisMessageBroker: RedisMessageBroker,
     private val messageSequenceService: MessageSequenceService,
     private val messagePersistenceService: MessagePersistenceService,
-    private val webSocketSessionManager: WebSocketSessionManager
+    private val webSocketSessionManager: WebSocketSessionManager,
+    private val messageStreamProducer: MessageStreamProducer,
 ) : ChatService {
 
     private val logger = LoggerFactory.getLogger(ChatServiceImpl::class.java)
@@ -334,6 +337,9 @@ class ChatServiceImpl(
             writeShard = writeShard(messageId),
             fanoutShard = fanoutShard(request.chatRoomId),
         )
+
+        messageStreamProducer.append(messageToStreamEnvelope(message))
+
         val savedMessage = try {
             messagePersistenceService.save(message)
         } catch (e: DataIntegrityViolationException) {
@@ -364,6 +370,25 @@ class ChatServiceImpl(
         }
 
         return messageToDto(savedMessage)
+    }
+
+    private fun messageToStreamEnvelope(message: Message): MessageStreamEnvelope {
+        val roomSeq = if (message.roomSeq > 0) message.roomSeq else message.sequenceNumber
+        return MessageStreamEnvelope(
+            messageId = message.messageId ?: legacyMessageId(message.id),
+            clientMessageId = message.clientMessageId,
+            chatRoomId = message.chatRoom.id,
+            senderId = message.sender.id,
+            senderName = message.sender.displayName,
+            messageType = message.type,
+            content = message.content,
+            sequenceNumber = message.sequenceNumber,
+            roomSeq = roomSeq,
+            streamShard = message.streamShard,
+            writeShard = message.writeShard,
+            fanoutShard = message.fanoutShard,
+            createdAt = message.createdAt,
+        )
     }
 
     private fun messageToChatMessage(message: Message): ChatMessage {

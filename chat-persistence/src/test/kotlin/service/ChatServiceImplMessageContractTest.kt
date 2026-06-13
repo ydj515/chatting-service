@@ -9,6 +9,8 @@ import com.chat.domain.model.User
 import com.chat.persistence.config.ChatRedisProperties
 import com.chat.persistence.config.ChatWebSocketGatewayProperties
 import com.chat.persistence.config.MessageSequenceProperties
+import com.chat.persistence.redis.MessageStreamEnvelope
+import com.chat.persistence.redis.MessageStreamProducer
 import com.chat.persistence.redis.RedisMessageBroker
 import com.chat.persistence.repository.ChatRoomMemberRepository
 import com.chat.persistence.repository.ChatRoomRepository
@@ -19,10 +21,12 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
 import com.fasterxml.jackson.module.kotlin.KotlinModule
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentCaptor
 import org.mockito.ArgumentMatchers.any
+import org.mockito.Mockito.inOrder
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
@@ -79,6 +83,92 @@ class ChatServiceImplMessageContractTest {
         assertEquals(0, savedMessage.streamShard)
         assertEquals(0, savedMessage.writeShard)
         assertEquals(0, savedMessage.fanoutShard)
+    }
+
+    @Test
+    fun `메시지 전송은 Redis Streams append 이후 compatibility 저장을 수행한다`() {
+        val messageStreamProducer = mock(MessageStreamProducer::class.java)
+        `when`(messageStreamProducer.append(anyMessageStreamEnvelope()))
+            .thenReturn("1749790000000-0")
+        val fixture = chatServiceFixture(messageStreamProducer = messageStreamProducer)
+        val clientMessageId = "client-message-1"
+        `when`(
+            fixture.messageRepository.findByChatRoomIdAndSenderIdAndClientMessageId(
+                10L,
+                7L,
+                clientMessageId,
+            )
+        ).thenReturn(Optional.empty())
+        `when`(fixture.messageRepository.saveAndFlush(any(Message::class.java))).thenAnswer { invocation ->
+            (invocation.arguments[0] as Message).copy(
+                id = 101L,
+                createdAt = LocalDateTime.parse("2026-06-12T12:00:00"),
+            )
+        }
+
+        val message = fixture.chatService.sendMessage(
+            SendMessageRequest(
+                chatRoomId = 10L,
+                type = MessageType.TEXT,
+                content = "hello",
+                clientMessageId = clientMessageId,
+            ),
+            senderId = 7L,
+        )
+
+        val envelopeCaptor = ArgumentCaptor.forClass(MessageStreamEnvelope::class.java)
+        val saveCaptor = ArgumentCaptor.forClass(Message::class.java)
+        val inOrder = inOrder(messageStreamProducer, fixture.messageRepository)
+        inOrder.verify(messageStreamProducer).append(captureMessageStreamEnvelope(envelopeCaptor))
+        inOrder.verify(fixture.messageRepository).saveAndFlush(saveCaptor.capture())
+
+        val envelope = envelopeCaptor.value
+        assertEquals(message.messageId, envelope.messageId)
+        assertEquals(clientMessageId, envelope.clientMessageId)
+        assertEquals(10L, envelope.chatRoomId)
+        assertEquals(7L, envelope.senderId)
+        assertEquals("User 7", envelope.senderName)
+        assertEquals(MessageType.TEXT, envelope.messageType)
+        assertEquals("hello", envelope.content)
+        assertEquals(1L, envelope.roomSeq)
+        assertEquals(1L, envelope.sequenceNumber)
+        assertEquals(0, envelope.streamShard)
+        assertEquals(0, envelope.writeShard)
+        assertEquals(0, envelope.fanoutShard)
+
+        val savedMessage = saveCaptor.value
+        assertEquals(envelope.messageId, savedMessage.messageId)
+        assertEquals(envelope.roomSeq, savedMessage.roomSeq)
+    }
+
+    @Test
+    fun `Redis Streams append 실패 시 메시지를 compatibility 저장하지 않는다`() {
+        val messageStreamProducer = mock(MessageStreamProducer::class.java)
+        `when`(messageStreamProducer.append(anyMessageStreamEnvelope()))
+            .thenThrow(IllegalStateException("stream append failed"))
+        val fixture = chatServiceFixture(messageStreamProducer = messageStreamProducer)
+        val clientMessageId = "client-message-1"
+        `when`(
+            fixture.messageRepository.findByChatRoomIdAndSenderIdAndClientMessageId(
+                10L,
+                7L,
+                clientMessageId,
+            )
+        ).thenReturn(Optional.empty())
+
+        assertThrows(IllegalStateException::class.java) {
+            fixture.chatService.sendMessage(
+                SendMessageRequest(
+                    chatRoomId = 10L,
+                    type = MessageType.TEXT,
+                    content = "hello",
+                    clientMessageId = clientMessageId,
+                ),
+                senderId = 7L,
+            )
+        }
+
+        verify(fixture.messageRepository, never()).saveAndFlush(any(Message::class.java))
     }
 
     @Test
@@ -171,7 +261,9 @@ class ChatServiceImplMessageContractTest {
     }
 
     @Suppress("UNCHECKED_CAST")
-    private fun chatServiceFixture(): Fixture {
+    private fun chatServiceFixture(
+        messageStreamProducer: MessageStreamProducer = successfulMessageStreamProducer(),
+    ): Fixture {
         val redisTemplate = mock(RedisTemplate::class.java) as RedisTemplate<String, String>
         val valueOperations = mock(ValueOperations::class.java) as ValueOperations<String, String>
         `when`(redisTemplate.opsForValue()).thenReturn(valueOperations)
@@ -227,6 +319,7 @@ class ChatServiceImplMessageContractTest {
                 ),
                 messagePersistenceService = MessagePersistenceService(messageRepository),
                 webSocketSessionManager = webSocketSessionManager,
+                messageStreamProducer = messageStreamProducer,
             ),
             messageRepository = messageRepository,
             chatRoom = chatRoom,
@@ -250,6 +343,27 @@ class ChatServiceImplMessageContractTest {
             createdBy = user(1L),
         )
     }
+
+    private fun anyMessageStreamEnvelope(): MessageStreamEnvelope {
+        any(MessageStreamEnvelope::class.java)
+        return uninitialized()
+    }
+
+    private fun captureMessageStreamEnvelope(
+        captor: ArgumentCaptor<MessageStreamEnvelope>,
+    ): MessageStreamEnvelope {
+        captor.capture()
+        return uninitialized()
+    }
+
+    private fun successfulMessageStreamProducer(): MessageStreamProducer {
+        val messageStreamProducer = mock(MessageStreamProducer::class.java)
+        `when`(messageStreamProducer.append(anyMessageStreamEnvelope())).thenReturn("1749790000000-0")
+        return messageStreamProducer
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun <T> uninitialized(): T = null as T
 
     private data class Fixture(
         val chatService: ChatServiceImpl,

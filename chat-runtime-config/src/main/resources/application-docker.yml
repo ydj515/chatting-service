@@ -138,6 +138,9 @@ chat:
       cleanup-initial-delay: ${CHAT_REDIS_BROKER_CLEANUP_INITIAL_DELAY:30s}
       processed-message-ttl: ${CHAT_REDIS_BROKER_PROCESSED_MESSAGE_TTL:1m}
       processed-message-max-size: ${CHAT_REDIS_BROKER_PROCESSED_MESSAGE_MAX_SIZE:10000}
+    streams:
+      room-stream-key-prefix: ${CHAT_REDIS_STREAMS_ROOM_STREAM_KEY_PREFIX:chat:stream:room:}
+      shard-count: ${CHAT_REDIS_STREAMS_SHARD_COUNT:1}
   message:
     sequence:
       ttl: ${CHAT_MESSAGE_SEQUENCE_TTL:24h}

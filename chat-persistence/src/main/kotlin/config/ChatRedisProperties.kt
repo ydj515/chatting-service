@@ -10,11 +10,17 @@ data class ChatRedisProperties(
     val roomTopicPrefix: String = "chat.room.",
     val membershipTopic: String = "chat.membership",
     val broker: Broker = Broker(),
+    val streams: Streams = Streams(),
 ) {
     data class Broker(
         val serverId: String? = null,
         val cleanupInitialDelay: Duration = Duration.ofSeconds(30),
         val processedMessageTtl: Duration = Duration.ofMinutes(1),
         val processedMessageMaxSize: Int = 10_000,
+    )
+
+    data class Streams(
+        val roomStreamKeyPrefix: String = "chat:stream:room:",
+        val shardCount: Int = 1,
     )
 }
