@@ -25,4 +25,7 @@ interface ChatService {
 
     // 커서 기반 메시지 페이지네이션 (성능 최적화)
     fun getMessagesByCursor(request: MessagePageRequest, userId: Long): MessagePageResponse
+
+    // 재연결 후 누락 메시지 보정용 gap fill
+    fun getMessagesGap(roomId: Long, userId: Long, afterSeq: Long, limit: Int): List<MessageDto>
 }

@@ -302,7 +302,7 @@ paths:
             example: 1
         - name: cursor
           in: query
-          description: Last message ID
+          description: Last roomSeq cursor
           schema:
             type: integer
             example: 100
@@ -324,6 +324,42 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MessagePageResponse'
+
+  /chat-rooms/{id}/messages/gap:
+    get:
+      summary: Get missed chat room messages after a room sequence
+      tags:
+        - Messages
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            example: 1
+        - name: afterSeq
+          in: query
+          required: true
+          description: Last roomSeq the client has applied
+          schema:
+            type: integer
+            example: 12345
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+      responses:
+        '200':
+          description: Messages after the supplied roomSeq, ordered ascending
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MessageDto'
 
   /chat-rooms/search:
     get:

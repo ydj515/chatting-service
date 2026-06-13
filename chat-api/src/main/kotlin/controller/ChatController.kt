@@ -108,6 +108,25 @@ class ChatController(
         return ResponseEntity.ok(response)
     }
 
+    @GetMapping("/{id}/messages/gap")
+    fun getMessagesGap(
+        @RequestHeader(HttpHeaders.AUTHORIZATION, required = false) authorization: String?,
+        @PathVariable id: Long,
+        @RequestParam afterSeq: Long,
+        @RequestParam(required = false) limit: Int?,
+    ): ResponseEntity<List<MessageDto>> {
+        val authenticatedUserId = authenticatedUserResolver.resolveRequired(authorization)
+        val boundedLimit = (limit ?: messagePaginationProperties.defaultLimit)
+            .coerceAtMost(messagePaginationProperties.maxLimit)
+        val messages = chatService.getMessagesGap(
+            roomId = id,
+            userId = authenticatedUserId,
+            afterSeq = afterSeq,
+            limit = boundedLimit,
+        )
+        return ResponseEntity.ok(messages)
+    }
+
     @GetMapping("/search")
     fun searchChatRooms(
         @RequestHeader(HttpHeaders.AUTHORIZATION, required = false) authorization: String?,
