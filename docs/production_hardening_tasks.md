@@ -51,13 +51,30 @@ return 0
 
 `ARGV[1]`은 window milliseconds, `ARGV[2]`는 limit이다.
 
+### Redis Cluster Hash Slot 판단
+
+현재 Lua script는 Redis Cluster hash slot 문제를 피하도록 **단일 key script**로 유지한다.
+
+- user rate limit script는 `chat:ws-ticket:rate:user:{userId}` 계열 key 1개만 `KEYS[1]`로 받는다.
+- IP rate limit script는 `chat:ws-ticket:rate:ip:{hashedIp}` 계열 key 1개만 `KEYS[1]`로 받는다.
+- user key와 IP key를 같은 Lua script에 함께 넘기지 않는다.
+- Lua script 내부에서 `KEYS[1]` 외의 Redis key를 조합하거나 접근하지 않는다.
+
+Redis Cluster에서 Lua script가 여러 key를 받으면 모든 key가 같은 hash slot에 있어야 한다. 현재 구현은 script 호출 1회당 key가 1개뿐이므로 cross-slot 문제가 발생하지 않는다. 따라서 현 단계에서는 rate limit key에 hash tag를 강제로 붙일 필요가 없다.
+
+향후 user rate limit과 IP rate limit을 하나의 script에서 완전 원자 처리하려면 두 key가 같은 hash slot에 있어야 한다. 다만 모든 key를 `{ws-ticket}` 같은 공통 hash tag로 묶으면 한 slot에 트래픽이 몰릴 수 있으므로 기본 방향으로 두지 않는다. 그 경우에는 다음 중 하나를 별도 설계로 선택한다.
+
+- user/IP를 계속 단일 key script로 분리하고, 두 제한의 완전 원자성은 포기한다.
+- 같은 hash slot이 필요한 범위만 hash tag로 묶되 slot skew와 hot key 위험을 별도 검증한다.
+- Lua script 대신 RedisGears, 별도 rate limit service, 또는 edge/WAF rate limit과 조합한다.
+
 ### 완료 기준
 
 - user 기준 ticket issue rate limit이 Lua script 경로를 사용한다.
 - IP 기준 ticket issue rate limit이 Lua script 경로를 사용한다.
 - Lua script 실행 실패 시 ticket 발급은 fail-closed로 실패한다.
 - `INCR` 이후 TTL이 없는 key가 남는 장애 모드가 단위 테스트로 방어된다.
-- Redis Cluster 전환 시 key 하나 단위 script 실행 또는 hash tag 정책이 문서화되어 있다.
+- Redis Cluster 전환 시 단일 key script라 hash tag 없이 cross-slot 문제가 없다는 판단이 문서화되어 있다.
 - ticket issue success/failure/rate-limited count가 metric으로 관측된다.
 - ticket issue latency가 `chat.websocket.ticket.issue.latency` timer로 관측된다.
 - Redis Lua script 실패가 `chat.websocket.ticket.rate_limit.script.failures` counter로 관측된다.
@@ -72,6 +89,7 @@ return 0
 ### 주의사항
 
 > - Redis Cluster에서 Lua script는 같은 hash slot의 key만 한 번에 다룰 수 있다. user key와 IP key를 하나의 script에서 동시에 처리하지 않는 편이 단순하다.
+> - 현재 rate limit script는 호출 1회당 key 1개만 사용하므로 hash tag가 필요 없다. 여러 key를 한 script로 합치면 Redis Cluster hash slot 설계를 다시 해야 한다.
 > - Lua script 장애 시 fail-open으로 ticket을 발급하면 abuse 방어가 깨질 수 있다. 운영 기본값은 fail-closed가 맞다.
 > - 이전 TTL repair 방식은 임시 완화책이며, 현재 최종 구현은 Lua script 원자 처리다.
 
