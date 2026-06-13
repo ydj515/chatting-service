@@ -160,6 +160,8 @@ chat:
       claim-interval-millis: ${CHAT_WORKER_FANOUT_CLAIM_INTERVAL_MILLIS:10000}
       max-delivery-count: ${CHAT_WORKER_FANOUT_MAX_DELIVERY_COUNT:5}
   message:
+    store:
+      target: ${CHAT_MESSAGE_STORE_TARGET:partitioned}
     sequence:
       ttl: ${CHAT_MESSAGE_SEQUENCE_TTL:24h}
       block-size: ${CHAT_MESSAGE_SEQUENCE_BLOCK_SIZE:1000}

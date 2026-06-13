@@ -430,7 +430,7 @@ PostgreSQL 기준 parent table 예시:
 
 ```sql
 CREATE TABLE chat_messages (
-    message_id uuid NOT NULL,
+    message_id text NOT NULL,
     client_message_id text,
     room_id bigint NOT NULL,
     room_seq bigint NOT NULL,

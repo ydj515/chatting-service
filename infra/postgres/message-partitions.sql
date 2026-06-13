@@ -5,7 +5,7 @@
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
 CREATE TABLE IF NOT EXISTS chat_messages (
-    message_id uuid NOT NULL,
+    message_id text NOT NULL,
     client_message_id text,
     room_id bigint NOT NULL,
     room_seq bigint NOT NULL,
