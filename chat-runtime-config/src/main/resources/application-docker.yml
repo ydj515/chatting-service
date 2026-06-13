@@ -151,11 +151,13 @@ chat:
       consumer-group: ${CHAT_WORKER_WRITER_CONSUMER_GROUP:message-writer}
       read-count: ${CHAT_WORKER_WRITER_READ_COUNT:100}
       min-idle-millis: ${CHAT_WORKER_WRITER_MIN_IDLE_MILLIS:30000}
+      claim-interval-millis: ${CHAT_WORKER_WRITER_CLAIM_INTERVAL_MILLIS:10000}
       max-delivery-count: ${CHAT_WORKER_WRITER_MAX_DELIVERY_COUNT:5}
     fanout:
       consumer-group: ${CHAT_WORKER_FANOUT_CONSUMER_GROUP:fanout}
       read-count: ${CHAT_WORKER_FANOUT_READ_COUNT:100}
       min-idle-millis: ${CHAT_WORKER_FANOUT_MIN_IDLE_MILLIS:30000}
+      claim-interval-millis: ${CHAT_WORKER_FANOUT_CLAIM_INTERVAL_MILLIS:10000}
       max-delivery-count: ${CHAT_WORKER_FANOUT_MAX_DELIVERY_COUNT:5}
   message:
     sequence:

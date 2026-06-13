@@ -10,6 +10,7 @@ import org.springframework.data.redis.connection.stream.StreamReadOptions
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.stereotype.Service
 import java.time.Duration
+import java.util.concurrent.ConcurrentHashMap
 
 @Service
 class RedisMessageStreamConsumer(
@@ -17,12 +18,18 @@ class RedisMessageStreamConsumer(
     private val objectMapper: ObjectMapper,
     private val keyResolver: MessageStreamKeyResolver,
 ) : MessageStreamConsumer {
+    private val ensuredConsumerGroups = ConcurrentHashMap.newKeySet<String>()
 
     override fun listStreamKeys(): Set<String> {
         return redisTemplate.opsForSet().members(keyResolver.knownStreamsKey()) ?: emptySet()
     }
 
     override fun ensureConsumerGroup(streamKey: String, consumerGroup: String) {
+        val cacheKey = "$streamKey:$consumerGroup"
+        if (!ensuredConsumerGroups.add(cacheKey)) {
+            return
+        }
+
         try {
             redisTemplate.opsForStream<String, String>()
                 .createGroup(streamKey, ReadOffset.from("0-0"), consumerGroup)
@@ -30,6 +37,7 @@ class RedisMessageStreamConsumer(
             if (e.message?.contains("BUSYGROUP", ignoreCase = true) == true) {
                 return
             }
+            ensuredConsumerGroups.remove(cacheKey)
             throw e
         }
     }

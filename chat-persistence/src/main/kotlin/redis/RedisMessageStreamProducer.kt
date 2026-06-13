@@ -4,6 +4,7 @@ import com.chat.persistence.config.ChatRedisProperties
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.stereotype.Service
+import java.util.concurrent.ConcurrentHashMap
 
 @Service
 class RedisMessageStreamProducer(
@@ -12,6 +13,7 @@ class RedisMessageStreamProducer(
     private val redisProperties: ChatRedisProperties,
     private val keyResolver: MessageStreamKeyResolver,
 ) : MessageStreamProducer {
+    private val knownStreamsCache = ConcurrentHashMap.newKeySet<String>()
 
     override fun append(envelope: MessageStreamEnvelope): String {
         val streamKey = keyResolver.roomStreamKey(envelope.chatRoomId, envelope.streamShard)
@@ -25,7 +27,14 @@ class RedisMessageStreamProducer(
         val recordId = redisTemplate.opsForStream<String, String>().add(streamKey, fields)
             ?: throw IllegalStateException("Redis Streams append returned null: $streamKey")
 
-        redisTemplate.opsForSet().add(redisProperties.streams.knownStreamsKey, streamKey)
+        if (knownStreamsCache.add(streamKey)) {
+            try {
+                redisTemplate.opsForSet().add(redisProperties.streams.knownStreamsKey, streamKey)
+            } catch (e: RuntimeException) {
+                knownStreamsCache.remove(streamKey)
+                throw e
+            }
+        }
 
         return recordId.value
     }

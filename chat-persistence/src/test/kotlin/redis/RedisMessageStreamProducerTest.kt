@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test
 import org.mockito.ArgumentCaptor
 import org.mockito.ArgumentMatchers.eq
 import org.mockito.Mockito.mock
+import org.mockito.Mockito.times
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
 import org.springframework.data.redis.connection.stream.RecordId
@@ -71,6 +72,48 @@ class RedisMessageStreamProducerTest {
         assertTrue(fields["payload"]!!.contains("\"messageId\":\"msg-1\""))
         assertTrue(fields["payload"]!!.contains("\"clientMessageId\":\"client-1\""))
         verify(setOperations).add("chat:stream:rooms", "chat:stream:room:42:shard:3")
+    }
+
+    @Test
+    fun `이미 등록한 stream key는 known stream set에 다시 쓰지 않는다`() {
+        val redisTemplate = redisTemplate()
+        val streamOperations = streamOperations()
+        val setOperations = setOperations()
+        `when`(redisTemplate.opsForStream<String, String>()).thenReturn(streamOperations)
+        `when`(redisTemplate.opsForSet()).thenReturn(setOperations)
+        `when`(streamOperations.add(eq("chat:stream:room:42:shard:3"), anyStringMap()))
+            .thenReturn(RecordId.of("1749790000000-0"), RecordId.of("1749790000000-1"))
+
+        val objectMapper = ObjectMapper()
+            .registerModule(JavaTimeModule())
+            .registerModule(KotlinModule.Builder().build())
+        val producer = RedisMessageStreamProducer(
+            redisTemplate = redisTemplate,
+            objectMapper = objectMapper,
+            redisProperties = ChatRedisProperties(),
+            keyResolver = MessageStreamKeyResolver(ChatRedisProperties()),
+        )
+        val envelope = MessageStreamEnvelope(
+            messageId = "msg-1",
+            clientMessageId = "client-1",
+            chatRoomId = 42L,
+            senderId = 7L,
+            senderName = "User 7",
+            messageType = MessageType.TEXT,
+            content = "hello",
+            sequenceNumber = 11L,
+            roomSeq = 11L,
+            streamShard = 3,
+            writeShard = 4,
+            fanoutShard = 5,
+            createdAt = LocalDateTime.parse("2026-06-13T12:00:00"),
+        )
+
+        producer.append(envelope)
+        producer.append(envelope.copy(messageId = "msg-2", roomSeq = 12L, sequenceNumber = 12L))
+
+        verify(setOperations, times(1)).add("chat:stream:rooms", "chat:stream:room:42:shard:3")
+        verify(streamOperations, times(2)).add(eq("chat:stream:room:42:shard:3"), anyStringMap())
     }
 
     @Suppress("UNCHECKED_CAST")

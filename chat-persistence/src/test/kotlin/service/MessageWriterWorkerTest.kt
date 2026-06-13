@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentCaptor
 import org.mockito.ArgumentMatchers.any
+import org.mockito.ArgumentMatchers.anyList
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
@@ -40,8 +41,8 @@ class MessageWriterWorkerTest {
         ).thenReturn(Optional.empty())
         `when`(fixture.chatRoomRepository.getReferenceById(10L)).thenReturn(fixture.chatRoom)
         `when`(fixture.userRepository.getReferenceById(7L)).thenReturn(fixture.sender)
-        `when`(fixture.messageRepository.saveAndFlush(any(Message::class.java))).thenAnswer { invocation ->
-            (invocation.arguments[0] as Message).copy(id = 101L)
+        `when`(fixture.messageRepository.saveAllAndFlush(anyMessageList())).thenAnswer { invocation ->
+            invocation.arguments[0]
         }
 
         val written = fixture.worker.pollAndWrite()
@@ -51,9 +52,10 @@ class MessageWriterWorkerTest {
         assertEquals(listOf("chat:stream:room:10:shard:0:message-writer:worker-1"), consumer.reads)
         assertEquals(listOf("chat:stream:room:10:shard:0:message-writer:1749790000000-0"), consumer.acked)
 
-        val messageCaptor = ArgumentCaptor.forClass(Message::class.java)
-        verify(fixture.messageRepository).saveAndFlush(messageCaptor.capture())
-        val savedMessage = messageCaptor.value
+        val messagesCaptor = messageListCaptor()
+        verify(fixture.messageRepository).saveAllAndFlush(captureMessageList(messagesCaptor))
+        verify(fixture.messageRepository, never()).saveAndFlush(any(Message::class.java))
+        val savedMessage = messagesCaptor.value.single()
         assertEquals("msg-1", savedMessage.messageId)
         assertEquals("client-1", savedMessage.clientMessageId)
         assertEquals(10L, savedMessage.chatRoom.id)
@@ -91,6 +93,7 @@ class MessageWriterWorkerTest {
 
         assertEquals(0, written)
         verify(fixture.messageRepository, never()).saveAndFlush(any(Message::class.java))
+        verify(fixture.messageRepository, never()).saveAllAndFlush(anyMessageList())
         assertEquals(listOf("chat:stream:room:10:shard:0:message-writer:1749790000000-0"), consumer.acked)
     }
 
@@ -111,8 +114,8 @@ class MessageWriterWorkerTest {
         ).thenReturn(Optional.empty())
         `when`(fixture.chatRoomRepository.getReferenceById(10L)).thenReturn(fixture.chatRoom)
         `when`(fixture.userRepository.getReferenceById(7L)).thenReturn(fixture.sender)
-        `when`(fixture.messageRepository.saveAndFlush(any(Message::class.java))).thenAnswer { invocation ->
-            (invocation.arguments[0] as Message).copy(id = 101L)
+        `when`(fixture.messageRepository.saveAllAndFlush(anyMessageList())).thenAnswer { invocation ->
+            invocation.arguments[0]
         }
 
         val written = fixture.worker.pollAndWrite()
@@ -120,6 +123,33 @@ class MessageWriterWorkerTest {
         assertEquals(1, written)
         assertEquals(listOf("chat:stream:room:10:shard:0:message-writer:worker-1:30000"), consumer.claims)
         assertEquals(listOf("chat:stream:room:10:shard:0:message-writer:1749790000000-2"), consumer.acked)
+    }
+
+    @Test
+    fun `writer worker는 빠른 연속 poll에서 pending claim을 주기적으로만 수행한다`() {
+        val consumer = FakeMessageStreamConsumer(
+            records = emptyList(),
+            claimedRecords = listOf(streamRecord(recordId = "1749790000000-2", deliveryCount = 2)),
+        )
+        val fixture = workerFixture(consumer)
+        `when`(fixture.messageRepository.findByMessageId("msg-1")).thenReturn(Optional.of(
+            Message(
+                id = 101L,
+                messageId = "msg-1",
+                clientMessageId = "client-1",
+                chatRoom = fixture.chatRoom,
+                sender = fixture.sender,
+                type = MessageType.TEXT,
+                content = "hello",
+                sequenceNumber = 11L,
+                roomSeq = 11L,
+            )
+        ))
+
+        fixture.worker.pollAndWrite()
+        fixture.worker.pollAndWrite()
+
+        assertEquals(listOf("chat:stream:room:10:shard:0:message-writer:worker-1:30000"), consumer.claims)
     }
 
     @Test
@@ -164,6 +194,7 @@ class MessageWriterWorkerTest {
                     readCount = 10,
                     maxDeliveryCount = 3,
                     minIdleMillis = 30_000,
+                    claimIntervalMillis = 10_000,
                 ),
             ),
         )
@@ -269,6 +300,24 @@ class MessageWriterWorkerTest {
             deadLetters += "${record.streamKey}:$consumerGroup:${record.recordId}:$reason"
         }
     }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun messageListCaptor(): ArgumentCaptor<List<Message>> {
+        return ArgumentCaptor.forClass(List::class.java) as ArgumentCaptor<List<Message>>
+    }
+
+    private fun anyMessageList(): List<Message> {
+        anyList<Message>()
+        return uninitialized()
+    }
+
+    private fun captureMessageList(captor: ArgumentCaptor<List<Message>>): List<Message> {
+        captor.capture()
+        return uninitialized()
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun <T> uninitialized(): T = null as T
 
     private data class Fixture(
         val worker: MessageWriterWorker,

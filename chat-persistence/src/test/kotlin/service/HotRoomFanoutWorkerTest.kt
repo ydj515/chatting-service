@@ -62,6 +62,32 @@ class HotRoomFanoutWorkerTest {
         assertEquals(listOf("msg-11", "msg-12"), batch.messages.map { it.messageId })
     }
 
+    @Test
+    fun `fanout worker는 빠른 연속 poll에서 pending claim을 주기적으로만 수행한다`() {
+        val consumer = FakeMessageStreamConsumer(
+            records = emptyList(),
+            claimedRecords = listOf(streamRecord(recordId = "1749790000000-0", roomSeq = 12L)),
+        )
+        val redisMessageBroker = mock(RedisMessageBroker::class.java)
+        val worker = HotRoomFanoutWorker(
+            messageStreamConsumer = consumer,
+            redisMessageBroker = redisMessageBroker,
+            workerProperties = ChatWorkerProperties(
+                consumerName = "worker-1",
+                fanout = ChatWorkerProperties.StreamConsumer(
+                    consumerGroup = "fanout",
+                    readCount = 10,
+                    claimIntervalMillis = 10_000,
+                ),
+            ),
+        )
+
+        worker.pollAndFanout()
+        worker.pollAndFanout()
+
+        assertEquals(listOf("chat:stream:room:10:shard:0:fanout:worker-1:30000"), consumer.claims)
+    }
+
     private fun streamRecord(recordId: String, roomSeq: Long): MessageStreamRecord {
         return MessageStreamRecord(
             streamKey = "chat:stream:room:10:shard:0",
@@ -86,13 +112,15 @@ class HotRoomFanoutWorkerTest {
 
     private class FakeMessageStreamConsumer(
         private val records: List<MessageStreamRecord>,
+        private val claimedRecords: List<MessageStreamRecord> = emptyList(),
     ) : MessageStreamConsumer {
         val ensuredGroups = mutableListOf<String>()
         val reads = mutableListOf<String>()
+        val claims = mutableListOf<String>()
         val acked = mutableListOf<String>()
 
         override fun listStreamKeys(): Set<String> {
-            return records.mapTo(sortedSetOf()) { it.streamKey }
+            return (records + claimedRecords).mapTo(sortedSetOf()) { it.streamKey }
         }
 
         override fun ensureConsumerGroup(streamKey: String, consumerGroup: String) {
@@ -120,7 +148,8 @@ class HotRoomFanoutWorkerTest {
             count: Long,
             minIdleMillis: Long,
         ): List<MessageStreamRecord> {
-            return emptyList()
+            claims += "${streamKeys.first()}:$consumerGroup:$consumerName:$minIdleMillis"
+            return claimedRecords
         }
 
         override fun sendToDeadLetter(

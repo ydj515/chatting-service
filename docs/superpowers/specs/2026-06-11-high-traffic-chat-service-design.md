@@ -1488,13 +1488,14 @@ mise run verify:chat
 - `chat:stream:room:<roomId>:shard:<streamShard>` key 전략을 구현한다.
 - `streamShard = hash(roomId 또는 messageId) % streamShardCount` 정책을 명시한다. 1차 vertical slice의 기본 shard count는 `1`이며, hot room 분산은 이후 shard count 확장과 worker 병렬화에서 적용한다.
 - `MessageIngestService`를 추가해 인증, 멤버십, rate limit, sequence, idempotency, Streams append를 한 경로로 묶는다.
-- `MessageWriterWorker` consumer group을 추가한다. Worker는 known stream index를 읽고 consumer group을 보장한 뒤, stream record를 기존 `messages` 테이블에 idempotent하게 compatibility 저장하고 ack한다.
+- `MessageWriterWorker` consumer group을 추가한다. Worker는 known stream index를 읽고 consumer group을 보장한 뒤, stream record를 기존 `messages` 테이블에 idempotent하게 compatibility 저장하고 ack한다. 정상 batch는 `saveAllAndFlush`를 사용하고, batch 충돌 시에만 단건 fallback으로 격리한다.
 - Phase 3의 writer는 `MessageWritePort`를 통해 기존 JPA `messages` 테이블에 호환 저장한다.
 - `HotRoomFanoutWorker` consumer group을 추가한다.
 - Fanout Worker는 50~100ms 단위 또는 max batch size 기준으로 `CHAT_MESSAGE_BATCH`를 발행한다.
 - Redis Pub/Sub channel은 `fanout:room:{roomId}:shard:{fanoutShard}` 형식을 사용한다.
 - Gateway는 fanout shard channel을 구독하고 batch를 local room sessions에 전달한다.
-- pending entry claim과 dead letter stream을 구현한다. Writer/Fanout worker는 `minIdleMillis` 이상 idle 상태인 pending entry를 claim하고, `maxDeliveryCount` 이상 실패한 record는 consumer group별 dead letter stream으로 이동한 뒤 ack한다.
+- pending entry claim과 dead letter stream을 구현한다. Writer/Fanout worker는 `minIdleMillis` 이상 idle 상태인 pending entry를 `claimIntervalMillis` 주기로만 claim하고, `maxDeliveryCount` 이상 실패한 record는 consumer group별 dead letter stream으로 이동한 뒤 ack한다.
+- Redis 부하를 낮추기 위해 producer는 이미 등록한 stream key의 known-stream `SADD`를 로컬 캐시로 생략하고, consumer는 이미 보장한 `(streamKey, consumerGroup)` 조합의 `XGROUP CREATE`를 로컬 캐시로 생략한다.
 - `WORKER_ROLES=message-writer,fanout`으로 worker role을 선택 실행할 수 있게 한다.
 
 이번 Phase에서 하지 않을 것:

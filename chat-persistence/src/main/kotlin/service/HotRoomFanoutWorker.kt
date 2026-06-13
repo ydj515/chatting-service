@@ -17,6 +17,7 @@ class HotRoomFanoutWorker(
     private val workerProperties: ChatWorkerProperties,
 ) {
     private val logger = LoggerFactory.getLogger(HotRoomFanoutWorker::class.java)
+    private var lastPendingClaimAtMillis = 0L
 
     fun pollAndFanout(): Int {
         val streamKeys = messageStreamConsumer.listStreamKeys()
@@ -34,13 +35,7 @@ class HotRoomFanoutWorker(
             consumerName = workerProperties.consumerName,
             streamKeys = streamKeys,
             count = workerProperties.fanout.readCount,
-        ) + messageStreamConsumer.claimPending(
-            consumerGroup = consumerGroup,
-            consumerName = workerProperties.consumerName,
-            streamKeys = streamKeys,
-            count = workerProperties.fanout.readCount,
-            minIdleMillis = workerProperties.fanout.minIdleMillis,
-        )
+        ) + claimPendingIfDue(consumerGroup, streamKeys)
 
         var broadcastCount = 0
         records.groupBy { it.envelope.chatRoomId }.forEach { (roomId, roomRecords) ->
@@ -74,6 +69,26 @@ class HotRoomFanoutWorker(
         }
 
         return broadcastCount
+    }
+
+    private fun claimPendingIfDue(
+        consumerGroup: String,
+        streamKeys: Set<String>,
+    ): List<MessageStreamRecord> {
+        val now = System.currentTimeMillis()
+        val intervalMillis = workerProperties.fanout.claimIntervalMillis
+        if (lastPendingClaimAtMillis != 0L && now - lastPendingClaimAtMillis < intervalMillis) {
+            return emptyList()
+        }
+        lastPendingClaimAtMillis = now
+
+        return messageStreamConsumer.claimPending(
+            consumerGroup = consumerGroup,
+            consumerName = workerProperties.consumerName,
+            streamKeys = streamKeys,
+            count = workerProperties.fanout.readCount,
+            minIdleMillis = workerProperties.fanout.minIdleMillis,
+        )
     }
 
     private fun handleFailure(

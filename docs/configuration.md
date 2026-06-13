@@ -31,10 +31,12 @@
 | `CHAT_WORKER_WRITER_CONSUMER_GROUP` | `message-writer` | Redis Streams writer consumer group 이름 |
 | `CHAT_WORKER_WRITER_READ_COUNT` | `100` | writer worker가 poll 1회에 읽을 최대 stream record 수 |
 | `CHAT_WORKER_WRITER_MIN_IDLE_MILLIS` | `30000` | writer worker가 pending record를 claim하기 전 필요한 최소 idle 시간 |
+| `CHAT_WORKER_WRITER_CLAIM_INTERVAL_MILLIS` | `10000` | writer worker가 pending claim을 수행하는 최소 주기 |
 | `CHAT_WORKER_WRITER_MAX_DELIVERY_COUNT` | `5` | writer worker record 처리 실패 후 DLQ로 보내는 delivery count 임계값 |
 | `CHAT_WORKER_FANOUT_CONSUMER_GROUP` | `fanout` | Redis Streams fanout consumer group 이름 |
 | `CHAT_WORKER_FANOUT_READ_COUNT` | `100` | fanout worker가 poll 1회에 읽을 최대 stream record 수 |
 | `CHAT_WORKER_FANOUT_MIN_IDLE_MILLIS` | `30000` | fanout worker가 pending record를 claim하기 전 필요한 최소 idle 시간 |
+| `CHAT_WORKER_FANOUT_CLAIM_INTERVAL_MILLIS` | `10000` | fanout worker가 pending claim을 수행하는 최소 주기 |
 | `CHAT_WORKER_FANOUT_MAX_DELIVERY_COUNT` | `5` | fanout worker record 처리 실패 후 DLQ로 보내는 delivery count 임계값 |
 | `REDIS_PORT` | `6379` | Redis 내부 포트 |
 | `CHAT_REDIS_MEMBERSHIP_TOPIC` | `chat.membership` | REST create/join 결과를 WebSocket 노드에 전파하는 Redis 제어 topic |

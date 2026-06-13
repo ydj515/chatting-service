@@ -20,6 +20,7 @@ data class ChatWorkerProperties(
         val consumerGroup: String,
         val readCount: Long = 100,
         val minIdleMillis: Long = 30_000,
+        val claimIntervalMillis: Long = 10_000,
         val maxDeliveryCount: Long = 5,
     )
 }
