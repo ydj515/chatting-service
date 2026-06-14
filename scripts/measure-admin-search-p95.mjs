@@ -6,7 +6,7 @@ import { summarizeSamples } from './lib/adminLatencyStats.mjs';
 
 const args = parseArgs(process.argv.slice(2));
 const baseUrl = args['base-url'] ?? process.env.ADMIN_API_BASE_URL ?? 'http://localhost/api';
-const token = args.token ?? process.env.CHAT_ADMIN_TOKEN ?? 'local-admin-token';
+const token = requiredAdminToken(args.token ?? process.env.CHAT_ADMIN_TOKEN);
 const scenario = scenarioValue(args.scenario ?? 'both');
 const requests = positiveInteger(args.requests ?? '100', '--requests');
 const warmup = nonNegativeInteger(args.warmup ?? '10', '--warmup');
@@ -106,6 +106,14 @@ function searchModeValue(value) {
     return normalized;
   }
   throw new Error('--search-mode must be one of FTS, CONTAINS.');
+}
+
+function requiredAdminToken(value) {
+  const token = String(value ?? '').trim();
+  if (token === '') {
+    throw new Error('--token or CHAT_ADMIN_TOKEN is required.');
+  }
+  return token;
 }
 
 async function runSamples(plan, count, concurrency, token) {

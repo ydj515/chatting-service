@@ -116,9 +116,14 @@ class AdminMessageExportWorker(
     }
 
     private fun String.csvEscape(): String {
-        val needsQuoting = any { it == ',' || it == '"' || it == '\n' || it == '\r' }
-        val escaped = replace("\"", "\"\"")
+        val formulaSafe = if (startsWithSpreadsheetFormulaPrefix()) "'$this" else this
+        val needsQuoting = formulaSafe.any { it == ',' || it == '"' || it == '\n' || it == '\r' }
+        val escaped = formulaSafe.replace("\"", "\"\"")
         return if (needsQuoting) "\"$escaped\"" else escaped
+    }
+
+    private fun String.startsWithSpreadsheetFormulaPrefix(): Boolean {
+        return firstOrNull() in setOf('=', '+', '-', '@')
     }
 
     private companion object {

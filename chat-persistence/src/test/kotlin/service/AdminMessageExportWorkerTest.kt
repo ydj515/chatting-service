@@ -71,7 +71,60 @@ class AdminMessageExportWorkerTest {
         assertTrue(csv.contains("msg-1,client-1,10,100"))
     }
 
-    private fun message(): AdminMessageDto {
+    @Test
+    fun `export worker는 spreadsheet formula injection을 방지한다`(
+        @TempDir tempDir: Path,
+    ) {
+        val exportJobRepository = mock(AdminExportJobRepository::class.java)
+        val messageRepository = mock(AdminMessageRepository::class.java)
+        val worker = AdminMessageExportWorker(
+            exportJobRepository = exportJobRepository,
+            messageRepository = messageRepository,
+            workerProperties = ChatWorkerProperties(consumerName = "worker-1"),
+            objectMapper = testObjectMapper(),
+            exportDirectory = tempDir.toString(),
+        )
+        `when`(exportJobRepository.claimNextPending("worker-1")).thenReturn(
+            AdminExportJobRecord(
+                jobId = "export-1",
+                actor = "admin-local",
+                requestJson = """{"roomId":10,"from":null,"to":null,"query":null,"senderId":null}""",
+            ),
+        )
+        `when`(
+            messageRepository.findRoomMessages(
+                roomId = 10L,
+                from = null,
+                to = null,
+                cursor = null,
+                limit = 10_000,
+            ),
+        ).thenReturn(
+            listOf(
+                message(
+                    senderDisplayName = "@admin",
+                    content = "=IMPORTXML(\"https://example.test\")",
+                ),
+            ),
+        )
+
+        worker.pollAndExport()
+
+        val outputCaptor = ArgumentCaptor.forClass(String::class.java)
+        verify(exportJobRepository).markCompleted(
+            eqString("export-1"),
+            captureString(outputCaptor),
+        )
+        val csvPath = Path.of(java.net.URI.create(outputCaptor.value))
+        val csv = Files.readString(csvPath, Charsets.UTF_8)
+        assertTrue(csv.contains("'\u0040admin"))
+        assertTrue(csv.contains("\"'=IMPORTXML(\"\"https://example.test\"\")\""))
+    }
+
+    private fun message(
+        senderDisplayName: String = "Sender",
+        content: String = "hello",
+    ): AdminMessageDto {
         return AdminMessageDto(
             messageId = "msg-1",
             clientMessageId = "client-1",
@@ -80,9 +133,9 @@ class AdminMessageExportWorkerTest {
             writeShard = 0,
             senderId = 7L,
             senderUsername = "sender",
-            senderDisplayName = "Sender",
+            senderDisplayName = senderDisplayName,
             messageType = MessageType.TEXT,
-            content = "hello",
+            content = content,
             isDeleted = false,
             createdAt = Instant.parse("2026-06-14T00:00:00Z"),
         )

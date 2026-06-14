@@ -4,16 +4,10 @@ import {
   fetchAdminRoomStatus,
   searchAdminMessages,
 } from './services/adminApi.mjs';
+import { loadAdminState, saveAdminState } from './services/adminState.mjs';
 import { appendMetric } from './services/rendering.mjs';
 
-const state = {
-  baseUrl: localStorage.getItem('client_admin_base_url') || '/api',
-  token: localStorage.getItem('client_admin_token') || '',
-  roomId: localStorage.getItem('client_admin_room_id') || '1',
-  searchMode: localStorage.getItem('client_admin_search_mode') || 'FTS',
-  historyCursor: null,
-  searchCursor: null,
-};
+const state = loadAdminState(localStorage);
 
 const form = document.querySelector('#admin-form');
 const historyBody = document.querySelector('#history-body');
@@ -136,10 +130,7 @@ function saveState() {
   state.token = document.querySelector('#admin-token').value.trim();
   state.roomId = document.querySelector('#room-id').value.trim() || '1';
   state.searchMode = document.querySelector('#search-mode').value || 'FTS';
-  localStorage.setItem('client_admin_base_url', state.baseUrl);
-  localStorage.setItem('client_admin_token', state.token);
-  localStorage.setItem('client_admin_room_id', state.roomId);
-  localStorage.setItem('client_admin_search_mode', state.searchMode);
+  saveAdminState(localStorage, state);
 }
 
 async function run(successMessage, operation) {

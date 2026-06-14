@@ -86,7 +86,7 @@ class AdminExportJobRepository(
     }
 
     fun markCompleted(jobId: String, outputUri: String) {
-        jdbcTemplate.update(
+        val updatedRows = jdbcTemplate.update(
             """
             UPDATE admin_message_export_jobs
             SET
@@ -95,14 +95,16 @@ class AdminExportJobRepository(
                 error_message = NULL,
                 completed_at = now()
             WHERE job_id = ?
+              AND status = 'RUNNING'
             """.trimIndent(),
             outputUri,
             jobId,
         )
+        requireRunningTransition(updatedRows, jobId)
     }
 
     fun markFailed(jobId: String, errorMessage: String) {
-        jdbcTemplate.update(
+        val updatedRows = jdbcTemplate.update(
             """
             UPDATE admin_message_export_jobs
             SET
@@ -110,10 +112,18 @@ class AdminExportJobRepository(
                 error_message = ?,
                 completed_at = now()
             WHERE job_id = ?
+              AND status = 'RUNNING'
             """.trimIndent(),
             errorMessage.take(MAX_ERROR_MESSAGE_LENGTH),
             jobId,
         )
+        requireRunningTransition(updatedRows, jobId)
+    }
+
+    private fun requireRunningTransition(updatedRows: Int, jobId: String) {
+        if (updatedRows != 1) {
+            throw IllegalStateException("Admin export job $jobId is not RUNNING or does not exist")
+        }
     }
 
     private companion object {

@@ -20,7 +20,7 @@ x-chat-app-environment: &chat-app-environment
   REDIS_HOST: redis
   REDIS_PORT: ${REDIS_PORT:-6379}
   REDIS_PASSWORD: ${REDIS_PASSWORD:-}
-  CHAT_ADMIN_TOKEN: ${CHAT_ADMIN_TOKEN:-local-admin-token}
+  CHAT_ADMIN_TOKEN: ${CHAT_ADMIN_TOKEN:?CHAT_ADMIN_TOKEN is required}
   CHAT_ADMIN_EXPORT_DIRECTORY: ${CHAT_ADMIN_EXPORT_DIRECTORY:-/tmp/chat-admin-exports}
 
 x-chat-app-healthcheck: &chat-app-healthcheck

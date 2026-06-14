@@ -977,6 +977,13 @@ components:
 
     AdminExportMessagesRequest:
       type: object
+      anyOf:
+        - required: [roomId]
+        - required: [query]
+          properties:
+            query:
+              type: string
+              minLength: 1
       properties:
         roomId:
           type: integer
@@ -991,6 +998,7 @@ components:
         query:
           type: string
           nullable: true
+          minLength: 1
           example: "hello"
         senderId:
           type: integer

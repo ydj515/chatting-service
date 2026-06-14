@@ -44,6 +44,12 @@ class AdminChatControllerTest {
                         ),
                     ),
                     adminChatService = service,
+                    adminProperties = AdminProperties(
+                        token = "local-admin-token",
+                        actor = "admin-local",
+                        defaultLimit = 50,
+                        maxLimit = 100,
+                    ),
                 ),
             )
             .build()
@@ -153,6 +159,26 @@ class AdminChatControllerTest {
         assertEquals("admin-local", service.exportActor)
         assertEquals(10L, service.exportRequest?.roomId)
         assertEquals("hello", service.exportRequest?.query)
+    }
+
+    @Test
+    fun `관리자 export 생성은 roomId와 query가 모두 없으면 400으로 거부한다`() {
+        mockMvc.post("/admin/exports/messages") {
+            header("X-Admin-Token", "local-admin-token")
+            contentType = MediaType.APPLICATION_JSON
+            content = """
+                {
+                  "from": "2026-06-14T00:00:00",
+                  "to": "2026-06-15T00:00:00",
+                  "query": "   "
+                }
+            """.trimIndent()
+        }
+            .andExpect {
+                status { isBadRequest() }
+            }
+
+        assertEquals(null, service.exportRequest)
     }
 
     @Test

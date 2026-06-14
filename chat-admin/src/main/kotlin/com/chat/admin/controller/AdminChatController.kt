@@ -32,7 +32,7 @@ import java.time.ZoneId
 class AdminChatController(
     private val adminTokenVerifier: AdminTokenVerifier,
     private val adminChatService: AdminChatService,
-    private val adminProperties: AdminProperties = AdminProperties(),
+    private val adminProperties: AdminProperties,
 ) {
 
     @GetMapping("/chat-rooms/{roomId}/messages")
@@ -100,6 +100,7 @@ class AdminChatController(
         @RequestBody request: AdminExportMessagesHttpRequest,
     ): ResponseEntity<AdminExportJobDto> {
         val actor = adminTokenVerifier.requireActor(adminToken)
+        validateExportRequest(request)
         val job = adminChatService.createMessageExport(
             actor = actor,
             request = AdminExportMessagesRequest(
@@ -111,6 +112,15 @@ class AdminChatController(
             ),
         )
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(job)
+    }
+
+    private fun validateExportRequest(request: AdminExportMessagesHttpRequest) {
+        if (request.roomId == null && request.query.isNullOrBlank()) {
+            throw ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "roomId or query is required for admin message export",
+            )
+        }
     }
 
     private fun boundedLimit(limit: Int?): Int {

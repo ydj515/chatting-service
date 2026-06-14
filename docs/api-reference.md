@@ -45,7 +45,7 @@ OpenAPI 스펙은 [`openapi.yaml`](openapi.yaml)을 참고하세요.
 
 ### 관리자
 
-관리자 API는 `X-Admin-Token` 헤더가 필요합니다. Phase 5 로컬 기본값은 `local-admin-token`이며 운영 환경에서는 `CHAT_ADMIN_TOKEN`으로 교체합니다.
+관리자 API는 `X-Admin-Token` 헤더가 필요합니다. `CHAT_ADMIN_TOKEN`은 Docker/admin 실행 시 명시해야 하며, 기본 토큰은 제공하지 않습니다.
 
 | 메서드 | 경로 | 설명 |
 | --- | --- | --- |

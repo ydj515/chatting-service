@@ -82,21 +82,56 @@ class AdminExportJobRepositoryTest {
 
     @Test
     fun `completed export job은 output uri와 completed status를 기록한다`() {
-        val jdbcTemplate = mock(JdbcTemplate::class.java)
+        val jdbcTemplate = RecordingJdbcTemplate(updatedRows = 1)
         val repository = AdminExportJobRepository(jdbcTemplate = jdbcTemplate)
 
         repository.markCompleted("export-1", "file:///tmp/export-1.csv")
 
-        verify(jdbcTemplate).update(
-            contains("status = 'COMPLETED'"),
-            eq("file:///tmp/export-1.csv"),
-            eq("export-1"),
-        )
+        assertEquals(listOf("file:///tmp/export-1.csv", "export-1"), jdbcTemplate.arguments)
+        assertTrue(jdbcTemplate.sql.contains("status = 'COMPLETED'"))
+        assertTrue(jdbcTemplate.sql.contains("WHERE job_id = ?"))
+        assertTrue(jdbcTemplate.sql.contains("AND status = 'RUNNING'"))
+    }
+
+    @Test
+    fun `failed export job은 running 상태에서만 실패로 전이한다`() {
+        val jdbcTemplate = RecordingJdbcTemplate(updatedRows = 1)
+        val repository = AdminExportJobRepository(jdbcTemplate = jdbcTemplate)
+
+        repository.markFailed("export-1", "boom")
+
+        assertEquals(listOf("boom", "export-1"), jdbcTemplate.arguments)
+        assertTrue(jdbcTemplate.sql.contains("status = 'FAILED'"))
+        assertTrue(jdbcTemplate.sql.contains("WHERE job_id = ?"))
+        assertTrue(jdbcTemplate.sql.contains("AND status = 'RUNNING'"))
+    }
+
+    @Test
+    fun `export job 상태 전이는 running job이 아니면 실패한다`() {
+        val jdbcTemplate = RecordingJdbcTemplate(updatedRows = 0)
+        val repository = AdminExportJobRepository(jdbcTemplate = jdbcTemplate)
+
+        org.junit.jupiter.api.assertThrows<IllegalStateException> {
+            repository.markCompleted("export-1", "file:///tmp/export-1.csv")
+        }
     }
 
     private fun anyExportJobRecordRowMapper(): RowMapper<AdminExportJobRecord> {
         any(RowMapper::class.java)
         return uninitialized()
+    }
+
+    private class RecordingJdbcTemplate(
+        private val updatedRows: Int,
+    ) : JdbcTemplate() {
+        lateinit var sql: String
+        lateinit var arguments: List<Any?>
+
+        override fun update(sql: String, vararg args: Any?): Int {
+            this.sql = sql
+            this.arguments = args.toList()
+            return updatedRows
+        }
     }
 
     @Suppress("UNCHECKED_CAST")
