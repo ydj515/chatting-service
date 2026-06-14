@@ -50,7 +50,7 @@ OpenAPI 스펙은 [`openapi.yaml`](openapi.yaml)을 참고하세요.
 | 메서드 | 경로 | 설명 |
 | --- | --- | --- |
 | `GET` | `/api/admin/chat-rooms/{roomId}/messages?from=...&to=...&cursor=...&limit=50` | canonical store 기준 방별/시간대별 history 조회 |
-| `GET` | `/api/admin/messages/search?q=hello&roomId=1&senderId=7&from=...&to=...&cursor=...&limit=50` | PostgreSQL FTS/trigram 기반 메시지 검색 |
+| `GET` | `/api/admin/messages/search?q=hello&mode=FTS&roomId=1&senderId=7&from=...&to=...&cursor=...&limit=50` | PostgreSQL 메시지 검색. 기본 `mode=FTS`, 부분 문자열 fallback은 `mode=CONTAINS` |
 | `GET` | `/api/admin/rooms/{roomId}/status` | room heat, bounded live feed, rate limit, replica/search latency 상태 조회 |
 | `POST` | `/api/admin/exports/messages` | 메시지 export job 생성. `admin-export` worker가 pending job을 claim해 CSV 산출물을 생성 |
 

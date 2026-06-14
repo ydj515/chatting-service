@@ -9,6 +9,7 @@ const state = {
   baseUrl: localStorage.getItem('client_admin_base_url') || '/api',
   token: localStorage.getItem('client_admin_token') || '',
   roomId: localStorage.getItem('client_admin_room_id') || '1',
+  searchMode: localStorage.getItem('client_admin_search_mode') || 'FTS',
   historyCursor: null,
   searchCursor: null,
 };
@@ -22,6 +23,7 @@ const notice = document.querySelector('#notice');
 document.querySelector('#base-url').value = state.baseUrl;
 document.querySelector('#admin-token').value = state.token;
 document.querySelector('#room-id').value = state.roomId;
+document.querySelector('#search-mode').value = state.searchMode;
 
 form.addEventListener('submit', async (event) => {
   event.preventDefault();
@@ -122,6 +124,7 @@ function renderRows(target, messages) {
 function filters() {
   return {
     query: document.querySelector('#query').value.trim(),
+    mode: document.querySelector('#search-mode').value,
     roomId: numberOrNull(document.querySelector('#room-id').value),
     senderId: numberOrNull(document.querySelector('#sender-id').value),
     from: document.querySelector('#from').value,
@@ -134,9 +137,11 @@ function saveState() {
   state.baseUrl = document.querySelector('#base-url').value.trim() || '/api';
   state.token = document.querySelector('#admin-token').value.trim();
   state.roomId = document.querySelector('#room-id').value.trim() || '1';
+  state.searchMode = document.querySelector('#search-mode').value || 'FTS';
   localStorage.setItem('client_admin_base_url', state.baseUrl);
   localStorage.setItem('client_admin_token', state.token);
   localStorage.setItem('client_admin_room_id', state.roomId);
+  localStorage.setItem('client_admin_search_mode', state.searchMode);
 }
 
 async function run(successMessage, operation) {

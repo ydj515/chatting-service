@@ -9,12 +9,13 @@ import {
 test('admin search URL includes query filters and bounded limit', () => {
   const url = buildAdminSearchUrl('/api', {
     query: 'hello world',
+    mode: 'CONTAINS',
     roomId: 10,
     senderId: 7,
     limit: 500,
   });
 
-  assert.equal(url, '/api/admin/messages/search?q=hello+world&roomId=10&senderId=7&limit=100');
+  assert.equal(url, '/api/admin/messages/search?q=hello+world&mode=CONTAINS&roomId=10&senderId=7&limit=100');
 });
 
 test('admin history URL includes room time range cursor and positive limit', () => {

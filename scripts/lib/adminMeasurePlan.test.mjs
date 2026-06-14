@@ -8,6 +8,7 @@ test('buildRequestPlans builds history and search admin URLs', () => {
     scenario: 'both',
     roomId: 30001,
     query: 'hello searchable admin keyword',
+    searchMode: 'FTS',
     limit: 50,
     from: '2026-06-14T00:00:00',
     to: '2026-06-15T00:00:00',
@@ -20,6 +21,6 @@ test('buildRequestPlans builds history and search admin URLs', () => {
   );
   assert.equal(
     plans[1].url,
-    'http://localhost/api/admin/messages/search?q=hello+searchable+admin+keyword&limit=50&roomId=30001&from=2026-06-14T00%3A00%3A00&to=2026-06-15T00%3A00%3A00',
+    'http://localhost/api/admin/messages/search?q=hello+searchable+admin+keyword&mode=FTS&limit=50&roomId=30001&from=2026-06-14T00%3A00%3A00&to=2026-06-15T00%3A00%3A00',
   );
 });

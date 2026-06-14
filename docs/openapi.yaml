@@ -440,6 +440,15 @@ paths:
           schema:
             type: string
             example: "hello"
+        - name: mode
+          in: query
+          description: Search mode. FTS is the default optimized path; CONTAINS enables substring fallback.
+          schema:
+            type: string
+            enum:
+              - FTS
+              - CONTAINS
+            default: FTS
         - name: roomId
           in: query
           schema:

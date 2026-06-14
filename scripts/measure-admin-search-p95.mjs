@@ -13,13 +13,14 @@ const warmup = nonNegativeInteger(args.warmup ?? '10', '--warmup');
 const concurrency = positiveInteger(args.concurrency ?? '5', '--concurrency');
 const roomId = positiveInteger(args['room-id'] ?? '30001', '--room-id');
 const query = args.query ?? 'hello searchable admin keyword';
+const searchMode = searchModeValue(args['search-mode'] ?? 'FTS');
 const limit = positiveInteger(args.limit ?? '50', '--limit');
 const targetP95Ms = positiveInteger(args['target-p95-ms'] ?? '1000', '--target-p95-ms');
 const output = args.output;
 const from = args.from;
 const to = args.to;
 
-const plans = buildRequestPlans({ baseUrl, scenario, roomId, query, limit, from, to });
+const plans = buildRequestPlans({ baseUrl, scenario, roomId, query, searchMode, limit, from, to });
 const results = [];
 for (const plan of plans) {
   if (warmup > 0) {
@@ -43,6 +44,7 @@ const report = {
     concurrency,
     roomId,
     query,
+    searchMode,
     limit,
     from: from ?? null,
     to: to ?? null,
@@ -96,6 +98,14 @@ function scenarioValue(value) {
     return value;
   }
   throw new Error('--scenario must be one of history, search, both.');
+}
+
+function searchModeValue(value) {
+  const normalized = String(value).trim().toUpperCase();
+  if (normalized === 'FTS' || normalized === 'CONTAINS') {
+    return normalized;
+  }
+  throw new Error('--search-mode must be one of FTS, CONTAINS.');
 }
 
 async function runSamples(plan, count, concurrency, token) {

@@ -1,4 +1,4 @@
-export function buildRequestPlans({ baseUrl, scenario, roomId, query, limit, from, to }) {
+export function buildRequestPlans({ baseUrl, scenario, roomId, query, searchMode, limit, from, to }) {
   const normalizedBaseUrl = String(baseUrl).replace(/\/+$/, '');
   const plans = [];
 
@@ -16,6 +16,7 @@ export function buildRequestPlans({ baseUrl, scenario, roomId, query, limit, fro
   if (scenario === 'search' || scenario === 'both') {
     const url = new URL(`${normalizedBaseUrl}/admin/messages/search`);
     url.searchParams.set('q', query);
+    if (searchMode) url.searchParams.set('mode', searchMode);
     url.searchParams.set('limit', String(limit));
     if (roomId) url.searchParams.set('roomId', String(roomId));
     if (from) url.searchParams.set('from', from);

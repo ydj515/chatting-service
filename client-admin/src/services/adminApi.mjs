@@ -19,6 +19,7 @@ export function buildAdminHistoryUrl(baseUrl, roomId, filters = {}) {
 export function buildAdminSearchUrl(baseUrl, filters = {}) {
   const params = new URLSearchParams();
   params.set('q', filters.query ?? '');
+  appendOptional(params, 'mode', filters.mode);
   appendOptional(params, 'roomId', filters.roomId);
   appendOptional(params, 'from', filters.from);
   appendOptional(params, 'to', filters.to);
