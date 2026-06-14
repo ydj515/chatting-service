@@ -1,0 +1,55 @@
+{
+  "measuredAt": "2026-06-14T07:12:16.004Z",
+  "targetP95Ms": 1000,
+  "options": {
+    "baseUrl": "http://localhost/api",
+    "scenario": "both",
+    "requests": 100,
+    "warmup": 10,
+    "concurrency": 5,
+    "roomId": 30001,
+    "query": "hello searchable admin keyword",
+    "searchMode": "FTS",
+    "limit": 50,
+    "from": "2026-06-13T11:46:50",
+    "to": "2026-06-14T15:33:25"
+  },
+  "results": [
+    {
+      "name": "history",
+      "url": "http://localhost/api/admin/chat-rooms/30001/messages?limit=50&from=2026-06-13T11%3A46%3A50&to=2026-06-14T15%3A33%3A25",
+      "summary": {
+        "requests": 100,
+        "successes": 100,
+        "failures": 0,
+        "minMs": 4,
+        "maxMs": 31,
+        "p50Ms": 9,
+        "p95Ms": 23,
+        "p99Ms": 30,
+        "passedTarget": true,
+        "statusCounts": {
+          "200": 100
+        }
+      }
+    },
+    {
+      "name": "search",
+      "url": "http://localhost/api/admin/messages/search?q=hello+searchable+admin+keyword&mode=FTS&limit=50&roomId=30001&from=2026-06-13T11%3A46%3A50&to=2026-06-14T15%3A33%3A25",
+      "summary": {
+        "requests": 100,
+        "successes": 100,
+        "failures": 0,
+        "minMs": 216,
+        "maxMs": 5798,
+        "p50Ms": 477,
+        "p95Ms": 1326,
+        "p99Ms": 5797,
+        "passedTarget": false,
+        "statusCounts": {
+          "200": 100
+        }
+      }
+    }
+  ]
+}

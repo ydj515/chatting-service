@@ -384,12 +384,163 @@ paths:
                 items:
                   $ref: '#/components/schemas/ChatRoomDto'
 
+  /admin/chat-rooms/{roomId}/messages:
+    get:
+      summary: Admin room message history
+      tags:
+        - Admin
+      security:
+        - adminToken: []
+      parameters:
+        - name: roomId
+          in: path
+          required: true
+          schema:
+            type: integer
+            example: 1
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: cursor
+          in: query
+          schema:
+            type: integer
+            example: 1000
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            maximum: 100
+      responses:
+        '200':
+          description: Admin message history page
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminMessagePageResponse'
+
+  /admin/messages/search:
+    get:
+      summary: Admin message keyword search
+      tags:
+        - Admin
+      security:
+        - adminToken: []
+      parameters:
+        - name: q
+          in: query
+          schema:
+            type: string
+            example: "hello"
+        - name: mode
+          in: query
+          description: Search mode. FTS is the default optimized path; CONTAINS enables substring fallback.
+          schema:
+            type: string
+            enum:
+              - FTS
+              - CONTAINS
+            default: FTS
+        - name: roomId
+          in: query
+          schema:
+            type: integer
+            example: 1
+        - name: senderId
+          in: query
+          schema:
+            type: integer
+            example: 7
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: cursor
+          in: query
+          schema:
+            type: integer
+            example: 1000
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            maximum: 100
+      responses:
+        '200':
+          description: Admin message search page
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminMessageSearchResponse'
+
+  /admin/rooms/{roomId}/status:
+    get:
+      summary: Admin room operational status
+      tags:
+        - Admin
+      security:
+        - adminToken: []
+      parameters:
+        - name: roomId
+          in: path
+          required: true
+          schema:
+            type: integer
+            example: 1
+      responses:
+        '200':
+          description: Room operational status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminRoomStatusDto'
+
+  /admin/exports/messages:
+    post:
+      summary: Create admin message export job
+      tags:
+        - Admin
+      security:
+        - adminToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminExportMessagesRequest'
+      responses:
+        '202':
+          description: Export job accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminExportJobDto'
+
 components:
   securitySchemes:
     bearerAuth:
       type: http
       scheme: bearer
       bearerFormat: SessionToken
+    adminToken:
+      type: apiKey
+      in: header
+      name: X-Admin-Token
   schemas:
     CreateUserRequest:
       type: object
@@ -712,3 +863,157 @@ components:
         number:
           type: integer
           example: 0
+
+    AdminMessageDto:
+      type: object
+      properties:
+        messageId:
+          type: string
+          example: "msg_m8abcd123_xYz..."
+        clientMessageId:
+          type: string
+          nullable: true
+          example: "client-generated-id"
+        roomId:
+          type: integer
+          example: 1
+        roomSeq:
+          type: integer
+          example: 1005
+        writeShard:
+          type: integer
+          example: 0
+        senderId:
+          type: integer
+          example: 7
+        senderUsername:
+          type: string
+          example: "alice"
+        senderDisplayName:
+          type: string
+          example: "Alice"
+        messageType:
+          type: string
+          enum: [TEXT, SYSTEM]
+          example: "TEXT"
+        content:
+          type: string
+          nullable: true
+          example: "hello"
+        isDeleted:
+          type: boolean
+          example: false
+        createdAt:
+          type: string
+          format: date-time
+
+    AdminMessagePageResponse:
+      type: object
+      properties:
+        messages:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminMessageDto'
+        nextCursor:
+          type: integer
+          nullable: true
+          example: 1001
+        hasNext:
+          type: boolean
+          example: true
+        latencyMs:
+          type: integer
+          example: 12
+
+    AdminMessageSearchResponse:
+      type: object
+      properties:
+        query:
+          type: string
+          example: "hello"
+        messages:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminMessageDto'
+        nextCursor:
+          type: integer
+          nullable: true
+          example: 1001
+        hasNext:
+          type: boolean
+          example: true
+        latencyMs:
+          type: integer
+          example: 15
+
+    AdminRoomStatusDto:
+      type: object
+      properties:
+        roomId:
+          type: integer
+          example: 1
+        heatLevel:
+          type: string
+          example: "NORMAL"
+        liveFeedMaxMessages:
+          type: integer
+          example: 1000
+        liveFeedMaxAgeSeconds:
+          type: integer
+          example: 60
+        rateLimitPerSecond:
+          type: integer
+          nullable: true
+        slowModeSeconds:
+          type: integer
+          nullable: true
+        replicaLagMs:
+          type: integer
+          nullable: true
+          example: 5
+        searchP95LatencyMs:
+          type: integer
+          nullable: true
+
+    AdminExportMessagesRequest:
+      type: object
+      anyOf:
+        - required: [roomId]
+        - required: [query]
+          properties:
+            query:
+              type: string
+              minLength: 1
+      properties:
+        roomId:
+          type: integer
+          nullable: true
+          example: 1
+        from:
+          type: string
+          format: date-time
+        to:
+          type: string
+          format: date-time
+        query:
+          type: string
+          nullable: true
+          minLength: 1
+          example: "hello"
+        senderId:
+          type: integer
+          nullable: true
+          example: 7
+
+    AdminExportJobDto:
+      type: object
+      properties:
+        jobId:
+          type: string
+          example: "export-1"
+        status:
+          type: string
+          example: "PENDING"
+        createdAt:
+          type: string
+          format: date-time

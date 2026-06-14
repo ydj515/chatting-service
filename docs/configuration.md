@@ -33,7 +33,12 @@
 | `CHAT_MESSAGE_HASH_PARTITIONS` | `16` | 일별 `chat_messages` partition 아래 생성할 hash subpartition 수 |
 | `CHAT_PARTITION_ARCHIVE_DROP_AFTER_COPY` | `false` | archive 성공 후 partition detach/drop 여부 |
 | `CHAT_PARTITION_ARCHIVE_INTERVAL_SECONDS` | `86400` | archive worker 실행 주기 |
-| `WORKER_ROLES` | `message-writer,fanout,search-projection,archive` | `chat-worker-application`에서 활성화할 worker role 목록 |
+| `CHAT_ADMIN_TOKEN` | 필수 | `chat-admin` API의 `X-Admin-Token` 검증 값. Docker/admin 실행 시 명시하지 않으면 시작 실패 |
+| `CHAT_ADMIN_ACTOR` | `admin-local` | shared token 인증 시 audit log에 기록할 기본 관리자 actor |
+| `CHAT_ADMIN_DEFAULT_LIMIT` | `50` | 관리자 history/search 기본 page size |
+| `CHAT_ADMIN_MAX_LIMIT` | `100` | 관리자 history/search 최대 page size |
+| `CHAT_ADMIN_EXPORT_DIRECTORY` | `/tmp/chat-admin-exports` | admin export worker가 CSV 산출물을 기록할 로컬 디렉터리 |
+| `WORKER_ROLES` | `message-writer,fanout,admin-export` | `chat-worker-application`에서 활성화할 worker role 목록 |
 | `CHAT_WORKER_POLL_DELAY_MILLIS` | `100` | worker scheduler poll 간격 |
 | `CHAT_WORKER_WRITER_CONSUMER_GROUP` | `message-writer` | Redis Streams writer consumer group 이름 |
 | `CHAT_WORKER_WRITER_READ_COUNT` | `100` | writer worker가 poll 1회에 읽을 최대 stream record 수 |

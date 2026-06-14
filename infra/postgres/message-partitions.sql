@@ -3,6 +3,7 @@
 -- table is prepared for the Message Writer Worker phase.
 
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
+CREATE EXTENSION IF NOT EXISTS btree_gin;
 
 CREATE TABLE IF NOT EXISTS chat_messages (
     message_id text NOT NULL,
@@ -50,6 +51,41 @@ CREATE TABLE IF NOT EXISTS room_storage_configs (
     updated_at timestamptz NOT NULL DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS admin_audit_logs (
+    id bigserial PRIMARY KEY,
+    actor text NOT NULL,
+    action varchar(100) NOT NULL,
+    target_type varchar(50) NOT NULL,
+    target_id text,
+    metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
+    created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS ix_admin_audit_logs_created_at
+ON admin_audit_logs (created_at DESC);
+
+CREATE INDEX IF NOT EXISTS ix_admin_audit_logs_actor_created_at
+ON admin_audit_logs (actor, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS admin_message_export_jobs (
+    job_id text PRIMARY KEY,
+    actor text NOT NULL,
+    status varchar(30) NOT NULL,
+    request jsonb NOT NULL,
+    output_uri text,
+    error_message text,
+    claimed_by text,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    started_at timestamptz,
+    completed_at timestamptz
+);
+
+ALTER TABLE IF EXISTS admin_message_export_jobs
+ADD COLUMN IF NOT EXISTS claimed_by text;
+
+CREATE INDEX IF NOT EXISTS ix_admin_message_export_jobs_status_created_at
+ON admin_message_export_jobs (status, created_at DESC);
+
 CREATE INDEX IF NOT EXISTS ix_chat_messages_default_room_time
 ON chat_messages_default (room_id, created_at DESC, room_seq DESC);
 
@@ -58,6 +94,9 @@ ON chat_messages_default (sender_id, created_at DESC);
 
 CREATE INDEX IF NOT EXISTS ix_chat_messages_default_content_tsv
 ON chat_messages_default USING gin (content_tsv);
+
+CREATE INDEX IF NOT EXISTS ix_chat_messages_default_room_content_tsv
+ON chat_messages_default USING gin (room_id int8_ops, content_tsv);
 
 CREATE INDEX IF NOT EXISTS ix_chat_messages_default_content_trgm
 ON chat_messages_default USING gin (content gin_trgm_ops);
@@ -127,6 +166,12 @@ BEGIN
         EXECUTE format(
             'CREATE INDEX IF NOT EXISTS %I ON %I USING gin (content_tsv)',
             format('ix_%s_content_tsv', child_name),
+            child_name
+        );
+
+        EXECUTE format(
+            'CREATE INDEX IF NOT EXISTS %I ON %I USING gin (room_id int8_ops, content_tsv)',
+            format('ix_%s_room_content_tsv', child_name),
             child_name
         );
 
