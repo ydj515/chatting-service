@@ -1,0 +1,187 @@
+# 고트래픽 채팅 서비스 아키텍처 Q&A
+
+이 문서는 `2026-06-11-high-traffic-chat-service-design.md` 설계서를 바탕으로 진행된 시스템 아키텍처 및 엣지 케이스 처리에 대한 질의응답을 기록한 문서입니다.
+
+---
+
+## 1. 메시지 쓰기 구조 및 Redis 샤딩 (Sharding)
+
+**Q. 메시지 쓰는 것이 여러 대의 인스턴스에서 쓸 수 있는 구조인가요? 그리고 그게 Redis 어디에 들어가도 상관없는 구조인가요?**
+
+**A.**
+네, 여러 대의 애플리케이션 인스턴스(API Pod)에서 동시에 메시지를 쓸 수 있고, 단일 Redis가 병목이 되지 않도록 여러 Redis 노드에 분산되어 저장되는 구조입니다.
+- **수평 확장 및 순서 보장:** 여러 API 인스턴스는 Redis로부터 시퀀스 블록(`roomSeq`)을 할당받아 동시에 메시지를 쓰더라도 순서가 꼬이지 않게 처리합니다.
+- **키 기반 샤딩(Key-based Sharding):** Redis의 아무 노드나 랜덤하게 들어가는 것이 아니라 키에 의해 분산됩니다.
+  - 일반 방은 방 ID(`roomId`)를 기준으로 특정 Redis 노드에 할당됩니다.
+  - 트래픽이 몰리는 Hot Room의 경우 방 내부에서도 샤드 번호를 나누어(`stream:room:{roomId}:shard:{shardNo}`) 여러 Redis 스트림/채널로 트래픽을 쪼개므로, 클러스터 내의 여러 Redis 노드에 골고루 데이터가 분산됩니다.
+
+---
+
+## 2. Hot Room 결정 기준
+
+**Q. Hot Room은 언제 정해지나요? 실시간 메시지 양을 보고 정해지는 건가요?**
+
+**A.**
+네, 사전에 고정되는 것이 아니라 실시간 메시지 유입량(Messages Per Second)과 인프라 부하 상태를 모니터링하여 동적으로 결정됩니다.
+
+- **등급 기준:**
+  - `NORMAL`: 초당 메시지 < 1,000 (기본 속도 제한)
+  - `HOT`: 1,000 <= 초당 메시지 < 5,000 (Slow mode 권장, 비인증 제한 강화)
+  - `VERY_HOT`: 초당 메시지 >= 5,000 (표시되는 라이브 피드 축소, Slow mode 자동 적용)
+  - `OVERLOAD`: 메시지 양 무관하게 시스템(DB, 큐 등)에 딜레이/Lag 발생 시 (일반 사용자 수락 제한, 관리자 우선)
+- **판정 방식:** 순간적인 튀는 값을 방지하기 위해 최근 10초 EWMA(이동평균)와 1분 p95 수치를 함께 사용하여 트래픽 추세를 분석합니다. 승격(상향)은 빠르게, 강등(하향)은 플래핑(Flapping) 방지를 위해 천천히 진행합니다.
+
+---
+
+## 3. 샤드 분할, OVERLOAD 거절, 통계 데이터 관리
+
+**Q1. 등급이 Hot Room으로 승격되었을 때, 기존 1개였던 Redis 샤드를 여러 개로 쪼개는 작업(Resharding)은 어떤 흐름으로 진행되나요?**
+**A1.** 과거 데이터는 건드리지 않고, 새로운 메시지(Time Bucket)부터 변경된 샤드 개수(Modulo)를 적용하는 **Forward-only sharding** 방식을 취합니다. `room_storage_configs` 설정이 변경되면 이후 들어오는 메시지부터 변경된 샤드 개수로 해시되어 분산됩니다.
+
+**Q2. OVERLOAD 상태에서 일반 사용자 메시지를 제한할 때 클라이언트에게는 어떤 응답(ACK)을 내려주나요?**
+**A2.** 성공 응답인 `MESSAGE_ACCEPTED`를 보내지 않습니다. 대신 드랍(Drop)된 사유(`rate limit reject reason` 등)를 포함하여 HTTP 429 에러나 웹소켓 에러 이벤트를 클라이언트에게 내려보내어 전송 실패를 알립니다.
+
+**Q3. 최근 10초 EWMA나 1분 p95 같은 통계 데이터는 어디에서 어떻게 집계하나요?**
+**A3.** Redis를 중앙 카운터로 사용합니다. 메시지가 들어올 때마다 Redis에 초 단위 카운터 키(`rate:room:{roomId}:sec:{epochSecond}`)를 INCR 하고, 백그라운드 Worker나 모니터링 Job이 주기적으로 이 카운터들을 읽어와서 통계(EWMA, p95)를 연산하여 방 등급을 갱신합니다.
+
+---
+
+## 4. 상태 동기화 및 Worker Scale-out
+
+**Q1. OVERLOAD가 해제되어 정상화(VERY_HOT/HOT 강등)될 때, 클라이언트들에게는 어떻게 알려주나요?**
+**A1.** 방의 상태와 새로운 정책이 담긴 **제어 메시지(Control Event, 예: `ROOM_STATE_CHANGED`)** 를 생성하여 Redis Pub/Sub 채널을 통해 모든 웹소켓 Gateway로 브로드캐스트합니다. 클라이언트는 이 이벤트를 받아 UI를 갱신합니다.
+
+**Q2. `room_storage_configs` 설정 변경 시 수십 대의 Pod가 폴링(Polling) 없이 어떻게 동기화하나요?**
+**A2.** **Redis 캐시 + Redis Pub/Sub** 조합을 사용합니다. 설정이 변경되면 DB와 Redis 캐시를 업데이트한 직후, Redis Pub/Sub을 통해 설정 변경 이벤트를 발행합니다. 각 Pod는 이 이벤트를 수신하면 로컬 캐시를 무효화(Evict)하여, 폴링 없이 즉각적으로 최신 상태를 동기화합니다.
+
+**Q3. 샤드 개수가 늘어날 때 MessageWriterWorker는 컨슈머 개수를 어떻게 맞추고 Scale-out 하나요?**
+**A3.** **Redis Streams Consumer Group**과 **Kubernetes HPA**가 협력합니다. 워커들은 동적으로 신규 샤드의 스트림을 감지하여 구독합니다. 트래픽이 몰려 Redis Streams의 큐가 밀리기 시작하면(Lag 증가), K8s HPA가 이를 감지하여 새로운 Worker Pod를 띄웁니다. 새 Pod가 Consumer Group에 합류하면 Redis가 알아서 메시지 분배를 리밸런싱합니다.
+
+---
+
+## 5. HPA 지연 대응 및 OOM 시 데이터 복구 메커니즘
+
+**Q1. K8s HPA가 새로운 워커를 띄우는 1~2분 동안 쌓이는 막대한 Lag로 인한 메모리/Redis 터짐 방지책은?**
+**A1.** 
+1. **Redis MAXLEN:** Streams 적재 시 큐의 최대 길이(`MAXLEN`)를 제한하여 최악의 경우에도 Redis OOM을 막습니다 (오래된 데이터 유실 감수).
+2. **OVERLOAD 선제적 수락 거부:** Lag나 Send Queue가 설정된 임계치를 넘으면 시스템이 스스로 `OVERLOAD` 상태가 되어 일반 채팅 수락을 거절(Drop)합니다. HPA가 안정화될 때까지 트래픽 누적을 물리적으로 차단하여 시스템 생존을 최우선으로 합니다.
+
+**Q2. 워커가 읽어간 직후 OOM으로 죽으면 아직 DB에 못 쓴 메시지는 어떻게 복구하나요? (Pending Entry 재처리)**
+**A2.** Redis Streams의 **PEL (Pending Entries List)** 구조를 활용합니다.
+- 메시지를 읽어가면 PEL에 등록되며, DB 쓰기 후 **XACK**를 날려야만 삭제됩니다.
+- OOM으로 워커가 죽어 XACK를 못 보낸 메시지들은 PEL에 영원히 남습니다.
+- 살아있는 다른 워커나 Cleanup Job이 주기적으로 **XPENDING** 명령을 날려 일정 시간 이상 XACK가 없는 메시지를 찾고, **XCLAIM** 명령으로 소유권을 가져와 재처리합니다. 
+- 이 과정에서 중복 기록을 막기 위한 멱등성 보장(Idempotency, `messageId` PK 활용)이 필수적입니다.
+
+---
+
+## 6. 배치 처리 에러, 경쟁 상태(Race Condition), 유실 데이터 검증
+
+**Q1. 워커가 DB에 데이터를 넣을 때 100~1000건 단위의 Batch Insert를 하는데, 한 건이라도 DB 포맷 에러 등으로 실패하면 해당 배치의 XACK 처리는 어떻게 하나요?**
+**A1.** 단일 불량 메시지(Poison Pill) 때문에 전체 배치가 막히는 것을 방지해야 합니다.
+1. Batch Insert는 하나의 트랜잭션으로 묶여 있으므로 실패 시 데이터베이스 단위에서 전체 롤백(Rollback)됩니다.
+2. 예외를 캐치한 워커는 무한 재시도하는 대신 **Fall-back 모드**로 진입하여 해당 배치를 건건이(1건씩) 분할 삽입하여 불량 메시지를 색출합니다.
+3. 정상적인 메시지들은 삽입 후 `XACK` 처리합니다.
+4. 불량 메시지는 로그를 남기거나 Dead Letter Queue(또는 별도 에러 테이블)로 보낸 뒤 `XACK` 처리하여 전체 파이프라인의 병목을 해소합니다.
+
+**Q2. 네트워크 파티션으로 잠시 멈춘 워커와 이를 `XCLAIM`으로 가져간 다른 워커가 동시에 DB에 같은 메시지를 넣으려 하는 경쟁 상태(Race Condition)는 어떻게 방지하나요?**
+**A2.** 데이터베이스 레벨의 **멱등성(Idempotency)** 보장으로 방어합니다.
+- 메시지가 생성될 때 발급된 고유한 `messageId`를 PostgreSQL `chat_messages` 테이블의 Primary Key(또는 Unique Index)로 사용합니다.
+- 두 워커가 동시에 INSERT를 시도하면, 한 워커는 성공하고 다른 워커는 Unique Constraint Violation 에러(`ON CONFLICT DO NOTHING`)를 받게 됩니다.
+- 에러를 캐치한 워커 역시 결과적으로 해당 메시지가 이미 잘 저장되었음을 인지하고, 안심하고 Redis에 `XACK`를 전송합니다. (Redis는 중복된 XACK를 무시하므로 안전합니다.)
+
+**Q3. `MAXLEN` 제한으로 유실된 채팅 데이터가 있다면 서버 로그나 DB에 안 남을 텐데, 관리자는 유실 여부를 어떻게 확인할 수 있나요?**
+**A3.** 설계서의 핵심인 **방별 시퀀스(`roomSeq`)** 를 통해 정확히 감지할 수 있습니다.
+- 모든 메시지는 큐에 들어가기 직전에 방에서 유일하게 단조 증가하는 `roomSeq`를 발급받습니다.
+- 관리자나 감사(Audit) 배치 Job은 DB에 저장된 메시지들의 `roomSeq`를 스캔하여 중간에 비어 있는 번호(Gap)를 찾아냅니다. (예: 101번과 105번 사이 102, 103, 104번 부재)
+- 이를 통해 정확히 몇 번 메시지가 어떤 시간대에 유실되었는지(MAXLEN이나 기타 장애로 인해) 100% 식별해 낼 수 있습니다. 또한, 모니터링 시스템에서 Redis의 `Evicted` 메트릭을 추적하여 실시간으로 유실 경고 알람을 받을 수도 있습니다.
+
+---
+
+## 7. 인증 및 웹소켓 연결 보안 (WebSocket Ticket Hardening)
+
+**Q1. 웹소켓 연결 시 왜 세션 토큰(Session Token)을 그대로 안 쓰고, 굳이 REST API를 한 번 더 거쳐 1회용 티켓(One-time Ticket)을 발급받나요?**
+**A1.** 브라우저 환경상 웹소켓 연결(Handshake) 시에는 HTTP Header(`Authorization`)를 마음대로 커스텀하여 전송하기 어렵기 때문에 URL의 Query String에 토큰을 담아야 합니다. 하지만 Query String에 영구적인/수명이 긴 세션 토큰을 담으면 서버 로그(Access Log)나 프록시 장비에 평문으로 남는 심각한 보안 취약점이 됩니다. 이를 막기 위해 유효시간이 매우 짧고 한 번만 쓰면 버려지는(Consume) 1회용 티켓을 발급하여 URL에 노출시킵니다.
+
+**Q2. Redis에 티켓을 저장할 때 왜 평문(Plaintext)이 아닌 `sha256(ticket)` 해시값으로 저장하나요?**
+**A2.** 혹시라도 Redis 서버가 해킹당하거나, 모니터링/디버깅 도중 Redis 안의 데이터가 유출되더라도, 해시값만으로는 원본 티켓 값을 복원할 수 없게 하여 공격자가 웹소켓 핸드셰이크를 흉내 내는 것을 원천 차단하기 위함입니다. (심층 방어, Defense in Depth)
+
+---
+
+## 8. Bounded Queue와 메모리 관리
+
+**Q1. Gateway 서버 내부에서 로컬 세션 목록을 메모리로 관리하는데, 다중 스레드(Event Loop) 환경에서 동시성 문제나 데드락(Deadlock)은 어떻게 피하나요?**
+**A1.** ConcurrentHashMap 등 동시성 제어가 보장된 자료구조를 활용하여 O(1) 수준의 락 오버헤드로 관리하며, 메시지 브로드캐스트 시 컬렉션 복사본을 순회하거나 Thread-safe한 Iterator를 사용하여 `ConcurrentModificationException` 발생을 원천 차단합니다.
+
+**Q2. Bounded Outbound Queue가 가득 차서 메시지가 Drop된 클라이언트(Slow Client)는 영원히 메시지를 잃어버리게 되나요?**
+**A2.** 아닙니다. Gateway 메모리의 무한 증식을 막기 위해 큐가 꽉 차면 일단 메시지를 Drop 하지만, 클라이언트 로직은 실시간 이벤트가 유실(Drop)되었음을 자신의 가장 최근 `roomSeq`와 새로 수신한 메시지의 `roomSeq` 사이의 Gap(순서 빈틈)을 통해 알아챕니다. 그 후 즉시 REST API(`GET /chat-rooms/{roomId}/messages/gap`)를 호출하여 누락된 메시지를 스스로 복구(Gap Fill)합니다.
+
+---
+
+## 9. 단조 증가 시퀀스(roomSeq) 발급 성능
+
+**Q. `roomSeq`를 발급할 때마다 Redis의 `INCR`를 호출하면 결국 Redis가 병목이 되거나 터지지 않을까요?**
+**A.** `INCRBY` 명령어를 사용하여 한 번에 블록 단위(Block Allocation, 예: 1000개)로 시퀀스를 뭉텅이로 가져온 뒤, 각 API 인스턴스의 로컬 메모리에서 하나씩 소진합니다. 덕분에 Redis 통신 비용을 O(1/1000) 수준으로 획기적으로 줄여 Hot Room의 성능을 극대화합니다. (단, API 인스턴스가 중간에 죽으면 남은 시퀀스가 통째로 날아가 Sequence Gap이 발생할 수 있으나, 단조 증가는 유지되므로 클라이언트 측 정렬 로직에는 문제가 없습니다.)
+
+---
+
+## 10. 클라이언트 응답성 (MESSAGE_ACCEPTED) 분리
+
+**Q. 기존에는 DB(PostgreSQL)에 직접 삽입(JPA Save)을 성공해야만 클라이언트에게 전송 성공(ACK)을 보냈는데, Redis Streams Append만 성공해도 `MESSAGE_ACCEPTED`를 주도록 변경한 이유는 무엇인가요?**
+**A.** 극단적인 Hot Room 환경에서는 RDBMS의 디스크 쓰기 속도가 병목의 주원인이 됩니다. Redis Streams를 고성능 1차 인제스트 큐(Durable 기 Queue)로 활용하여, 메모리 속도로 일단 수락(Append)을 완료해 클라이언트에게 매우 빠른 응답성(Low Latency)을 보장합니다. 실제 무거운 DB 저장은 백그라운드 Worker들이 자신의 처리량에 맞춰 비동기로 처리하도록 시스템의 결합도(Decoupling)를 끊어낸 것입니다.
+
+---
+
+## 11. 메인 DB 읽기/쓰기 분리와 Replica 지연
+
+**Q. 관리자 조회나 이전 채팅 이력 조회를 무조건 Read Replica에서 하도록 분리했는데, 만약 Replica 동기화가 지연(Replication Lag)되어서 사용자가 방금 자신이 쓴 메시지를 조회할 때 못 보면 어떻게 하나요?**
+**A.** 
+- **일반 사용자(최근 메시지/방 입장 시 조회):** Replica Lag 메트릭이 시스템에 설정된 임계치를 넘으면 자동으로 Primary DB로 Fallback(우회)하여 최신 데이터 읽기를 보장하도록 설계되어 있습니다.
+- **관리자(장기 이력/검색 조회):** Primary 서버에 부하를 주지 않기 위해 지연이 있더라도 항상 Replica를 참조하며, 대신 UI 상단에 "현재 DB 동기화가 X초 지연 중입니다"와 같은 알림(Delayed Notice)을 띄우는 방식으로 사용자 경험(UX)과 시스템 안정성 간의 균형을 유지합니다.
+
+---
+
+## 12. 파이프라인 워커 구현체 (Writer & Fanout)
+
+**Q1. Kafka 대신 Redis Streams를 메인 인제스트 파이프라인으로 채택했는데, 워커들은 어떻게 메시지를 폴링(Polling)하고 스케일아웃(Scale-out)하나요?**
+**A1.** `MessageWriterWorker`와 `HotRoomFanoutWorker`는 모두 Redis의 **Consumer Group** 기능을 활용하여 `XREADGROUP` 명령어로 메시지를 읽어옵니다. 컨슈머 그룹 덕분에 파드가 여러 개 띄워지더라도 겹치지 않게 메시지가 자동 분배되며, 트래픽 증가로 Lag가 발생하면 K8s HPA를 통해 파드 개수만 늘려주면 즉각적인 스케일아웃이 가능합니다. 무거운 Kafka 클러스터 없이도 강력한 파티셔닝과 컨슈머 분배를 달성했습니다.
+
+**Q2. 워커 코드 내부에 `claimPendingIfDue()`라는 로직이 공통적으로 들어있는데, 이것은 어떤 역할을 하나요?**
+**A2.** 워커가 메시지를 읽어가서 DB 저장이나 브로드캐스트를 완료하기 전에 OOM 등으로 급사(Crash)할 경우를 대비한 **자가 복구(Self-healing)** 로직입니다. 워커들은 주기적으로 `XPENDING`을 호출해 오랫동안 ACK를 받지 못한(즉, 죽은 워커가 물고 있는) 메시지를 찾고, `XCLAIM`을 통해 살아있는 워커가 소유권을 강제로 빼앗아와 재처리하도록 만듭니다. 이를 통해 장애 상황에서도 메시지 유실 없는 'At-least-once' 처리를 보장합니다.
+
+**Q3. 재처리하다가 계속 에러가 나는 불량 메시지(Poison Pill) 때문에 워커가 무한 루프에 빠져 전체 파이프라인이 멈추면 어떻게 하나요?**
+**A3.** 워커 내부의 `handleFailure()` 로직에서 메시지의 재시도 횟수(`deliveryCount`)를 추적합니다. 재시도 횟수가 설정된 `maxDeliveryCount`를 초과하면, 해당 메시지를 에러 전용 스트림인 **DLQ(Dead Letter Queue)** 로 격리(`sendToDeadLetter`)시키고 정상 스트림에서는 `XACK` 처리하여 파이프라인의 병목(Head-of-line blocking)을 해소합니다.
+
+**Q4. FanoutWorker는 왜 단건으로 브로드캐스트하지 않고 `ChatMessageBatch` 객체로 묶어서 퍼블리싱하나요?**
+**A4.** `HotRoomFanoutWorker`는 스트림에서 읽어온 여러 레코드를 `roomId` 단위로 그룹화(`groupBy`)하고 시퀀스(`roomSeq`) 순으로 정렬하여 하나의 Batch 형태로 Redis Pub/Sub에 발행합니다.
+1. 웹소켓 게이트웨이(API 서버) 측에서 이벤트를 받을 때 단건 처리가 아닌 묶음 처리로 오버헤드를 대폭 줄입니다.
+2. 클라이언트 브라우저 측에서도 여러 개의 메시지가 쏟아질 때 건건이 화면 렌더링(DOM Update)을 하지 않고 묶어서 처리해 프론트엔드 성능 저하를 방지하기 위함입니다. (Phase 2에서 정의된 `CHAT_MESSAGE_BATCH` 프로토콜 준수)
+
+---
+
+## 13. 클라이언트 처리 및 프론트엔드 연동 (Client-Side & UI)
+
+**Q1. 클라이언트(프론트엔드)는 수신한 메시지들을 어떻게 화면에 정렬하고, 중복 수신된 메시지는 어떻게 걸러내나요?**
+**A1.** 클라이언트는 서버에서 발급된 고유 식별자인 `messageId`를 Set/Map 같은 자료구조로 관리하여 중복 메시지 수신 시 O(1)의 복잡도로 무시(Deduplication)합니다. 화면 정렬 시에는 메시지 도착 시간(Client Timestamp)이 아닌, 서버에서 부여한 단조 증가 번호인 `roomSeq`를 기준으로 정렬(O(M log M) 또는 삽입 시 O(log M))하여, 네트워크 지연으로 인해 뒤늦게 도착한 메시지도 올바른 순서의 위치에 삽입되도록 구현합니다.
+
+**Q2. 실시간 브로드캐스트 이벤트(`CHAT_MESSAGE_BATCH`)와 본인이 보낸 직후 받는 `MESSAGE_ACCEPTED` ACK 응답을 어떻게 구분해서 처리하나요?**
+**A2.** 두 이벤트 처리는 명확히 분리됩니다.
+- **`MESSAGE_ACCEPTED` (본인 전송에 대한 ACK):** 클라이언트는 로컬 UI의 "전송 중(Pending)" 상태를 "전송 완료"로 즉시 변경하고, 임시 발급했던 `clientMessageId`를 실제 `messageId`와 매핑하는 데 사용합니다.
+- **`CHAT_MESSAGE_BATCH` (브로드캐스트):** 다른 사람의 메시지를 화면에 추가합니다. 만약 자신이 보낸 메시지가 브로드캐스트를 통해서도 들어오면, 앞서 구현한 `messageId` 기반 중복 제거 로직에 의해 자연스럽게 무시되어 채팅창에 두 번 뜨는 것을 방지합니다.
+
+---
+
+## 14. 데이터베이스 파티셔닝 및 데이터 보관 (Partitioning & Archiving)
+
+**Q1. 무한히 쌓이는 채팅 데이터를 단일 PostgreSQL 테이블(`chat_messages`)에 계속 넣으면 언젠가 검색이나 삽입 성능이 저하되지 않나요?**
+**A1.** 이를 방지하기 위해 일자별(또는 특정 단위별)로 테이블을 물리적으로 쪼개는 **PostgreSQL 파티셔닝(Partitioning)** 전략을 적용했습니다. 또한 트래픽 스파이크 시 파티션 생성 락(Lock)이 걸리는 것을 피하기 위해, `Partition Maintenance Job`이 매일 심야에 다음 날자 파티션을 미리 생성(Precreate)해 두어 일관된 O(1) 수준의 삽입 성능을 유지합니다.
+
+**Q2. 보관 주기(100일)가 지난 오래된 채팅 데이터는 어떻게 처리(삭제/보관)되나요?**
+**A2.** 오래된 파티션의 레코드를 `DELETE` 쿼리로 한 줄씩 지우면 극심한 디스크 I/O와 Vacuum 오버헤드가 발생합니다. 따라서 **Partition Archive Job**을 통해 오래된 파티션(테이블)을 통째로 `DROP` 하거나, 필요한 경우 콜드 스토리지(S3 등)로 덤프(Archive)한 뒤 체크섬 메타데이터만 남기는 방식을 사용합니다. 이는 RDBMS의 부담을 획기적으로 줄여주어 고부하 환경에 완벽하게 부합합니다.
+
+---
+
+## 15. 아키텍처: 포트 앤 어댑터 (Ports and Adapters 패턴)
+
+**Q. Phase 4에서 기존 JPA로 짜인 코드를 들어내고 굳이 `MessageWritePort`라는 인터페이스를 도입한 이유는 무엇인가요?**
+**A.** 기존에는 도메인(핵심 비즈니스 로직)이 특정 ORM(JPA) 기술에 강하게 결합되어 있었습니다. `MessageWritePort`라는 추상화된 포트를 도메인 계층에 두고, 밖에서 이를 구현한 `JpaMessageWriteAdapter`(기존 하위 호환/마이그레이션용)와 `PartitionedMessageWriteAdapter`(신규 고성능 JdbcTemplate 기반)를 언제든 갈아 끼울 수 있게 만들었습니다. 결과적으로 핵심 도메인 로직을 한 줄도 수정하지 않고 데이터베이스 저장 기술만 유연하게 전환할 수 있는 **클린 아키텍처(헥사고날 아키텍처)** 의 이점을 100% 취하게 된 것입니다.
