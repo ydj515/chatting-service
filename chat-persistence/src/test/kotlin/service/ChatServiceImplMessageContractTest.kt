@@ -242,6 +242,7 @@ class ChatServiceImplMessageContractTest {
             chatService = ChatServiceImpl(
                 chatRoomRepository = chatRoomRepository,
                 messageRepository = messageRepository,
+                messageReadPort = JpaMessageReadAdapter(messageRepository),
                 chatRoomMemberRepository = chatRoomMemberRepository,
                 userRepository = userRepository,
                 redisMessageBroker = redisMessageBroker,

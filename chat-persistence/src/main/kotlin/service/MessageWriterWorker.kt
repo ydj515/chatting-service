@@ -1,27 +1,26 @@
 package com.chat.persistence.service
 
-import com.chat.domain.model.Message
 import com.chat.persistence.config.ChatWorkerProperties
 import com.chat.persistence.redis.MessageStreamConsumer
 import com.chat.persistence.redis.MessageStreamEnvelope
 import com.chat.persistence.redis.MessageStreamRecord
-import com.chat.persistence.repository.ChatRoomRepository
-import com.chat.persistence.repository.MessageRepository
-import com.chat.persistence.repository.UserRepository
-import org.springframework.dao.DataIntegrityViolationException
+import jakarta.annotation.PostConstruct
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 
 @Service
 class MessageWriterWorker(
     private val messageStreamConsumer: MessageStreamConsumer,
-    private val messageRepository: MessageRepository,
-    private val chatRoomRepository: ChatRoomRepository,
-    private val userRepository: UserRepository,
+    private val messageWritePort: MessageWritePort,
     private val workerProperties: ChatWorkerProperties,
 ) {
     private val logger = LoggerFactory.getLogger(MessageWriterWorker::class.java)
     private var lastPendingClaimAtMillis = 0L
+
+    @PostConstruct
+    fun initialize() {
+        logger.info("Message writer initialized with write port ${messageWritePort.javaClass.name}")
+    }
 
     fun pollAndWrite(): Int {
         val streamKeys = messageStreamConsumer.listStreamKeys()
@@ -85,56 +84,59 @@ class MessageWriterWorker(
     }
 
     private fun writeBatch(records: List<MessageStreamRecord>, consumerGroup: String): Int {
-        val pendingWrites = mutableListOf<PendingWrite>()
+        if (records.isEmpty()) {
+            return 0
+        }
 
+        return try {
+            val result = messageWritePort.write(records.map { it.envelope.toWriteRequest() })
+            if (result.outcomes.size != records.size) {
+                throw IllegalStateException(
+                    "MessageWritePort returned ${result.outcomes.size} outcomes for ${records.size} records",
+                )
+            }
+            if (result.writtenCount == 0) {
+                logger.warn(
+                    "Message writer processed ${records.size} records with no inserts using ${messageWritePort.javaClass.name}",
+                )
+            }
+            records.forEach { record -> acknowledge(record, consumerGroup) }
+            result.writtenCount
+        } catch (e: Exception) {
+            logger.warn(
+                "Message writer batch failed for ${records.size} records; retrying records individually",
+                e,
+            )
+            writeIndividually(records, consumerGroup, e)
+        }
+    }
+
+    private fun writeIndividually(
+        records: List<MessageStreamRecord>,
+        consumerGroup: String,
+        batchFailure: Exception,
+    ): Int {
+        var writtenCount = 0
         records.forEach { record ->
             try {
-                val message = messageForWrite(record.envelope)
-                if (message == null) {
-                    acknowledge(record, consumerGroup)
-                } else {
-                    pendingWrites += PendingWrite(record, message)
+                val result = messageWritePort.write(listOf(record.envelope.toWriteRequest()))
+                if (result.outcomes.size != 1) {
+                    throw IllegalStateException(
+                        "MessageWritePort returned ${result.outcomes.size} outcomes for 1 record",
+                    )
+                }
+                acknowledge(record, consumerGroup)
+                if (result.outcomes.single().written) {
+                    writtenCount += 1
                 }
             } catch (e: Exception) {
                 handleFailure(record, consumerGroup, e)
             }
         }
-
-        if (pendingWrites.isEmpty()) {
-            return 0
+        if (writtenCount == 0) {
+            logger.warn("Message writer individual retry wrote no records after batch failure: ${batchFailure.message}")
         }
-
-        return try {
-            messageRepository.saveAllAndFlush(pendingWrites.map { it.message })
-            pendingWrites.forEach { acknowledge(it.record, consumerGroup) }
-            pendingWrites.size
-        } catch (e: DataIntegrityViolationException) {
-            var written = 0
-            pendingWrites.forEach { pendingWrite ->
-                if (processRecord(pendingWrite.record, consumerGroup) { writeOne(pendingWrite.record.envelope) }) {
-                    written += 1
-                }
-            }
-            written
-        } catch (e: Exception) {
-            pendingWrites.forEach { handleFailure(it.record, consumerGroup, e) }
-            0
-        }
-    }
-
-    private fun processRecord(
-        record: MessageStreamRecord,
-        consumerGroup: String,
-        handler: () -> Boolean,
-    ): Boolean {
-        return try {
-            val written = handler()
-            acknowledge(record, consumerGroup)
-            written
-        } catch (e: Exception) {
-            handleFailure(record, consumerGroup, e)
-            false
-        }
+        return writtenCount
     }
 
     private fun acknowledge(record: MessageStreamRecord, consumerGroup: String) {
@@ -145,70 +147,20 @@ class MessageWriterWorker(
         )
     }
 
-    private fun writeOne(envelope: MessageStreamEnvelope): Boolean {
-        val message = messageForWrite(envelope) ?: return false
-        return try {
-            messageRepository.saveAndFlush(message)
-            true
-        } catch (e: DataIntegrityViolationException) {
-            if (isDuplicate(envelope)) {
-                false
-            } else {
-                throw e
-            }
-        }
-    }
-
-    private fun messageForWrite(envelope: MessageStreamEnvelope): Message? {
-        if (messageRepository.findByMessageId(envelope.messageId).isPresent) {
-            return null
-        }
-
-        if (envelope.clientMessageId != null) {
-            val existingMessage = messageRepository.findByChatRoomIdAndSenderIdAndClientMessageId(
-                chatRoomId = envelope.chatRoomId,
-                senderId = envelope.senderId,
-                clientMessageId = envelope.clientMessageId,
-            )
-            if (existingMessage.isPresent) {
-                return null
-            }
-        }
-
-        return Message(
-            messageId = envelope.messageId,
-            clientMessageId = envelope.clientMessageId,
-            chatRoom = chatRoomRepository.getReferenceById(envelope.chatRoomId),
-            sender = userRepository.getReferenceById(envelope.senderId),
-            type = envelope.messageType,
-            content = envelope.content,
-            sequenceNumber = envelope.sequenceNumber,
-            roomSeq = envelope.roomSeq,
-            streamShard = envelope.streamShard,
-            writeShard = envelope.writeShard,
-            fanoutShard = envelope.fanoutShard,
-            createdAt = envelope.createdAt,
+    private fun MessageStreamEnvelope.toWriteRequest(): MessageWriteRequest {
+        return MessageWriteRequest(
+            messageId = messageId,
+            clientMessageId = clientMessageId,
+            chatRoomId = chatRoomId,
+            senderId = senderId,
+            messageType = messageType,
+            content = content,
+            sequenceNumber = sequenceNumber,
+            roomSeq = roomSeq,
+            streamShard = streamShard,
+            writeShard = writeShard,
+            fanoutShard = fanoutShard,
+            createdAt = createdAt,
         )
     }
-
-    private fun isDuplicate(envelope: MessageStreamEnvelope): Boolean {
-        if (messageRepository.findByMessageId(envelope.messageId).isPresent) {
-            return true
-        }
-
-        if (envelope.clientMessageId == null) {
-            return false
-        }
-
-        return messageRepository.findByChatRoomIdAndSenderIdAndClientMessageId(
-            chatRoomId = envelope.chatRoomId,
-            senderId = envelope.senderId,
-            clientMessageId = envelope.clientMessageId,
-        ).isPresent
-    }
-
-    private data class PendingWrite(
-        val record: MessageStreamRecord,
-        val message: Message,
-    )
 }

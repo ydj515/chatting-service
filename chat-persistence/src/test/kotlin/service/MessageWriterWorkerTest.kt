@@ -1,99 +1,63 @@
 package com.chat.persistence.service
 
-import com.chat.domain.model.ChatRoom
-import com.chat.domain.model.Message
 import com.chat.domain.model.MessageType
-import com.chat.domain.model.User
 import com.chat.persistence.config.ChatWorkerProperties
 import com.chat.persistence.redis.MessageStreamConsumer
 import com.chat.persistence.redis.MessageStreamEnvelope
 import com.chat.persistence.redis.MessageStreamRecord
-import com.chat.persistence.repository.ChatRoomRepository
-import com.chat.persistence.repository.MessageRepository
-import com.chat.persistence.repository.UserRepository
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
-import org.mockito.ArgumentCaptor
-import org.mockito.ArgumentMatchers.any
-import org.mockito.ArgumentMatchers.anyList
-import org.mockito.Mockito.mock
-import org.mockito.Mockito.never
-import org.mockito.Mockito.verify
-import org.mockito.Mockito.`when`
 import java.time.LocalDateTime
-import java.util.Optional
 
 class MessageWriterWorkerTest {
 
     @Test
-    fun `writer worker는 stream consumer group으로 읽은 메시지를 compatibility table에 저장하고 ack한다`() {
+    fun `writer worker는 stream record를 write port 요청으로 변환하고 저장 성공 시 ack한다`() {
         val consumer = FakeMessageStreamConsumer(
             records = listOf(streamRecord()),
         )
-        val fixture = workerFixture(consumer)
-        `when`(fixture.messageRepository.findByMessageId("msg-1")).thenReturn(Optional.empty())
-        `when`(
-            fixture.messageRepository.findByChatRoomIdAndSenderIdAndClientMessageId(
-                10L,
-                7L,
-                "client-1",
-            )
-        ).thenReturn(Optional.empty())
-        `when`(fixture.chatRoomRepository.getReferenceById(10L)).thenReturn(fixture.chatRoom)
-        `when`(fixture.userRepository.getReferenceById(7L)).thenReturn(fixture.sender)
-        `when`(fixture.messageRepository.saveAllAndFlush(anyMessageList())).thenAnswer { invocation ->
-            invocation.arguments[0]
-        }
+        val writePort = FakeMessageWritePort()
+        val worker = workerFixture(consumer, writePort)
 
-        val written = fixture.worker.pollAndWrite()
+        val written = worker.pollAndWrite()
 
         assertEquals(1, written)
         assertEquals(listOf("chat:stream:room:10:shard:0:message-writer"), consumer.ensuredGroups)
         assertEquals(listOf("chat:stream:room:10:shard:0:message-writer:worker-1"), consumer.reads)
         assertEquals(listOf("chat:stream:room:10:shard:0:message-writer:1749790000000-0"), consumer.acked)
 
-        val messagesCaptor = messageListCaptor()
-        verify(fixture.messageRepository).saveAllAndFlush(captureMessageList(messagesCaptor))
-        verify(fixture.messageRepository, never()).saveAndFlush(any(Message::class.java))
-        val savedMessage = messagesCaptor.value.single()
-        assertEquals("msg-1", savedMessage.messageId)
-        assertEquals("client-1", savedMessage.clientMessageId)
-        assertEquals(10L, savedMessage.chatRoom.id)
-        assertEquals(7L, savedMessage.sender.id)
-        assertEquals(MessageType.TEXT, savedMessage.type)
-        assertEquals("hello", savedMessage.content)
-        assertEquals(11L, savedMessage.sequenceNumber)
-        assertEquals(11L, savedMessage.roomSeq)
-        assertEquals(0, savedMessage.streamShard)
-        assertEquals(1, savedMessage.writeShard)
-        assertEquals(2, savedMessage.fanoutShard)
-        assertEquals(LocalDateTime.parse("2026-06-13T12:00:00"), savedMessage.createdAt)
+        val request = writePort.requestBatches.single().single()
+        assertEquals("msg-1", request.messageId)
+        assertEquals("client-1", request.clientMessageId)
+        assertEquals(10L, request.chatRoomId)
+        assertEquals(7L, request.senderId)
+        assertEquals(MessageType.TEXT, request.messageType)
+        assertEquals("hello", request.content)
+        assertEquals(11L, request.sequenceNumber)
+        assertEquals(11L, request.roomSeq)
+        assertEquals(0, request.streamShard)
+        assertEquals(1, request.writeShard)
+        assertEquals(2, request.fanoutShard)
+        assertEquals(LocalDateTime.parse("2026-06-13T12:00:00"), request.createdAt)
     }
 
     @Test
-    fun `writer worker는 이미 저장된 messageId를 다시 저장하지 않고 ack한다`() {
+    fun `writer worker는 write port가 duplicate 결과를 반환하면 저장 건수 없이 ack한다`() {
         val consumer = FakeMessageStreamConsumer(
             records = listOf(streamRecord()),
         )
-        val fixture = workerFixture(consumer)
-        val existing = Message(
-            id = 101L,
-            messageId = "msg-1",
-            clientMessageId = "client-1",
-            chatRoom = fixture.chatRoom,
-            sender = fixture.sender,
-            type = MessageType.TEXT,
-            content = "hello",
-            sequenceNumber = 11L,
-            roomSeq = 11L,
-        )
-        `when`(fixture.messageRepository.findByMessageId("msg-1")).thenReturn(Optional.of(existing))
+        val writePort = FakeMessageWritePort { requests ->
+            MessageWriteResult(
+                outcomes = requests.map { request ->
+                    MessageWriteOutcome(request = request, written = false)
+                },
+            )
+        }
+        val worker = workerFixture(consumer, writePort)
 
-        val written = fixture.worker.pollAndWrite()
+        val written = worker.pollAndWrite()
 
         assertEquals(0, written)
-        verify(fixture.messageRepository, never()).saveAndFlush(any(Message::class.java))
-        verify(fixture.messageRepository, never()).saveAllAndFlush(anyMessageList())
         assertEquals(listOf("chat:stream:room:10:shard:0:message-writer:1749790000000-0"), consumer.acked)
     }
 
@@ -103,22 +67,10 @@ class MessageWriterWorkerTest {
             records = emptyList(),
             claimedRecords = listOf(streamRecord(recordId = "1749790000000-2", deliveryCount = 2)),
         )
-        val fixture = workerFixture(consumer)
-        `when`(fixture.messageRepository.findByMessageId("msg-1")).thenReturn(Optional.empty())
-        `when`(
-            fixture.messageRepository.findByChatRoomIdAndSenderIdAndClientMessageId(
-                10L,
-                7L,
-                "client-1",
-            )
-        ).thenReturn(Optional.empty())
-        `when`(fixture.chatRoomRepository.getReferenceById(10L)).thenReturn(fixture.chatRoom)
-        `when`(fixture.userRepository.getReferenceById(7L)).thenReturn(fixture.sender)
-        `when`(fixture.messageRepository.saveAllAndFlush(anyMessageList())).thenAnswer { invocation ->
-            invocation.arguments[0]
-        }
+        val writePort = FakeMessageWritePort()
+        val worker = workerFixture(consumer, writePort)
 
-        val written = fixture.worker.pollAndWrite()
+        val written = worker.pollAndWrite()
 
         assertEquals(1, written)
         assertEquals(listOf("chat:stream:room:10:shard:0:message-writer:worker-1:30000"), consumer.claims)
@@ -131,62 +83,97 @@ class MessageWriterWorkerTest {
             records = emptyList(),
             claimedRecords = listOf(streamRecord(recordId = "1749790000000-2", deliveryCount = 2)),
         )
-        val fixture = workerFixture(consumer)
-        `when`(fixture.messageRepository.findByMessageId("msg-1")).thenReturn(Optional.of(
-            Message(
-                id = 101L,
-                messageId = "msg-1",
-                clientMessageId = "client-1",
-                chatRoom = fixture.chatRoom,
-                sender = fixture.sender,
-                type = MessageType.TEXT,
-                content = "hello",
-                sequenceNumber = 11L,
-                roomSeq = 11L,
+        val writePort = FakeMessageWritePort { requests ->
+            MessageWriteResult(
+                outcomes = requests.map { request ->
+                    MessageWriteOutcome(request = request, written = false)
+                },
             )
-        ))
+        }
+        val worker = workerFixture(consumer, writePort)
 
-        fixture.worker.pollAndWrite()
-        fixture.worker.pollAndWrite()
+        worker.pollAndWrite()
+        worker.pollAndWrite()
 
         assertEquals(listOf("chat:stream:room:10:shard:0:message-writer:worker-1:30000"), consumer.claims)
     }
 
     @Test
-    fun `writer worker는 재시도 한계를 넘긴 실패 record를 dead letter stream으로 보내고 ack한다`() {
+    fun `writer worker는 재시도 한계를 넘긴 저장 실패 record를 dead letter stream으로 보내고 ack한다`() {
         val consumer = FakeMessageStreamConsumer(
             records = emptyList(),
             claimedRecords = listOf(streamRecord(recordId = "1749790000000-3", deliveryCount = 5)),
         )
-        val fixture = workerFixture(consumer)
-        `when`(fixture.messageRepository.findByMessageId("msg-1")).thenReturn(Optional.empty())
-        `when`(
-            fixture.messageRepository.findByChatRoomIdAndSenderIdAndClientMessageId(
-                10L,
-                7L,
-                "client-1",
-            )
-        ).thenReturn(Optional.empty())
-        `when`(fixture.chatRoomRepository.getReferenceById(10L)).thenReturn(fixture.chatRoom)
-        `when`(fixture.userRepository.getReferenceById(7L)).thenThrow(IllegalStateException("missing user"))
+        val writePort = FakeMessageWritePort {
+            throw IllegalStateException("missing user")
+        }
+        val worker = workerFixture(consumer, writePort)
 
-        val written = fixture.worker.pollAndWrite()
+        val written = worker.pollAndWrite()
 
         assertEquals(0, written)
         assertEquals(listOf("chat:stream:room:10:shard:0:message-writer:1749790000000-3:missing user"), consumer.deadLetters)
         assertEquals(listOf("chat:stream:room:10:shard:0:message-writer:1749790000000-3"), consumer.acked)
-        verify(fixture.messageRepository, never()).saveAndFlush(any(Message::class.java))
     }
 
-    private fun workerFixture(consumer: MessageStreamConsumer): Fixture {
-        val messageRepository = mock(MessageRepository::class.java)
-        val chatRoomRepository = mock(ChatRoomRepository::class.java)
-        val userRepository = mock(UserRepository::class.java)
-        val worker = MessageWriterWorker(
+    @Test
+    fun `writer worker는 batch 실패 후 record별 재시도로 이미 처리된 record를 ack한다`() {
+        val records = listOf(
+            streamRecord(recordId = "1749790000000-1", messageId = "msg-1"),
+            streamRecord(recordId = "1749790000000-2", messageId = "msg-2"),
+            streamRecord(recordId = "1749790000000-3", messageId = "msg-3"),
+        )
+        val consumer = FakeMessageStreamConsumer(records = records)
+        val writePort = FakeMessageWritePort { requests ->
+            if (requests.size > 1) {
+                throw IllegalStateException("batch failed after partial write")
+            }
+
+            when (requests.single().messageId) {
+                "msg-1" -> MessageWriteResult(
+                    outcomes = requests.map { request ->
+                        MessageWriteOutcome(request = request, written = false)
+                    },
+                )
+                "msg-2" -> throw IllegalStateException("missing user")
+                else -> MessageWriteResult(
+                    outcomes = requests.map { request ->
+                        MessageWriteOutcome(request = request, written = true)
+                    },
+                )
+            }
+        }
+        val worker = workerFixture(consumer, writePort)
+
+        val written = worker.pollAndWrite()
+
+        assertEquals(1, written)
+        assertEquals(
+            listOf(
+                "chat:stream:room:10:shard:0:message-writer:1749790000000-1",
+                "chat:stream:room:10:shard:0:message-writer:1749790000000-3",
+            ),
+            consumer.acked,
+        )
+        assertEquals(emptyList<String>(), consumer.deadLetters)
+        assertEquals(
+            listOf(
+                listOf("msg-1", "msg-2", "msg-3"),
+                listOf("msg-1"),
+                listOf("msg-2"),
+                listOf("msg-3"),
+            ),
+            writePort.requestBatches.map { batch -> batch.map { it.messageId } },
+        )
+    }
+
+    private fun workerFixture(
+        consumer: MessageStreamConsumer,
+        writePort: MessageWritePort,
+    ): MessageWriterWorker {
+        return MessageWriterWorker(
             messageStreamConsumer = consumer,
-            messageRepository = messageRepository,
-            chatRoomRepository = chatRoomRepository,
-            userRepository = userRepository,
+            messageWritePort = writePort,
             workerProperties = ChatWorkerProperties(
                 consumerName = "worker-1",
                 writer = ChatWorkerProperties.StreamConsumer(
@@ -198,40 +185,18 @@ class MessageWriterWorkerTest {
                 ),
             ),
         )
-
-        return Fixture(
-            worker = worker,
-            messageRepository = messageRepository,
-            chatRoomRepository = chatRoomRepository,
-            userRepository = userRepository,
-            chatRoom = ChatRoom(
-                id = 10L,
-                name = "room-10",
-                createdBy = User(
-                    id = 1L,
-                    username = "owner",
-                    password = "password",
-                    displayName = "Owner",
-                ),
-            ),
-            sender = User(
-                id = 7L,
-                username = "user7",
-                password = "password",
-                displayName = "User 7",
-            ),
-        )
     }
 
     private fun streamRecord(
         recordId: String = "1749790000000-0",
         deliveryCount: Long = 1,
+        messageId: String = "msg-1",
     ): MessageStreamRecord {
         return MessageStreamRecord(
             streamKey = "chat:stream:room:10:shard:0",
             recordId = recordId,
             envelope = MessageStreamEnvelope(
-                messageId = "msg-1",
+                messageId = messageId,
                 clientMessageId = "client-1",
                 chatRoomId = 10L,
                 senderId = 7L,
@@ -247,6 +212,23 @@ class MessageWriterWorkerTest {
             ),
             deliveryCount = deliveryCount,
         )
+    }
+
+    private class FakeMessageWritePort(
+        private val handler: (List<MessageWriteRequest>) -> MessageWriteResult = { requests ->
+            MessageWriteResult(
+                outcomes = requests.map { request ->
+                    MessageWriteOutcome(request = request, written = true)
+                },
+            )
+        },
+    ) : MessageWritePort {
+        val requestBatches = mutableListOf<List<MessageWriteRequest>>()
+
+        override fun write(requests: List<MessageWriteRequest>): MessageWriteResult {
+            requestBatches += requests
+            return handler(requests)
+        }
     }
 
     private class FakeMessageStreamConsumer(
@@ -300,31 +282,4 @@ class MessageWriterWorkerTest {
             deadLetters += "${record.streamKey}:$consumerGroup:${record.recordId}:$reason"
         }
     }
-
-    @Suppress("UNCHECKED_CAST")
-    private fun messageListCaptor(): ArgumentCaptor<List<Message>> {
-        return ArgumentCaptor.forClass(List::class.java) as ArgumentCaptor<List<Message>>
-    }
-
-    private fun anyMessageList(): List<Message> {
-        anyList<Message>()
-        return uninitialized()
-    }
-
-    private fun captureMessageList(captor: ArgumentCaptor<List<Message>>): List<Message> {
-        captor.capture()
-        return uninitialized()
-    }
-
-    @Suppress("UNCHECKED_CAST")
-    private fun <T> uninitialized(): T = null as T
-
-    private data class Fixture(
-        val worker: MessageWriterWorker,
-        val messageRepository: MessageRepository,
-        val chatRoomRepository: ChatRoomRepository,
-        val userRepository: UserRepository,
-        val chatRoom: ChatRoom,
-        val sender: User,
-    )
 }

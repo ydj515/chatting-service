@@ -94,9 +94,12 @@ class ChatServiceImplMembershipEventTest {
             outboundExecutor = Runnable::run,
         )
 
+        val messageRepository = mock(MessageRepository::class.java)
+
         return ChatServiceImpl(
             chatRoomRepository = chatRoomRepository,
-            messageRepository = mock(MessageRepository::class.java),
+            messageRepository = messageRepository,
+            messageReadPort = JpaMessageReadAdapter(messageRepository),
             chatRoomMemberRepository = chatRoomMemberRepository,
             userRepository = userRepository,
             redisMessageBroker = redisMessageBroker,
@@ -105,7 +108,7 @@ class ChatServiceImplMembershipEventTest {
                 redisProperties = redisProperties,
                 sequenceProperties = MessageSequenceProperties(),
             ),
-            messagePersistenceService = MessagePersistenceService(mock(MessageRepository::class.java)),
+            messagePersistenceService = MessagePersistenceService(messageRepository),
             webSocketSessionManager = webSocketSessionManager,
             messageStreamProducer = mock(MessageStreamProducer::class.java),
         )

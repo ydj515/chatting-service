@@ -53,6 +53,7 @@ docker compose run --rm \
 - replication 상태: `chat_replicator|streaming|async`
 - replica recovery 상태: `true`
 - 오래된 파티션이 없으면 archive worker는 `No partitions are older than retention window.`를 출력합니다.
+- archive 대상 파티션이 있으면 `${partition}.csv`와 `${partition}.csv.metadata.json`이 함께 생성됩니다. metadata에는 `sha256`, `bytes`, `rowCount`, `archivedAt`이 포함됩니다.
 
 ---
 

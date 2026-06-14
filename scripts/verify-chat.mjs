@@ -313,6 +313,18 @@ class RawWebSocket {
   }
 }
 
+function findChatMessage(message, predicate) {
+  if (message.type === 'CHAT_MESSAGE') {
+    return predicate(message) ? message : null;
+  }
+
+  if (message.type === 'CHAT_MESSAGE_BATCH' && Array.isArray(message.messages)) {
+    return message.messages.find((item) => predicate(item)) ?? null;
+  }
+
+  return null;
+}
+
 async function connectTicket(ticket, userIdQuery = null, label = 'session') {
   const url = new URL(wsBaseUrl);
   url.searchParams.set('ticket', ticket);
@@ -412,13 +424,12 @@ async function main() {
       message.chatRoomId === room.id &&
       message.clientMessageId === clientMessageId
     ));
-    const receivedPromise = receiverWs.waitForJson((message) => (
-      message.type === 'CHAT_MESSAGE' &&
-      message.chatRoomId === room.id &&
-      message.senderId === sender.id &&
-      message.content === content &&
-      message.clientMessageId === clientMessageId
-    ));
+    const receivedPromise = receiverWs.waitForJson((message) => findChatMessage(message, (item) => (
+      item.chatRoomId === room.id &&
+      item.senderId === sender.id &&
+      item.content === content &&
+      item.clientMessageId === clientMessageId
+    )));
 
     senderWs.sendJson({
       type: 'SEND_MESSAGE',
@@ -429,7 +440,15 @@ async function main() {
     });
 
     const accepted = await acceptedPromise;
-    const received = await receivedPromise;
+    const received = findChatMessage(await receivedPromise, (item) => (
+      item.chatRoomId === room.id &&
+      item.senderId === sender.id &&
+      item.content === content &&
+      item.clientMessageId === clientMessageId
+    ));
+    if (!received) {
+      throw new Error('Matched WebSocket payload did not contain the expected chat message');
+    }
     if (
       !accepted.messageId ||
       accepted.messageId !== received.messageId ||
@@ -485,13 +504,12 @@ async function main() {
 
     const spoofedUserIdContent = `verify-spoofed-user-id-message-${Date.now()}`;
     const spoofedClientMessageId = `verify-spoofed-client-${Date.now()}`;
-    const spoofedUserIdReceivedPromise = receiverWs.waitForJson((message) => (
-      message.type === 'CHAT_MESSAGE' &&
-      message.chatRoomId === room.id &&
-      message.senderId === sender.id &&
-      message.content === spoofedUserIdContent &&
-      message.clientMessageId === spoofedClientMessageId
-    ));
+    const spoofedUserIdReceivedPromise = receiverWs.waitForJson((message) => findChatMessage(message, (item) => (
+      item.chatRoomId === room.id &&
+      item.senderId === sender.id &&
+      item.content === spoofedUserIdContent &&
+      item.clientMessageId === spoofedClientMessageId
+    )));
     const spoofedUserIdWs = await connectSession(senderLogin, receiver.id, 'spoofed-user-id');
     try {
       spoofedUserIdWs.sendJson({
@@ -515,13 +533,12 @@ async function main() {
 
     const lateJoinContent = `verify-late-join-message-${Date.now()}`;
     const lateJoinClientMessageId = `verify-late-join-client-${Date.now()}`;
-    const lateJoinReceivedPromise = receiverWs.waitForJson((message) => (
-      message.type === 'CHAT_MESSAGE' &&
-      message.chatRoomId === lateRoom.id &&
-      message.senderId === sender.id &&
-      message.content === lateJoinContent &&
-      message.clientMessageId === lateJoinClientMessageId
-    ));
+    const lateJoinReceivedPromise = receiverWs.waitForJson((message) => findChatMessage(message, (item) => (
+      item.chatRoomId === lateRoom.id &&
+      item.senderId === sender.id &&
+      item.content === lateJoinContent &&
+      item.clientMessageId === lateJoinClientMessageId
+    )));
 
     senderWs.sendJson({
       type: 'SEND_MESSAGE',
@@ -531,7 +548,15 @@ async function main() {
       clientMessageId: lateJoinClientMessageId,
     });
 
-    const lateJoinReceived = await lateJoinReceivedPromise;
+    const lateJoinReceived = findChatMessage(await lateJoinReceivedPromise, (item) => (
+      item.chatRoomId === lateRoom.id &&
+      item.senderId === sender.id &&
+      item.content === lateJoinContent &&
+      item.clientMessageId === lateJoinClientMessageId
+    ));
+    if (!lateJoinReceived) {
+      throw new Error('Matched late-join payload did not contain the expected chat message');
+    }
 
     console.log(JSON.stringify({
       ok: true,

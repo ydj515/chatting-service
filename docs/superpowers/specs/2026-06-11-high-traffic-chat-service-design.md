@@ -430,7 +430,7 @@ PostgreSQL 기준 parent table 예시:
 
 ```sql
 CREATE TABLE chat_messages (
-    message_id uuid NOT NULL,
+    message_id text NOT NULL,
     client_message_id text,
     room_id bigint NOT NULL,
     room_seq bigint NOT NULL,
@@ -519,7 +519,9 @@ room_storage_configs
 - updated_at
 ```
 
-이 값은 Redis에 캐시한다. hot room으로 승격되면 shard count를 늘린다. 단, 이미 저장된 과거 bucket의 shard count는 유지하고, 새 bucket부터 변경한다.
+Writer는 `room_storage_configs.current_shard_count`를 읽어 insert 직전 `writeShard = hash(messageId) % currentShardCount`를 계산한다. 설정 row가 없거나 `current_shard_count < 1`이면 1 shard로 fallback한다. `writeShard`는 PostgreSQL 저장 분산용 값이며 Redis Streams의 `streamShard`, WebSocket fan-out의 `fanoutShard`와 독립적으로 유지한다.
+
+이 값은 추후 Redis에 캐시한다. hot room으로 승격되면 shard count를 늘린다. 단, 이미 저장된 과거 bucket의 shard count는 유지하고, 새 bucket부터 변경한다.
 
 ### 7.3 PostgreSQL 검색 인덱스
 
@@ -866,7 +868,7 @@ docker compose run --rm \
 
 - 애플리케이션은 아직 `DB_READ_HOST=postgres-replica`를 사용하지 않는다. read/write datasource 분리는 Phase 4 구현 대상이다.
 - 현재 JPA `messages` 테이블과 신규 `chat_messages` partitioned table은 병행 상태다. 신규 table은 Message Writer Worker phase를 위한 준비물이다.
-- archive worker는 로컬 검증용 CSV archive를 수행한다. 운영에서는 S3 호환 object storage와 무결성 checksum 저장을 추가한다.
+- archive worker는 로컬 검증용 CSV archive와 checksum metadata 저장을 수행한다. 운영에서는 S3 호환 object storage 업로드 경로를 추가한다.
 
 ## 11. 관리자 페이지 설계
 
@@ -1563,6 +1565,7 @@ docker compose logs --tail=200 chat-worker-app-1
 - `GET /chat-rooms/{roomId}/messages`, cursor history, gap fill API를 partitioned table 기준으로 바꾼다.
 - read-only 조회 datasource를 `DB_READ_HOST=postgres-replica`로 분리한다.
 - replica lag가 임계치를 넘으면 사용자 최신 history는 primary fallback, 관리자 장기 조회는 지연 안내 또는 다른 replica fallback 정책을 적용한다.
+- 구현 기본값은 `CHAT_DATASOURCE_READ_ENABLED=true`, `DB_READ_HOST=postgres-replica`, `CHAT_DATASOURCE_READ_LATEST_HISTORY_MAX_REPLICA_LAG=2s`다. read datasource가 비활성화된 로컬/테스트 환경은 primary `JdbcTemplate`를 read alias로 사용한다.
 - partition 생성 job을 추가해 오늘/내일 partition을 미리 만든다.
 - archive worker 결과 파일에 checksum metadata를 추가한다.
 - 기존 JPA `messages` 테이블은 migration source 또는 fallback으로만 남긴다.

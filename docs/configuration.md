@@ -21,9 +21,16 @@
 | `DB_USERNAME` | `chatuser` | PostgreSQL 사용자 |
 | `DB_PASSWORD` | `chatpass` | PostgreSQL 비밀번호 |
 | `DB_REPLICA_HOST_PORT` | `5433` | 호스트에 노출할 PostgreSQL read replica 포트 |
+| `CHAT_DATASOURCE_READ_ENABLED` | `true` | backend가 read-only message history datasource를 별도로 사용할지 여부 |
+| `DB_READ_HOST` | `postgres-replica` | read-only message history datasource host |
+| `DB_READ_PORT` | `5432` | read-only message history datasource port |
+| `DB_READ_USERNAME` | `DB_USERNAME` | read-only datasource 사용자. 미설정 시 primary DB 사용자 사용 |
+| `DB_READ_PASSWORD` | `DB_PASSWORD` | read-only datasource 비밀번호. 미설정 시 primary DB 비밀번호 사용 |
+| `CHAT_DATASOURCE_READ_LATEST_HISTORY_MAX_REPLICA_LAG` | `2s` | 최신 사용자 history 조회가 primary로 fallback되는 read replica lag 임계값 |
 | `POSTGRES_REPLICATION_USER` | `chat_replicator` | PostgreSQL streaming replication 사용자 |
 | `POSTGRES_REPLICATION_PASSWORD` | `replicatorpass` | PostgreSQL streaming replication 비밀번호 |
 | `CHAT_MESSAGE_RETENTION_DAYS` | `100` | 메시지 파티션 보관 기간 |
+| `CHAT_MESSAGE_HASH_PARTITIONS` | `16` | 일별 `chat_messages` partition 아래 생성할 hash subpartition 수 |
 | `CHAT_PARTITION_ARCHIVE_DROP_AFTER_COPY` | `false` | archive 성공 후 partition detach/drop 여부 |
 | `CHAT_PARTITION_ARCHIVE_INTERVAL_SECONDS` | `86400` | archive worker 실행 주기 |
 | `WORKER_ROLES` | `message-writer,fanout,search-projection,archive` | `chat-worker-application`에서 활성화할 worker role 목록 |

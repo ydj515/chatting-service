@@ -136,6 +136,7 @@ class ChatServiceImplCursorPaginationTest {
         return ChatServiceImpl(
             chatRoomRepository = chatRoomRepository,
             messageRepository = messageRepository,
+            messageReadPort = JpaMessageReadAdapter(messageRepository),
             chatRoomMemberRepository = chatRoomMemberRepository,
             userRepository = userRepository,
             redisMessageBroker = redisMessageBroker,

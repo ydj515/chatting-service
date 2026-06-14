@@ -10,7 +10,6 @@ import com.chat.persistence.redis.RedisMessageBroker
 import org.slf4j.LoggerFactory
 import org.springframework.cache.annotation.*
 import org.springframework.data.domain.Page
-import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Pageable
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -31,6 +30,7 @@ import java.util.Base64
 class ChatServiceImpl(
     private val chatRoomRepository: ChatRoomRepository,
     private val messageRepository: MessageRepository,
+    private val messageReadPort: MessageReadPort,
     private val chatRoomMemberRepository: ChatRoomMemberRepository,
     private val userRepository: UserRepository,
     private val redisMessageBroker: RedisMessageBroker,
@@ -47,7 +47,7 @@ class ChatServiceImpl(
     @Cacheable(value = ["chatRooms"], key = "#chatRoom.id")
     private fun chatRoomToDto(chatRoom: ChatRoom): ChatRoomDto {
         val memberCount = chatRoomMemberRepository.countActiveMembersInRoom(chatRoom.id).toInt()
-        val lastMessage = messageRepository.findLatestMessage(chatRoom.id)?.let { messageToDto(it) }
+        val lastMessage = messageReadPort.findLatestMessage(chatRoom.id)
 
         return ChatRoomDto(
             id = chatRoom.id,
@@ -229,8 +229,7 @@ class ChatServiceImpl(
             throw IllegalArgumentException("채팅방 멤버가 아닙니다")
         }
 
-        return messageRepository.findByChatRoomId(roomId, pageable)
-            .map { messageToDto(it) }
+        return messageReadPort.findPageByRoom(roomId, pageable)
     }
 
     override fun getMessagesByCursor(
@@ -256,42 +255,52 @@ class ChatServiceImpl(
             throw IllegalArgumentException("채팅방 멤버가 아닙니다")
         }
 
-        val pageable = PageRequest.of(0, request.limit)
         val cursor = request.cursor // effective roomSeq cursor
 
         val messages = when {
             cursor == null -> {
                 // 커서가 없으면 최신 메시지부터
-                messageRepository.findLatestMessages(request.chatRoomId, pageable)
+                messageReadPort.findLatestMessages(request.chatRoomId, request.limit)
             }
             request.direction == MessageDirection.BEFORE -> {
                 // 커서 이전 메시지들 (과거 방향)
-                messageRepository.findMessagesBefore(request.chatRoomId, cursor, pageable)
+                messageReadPort.findMessagesBefore(request.chatRoomId, cursor, request.limit)
             }
             else -> {
                 // 커서 이후 메시지들 (최신 방향)
-                messageRepository.findMessagesAfter(request.chatRoomId, cursor, pageable)
+                messageReadPort.findMessagesAfter(request.chatRoomId, cursor, request.limit)
                     .reversed() // 시간순 정렬로 변경
             }
         }
 
-        val messageDtos = messages.map { messageToDto(it) }
-
         // 다음/이전 커서는 repository ordering key와 같은 effective roomSeq를 사용한다.
-        val nextCursor = if (messageDtos.isNotEmpty()) messageDtos.last().roomSeq else null
-        val prevCursor = if (messageDtos.isNotEmpty()) messageDtos.first().roomSeq else null
+        val nextCursor = if (messages.isNotEmpty()) messages.last().roomSeq else null
+        val prevCursor = if (messages.isNotEmpty()) messages.first().roomSeq else null
 
         // 추가 데이터 존재 여부 확인
         val hasNext = messages.size == request.limit
         val hasPrev = cursor != null
 
         return MessagePageResponse(
-            messages = messageDtos,
+            messages = messages,
             nextCursor = nextCursor,
             prevCursor = prevCursor,
             hasNext = hasNext,
             hasPrev = hasPrev
         )
+    }
+
+    override fun getMessagesGap(
+        roomId: Long,
+        userId: Long,
+        afterSeq: Long,
+        limit: Int,
+    ): List<MessageDto> {
+        if (!chatRoomMemberRepository.existsByChatRoomIdAndUserIdAndIsActiveTrue(roomId, userId)) {
+            throw IllegalArgumentException("채팅방 멤버가 아닙니다")
+        }
+
+        return messageReadPort.findGapMessages(roomId, afterSeq, limit)
     }
 
     override fun sendMessage(
@@ -309,13 +318,13 @@ class ChatServiceImpl(
             .orElseThrow { IllegalArgumentException("채팅방에 참여하지 않은 사용자입니다.") }
 
         if (requestedClientMessageId != null) {
-            val existingMessage = messageRepository.findByChatRoomIdAndSenderIdAndClientMessageId(
-                chatRoomId = request.chatRoomId,
+            val existingMessage = messageReadPort.findByClientMessageId(
+                roomId = request.chatRoomId,
                 senderId = senderId,
                 clientMessageId = requestedClientMessageId,
-            ).orElse(null)
+            )
             if (existingMessage != null) {
-                return messageToDto(existingMessage)
+                return existingMessage
             }
         }
 

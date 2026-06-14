@@ -5,7 +5,7 @@
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
 CREATE TABLE IF NOT EXISTS chat_messages (
-    message_id uuid NOT NULL,
+    message_id text NOT NULL,
     client_message_id text,
     room_id bigint NOT NULL,
     room_seq bigint NOT NULL,
@@ -23,6 +23,22 @@ CREATE TABLE IF NOT EXISTS chat_messages (
 
 CREATE TABLE IF NOT EXISTS chat_messages_default
 PARTITION OF chat_messages DEFAULT;
+
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'chat_messages'
+          AND column_name = 'message_id'
+          AND data_type = 'uuid'
+    ) THEN
+        ALTER TABLE chat_messages
+        ALTER COLUMN message_id TYPE text USING message_id::text;
+    END IF;
+END;
+$$;
 
 CREATE TABLE IF NOT EXISTS room_storage_configs (
     room_id bigint PRIMARY KEY,
