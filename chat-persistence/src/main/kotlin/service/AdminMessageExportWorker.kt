@@ -1,6 +1,7 @@
 package com.chat.persistence.service
 
 import com.chat.domain.dto.AdminExportMessagesRequest
+import com.chat.domain.dto.AdminMessageCursor
 import com.chat.domain.dto.AdminMessageDto
 import com.chat.domain.dto.AdminMessageSearchMode
 import com.chat.persistence.config.ChatWorkerProperties
@@ -23,6 +24,8 @@ class AdminMessageExportWorker(
     private val objectMapper: ObjectMapper,
     @Value("\${chat.admin.export.directory:build/admin-exports}")
     private val exportDirectory: String,
+    @Value("\${chat.admin.export.chunk-size:1000}")
+    private val exportChunkSize: Int = DEFAULT_EXPORT_CHUNK_SIZE,
 ) {
     private val logger = LoggerFactory.getLogger(AdminMessageExportWorker::class.java)
 
@@ -30,11 +33,11 @@ class AdminMessageExportWorker(
         val job = exportJobRepository.claimNextPending(workerProperties.consumerName) ?: return 0
         return try {
             val request = objectMapper.readValue<AdminExportMessagesRequest>(job.requestJson)
-            val messages = readMessages(request)
-            val outputUri = writeCsv(job.jobId, messages)
+            val exportResult = writeCsv(job.jobId, request)
+            val outputUri = exportResult.outputUri
             exportJobRepository.markCompleted(job.jobId, outputUri)
-            logger.info("Completed admin message export job ${job.jobId} with ${messages.size} rows")
-            messages.size
+            logger.info("Completed admin message export job ${job.jobId} with ${exportResult.exportedRows} rows")
+            exportResult.exportedRows
         } catch (e: Exception) {
             val reason = e.message ?: e.javaClass.simpleName
             exportJobRepository.markFailed(job.jobId, reason)
@@ -43,7 +46,11 @@ class AdminMessageExportWorker(
         }
     }
 
-    private fun readMessages(request: AdminExportMessagesRequest): List<AdminMessageDto> {
+    private fun readMessagesChunk(
+        request: AdminExportMessagesRequest,
+        cursor: AdminMessageCursor?,
+        limit: Int,
+    ): List<AdminMessageDto> {
         val query = request.query?.trim().orEmpty()
         if (query.isNotEmpty()) {
             return messageRepository.searchMessages(
@@ -53,8 +60,8 @@ class AdminMessageExportWorker(
                 from = request.from,
                 to = request.to,
                 senderId = request.senderId,
-                cursor = null,
-                limit = EXPORT_MAX_ROWS,
+                cursor = cursor,
+                limit = limit,
             )
         }
 
@@ -63,15 +70,16 @@ class AdminMessageExportWorker(
             roomId = roomId,
             from = request.from,
             to = request.to,
-            cursor = null,
-            limit = EXPORT_MAX_ROWS,
+            cursor = cursor,
+            limit = limit,
         )
     }
 
-    private fun writeCsv(jobId: String, messages: List<AdminMessageDto>): String {
+    private fun writeCsv(jobId: String, request: AdminExportMessagesRequest): ExportResult {
         val directory = Path.of(exportDirectory)
         Files.createDirectories(directory)
         val output = directory.resolve("$jobId.csv").toAbsolutePath().normalize()
+        var exportedRows = 0
 
         Files.newBufferedWriter(output, StandardCharsets.UTF_8).use { writer ->
             writer.appendLine(
@@ -90,12 +98,40 @@ class AdminMessageExportWorker(
                     "createdAt",
                 ).joinToString(","),
             )
-            messages.forEach { message ->
-                writer.appendLine(message.toCsvRow())
+            var cursor: AdminMessageCursor? = null
+            val chunkLimit = exportChunkSize.coerceIn(1, EXPORT_MAX_ROWS)
+
+            while (exportedRows < EXPORT_MAX_ROWS) {
+                val limit = minOf(chunkLimit, EXPORT_MAX_ROWS - exportedRows)
+                val chunk = readMessagesChunk(request, cursor, limit)
+                if (chunk.isEmpty()) {
+                    break
+                }
+
+                chunk.forEach { message ->
+                    writer.appendLine(message.toCsvRow())
+                }
+                exportedRows += chunk.size
+                cursor = chunk.last().toExportCursor()
+
+                if (chunk.size < limit) {
+                    break
+                }
             }
         }
 
-        return output.toUri().toString()
+        return ExportResult(
+            outputUri = output.toUri().toString(),
+            exportedRows = exportedRows,
+        )
+    }
+
+    private fun AdminMessageDto.toExportCursor(): AdminMessageCursor {
+        return AdminMessageCursor(
+            createdAt = createdAt,
+            roomSeq = roomSeq,
+            messageId = messageId,
+        )
     }
 
     private fun AdminMessageDto.toCsvRow(): String {
@@ -127,6 +163,12 @@ class AdminMessageExportWorker(
     }
 
     private companion object {
+        const val DEFAULT_EXPORT_CHUNK_SIZE = 1_000
         const val EXPORT_MAX_ROWS = 10_000
     }
+
+    private data class ExportResult(
+        val outputUri: String,
+        val exportedRows: Int,
+    )
 }

@@ -64,11 +64,11 @@
 - Modify: `chat-persistence/src/test/kotlin/service/AdminMessageExportWorkerTest.kt`
 - Test: `./gradlew :chat-persistence:test --tests com.chat.persistence.service.AdminMessageExportWorkerTest --no-daemon`
 
-- [ ] Add configurable `exportChunkSize` with default `1000`.
-- [ ] Read room history exports in repeated chunk queries instead of one `EXPORT_MAX_ROWS` query.
-- [ ] Read keyword exports in repeated chunk queries using search cursor pagination.
-- [ ] Write CSV rows incrementally while preserving spreadsheet formula injection protection.
-- [ ] Keep total export cap at `10000` rows.
+- [x] Add configurable `exportChunkSize` with default `1000`.
+- [x] Read room history exports in repeated chunk queries instead of one `EXPORT_MAX_ROWS` query.
+- [x] Read keyword exports in repeated chunk queries using search cursor pagination.
+- [x] Write CSV rows incrementally while preserving spreadsheet formula injection protection.
+- [x] Keep total export cap at `10000` rows.
 
 ## Slice 4: Admin Export Resume Checkpoint
 
