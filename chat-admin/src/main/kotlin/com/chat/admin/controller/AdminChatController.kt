@@ -8,10 +8,12 @@ import com.chat.domain.dto.AdminMessageHistoryRequest
 import com.chat.domain.dto.AdminMessagePageResponse
 import com.chat.domain.dto.AdminMessageSearchRequest
 import com.chat.domain.dto.AdminMessageSearchResponse
+import com.chat.domain.dto.AdminMessageSearchMode
 import com.chat.domain.dto.AdminRoomStatusDto
 import com.chat.domain.service.AdminChatService
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
+import org.springframework.web.server.ResponseStatusException
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
@@ -61,6 +63,7 @@ class AdminChatController(
         @RequestParam(required = false) from: String?,
         @RequestParam(required = false) to: String?,
         @RequestParam(required = false) senderId: Long?,
+        @RequestParam(required = false) mode: String?,
         @RequestParam(required = false) cursor: Long?,
         @RequestParam(required = false) limit: Int?,
     ): AdminMessageSearchResponse {
@@ -69,6 +72,7 @@ class AdminChatController(
             actor = actor,
             request = AdminMessageSearchRequest(
                 query = query,
+                searchMode = parseSearchMode(mode),
                 roomId = roomId,
                 from = parseDateTime(from),
                 to = parseDateTime(to),
@@ -118,6 +122,19 @@ class AdminChatController(
         }
         return runCatching { OffsetDateTime.parse(value).toLocalDateTime() }
             .getOrElse { LocalDateTime.parse(value) }
+    }
+
+    private fun parseSearchMode(value: String?): AdminMessageSearchMode {
+        if (value.isNullOrBlank()) {
+            return AdminMessageSearchMode.FTS
+        }
+        return runCatching { AdminMessageSearchMode.valueOf(value.trim().uppercase()) }
+            .getOrElse {
+                throw ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Unsupported admin search mode: $value",
+                )
+            }
     }
 
     data class AdminExportMessagesHttpRequest(

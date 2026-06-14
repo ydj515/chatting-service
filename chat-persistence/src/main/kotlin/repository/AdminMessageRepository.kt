@@ -1,6 +1,7 @@
 package com.chat.persistence.repository
 
 import com.chat.domain.dto.AdminMessageDto
+import com.chat.domain.dto.AdminMessageSearchMode
 import com.chat.domain.dto.AdminRoomStatusDto
 import com.chat.domain.model.MessageType
 import org.springframework.beans.factory.annotation.Qualifier
@@ -55,6 +56,7 @@ class AdminMessageRepository(
 
     fun searchMessages(
         query: String,
+        searchMode: AdminMessageSearchMode,
         roomId: Long?,
         from: LocalDateTime?,
         to: LocalDateTime?,
@@ -63,10 +65,18 @@ class AdminMessageRepository(
         limit: Int,
     ): List<AdminMessageDto> {
         val normalizedQuery = query.trim()
-        val where = mutableListOf(
-            "(cm.content_tsv @@ plainto_tsquery('simple', ?) OR cm.content ILIKE ?)",
-        )
-        val args = mutableListOf<Any>(normalizedQuery, "%$normalizedQuery%")
+        val where = mutableListOf<String>()
+        val args = mutableListOf<Any>()
+        when (searchMode) {
+            AdminMessageSearchMode.FTS -> {
+                where += "cm.content_tsv @@ plainto_tsquery('simple', ?)"
+                args += normalizedQuery
+            }
+            AdminMessageSearchMode.CONTAINS -> {
+                where += "cm.content ILIKE ?"
+                args += "%$normalizedQuery%"
+            }
+        }
         if (roomId != null) {
             where += "cm.room_id = ?"
             args += roomId

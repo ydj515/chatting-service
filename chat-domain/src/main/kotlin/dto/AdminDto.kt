@@ -26,8 +26,14 @@ data class AdminMessageHistoryRequest(
     val limit: Int,
 )
 
+enum class AdminMessageSearchMode {
+    FTS,
+    CONTAINS,
+}
+
 data class AdminMessageSearchRequest(
     val query: String,
+    val searchMode: AdminMessageSearchMode = AdminMessageSearchMode.FTS,
     val roomId: Long?,
     val from: LocalDateTime?,
     val to: LocalDateTime?,

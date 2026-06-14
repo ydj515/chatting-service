@@ -9,6 +9,7 @@ import com.chat.domain.dto.AdminMessageHistoryRequest
 import com.chat.domain.dto.AdminMessagePageResponse
 import com.chat.domain.dto.AdminMessageSearchRequest
 import com.chat.domain.dto.AdminMessageSearchResponse
+import com.chat.domain.dto.AdminMessageSearchMode
 import com.chat.domain.dto.AdminRoomStatusDto
 import com.chat.domain.model.MessageType
 import com.chat.domain.service.AdminChatService
@@ -72,6 +73,7 @@ class AdminChatControllerTest {
             param("q", "hello")
             param("roomId", "10")
             param("senderId", "7")
+            param("mode", "CONTAINS")
             param("limit", "500")
         }
             .andExpect {
@@ -83,7 +85,22 @@ class AdminChatControllerTest {
         assertEquals("hello", service.searchRequest?.query)
         assertEquals(10L, service.searchRequest?.roomId)
         assertEquals(7L, service.searchRequest?.senderId)
+        assertEquals(AdminMessageSearchMode.CONTAINS, service.searchRequest?.searchMode)
         assertEquals(100, service.searchRequest?.limit)
+    }
+
+    @Test
+    fun `관리자 search 조회는 mode가 없으면 FTS를 기본값으로 사용한다`() {
+        mockMvc.get("/admin/messages/search") {
+            header("X-Admin-Token", "local-admin-token")
+            param("q", "hello")
+            param("roomId", "10")
+        }
+            .andExpect {
+                status { isOk() }
+            }
+
+        assertEquals(AdminMessageSearchMode.FTS, service.searchRequest?.searchMode)
     }
 
     @Test

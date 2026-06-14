@@ -2,6 +2,7 @@ package com.chat.persistence.service
 
 import com.chat.domain.dto.AdminExportMessagesRequest
 import com.chat.domain.dto.AdminMessageDto
+import com.chat.domain.dto.AdminMessageSearchMode
 import com.chat.persistence.config.ChatWorkerProperties
 import com.chat.persistence.repository.AdminExportJobRepository
 import com.chat.persistence.repository.AdminMessageRepository
@@ -46,6 +47,7 @@ class AdminMessageExportWorker(
         if (query.isNotEmpty()) {
             return messageRepository.searchMessages(
                 query = query,
+                searchMode = AdminMessageSearchMode.FTS,
                 roomId = request.roomId,
                 from = request.from,
                 to = request.to,

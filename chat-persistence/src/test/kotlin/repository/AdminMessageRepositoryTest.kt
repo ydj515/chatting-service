@@ -1,6 +1,7 @@
 package com.chat.persistence.repository
 
 import com.chat.domain.dto.AdminMessageDto
+import com.chat.domain.dto.AdminMessageSearchMode
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -57,7 +58,7 @@ class AdminMessageRepositoryTest {
     }
 
     @Test
-    fun `search query는 FTS와 trigram 필터를 parameter로 바인딩한다`() {
+    fun `search query 기본 모드는 FTS 필터만 parameter로 바인딩한다`() {
         val jdbcTemplate = mock(JdbcTemplate::class.java)
         val repository = AdminMessageRepository(jdbcTemplate)
         `when`(
@@ -70,6 +71,7 @@ class AdminMessageRepositoryTest {
 
         repository.searchMessages(
             query = "hello",
+            searchMode = AdminMessageSearchMode.FTS,
             roomId = 10L,
             from = null,
             to = null,
@@ -83,15 +85,50 @@ class AdminMessageRepositoryTest {
             sqlCaptor.capture(),
             anyAdminMessageRowMapper(),
             eq("hello"),
-            eq("%hello%"),
             eq(10L),
             eq(7L),
             eq(25),
         )
         assertTrue(sqlCaptor.value.contains("plainto_tsquery('simple', ?)"))
-        assertTrue(sqlCaptor.value.contains("cm.content ILIKE ?"))
+        assertTrue(!sqlCaptor.value.contains(" OR "))
+        assertTrue(!sqlCaptor.value.contains("cm.content ILIKE ?"))
         assertTrue(sqlCaptor.value.contains("cm.room_id = ?"))
         assertTrue(sqlCaptor.value.contains("cm.sender_id = ?"))
+    }
+
+    @Test
+    fun `search query CONTAINS 모드는 trigram fallback 필터를 parameter로 바인딩한다`() {
+        val jdbcTemplate = mock(JdbcTemplate::class.java)
+        val repository = AdminMessageRepository(jdbcTemplate)
+        `when`(
+            jdbcTemplate.query(
+                anyString(),
+                anyAdminMessageRowMapper(),
+                anyVararg(),
+            ),
+        ).thenReturn(emptyList())
+
+        repository.searchMessages(
+            query = "hello",
+            searchMode = AdminMessageSearchMode.CONTAINS,
+            roomId = 10L,
+            from = null,
+            to = null,
+            senderId = null,
+            cursor = null,
+            limit = 25,
+        )
+
+        val sqlCaptor = ArgumentCaptor.forClass(String::class.java)
+        verify(jdbcTemplate).query(
+            sqlCaptor.capture(),
+            anyAdminMessageRowMapper(),
+            eq("%hello%"),
+            eq(10L),
+            eq(25),
+        )
+        assertTrue(sqlCaptor.value.contains("cm.content ILIKE ?"))
+        assertTrue(!sqlCaptor.value.contains("plainto_tsquery('simple', ?)"))
     }
 
     @Test

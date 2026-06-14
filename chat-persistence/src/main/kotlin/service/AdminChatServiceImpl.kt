@@ -59,6 +59,7 @@ class AdminChatServiceImpl(
         val elapsedNanos = measureNanoTime {
             val rows = messageRepository.searchMessages(
                 query = request.query,
+                searchMode = request.searchMode,
                 roomId = request.roomId,
                 from = request.from,
                 to = request.to,

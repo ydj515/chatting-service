@@ -5,6 +5,7 @@ import com.chat.domain.dto.AdminExportMessagesRequest
 import com.chat.domain.dto.AdminMessageDto
 import com.chat.domain.dto.AdminMessageHistoryRequest
 import com.chat.domain.dto.AdminMessageSearchRequest
+import com.chat.domain.dto.AdminMessageSearchMode
 import com.chat.domain.model.MessageType
 import com.chat.persistence.repository.AdminAuditLogRepository
 import com.chat.persistence.repository.AdminExportJobRepository
@@ -67,6 +68,7 @@ class AdminChatServiceImplTest {
         `when`(
             fixture.messageRepository.searchMessages(
                 query = "hello",
+                searchMode = AdminMessageSearchMode.CONTAINS,
                 roomId = 10L,
                 from = null,
                 to = null,
@@ -80,6 +82,7 @@ class AdminChatServiceImplTest {
             actor = "admin-local",
             request = AdminMessageSearchRequest(
                 query = "hello",
+                searchMode = AdminMessageSearchMode.CONTAINS,
                 roomId = 10L,
                 from = null,
                 to = null,
@@ -100,6 +103,13 @@ class AdminChatServiceImplTest {
             eqString("MESSAGE"),
             eqString("room:10"),
             containsString(""""query":"hello""""),
+        )
+        verify(fixture.auditRepository).record(
+            eqString("admin-local"),
+            eqString("ADMIN_MESSAGE_SEARCH"),
+            eqString("MESSAGE"),
+            eqString("room:10"),
+            containsString(""""searchMode":"CONTAINS""""),
         )
     }
 
