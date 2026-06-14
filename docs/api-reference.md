@@ -43,6 +43,19 @@ OpenAPI 스펙은 [`openapi.yaml`](openapi.yaml)을 참고하세요.
 | `GET` | `/api/chat-rooms/{id}/messages/cursor?cursor=...&limit=50&direction=BEFORE` | `roomSeq` 기준 커서 기반 메시지 페이징 (장기적으로 cursor는 보안 및 유연성을 위해 Long 대신 Base64 등 Opaque 문자열로 변경 검토) |
 | `GET` | `/api/chat-rooms/{id}/messages/gap?afterSeq=12345&limit=50` | 재연결 후 누락 메시지 보정용 gap fill |
 
+### 관리자
+
+관리자 API는 `X-Admin-Token` 헤더가 필요합니다. Phase 5 로컬 기본값은 `local-admin-token`이며 운영 환경에서는 `CHAT_ADMIN_TOKEN`으로 교체합니다.
+
+| 메서드 | 경로 | 설명 |
+| --- | --- | --- |
+| `GET` | `/api/admin/chat-rooms/{roomId}/messages?from=...&to=...&cursor=...&limit=50` | canonical store 기준 방별/시간대별 history 조회 |
+| `GET` | `/api/admin/messages/search?q=hello&roomId=1&senderId=7&from=...&to=...&cursor=...&limit=50` | PostgreSQL FTS/trigram 기반 메시지 검색 |
+| `GET` | `/api/admin/rooms/{roomId}/status` | room heat, bounded live feed, rate limit, replica/search latency 상태 조회 |
+| `POST` | `/api/admin/exports/messages` | 메시지 export job 생성. `admin-export` worker가 pending job을 claim해 CSV 산출물을 생성 |
+
+관리자 프론트는 일반 사용자용 `client`와 분리된 `client-admin` 모듈입니다.
+
 ---
 
 ## WebSocket 프로토콜

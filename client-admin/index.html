@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Chat Admin</title>
+    <link rel="stylesheet" href="./src/styles.css" />
+  </head>
+  <body>
+    <div class="shell">
+      <header class="topbar">
+        <h1>Chat Admin</h1>
+        <div id="notice" class="notice">Ready</div>
+      </header>
+
+      <main class="layout">
+        <form id="admin-form" class="controls">
+          <div class="control-grid">
+            <label>
+              API Base URL
+              <input id="base-url" name="baseUrl" autocomplete="off" />
+            </label>
+            <label>
+              Admin Token
+              <input id="admin-token" name="adminToken" type="password" autocomplete="off" />
+            </label>
+            <label>
+              Room ID
+              <input id="room-id" name="roomId" inputmode="numeric" />
+            </label>
+            <label>
+              Sender ID
+              <input id="sender-id" name="senderId" inputmode="numeric" />
+            </label>
+            <label>
+              From
+              <input id="from" name="from" type="datetime-local" />
+            </label>
+            <label>
+              To
+              <input id="to" name="to" type="datetime-local" />
+            </label>
+            <label>
+              Query
+              <input id="query" name="query" autocomplete="off" />
+            </label>
+            <label>
+              Limit
+              <input id="limit" name="limit" inputmode="numeric" value="50" />
+            </label>
+          </div>
+          <button type="submit">Refresh</button>
+          <button id="export-button" class="secondary" type="button">Create Export</button>
+        </form>
+
+        <section class="content">
+          <section class="panel">
+            <div class="panel-header">
+              <h2>Room Status</h2>
+            </div>
+            <div id="status-grid" class="metrics"></div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <h2>Room History</h2>
+              <span id="history-latency" class="latency">0ms</span>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Seq</th>
+                    <th>Message ID</th>
+                    <th>Sender</th>
+                    <th>Type</th>
+                    <th>Content</th>
+                    <th>Created</th>
+                  </tr>
+                </thead>
+                <tbody id="history-body"></tbody>
+              </table>
+            </div>
+            <div class="panel-actions">
+              <button id="history-next" class="secondary" type="button" disabled>Next</button>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <h2>Message Search</h2>
+              <span id="search-latency" class="latency">0ms</span>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Seq</th>
+                    <th>Message ID</th>
+                    <th>Sender</th>
+                    <th>Type</th>
+                    <th>Content</th>
+                    <th>Created</th>
+                  </tr>
+                </thead>
+                <tbody id="search-body"></tbody>
+              </table>
+            </div>
+            <div class="panel-actions">
+              <button id="search-next" class="secondary" type="button" disabled>Next</button>
+            </div>
+          </section>
+        </section>
+      </main>
+    </div>
+    <script type="module" src="./src/main.mjs"></script>
+  </body>
+</html>

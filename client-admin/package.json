@@ -1,0 +1,10 @@
+{
+  "name": "client-admin",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:unit": "node --test src/services/*.test.mjs",
+    "build": "node scripts/build.mjs"
+  }
+}
