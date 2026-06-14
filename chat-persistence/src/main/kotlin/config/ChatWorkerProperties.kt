@@ -4,7 +4,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties
 
 @ConfigurationProperties(prefix = "chat.worker")
 data class ChatWorkerProperties(
-    val roles: Set<String> = setOf("message-writer", "fanout"),
+    val roles: Set<String> = setOf("message-writer", "fanout", "admin-export"),
     val consumerName: String = "worker-local",
     val pollDelayMillis: Long = 100,
     val writer: StreamConsumer = StreamConsumer(

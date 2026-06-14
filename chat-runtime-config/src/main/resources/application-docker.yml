@@ -131,6 +131,13 @@ chat:
       allowed-methods: ${CHAT_API_CORS_ALLOWED_METHODS:GET,POST,PUT,DELETE,PATCH,OPTIONS}
       allowed-headers: ${CHAT_API_CORS_ALLOWED_HEADERS:*}
       max-age: ${CHAT_API_CORS_MAX_AGE:3600}
+  admin:
+    token: ${CHAT_ADMIN_TOKEN:local-admin-token}
+    actor: ${CHAT_ADMIN_ACTOR:admin-local}
+    default-limit: ${CHAT_ADMIN_DEFAULT_LIMIT:50}
+    max-limit: ${CHAT_ADMIN_MAX_LIMIT:100}
+    export:
+      directory: ${CHAT_ADMIN_EXPORT_DIRECTORY:/tmp/chat-admin-exports}
   websocket:
     endpoint: ${CHAT_WEBSOCKET_ENDPOINT:/ws/chat}
     allowed-origins: ${CHAT_WEBSOCKET_ALLOWED_ORIGINS:*}
@@ -157,7 +164,7 @@ chat:
       dead-letter-stream-key-prefix: ${CHAT_REDIS_STREAMS_DEAD_LETTER_STREAM_KEY_PREFIX:chat:stream:dlq:}
       shard-count: ${CHAT_REDIS_STREAMS_SHARD_COUNT:1}
   worker:
-    roles: ${WORKER_ROLES:message-writer,fanout,search-projection,archive}
+    roles: ${WORKER_ROLES:message-writer,fanout,admin-export}
     consumer-name: ${HOSTNAME:worker-local}
     poll-delay-millis: ${CHAT_WORKER_POLL_DELAY_MILLIS:100}
     writer:

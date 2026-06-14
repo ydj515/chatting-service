@@ -20,6 +20,8 @@ x-chat-app-environment: &chat-app-environment
   REDIS_HOST: redis
   REDIS_PORT: ${REDIS_PORT:-6379}
   REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+  CHAT_ADMIN_TOKEN: ${CHAT_ADMIN_TOKEN:-local-admin-token}
+  CHAT_ADMIN_EXPORT_DIRECTORY: ${CHAT_ADMIN_EXPORT_DIRECTORY:-/tmp/chat-admin-exports}
 
 x-chat-app-healthcheck: &chat-app-healthcheck
   test: [ "CMD-SHELL", "curl -f http://localhost:$${SERVER_PORT:-8080}$${SERVER_CONTEXT_PATH:-/api}/actuator/health" ]
@@ -251,7 +253,7 @@ services:
       <<: *chat-app-environment
       SPRING_APPLICATION_NAME: chat-worker-application
       APP_ROLE: worker
-      WORKER_ROLES: ${WORKER_ROLES:-message-writer,fanout,search-projection,archive}
+      WORKER_ROLES: ${WORKER_ROLES:-message-writer,fanout,admin-export}
     depends_on:
       postgres-primary-setup: { condition: service_completed_successfully }
       redis: { condition: service_healthy }
