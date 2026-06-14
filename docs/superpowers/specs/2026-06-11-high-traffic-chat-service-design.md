@@ -600,7 +600,7 @@ GET /chat-rooms/{roomId}/messages/gap?afterSeq=12345&limit=200
 3. 짧은 시간 범위의 정확 조회는 PostgreSQL partition table을 직접 조회한다.
 4. 키워드가 있으면 초기에는 PostgreSQL FTS/trigram index를 조회한다.
 5. OpenSearch 도입 이후에는 OpenSearch 결과의 `messageId` 목록을 기준으로 PostgreSQL canonical store에서 원본을 재조회한다.
-6. 관리자 화면에 pagination cursor와 함께 반환한다. Admin keyword/global search와 admin room history cursor는 `createdAt + roomSeq + messageId`를 Base64URL로 감싼 opaque cursor를 사용하고, 클라이언트는 값을 해석하지 않고 그대로 재전송한다. 일반 사용자 room history cursor는 별도 compatibility task에서 전환한다.
+6. 관리자 화면에 pagination cursor와 함께 반환한다. Admin keyword/global search와 admin room history cursor는 `createdAt + roomSeq + messageId`를 Base64URL로 감싼 opaque cursor를 사용하고, 클라이언트는 값을 해석하지 않고 그대로 재전송한다. 일반 사용자 room history도 `cursorToken` 기반 opaque cursor를 지원하며, numeric cursor는 public client migration 이후 `2 releases or 30 days` 중 더 긴 기간 동안 호환 유지한다.
 
 대량 export:
 
@@ -1655,7 +1655,7 @@ docker compose run --rm -e CHAT_PARTITION_ARCHIVE_RUN_ONCE=true postgres-partiti
 
 완료 기준:
 
-- 방별/시간대별 조회가 cursor pagination으로 동작한다. (장기적으로 cursor는 DB 식별자 노출 방지 및 유연성 확보를 위해 Long 타입에서 Base64 등 Opaque cursor로 변경을 검토한다)
+- 방별/시간대별 조회가 cursor pagination으로 동작한다. 일반 사용자 history는 opaque `cursorToken`을 우선 사용하고, legacy numeric cursor는 public client migration 이후 `2 releases or 30 days` 중 더 긴 기간 동안 호환 유지한다.
 - 키워드 검색이 `roomId`, `from`, `to`, `senderId` 필터와 함께 동작한다.
 - 1천만 메시지 테스트 데이터에서 관리자 방별/시간대별 조회 p95 1초 목표를 검증한다.
 - 관리자 UI에서 방 상태, bounded live feed 정책, rate limit/slow mode 상태, 검색 latency를 확인할 수 있다.
@@ -1892,4 +1892,4 @@ node scripts/load-chat.mjs --room hot --viewers 10000 --messages-per-sec 10000 -
 
 ## 23. TODO List
 
-- [ ] 장기적으로 cursor API를 Long 타입에서 Base64 등 Opaque cursor 타입으로 변경 검토
+- [x] 일반 사용자 room history cursor API에 opaque `cursorToken` compatibility path 추가

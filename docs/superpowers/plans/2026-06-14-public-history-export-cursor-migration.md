@@ -52,10 +52,10 @@
 - Modify: `docs/openapi.yaml`
 - Test: `node --test scripts/lib/openapiAdminContract.test.mjs scripts/lib/postgresDdl.test.mjs`
 
-- [ ] Document that numeric public history cursors are deprecated but still accepted.
-- [ ] Document the deprecation window: `2 releases or 30 days after public client migration`, whichever is longer.
-- [ ] Document precedence: `cursorToken` wins over numeric `cursor`.
-- [ ] Document rollback behavior: legacy clients can keep using numeric cursor until the deprecation window closes.
+- [x] Document that numeric public history cursors are deprecated but still accepted.
+- [x] Document the deprecation window: `2 releases or 30 days after public client migration`, whichever is longer.
+- [x] Document precedence: `cursorToken` wins over numeric `cursor`.
+- [x] Document rollback behavior: legacy clients can keep using numeric cursor until the deprecation window closes.
 
 ## Slice 3: Admin Export Worker Internal Pagination
 

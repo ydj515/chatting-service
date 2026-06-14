@@ -302,7 +302,7 @@ paths:
             example: 1
         - name: cursor
           in: query
-          description: Deprecated numeric roomSeq cursor for legacy clients. cursorToken takes precedence when both are supplied.
+          description: Deprecated numeric roomSeq cursor for legacy clients. cursorToken takes precedence when both are supplied. Accepted for 2 releases or 30 days after public client migration, whichever is longer.
           schema:
             type: integer
             example: 100
