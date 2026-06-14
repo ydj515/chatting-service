@@ -1,0 +1,131 @@
+package com.chat.persistence.service
+
+import com.chat.domain.dto.AdminExportJobDto
+import com.chat.domain.dto.AdminExportMessagesRequest
+import com.chat.domain.dto.AdminMessageHistoryRequest
+import com.chat.domain.dto.AdminMessagePageResponse
+import com.chat.domain.dto.AdminMessageSearchRequest
+import com.chat.domain.dto.AdminMessageSearchResponse
+import com.chat.domain.dto.AdminRoomStatusDto
+import com.chat.domain.service.AdminChatService
+import com.chat.persistence.repository.AdminAuditLogRepository
+import com.chat.persistence.repository.AdminExportJobRepository
+import com.chat.persistence.repository.AdminMessageRepository
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
+import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import org.springframework.stereotype.Service
+import kotlin.system.measureNanoTime
+
+@Service
+class AdminChatServiceImpl(
+    private val messageRepository: AdminMessageRepository,
+    private val auditLogRepository: AdminAuditLogRepository,
+    private val exportJobRepository: AdminExportJobRepository,
+) : AdminChatService {
+
+    private val objectMapper = jacksonObjectMapper().registerModule(JavaTimeModule())
+
+    override fun getRoomMessages(
+        actor: String,
+        request: AdminMessageHistoryRequest,
+    ): AdminMessagePageResponse {
+        var response: AdminMessagePageResponse
+        val elapsedNanos = measureNanoTime {
+            val rows = messageRepository.findRoomMessages(
+                roomId = request.roomId,
+                from = request.from,
+                to = request.to,
+                cursor = request.cursor,
+                limit = request.limit + 1,
+            )
+            response = rows.toMessagePage(request.limit, 0)
+        }
+        val finalResponse = response.copy(latencyMs = elapsedNanos.toMillis())
+        auditLogRepository.record(
+            actor = actor,
+            action = "ADMIN_ROOM_MESSAGES",
+            targetType = "ROOM",
+            targetId = "room:${request.roomId}",
+            metadataJson = objectMapper.writeValueAsString(request),
+        )
+        return finalResponse
+    }
+
+    override fun searchMessages(
+        actor: String,
+        request: AdminMessageSearchRequest,
+    ): AdminMessageSearchResponse {
+        var response: AdminMessageSearchResponse
+        val elapsedNanos = measureNanoTime {
+            val rows = messageRepository.searchMessages(
+                query = request.query,
+                roomId = request.roomId,
+                from = request.from,
+                to = request.to,
+                senderId = request.senderId,
+                cursor = request.cursor,
+                limit = request.limit + 1,
+            )
+            val page = rows.toMessagePage(request.limit, 0)
+            response = AdminMessageSearchResponse(
+                query = request.query,
+                messages = page.messages,
+                nextCursor = page.nextCursor,
+                hasNext = page.hasNext,
+                latencyMs = page.latencyMs,
+            )
+        }
+        val finalResponse = response.copy(latencyMs = elapsedNanos.toMillis())
+        auditLogRepository.record(
+            actor = actor,
+            action = "ADMIN_MESSAGE_SEARCH",
+            targetType = "MESSAGE",
+            targetId = request.roomId?.let { "room:$it" } ?: "global",
+            metadataJson = objectMapper.writeValueAsString(request),
+        )
+        return finalResponse
+    }
+
+    override fun getRoomStatus(actor: String, roomId: Long): AdminRoomStatusDto {
+        val status = messageRepository.findRoomStatus(roomId)
+        auditLogRepository.record(
+            actor = actor,
+            action = "ADMIN_ROOM_STATUS",
+            targetType = "ROOM",
+            targetId = "room:$roomId",
+            metadataJson = """{"roomId":$roomId}""",
+        )
+        return status
+    }
+
+    override fun createMessageExport(
+        actor: String,
+        request: AdminExportMessagesRequest,
+    ): AdminExportJobDto {
+        val requestJson = objectMapper.writeValueAsString(request)
+        val job = exportJobRepository.create(actor = actor, requestJson = requestJson)
+        auditLogRepository.record(
+            actor = actor,
+            action = "ADMIN_MESSAGE_EXPORT_REQUESTED",
+            targetType = "EXPORT_JOB",
+            targetId = job.jobId,
+            metadataJson = requestJson,
+        )
+        return job
+    }
+
+    private fun List<com.chat.domain.dto.AdminMessageDto>.toMessagePage(
+        limit: Int,
+        latencyMs: Long,
+    ): AdminMessagePageResponse {
+        val messages = take(limit)
+        return AdminMessagePageResponse(
+            messages = messages,
+            nextCursor = if (size > limit) messages.lastOrNull()?.roomSeq else null,
+            hasNext = size > limit,
+            latencyMs = latencyMs,
+        )
+    }
+
+    private fun Long.toMillis(): Long = this / 1_000_000
+}
