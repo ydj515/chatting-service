@@ -92,10 +92,10 @@
 
 ## Final Verification
 
-- [ ] Run `./gradlew test --no-daemon`.
-- [ ] Run `./gradlew check --no-daemon`.
-- [ ] Run `npm --prefix client run build`.
-- [ ] Run `npm --prefix client-admin test`.
-- [ ] Run `npm --prefix client-admin run build`.
-- [ ] Run `node --test scripts/lib/*.test.mjs`.
-- [ ] Run `git diff --check`.
+- [x] Run `./gradlew test --no-daemon`.
+- [x] Run `./gradlew check --no-daemon`.
+- [x] Run `npm --prefix client run build`.
+- [x] Run `npm --prefix client-admin test`.
+- [x] Run `npm --prefix client-admin run build`.
+- [x] Run `node --test scripts/lib/*.test.mjs`.
+- [x] Run `git diff --check`.
