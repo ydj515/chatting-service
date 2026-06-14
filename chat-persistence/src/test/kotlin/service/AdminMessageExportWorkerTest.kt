@@ -2,6 +2,7 @@ package com.chat.persistence.service
 
 import com.chat.domain.dto.AdminMessageDto
 import com.chat.domain.dto.AdminMessageCursor
+import com.chat.domain.dto.AdminMessageCursorCodec
 import com.chat.domain.model.MessageType
 import com.chat.domain.dto.AdminMessageSearchMode
 import com.chat.persistence.config.ChatWorkerProperties
@@ -72,7 +73,7 @@ class AdminMessageExportWorkerTest {
         assertTrue(Files.exists(csvPath))
         val csv = Files.readString(csvPath, Charsets.UTF_8)
         assertTrue(csv.contains("messageId,clientMessageId,roomId"))
-        assertTrue(csv.contains("msg-1,client-1,10,100"))
+        assertTrue(csv.contains("msg-1,client-100,10,100"))
     }
 
     @Test
@@ -185,6 +186,12 @@ class AdminMessageExportWorkerTest {
         assertEquals(3, exportedRows)
         verify(messageRepository).findRoomMessages(10L, null, null, null, 2)
         verify(messageRepository).findRoomMessages(10L, null, null, firstChunkCursor, 2)
+        verify(exportJobRepository).updateCheckpoint(
+            eqString("export-1"),
+            eqString(AdminMessageCursorCodec.encode(firstChunkCursor)),
+            eq(2),
+            org.mockito.ArgumentMatchers.anyString(),
+        )
     }
 
     @Test
@@ -248,7 +255,84 @@ class AdminMessageExportWorkerTest {
         assertEquals(2, exportedRows)
         verify(messageRepository).searchMessages("hello", AdminMessageSearchMode.FTS, 10L, null, null, 7L, null, 2)
         verify(messageRepository).searchMessages("hello", AdminMessageSearchMode.FTS, 10L, null, null, 7L, firstChunkCursor, 2)
+        verify(exportJobRepository).updateCheckpoint(
+            eqString("export-1"),
+            eqString(AdminMessageCursorCodec.encode(firstChunkCursor)),
+            eq(2),
+            org.mockito.ArgumentMatchers.anyString(),
+        )
         verify(exportJobRepository, times(1)).markCompleted(eqString("export-1"), org.mockito.ArgumentMatchers.anyString())
+    }
+
+    @Test
+    fun `export worker는 requeued job의 checkpoint cursor와 output 파일에서 이어 쓴다`(
+        @TempDir tempDir: Path,
+    ) {
+        val exportJobRepository = mock(AdminExportJobRepository::class.java)
+        val messageRepository = mock(AdminMessageRepository::class.java)
+        val worker = AdminMessageExportWorker(
+            exportJobRepository = exportJobRepository,
+            messageRepository = messageRepository,
+            workerProperties = ChatWorkerProperties(consumerName = "worker-1"),
+            objectMapper = testObjectMapper(),
+            exportDirectory = tempDir.toString(),
+            exportChunkSize = 2,
+        )
+        val output = tempDir.resolve("export-1.csv")
+        Files.writeString(
+            output,
+            "messageId,clientMessageId,roomId,roomSeq,writeShard,senderId,senderUsername,senderDisplayName,messageType,content,isDeleted,createdAt\n" +
+                "msg-100,client-100,10,100,0,7,sender,Sender,TEXT,hello,false,2026-06-14T00:00:02Z\n" +
+                "msg-99,client-99,10,99,0,7,sender,Sender,TEXT,hello,false,2026-06-14T00:00:01Z\n",
+            Charsets.UTF_8,
+        )
+        val checkpointCursor = AdminMessageCursor(
+            createdAt = Instant.parse("2026-06-14T00:00:01Z"),
+            roomSeq = 99L,
+            messageId = "msg-99",
+        )
+        val finalCursor = AdminMessageCursor(
+            createdAt = Instant.parse("2026-06-14T00:00:00Z"),
+            roomSeq = 98L,
+            messageId = "msg-98",
+        )
+        `when`(exportJobRepository.claimNextPending("worker-1")).thenReturn(
+            AdminExportJobRecord(
+                jobId = "export-1",
+                actor = "admin-local",
+                requestJson = """{"roomId":10,"from":null,"to":null,"query":null,"senderId":null}""",
+                cursorToken = AdminMessageCursorCodec.encode(checkpointCursor),
+                exportedRows = 2,
+                outputUri = output.toUri().toString(),
+            ),
+        )
+        `when`(
+            messageRepository.findRoomMessages(
+                roomId = 10L,
+                from = null,
+                to = null,
+                cursor = checkpointCursor,
+                limit = 2,
+            ),
+        ).thenReturn(
+            listOf(
+                message(messageId = "msg-98", roomSeq = 98L, createdAt = Instant.parse("2026-06-14T00:00:00Z")),
+            ),
+        )
+
+        val exportedRows = worker.pollAndExport()
+
+        assertEquals(3, exportedRows)
+        val csv = Files.readString(output, Charsets.UTF_8)
+        assertEquals(1, Regex("messageId,clientMessageId,roomId").findAll(csv).count())
+        assertTrue(csv.contains("msg-98,client-98,10,98"))
+        verify(messageRepository).findRoomMessages(10L, null, null, checkpointCursor, 2)
+        verify(exportJobRepository).updateCheckpoint(
+            eqString("export-1"),
+            eqString(AdminMessageCursorCodec.encode(finalCursor)),
+            eq(3),
+            eqString(output.toUri().toString()),
+        )
     }
 
     private fun message(
@@ -260,7 +344,7 @@ class AdminMessageExportWorkerTest {
     ): AdminMessageDto {
         return AdminMessageDto(
             messageId = messageId,
-            clientMessageId = "client-1",
+            clientMessageId = "client-$roomSeq",
             roomId = 10L,
             roomSeq = roomSeq,
             writeShard = 0,

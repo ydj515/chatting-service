@@ -22,3 +22,10 @@ test('message partition DDL includes admin room history cursor ordering indexes'
   assert.match(ddl, /room_id, room_seq DESC, created_at DESC, message_id DESC/);
   assert.match(ddl, /ix_%s_admin_room_history_cursor/);
 });
+
+test('admin export jobs include resume checkpoint columns', () => {
+  assert.match(ddl, /cursor_token text/);
+  assert.match(ddl, /exported_rows integer NOT NULL DEFAULT 0/);
+  assert.match(ddl, /ADD COLUMN IF NOT EXISTS cursor_token text/);
+  assert.match(ddl, /ADD COLUMN IF NOT EXISTS exported_rows integer NOT NULL DEFAULT 0/);
+});

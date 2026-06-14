@@ -2,9 +2,11 @@ package com.chat.persistence.service
 
 import com.chat.domain.dto.AdminExportMessagesRequest
 import com.chat.domain.dto.AdminMessageCursor
+import com.chat.domain.dto.AdminMessageCursorCodec
 import com.chat.domain.dto.AdminMessageDto
 import com.chat.domain.dto.AdminMessageSearchMode
 import com.chat.persistence.config.ChatWorkerProperties
+import com.chat.persistence.repository.AdminExportJobRecord
 import com.chat.persistence.repository.AdminExportJobRepository
 import com.chat.persistence.repository.AdminMessageRepository
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -12,9 +14,11 @@ import com.fasterxml.jackson.module.kotlin.readValue
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
+import java.net.URI
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.StandardOpenOption
 
 @Service
 class AdminMessageExportWorker(
@@ -33,7 +37,7 @@ class AdminMessageExportWorker(
         val job = exportJobRepository.claimNextPending(workerProperties.consumerName) ?: return 0
         return try {
             val request = objectMapper.readValue<AdminExportMessagesRequest>(job.requestJson)
-            val exportResult = writeCsv(job.jobId, request)
+            val exportResult = writeCsv(job, request)
             val outputUri = exportResult.outputUri
             exportJobRepository.markCompleted(job.jobId, outputUri)
             logger.info("Completed admin message export job ${job.jobId} with ${exportResult.exportedRows} rows")
@@ -75,30 +79,27 @@ class AdminMessageExportWorker(
         )
     }
 
-    private fun writeCsv(jobId: String, request: AdminExportMessagesRequest): ExportResult {
+    private fun writeCsv(job: AdminExportJobRecord, request: AdminExportMessagesRequest): ExportResult {
         val directory = Path.of(exportDirectory)
         Files.createDirectories(directory)
-        val output = directory.resolve("$jobId.csv").toAbsolutePath().normalize()
-        var exportedRows = 0
+        val output = resolveOutputPath(job, directory)
+        val outputUri = output.toUri().toString()
+        val appendToCheckpoint = job.outputUri != null && job.exportedRows > 0
+        if (appendToCheckpoint && !Files.exists(output)) {
+            error("Export checkpoint output does not exist: $outputUri")
+        }
+        var exportedRows = job.exportedRows.coerceAtLeast(0)
+        var cursor = AdminMessageCursorCodec.decode(job.cursorToken)
+        val openOptions = if (appendToCheckpoint) {
+            arrayOf(StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.APPEND)
+        } else {
+            arrayOf(StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING)
+        }
 
-        Files.newBufferedWriter(output, StandardCharsets.UTF_8).use { writer ->
-            writer.appendLine(
-                listOf(
-                    "messageId",
-                    "clientMessageId",
-                    "roomId",
-                    "roomSeq",
-                    "writeShard",
-                    "senderId",
-                    "senderUsername",
-                    "senderDisplayName",
-                    "messageType",
-                    "content",
-                    "isDeleted",
-                    "createdAt",
-                ).joinToString(","),
-            )
-            var cursor: AdminMessageCursor? = null
+        Files.newBufferedWriter(output, StandardCharsets.UTF_8, *openOptions).use { writer ->
+            if (!appendToCheckpoint) {
+                writer.appendLine(csvHeader())
+            }
             val chunkLimit = exportChunkSize.coerceIn(1, EXPORT_MAX_ROWS)
 
             while (exportedRows < EXPORT_MAX_ROWS) {
@@ -113,6 +114,13 @@ class AdminMessageExportWorker(
                 }
                 exportedRows += chunk.size
                 cursor = chunk.last().toExportCursor()
+                val cursorToken = AdminMessageCursorCodec.encode(cursor)
+                exportJobRepository.updateCheckpoint(
+                    jobId = job.jobId,
+                    cursorToken = cursorToken,
+                    exportedRows = exportedRows,
+                    outputUri = outputUri,
+                )
 
                 if (chunk.size < limit) {
                     break
@@ -121,9 +129,35 @@ class AdminMessageExportWorker(
         }
 
         return ExportResult(
-            outputUri = output.toUri().toString(),
+            outputUri = outputUri,
             exportedRows = exportedRows,
         )
+    }
+
+    private fun resolveOutputPath(job: AdminExportJobRecord, directory: Path): Path {
+        val outputUri = job.outputUri?.takeIf { it.isNotBlank() }
+        return if (outputUri == null) {
+            directory.resolve("${job.jobId}.csv").toAbsolutePath().normalize()
+        } else {
+            Path.of(URI.create(outputUri)).toAbsolutePath().normalize()
+        }
+    }
+
+    private fun csvHeader(): String {
+        return listOf(
+            "messageId",
+            "clientMessageId",
+            "roomId",
+            "roomSeq",
+            "writeShard",
+            "senderId",
+            "senderUsername",
+            "senderDisplayName",
+            "messageType",
+            "content",
+            "isDeleted",
+            "createdAt",
+        ).joinToString(",")
     }
 
     private fun AdminMessageDto.toExportCursor(): AdminMessageCursor {

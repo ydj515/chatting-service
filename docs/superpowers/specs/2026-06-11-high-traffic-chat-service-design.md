@@ -605,9 +605,13 @@ GET /chat-rooms/{roomId}/messages/gap?afterSeq=12345&limit=200
 대량 export:
 
 1. Admin API가 export job을 만든다.
-2. Export Worker가 PostgreSQL canonical store/Object Storage에서 데이터를 읽는다.
-3. CSV 또는 Parquet 파일을 Object Storage에 저장한다.
-4. 관리자에게 만료 시간이 있는 다운로드 URL을 제공한다.
+2. Export Worker가 PostgreSQL canonical store에서 `exportChunkSize` 단위로 데이터를 읽는다. 기본값은 1,000건이며, 전체 export cap은 10,000건이다.
+3. Worker는 각 chunk를 CSV에 기록한 뒤 `cursor_token`, `exported_rows`, `output_uri` checkpoint를 저장한다.
+4. 실패한 job이 운영자 또는 retry 정책으로 다시 `PENDING`이 되면, Worker는 checkpoint cursor와 기존 output 파일에서 이어 쓴다.
+5. CSV 또는 Parquet 파일을 Object Storage에 저장한다.
+6. 관리자에게 만료 시간이 있는 다운로드 URL을 제공한다.
+
+> Resume checkpoint는 chunk 단위 best-effort 보장이다. 파일 append 성공 후 DB checkpoint 저장 전에 프로세스가 죽는 매우 짧은 구간에서는 재시도 시 마지막 chunk가 중복될 수 있다. 이 경우 운영자는 해당 job을 재생성하거나 output 파일을 정리한 뒤 재시도한다.
 
 ## 9. Hot Room 대응 전략
 

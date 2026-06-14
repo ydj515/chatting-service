@@ -83,12 +83,12 @@
 - Test: `./gradlew :chat-persistence:test --tests com.chat.persistence.repository.AdminExportJobRepositoryTest --tests com.chat.persistence.service.AdminMessageExportWorkerTest --no-daemon`
 - Test: `node --test scripts/lib/postgresDdl.test.mjs`
 
-- [ ] Add `cursor_token` and `exported_rows` checkpoint columns.
-- [ ] Return checkpoint fields when a pending export job is claimed.
-- [ ] Update checkpoint after each successfully written chunk.
-- [ ] Resume from checkpoint when a previously started job is requeued to `PENDING`.
-- [ ] Preserve checkpoint fields when a job fails.
-- [ ] Document resume semantics and the best-effort duplicate risk window between file write and checkpoint update.
+- [x] Add `cursor_token` and `exported_rows` checkpoint columns.
+- [x] Return checkpoint fields when a pending export job is claimed.
+- [x] Update checkpoint after each successfully written chunk.
+- [x] Resume from checkpoint when a previously started job is requeued to `PENDING`.
+- [x] Preserve checkpoint fields when a job fails.
+- [x] Document resume semantics and the best-effort duplicate risk window between file write and checkpoint update.
 
 ## Final Verification
 

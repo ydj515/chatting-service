@@ -62,6 +62,9 @@ class AdminExportJobRepositoryTest {
                 jobId = "export-1",
                 actor = "admin-local",
                 requestJson = """{"roomId":10}""",
+                cursorToken = "cursor-token",
+                exportedRows = 42,
+                outputUri = "file:///tmp/export-1.csv",
             ),
         )
 
@@ -69,6 +72,9 @@ class AdminExportJobRepositoryTest {
 
         assertNotNull(job)
         assertEquals("export-1", job?.jobId)
+        assertEquals("cursor-token", job?.cursorToken)
+        assertEquals(42, job?.exportedRows)
+        assertEquals("file:///tmp/export-1.csv", job?.outputUri)
         val sqlCaptor = ArgumentCaptor.forClass(String::class.java)
         verify(jdbcTemplate).queryForObject(
             sqlCaptor.capture(),
@@ -78,6 +84,31 @@ class AdminExportJobRepositoryTest {
         assertTrue(sqlCaptor.value.contains("FOR UPDATE SKIP LOCKED"))
         assertTrue(sqlCaptor.value.contains("status = 'RUNNING'"))
         assertTrue(sqlCaptor.value.contains("claimed_by = ?"))
+        assertTrue(sqlCaptor.value.contains("cursor_token"))
+        assertTrue(sqlCaptor.value.contains("exported_rows"))
+        assertTrue(sqlCaptor.value.contains("output_uri"))
+    }
+
+    @Test
+    fun `running export job checkpoint는 cursor token과 row count와 output uri를 저장한다`() {
+        val jdbcTemplate = RecordingJdbcTemplate(updatedRows = 1)
+        val repository = AdminExportJobRepository(jdbcTemplate = jdbcTemplate)
+
+        repository.updateCheckpoint(
+            jobId = "export-1",
+            cursorToken = "cursor-token",
+            exportedRows = 100,
+            outputUri = "file:///tmp/export-1.csv",
+        )
+
+        assertEquals(
+            listOf("cursor-token", 100, "file:///tmp/export-1.csv", "export-1"),
+            jdbcTemplate.arguments,
+        )
+        assertTrue(jdbcTemplate.sql.contains("cursor_token = ?"))
+        assertTrue(jdbcTemplate.sql.contains("exported_rows = ?"))
+        assertTrue(jdbcTemplate.sql.contains("output_uri = ?"))
+        assertTrue(jdbcTemplate.sql.contains("AND status = 'RUNNING'"))
     }
 
     @Test
@@ -104,6 +135,8 @@ class AdminExportJobRepositoryTest {
         assertTrue(jdbcTemplate.sql.contains("status = 'FAILED'"))
         assertTrue(jdbcTemplate.sql.contains("WHERE job_id = ?"))
         assertTrue(jdbcTemplate.sql.contains("AND status = 'RUNNING'"))
+        assertTrue(!jdbcTemplate.sql.contains("cursor_token = NULL"))
+        assertTrue(!jdbcTemplate.sql.contains("exported_rows = 0"))
     }
 
     @Test

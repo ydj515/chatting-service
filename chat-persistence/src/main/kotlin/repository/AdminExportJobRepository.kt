@@ -17,6 +17,9 @@ data class AdminExportJobRecord(
     val jobId: String,
     val actor: String,
     val requestJson: String,
+    val cursorToken: String? = null,
+    val exportedRows: Int = 0,
+    val outputUri: String? = null,
 )
 
 @Repository
@@ -75,7 +78,13 @@ class AdminExportJobRepository(
                     FOR UPDATE SKIP LOCKED
                     LIMIT 1
                 )
-                RETURNING job_id, actor, request::text AS request_json
+                RETURNING
+                    job_id,
+                    actor,
+                    request::text AS request_json,
+                    cursor_token,
+                    exported_rows,
+                    output_uri
                 """.trimIndent(),
                 exportJobRowMapper,
                 workerId,
@@ -83,6 +92,31 @@ class AdminExportJobRepository(
         } catch (e: EmptyResultDataAccessException) {
             null
         }
+    }
+
+    fun updateCheckpoint(
+        jobId: String,
+        cursorToken: String,
+        exportedRows: Int,
+        outputUri: String,
+    ) {
+        val updatedRows = jdbcTemplate.update(
+            """
+            UPDATE admin_message_export_jobs
+            SET
+                cursor_token = ?,
+                exported_rows = ?,
+                output_uri = ?,
+                error_message = NULL
+            WHERE job_id = ?
+              AND status = 'RUNNING'
+            """.trimIndent(),
+            cursorToken,
+            exportedRows,
+            outputUri,
+            jobId,
+        )
+        requireRunningTransition(updatedRows, jobId)
     }
 
     fun markCompleted(jobId: String, outputUri: String) {
@@ -134,6 +168,9 @@ class AdminExportJobRepository(
                 jobId = rs.getString("job_id"),
                 actor = rs.getString("actor"),
                 requestJson = rs.getString("request_json"),
+                cursorToken = rs.getString("cursor_token"),
+                exportedRows = rs.getInt("exported_rows"),
+                outputUri = rs.getString("output_uri"),
             )
         }
     }

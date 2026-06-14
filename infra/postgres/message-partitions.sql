@@ -73,6 +73,8 @@ CREATE TABLE IF NOT EXISTS admin_message_export_jobs (
     status varchar(30) NOT NULL,
     request jsonb NOT NULL,
     output_uri text,
+    cursor_token text,
+    exported_rows integer NOT NULL DEFAULT 0,
     error_message text,
     claimed_by text,
     created_at timestamptz NOT NULL DEFAULT now(),
@@ -82,6 +84,12 @@ CREATE TABLE IF NOT EXISTS admin_message_export_jobs (
 
 ALTER TABLE IF EXISTS admin_message_export_jobs
 ADD COLUMN IF NOT EXISTS claimed_by text;
+
+ALTER TABLE IF EXISTS admin_message_export_jobs
+ADD COLUMN IF NOT EXISTS cursor_token text;
+
+ALTER TABLE IF EXISTS admin_message_export_jobs
+ADD COLUMN IF NOT EXISTS exported_rows integer NOT NULL DEFAULT 0;
 
 CREATE INDEX IF NOT EXISTS ix_admin_message_export_jobs_status_created_at
 ON admin_message_export_jobs (status, created_at DESC);
