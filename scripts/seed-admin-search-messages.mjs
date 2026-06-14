@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 import { spawn } from 'node:child_process';
+import { buildPsqlCommand } from './lib/psqlCommand.mjs';
+import { writeChunk } from './lib/streamWrite.mjs';
 
 const args = parseArgs(process.argv.slice(2));
 const messageCount = positiveInteger(args.messages, '--messages');
@@ -7,7 +9,10 @@ const rooms = parseRooms(args.rooms ?? 'normal:1');
 const dryRun = args['dry-run'] === true;
 const batchSize = positiveInteger(args['batch-size'] ?? '10000', '--batch-size');
 const userCount = positiveInteger(args.users ?? '100', '--users');
+const userIdStart = positiveInteger(args['user-id-start'] ?? '1000000', '--user-id-start');
 const seedId = args['seed-id'] ?? Date.now().toString(36);
+const psqlMode = psqlModeValue(args['psql-mode'] ?? 'local');
+const psqlService = args['psql-service'] ?? 'postgres';
 const db = {
   host: args.host ?? process.env.DB_HOST ?? 'localhost',
   port: args.port ?? process.env.DB_PORT ?? '5432',
@@ -16,20 +21,30 @@ const db = {
   password: args.password ?? process.env.DB_PASSWORD ?? 'chatpass',
 };
 
-const plan = buildPlan({ messageCount, rooms, batchSize, userCount, seedId, db });
+const plan = buildPlan({
+  messageCount,
+  rooms,
+  batchSize,
+  userCount,
+  userIdStart,
+  seedId,
+  db,
+  psqlMode,
+  psqlService,
+});
 if (dryRun) {
   console.log(JSON.stringify(plan, null, 2));
   process.exit(0);
 }
 
-await runPsql(db, [
+await runPsql(db, { psqlMode, psqlService }, [
   'CREATE EXTENSION IF NOT EXISTS pg_trgm;',
   "SELECT create_chat_messages_daily_partition(current_date, 16);",
-  seedUsersSql(userCount),
+  seedUsersSql(userCount, userIdStart),
   seedRoomStorageConfigsSql(rooms),
 ].join('\n'));
 
-await copyMessages(db, { messageCount, rooms, userCount, seedId });
+await copyMessages(db, { messageCount, rooms, userCount, userIdStart, seedId, batchSize, psqlMode, psqlService });
 console.log(`Seeded ${messageCount} admin search messages across ${rooms.length} rooms.`);
 
 function parseArgs(argv) {
@@ -57,6 +72,13 @@ function positiveInteger(value, name) {
     throw new Error(`${name} must be a positive integer.`);
   }
   return parsed;
+}
+
+function psqlModeValue(value) {
+  if (value === 'local' || value === 'docker-compose') {
+    return value;
+  }
+  throw new Error('--psql-mode must be one of local, docker-compose.');
 }
 
 function parseRooms(value) {
@@ -94,7 +116,17 @@ function roomIdFor(heat, index) {
   return base + index + 1;
 }
 
-function buildPlan({ messageCount, rooms, batchSize, userCount, seedId, db }) {
+function buildPlan({
+  messageCount,
+  rooms,
+  batchSize,
+  userCount,
+  userIdStart,
+  seedId,
+  db,
+  psqlMode,
+  psqlService,
+}) {
   return {
     messageCount,
     roomCount: rooms.length,
@@ -104,6 +136,7 @@ function buildPlan({ messageCount, rooms, batchSize, userCount, seedId, db }) {
     }, {}),
     batchSize,
     userCount,
+    userIdStart,
     seedId,
     database: {
       host: db.host,
@@ -111,10 +144,15 @@ function buildPlan({ messageCount, rooms, batchSize, userCount, seedId, db }) {
       name: db.name,
       user: db.user,
     },
+    psql: {
+      mode: psqlMode,
+      service: psqlMode === 'docker-compose' ? psqlService : null,
+    },
   };
 }
 
-function seedUsersSql(userCount) {
+function seedUsersSql(userCount, userIdStart) {
+  const userIdEnd = userIdStart + userCount - 1;
   return `
 INSERT INTO app_users (id, username, password, display_name, is_active, created_at, updated_at)
 SELECT
@@ -125,8 +163,12 @@ SELECT
     true,
     now(),
     now()
-FROM generate_series(1, ${userCount}) gs
-ON CONFLICT (username) DO NOTHING;
+FROM generate_series(${userIdStart}, ${userIdEnd}) gs
+ON CONFLICT (id) DO UPDATE
+SET username = EXCLUDED.username,
+    display_name = EXCLUDED.display_name,
+    is_active = true,
+    updated_at = now();
 `;
 }
 
@@ -143,17 +185,15 @@ SET hot_room_policy = EXCLUDED.hot_room_policy,
 `;
 }
 
-function runPsql(db, sql) {
+function runPsql(db, options, sql) {
   return new Promise((resolve, reject) => {
+    const command = buildPsqlCommand(db, {
+      mode: options.psqlMode,
+      service: options.psqlService,
+    });
     const child = spawn(
-      'psql',
-      [
-        '-h', db.host,
-        '-p', String(db.port),
-        '-U', db.user,
-        '-d', db.name,
-        '-v', 'ON_ERROR_STOP=1',
-      ],
+      command.bin,
+      command.args,
       {
         env: { ...process.env, PGPASSWORD: db.password },
         stdio: ['pipe', 'inherit', 'inherit'],
@@ -168,16 +208,25 @@ function runPsql(db, sql) {
   });
 }
 
-function copyMessages(db, { messageCount, rooms, userCount, seedId }) {
+function copyMessages(db, {
+  messageCount,
+  rooms,
+  userCount,
+  userIdStart,
+  seedId,
+  batchSize,
+  psqlMode,
+  psqlService,
+}) {
   return new Promise((resolve, reject) => {
+    const command = buildPsqlCommand(db, {
+      mode: psqlMode,
+      service: psqlService,
+    });
     const child = spawn(
-      'psql',
+      command.bin,
       [
-        '-h', db.host,
-        '-p', String(db.port),
-        '-U', db.user,
-        '-d', db.name,
-        '-v', 'ON_ERROR_STOP=1',
+        ...command.args,
         '-c',
         `COPY chat_messages (
             message_id,
@@ -203,28 +252,40 @@ function copyMessages(db, { messageCount, rooms, userCount, seedId }) {
       else reject(new Error(`psql copy exited with code ${code}`));
     });
 
-    const roomPicker = weightedRoomPicker(rooms);
-    const now = Date.now();
-    for (let i = 1; i <= messageCount; i += 1) {
-      const room = roomPicker(i);
-      const senderId = ((i - 1) % userCount) + 1;
-      const createdAt = new Date(now - (messageCount - i) * 10).toISOString();
-      const content = contentFor(room.heatLevel, i);
-      const row = [
-        `seed_${seedId}_${i}`,
-        `seed_client_${seedId}_${i}`,
-        room.id,
-        i,
-        i % 16,
-        senderId,
-        'TEXT',
-        content,
-        createdAt,
-      ].map(csv).join(',');
-      child.stdin.write(`${row}\n`);
-    }
-    child.stdin.end('\\.\n');
+    writeMessages(child.stdin, { messageCount, rooms, userCount, userIdStart, seedId, batchSize })
+      .then(() => child.stdin.end('\\.\n'))
+      .catch((error) => {
+        child.kill('SIGTERM');
+        reject(error);
+      });
   });
+}
+
+async function writeMessages(stdin, { messageCount, rooms, userCount, userIdStart, seedId, batchSize }) {
+  const roomPicker = weightedRoomPicker(rooms);
+  const now = Date.now();
+  for (let i = 1; i <= messageCount; i += 1) {
+    const room = roomPicker(i);
+    const senderId = userIdStart + ((i - 1) % userCount);
+    const createdAt = new Date(now - (messageCount - i) * 10).toISOString();
+    const content = contentFor(room.heatLevel, i);
+    const row = [
+      `seed_${seedId}_${i}`,
+      `seed_client_${seedId}_${i}`,
+      room.id,
+      i,
+      i % 16,
+      senderId,
+      'TEXT',
+      content,
+      createdAt,
+    ].map(csv).join(',');
+    await writeChunk(stdin, `${row}\n`);
+
+    if (i % batchSize === 0) {
+      console.error(`Seed progress: ${i}/${messageCount}`);
+    }
+  }
 }
 
 function weightedRoomPicker(rooms) {
