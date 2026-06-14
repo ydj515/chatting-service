@@ -1,6 +1,7 @@
 package com.chat.persistence.repository
 
 import com.chat.domain.dto.AdminMessageDto
+import com.chat.domain.dto.AdminMessageSearchCursor
 import com.chat.domain.dto.AdminMessageSearchMode
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -185,6 +186,53 @@ class AdminMessageRepositoryTest {
         )
         assertTrue(sqlCaptor.value.contains("cm.content ILIKE ?"))
         assertTrue(!sqlCaptor.value.contains("plainto_tsquery('simple', ?)"))
+    }
+
+    @Test
+    fun `search query cursor는 정렬 tuple과 같은 key로 predicate를 만든다`() {
+        val jdbcTemplate = mock(JdbcTemplate::class.java)
+        val repository = AdminMessageRepository(jdbcTemplate)
+        val cursor = AdminMessageSearchCursor(
+            createdAt = Instant.parse("2026-06-14T00:00:01Z"),
+            roomSeq = 1001L,
+            messageId = "msg-1001",
+        )
+        `when`(
+            jdbcTemplate.query(
+                anyString(),
+                anyAdminMessageRowMapper(),
+                anyVararg(),
+            ),
+        ).thenReturn(emptyList())
+
+        repository.searchMessages(
+            query = "hello",
+            searchMode = AdminMessageSearchMode.FTS,
+            roomId = null,
+            from = null,
+            to = null,
+            senderId = null,
+            cursor = cursor,
+            limit = 25,
+        )
+
+        val sqlCaptor = ArgumentCaptor.forClass(String::class.java)
+        verify(jdbcTemplate).query(
+            sqlCaptor.capture(),
+            anyAdminMessageRowMapper(),
+            eq("hello"),
+            eq(Timestamp.from(cursor.createdAt)),
+            eq(Timestamp.from(cursor.createdAt)),
+            eq(1001L),
+            eq(Timestamp.from(cursor.createdAt)),
+            eq(1001L),
+            eq("msg-1001"),
+            eq(25),
+        )
+        assertTrue(sqlCaptor.value.contains("cm.created_at < ?"))
+        assertTrue(sqlCaptor.value.contains("cm.created_at = ? AND cm.room_seq < ?"))
+        assertTrue(sqlCaptor.value.contains("cm.created_at = ? AND cm.room_seq = ? AND cm.message_id < ?"))
+        assertTrue(sqlCaptor.value.contains("ORDER BY cm.created_at DESC, cm.room_seq DESC, cm.message_id DESC"))
     }
 
     @Test

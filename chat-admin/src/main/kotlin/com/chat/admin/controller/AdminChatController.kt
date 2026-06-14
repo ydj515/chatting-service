@@ -5,6 +5,7 @@ import com.chat.admin.security.AdminTokenVerifier
 import com.chat.domain.dto.AdminExportJobDto
 import com.chat.domain.dto.AdminExportMessagesRequest
 import com.chat.domain.dto.AdminMessageHistoryRequest
+import com.chat.domain.dto.AdminMessageSearchCursorCodec
 import com.chat.domain.dto.AdminMessagePageResponse
 import com.chat.domain.dto.AdminMessageSearchRequest
 import com.chat.domain.dto.AdminMessageSearchResponse
@@ -66,7 +67,7 @@ class AdminChatController(
         @RequestParam(required = false) to: String?,
         @RequestParam(required = false) senderId: Long?,
         @RequestParam(required = false) mode: String?,
-        @RequestParam(required = false) cursor: Long?,
+        @RequestParam(required = false) cursor: String?,
         @RequestParam(required = false) limit: Int?,
     ): AdminMessageSearchResponse {
         val actor = adminTokenVerifier.requireActor(adminToken)
@@ -79,7 +80,7 @@ class AdminChatController(
                 from = parseDateTime(from),
                 to = parseDateTime(to),
                 senderId = senderId,
-                cursor = cursor,
+                cursor = parseSearchCursor(cursor),
                 limit = boundedLimit(limit),
             ),
         )
@@ -153,6 +154,19 @@ class AdminChatController(
                     "Unsupported admin search mode: $value",
                 )
             }
+    }
+
+    private fun parseSearchCursor(value: String?): String? {
+        val cursor = value?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+        return runCatching {
+            AdminMessageSearchCursorCodec.decode(cursor)
+            cursor
+        }.getOrElse {
+            throw ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "Invalid admin search cursor",
+            )
+        }
     }
 
     data class AdminExportMessagesHttpRequest(

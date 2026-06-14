@@ -10,3 +10,9 @@ test('message partition DDL enables room-aware FTS indexing', () => {
   assert.match(ddl, /USING gin \(room_id int8_ops, content_tsv\)/);
   assert.match(ddl, /ix_%s_room_content_tsv/);
 });
+
+test('message partition DDL includes admin search cursor ordering indexes', () => {
+  assert.match(ddl, /ix_chat_messages_default_admin_search_cursor/);
+  assert.match(ddl, /created_at DESC, room_seq DESC, message_id DESC/);
+  assert.match(ddl, /ix_%s_admin_search_cursor/);
+});

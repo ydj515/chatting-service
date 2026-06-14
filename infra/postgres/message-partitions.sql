@@ -89,6 +89,9 @@ ON admin_message_export_jobs (status, created_at DESC);
 CREATE INDEX IF NOT EXISTS ix_chat_messages_default_room_time
 ON chat_messages_default (room_id, created_at DESC, room_seq DESC);
 
+CREATE INDEX IF NOT EXISTS ix_chat_messages_default_admin_search_cursor
+ON chat_messages_default (created_at DESC, room_seq DESC, message_id DESC);
+
 CREATE INDEX IF NOT EXISTS ix_chat_messages_default_sender_time
 ON chat_messages_default (sender_id, created_at DESC);
 
@@ -154,6 +157,12 @@ BEGIN
         EXECUTE format(
             'CREATE INDEX IF NOT EXISTS %I ON %I (room_id, created_at DESC, room_seq DESC)',
             format('ix_%s_room_time', child_name),
+            child_name
+        );
+
+        EXECUTE format(
+            'CREATE INDEX IF NOT EXISTS %I ON %I (created_at DESC, room_seq DESC, message_id DESC)',
+            format('ix_%s_admin_search_cursor', child_name),
             child_name
         );
 

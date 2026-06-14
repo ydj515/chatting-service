@@ -1,6 +1,7 @@
 package com.chat.persistence.repository
 
 import com.chat.domain.dto.AdminMessageDto
+import com.chat.domain.dto.AdminMessageSearchCursor
 import com.chat.domain.dto.AdminMessageSearchMode
 import com.chat.domain.dto.AdminRoomStatusDto
 import com.chat.domain.model.MessageType
@@ -61,7 +62,7 @@ class AdminMessageRepository(
         from: Instant?,
         to: Instant?,
         senderId: Long?,
-        cursor: Long?,
+        cursor: AdminMessageSearchCursor?,
         limit: Int,
     ): List<AdminMessageDto> {
         val normalizedQuery = query.trim()
@@ -96,8 +97,19 @@ class AdminMessageRepository(
             args += senderId
         }
         if (cursor != null) {
-            where += "cm.room_seq < ?"
-            args += cursor
+            where += """
+                (
+                    cm.created_at < ?
+                    OR (cm.created_at = ? AND cm.room_seq < ?)
+                    OR (cm.created_at = ? AND cm.room_seq = ? AND cm.message_id < ?)
+                )
+            """.trimIndent()
+            args += Timestamp.from(cursor.createdAt)
+            args += Timestamp.from(cursor.createdAt)
+            args += cursor.roomSeq
+            args += Timestamp.from(cursor.createdAt)
+            args += cursor.roomSeq
+            args += cursor.messageId
         }
         if (where.isEmpty()) {
             return emptyList()
@@ -108,7 +120,7 @@ class AdminMessageRepository(
             """
             $BASE_SELECT
             WHERE ${where.joinToString(" AND ")}
-            ORDER BY cm.created_at DESC, cm.room_seq DESC
+            ORDER BY cm.created_at DESC, cm.room_seq DESC, cm.message_id DESC
             LIMIT ?
             """.trimIndent(),
             messageRowMapper,

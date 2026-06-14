@@ -39,7 +39,7 @@ data class AdminMessageSearchRequest(
     val from: Instant?,
     val to: Instant?,
     val senderId: Long?,
-    val cursor: Long?,
+    val cursor: String?,
     val limit: Int,
 )
 
@@ -53,7 +53,7 @@ data class AdminMessagePageResponse(
 data class AdminMessageSearchResponse(
     val query: String,
     val messages: List<AdminMessageDto>,
-    val nextCursor: Long?,
+    val nextCursor: String?,
     val hasNext: Boolean,
     val latencyMs: Long,
 )

@@ -12,10 +12,11 @@ test('admin search URL includes query filters and bounded limit', () => {
     mode: 'CONTAINS',
     roomId: 10,
     senderId: 7,
+    cursor: 'opaque.cursor/with+symbols',
     limit: 500,
   });
 
-  assert.equal(url, '/api/admin/messages/search?q=hello+world&mode=CONTAINS&roomId=10&senderId=7&limit=100');
+  assert.equal(url, '/api/admin/messages/search?q=hello+world&mode=CONTAINS&roomId=10&senderId=7&cursor=opaque.cursor%2Fwith%2Bsymbols&limit=100');
 });
 
 test('admin history URL includes room time range cursor and positive limit', () => {

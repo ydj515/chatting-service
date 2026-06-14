@@ -14,3 +14,17 @@ test('AdminExportMessagesRequest documents roomId or query requirement', () => {
   assert.match(schema, /required: \[roomId\]/);
   assert.match(schema, /required: \[query\]/);
 });
+
+test('admin search cursor is documented as an opaque string', () => {
+  const searchPath = openapi.slice(
+    openapi.indexOf('  /admin/messages/search:'),
+    openapi.indexOf('    get:', openapi.indexOf('  /admin/rooms/{roomId}/status:')),
+  );
+  const searchResponse = openapi.slice(
+    openapi.indexOf('    AdminMessageSearchResponse:'),
+    openapi.indexOf('    AdminRoomStatusDto:'),
+  );
+
+  assert.match(searchPath, /name: cursor[\s\S]*opaque[\s\S]*type: string/);
+  assert.match(searchResponse, /nextCursor:[\s\S]*type: string[\s\S]*nullable: true/);
+});

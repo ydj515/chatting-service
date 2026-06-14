@@ -4,6 +4,8 @@ import com.chat.domain.dto.AdminExportJobDto
 import com.chat.domain.dto.AdminExportMessagesRequest
 import com.chat.domain.dto.AdminMessageHistoryRequest
 import com.chat.domain.dto.AdminMessagePageResponse
+import com.chat.domain.dto.AdminMessageSearchCursor
+import com.chat.domain.dto.AdminMessageSearchCursorCodec
 import com.chat.domain.dto.AdminMessageSearchRequest
 import com.chat.domain.dto.AdminMessageSearchResponse
 import com.chat.domain.dto.AdminRoomStatusDto
@@ -62,16 +64,16 @@ class AdminChatServiceImpl(
                 from = request.from,
                 to = request.to,
                 senderId = request.senderId,
-                cursor = request.cursor,
+                cursor = AdminMessageSearchCursorCodec.decode(request.cursor),
                 limit = request.limit + 1,
             )
-            val page = rows.toMessagePage(request.limit, 0)
+            val messages = rows.take(request.limit)
             response = AdminMessageSearchResponse(
                 query = request.query,
-                messages = page.messages,
-                nextCursor = page.nextCursor,
-                hasNext = page.hasNext,
-                latencyMs = page.latencyMs,
+                messages = messages,
+                nextCursor = if (rows.size > request.limit) messages.lastOrNull()?.toSearchCursor() else null,
+                hasNext = rows.size > request.limit,
+                latencyMs = 0,
             )
         }
         val finalResponse = response.copy(latencyMs = elapsedNanos.toMillis())
@@ -127,4 +129,14 @@ class AdminChatServiceImpl(
     }
 
     private fun Long.toMillis(): Long = this / 1_000_000
+
+    private fun com.chat.domain.dto.AdminMessageDto.toSearchCursor(): String {
+        return AdminMessageSearchCursorCodec.encode(
+            AdminMessageSearchCursor(
+                createdAt = createdAt,
+                roomSeq = roomSeq,
+                messageId = messageId,
+            ),
+        )
+    }
 }

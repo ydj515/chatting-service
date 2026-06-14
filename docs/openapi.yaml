@@ -471,9 +471,10 @@ paths:
             format: date-time
         - name: cursor
           in: query
+          description: opaque admin search cursor returned as nextCursor. Clients must pass it back unchanged.
           schema:
-            type: integer
-            example: 1000
+            type: string
+            example: "djEJMjAyNi0wNi0xNFQwMDowMDowMV..."
         - name: limit
           in: query
           schema:
@@ -936,9 +937,10 @@ components:
           items:
             $ref: '#/components/schemas/AdminMessageDto'
         nextCursor:
-          type: integer
+          type: string
           nullable: true
-          example: 1001
+          description: Opaque cursor for the next search page. Encodes createdAt, roomSeq, and messageId internally.
+          example: "djEJMjAyNi0wNi0xNFQwMDowMDowMV..."
         hasNext:
           type: boolean
           example: true

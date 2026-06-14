@@ -4,6 +4,8 @@ import com.chat.domain.dto.AdminExportJobDto
 import com.chat.domain.dto.AdminExportMessagesRequest
 import com.chat.domain.dto.AdminMessageDto
 import com.chat.domain.dto.AdminMessageHistoryRequest
+import com.chat.domain.dto.AdminMessageSearchCursor
+import com.chat.domain.dto.AdminMessageSearchCursorCodec
 import com.chat.domain.dto.AdminMessageSearchRequest
 import com.chat.domain.dto.AdminMessageSearchMode
 import com.chat.domain.model.MessageType
@@ -79,7 +81,12 @@ class AdminChatServiceImplTest {
                 cursor = null,
                 limit = 2,
             ),
-        ).thenReturn(listOf(message(roomSeq = 9L), message(roomSeq = 8L)))
+        ).thenReturn(
+            listOf(
+                message(messageId = "msg-9", roomSeq = 9L, createdAt = Instant.parse("2026-06-14T00:00:09Z")),
+                message(messageId = "msg-8", roomSeq = 8L, createdAt = Instant.parse("2026-06-14T00:00:08Z")),
+            ),
+        )
 
         val response = fixture.service.searchMessages(
             actor = "admin-local",
@@ -97,7 +104,14 @@ class AdminChatServiceImplTest {
 
         assertEquals("hello", response.query)
         assertEquals(listOf(9L), response.messages.map { it.roomSeq })
-        assertEquals(9L, response.nextCursor)
+        assertEquals(
+            AdminMessageSearchCursor(
+                createdAt = Instant.parse("2026-06-14T00:00:09Z"),
+                roomSeq = 9L,
+                messageId = "msg-9",
+            ),
+            AdminMessageSearchCursorCodec.decode(response.nextCursor),
+        )
         assertEquals(true, response.hasNext)
         assertTrue(response.latencyMs >= 0)
         verify(fixture.auditRepository).record(
@@ -113,6 +127,54 @@ class AdminChatServiceImplTest {
             eqString("MESSAGE"),
             eqString("room:10"),
             containsString(""""searchMode":"CONTAINS""""),
+        )
+    }
+
+    @Test
+    fun `search는 opaque cursor를 decode해서 repository로 전달한다`() {
+        val fixture = fixture()
+        val cursor = AdminMessageSearchCursor(
+            createdAt = Instant.parse("2026-06-14T00:00:01Z"),
+            roomSeq = 1001L,
+            messageId = "msg-1001",
+        )
+        val encodedCursor = AdminMessageSearchCursorCodec.encode(cursor)
+        `when`(
+            fixture.messageRepository.searchMessages(
+                query = "hello",
+                searchMode = AdminMessageSearchMode.FTS,
+                roomId = null,
+                from = null,
+                to = null,
+                senderId = null,
+                cursor = cursor,
+                limit = 51,
+            ),
+        ).thenReturn(emptyList())
+
+        fixture.service.searchMessages(
+            actor = "admin-local",
+            request = AdminMessageSearchRequest(
+                query = "hello",
+                searchMode = AdminMessageSearchMode.FTS,
+                roomId = null,
+                from = null,
+                to = null,
+                senderId = null,
+                cursor = encodedCursor,
+                limit = 50,
+            ),
+        )
+
+        verify(fixture.messageRepository).searchMessages(
+            eqString("hello"),
+            eqSearchMode(AdminMessageSearchMode.FTS),
+            eq(null),
+            eq(null),
+            eq(null),
+            eq(null),
+            eq(cursor),
+            eq(51),
         )
     }
 
@@ -170,9 +232,13 @@ class AdminChatServiceImplTest {
         )
     }
 
-    private fun message(roomSeq: Long): AdminMessageDto {
+    private fun message(
+        roomSeq: Long,
+        messageId: String = "msg-$roomSeq",
+        createdAt: Instant = Instant.parse("2026-06-14T00:00:00Z"),
+    ): AdminMessageDto {
         return AdminMessageDto(
-            messageId = "msg-$roomSeq",
+            messageId = messageId,
             clientMessageId = "client-$roomSeq",
             roomId = 10L,
             roomSeq = roomSeq,
@@ -183,7 +249,7 @@ class AdminChatServiceImplTest {
             messageType = MessageType.TEXT,
             content = "hello",
             isDeleted = false,
-            createdAt = Instant.parse("2026-06-14T00:00:00Z"),
+            createdAt = createdAt,
         )
     }
 
@@ -194,6 +260,11 @@ class AdminChatServiceImplTest {
 
     private fun containsString(value: String): String {
         contains(value)
+        return uninitialized()
+    }
+
+    private fun eqSearchMode(value: AdminMessageSearchMode): AdminMessageSearchMode {
+        eq(value)
         return uninitialized()
     }
 

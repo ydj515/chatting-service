@@ -6,6 +6,8 @@ import com.chat.domain.dto.AdminExportJobDto
 import com.chat.domain.dto.AdminExportMessagesRequest
 import com.chat.domain.dto.AdminMessageDto
 import com.chat.domain.dto.AdminMessageHistoryRequest
+import com.chat.domain.dto.AdminMessageSearchCursor
+import com.chat.domain.dto.AdminMessageSearchCursorCodec
 import com.chat.domain.dto.AdminMessagePageResponse
 import com.chat.domain.dto.AdminMessageSearchRequest
 import com.chat.domain.dto.AdminMessageSearchResponse
@@ -102,12 +104,20 @@ class AdminChatControllerTest {
 
     @Test
     fun `관리자 search 조회는 query와 필터를 service로 전달한다`() {
+        val cursor = AdminMessageSearchCursorCodec.encode(
+            AdminMessageSearchCursor(
+                createdAt = Instant.parse("2026-06-14T00:00:01Z"),
+                roomSeq = 1001L,
+                messageId = "msg-1001",
+            ),
+        )
         mockMvc.get("/admin/messages/search") {
             header("X-Admin-Token", "local-admin-token")
             param("q", "hello")
             param("roomId", "10")
             param("senderId", "7")
             param("mode", "CONTAINS")
+            param("cursor", cursor)
             param("limit", "500")
         }
             .andExpect {
@@ -120,7 +130,22 @@ class AdminChatControllerTest {
         assertEquals(10L, service.searchRequest?.roomId)
         assertEquals(7L, service.searchRequest?.senderId)
         assertEquals(AdminMessageSearchMode.CONTAINS, service.searchRequest?.searchMode)
+        assertEquals(cursor, service.searchRequest?.cursor)
         assertEquals(100, service.searchRequest?.limit)
+    }
+
+    @Test
+    fun `관리자 search 조회는 잘못된 cursor를 400으로 거부한다`() {
+        mockMvc.get("/admin/messages/search") {
+            header("X-Admin-Token", "local-admin-token")
+            param("q", "hello")
+            param("cursor", "not-a-valid-cursor")
+        }
+            .andExpect {
+                status { isBadRequest() }
+            }
+
+        assertEquals(null, service.searchRequest)
     }
 
     @Test
