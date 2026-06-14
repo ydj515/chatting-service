@@ -26,20 +26,9 @@ class PartitionedMessageRepository(
             }
 
             override fun getBatchSize(): Int = requests.size
-        }).mapIndexed { index, updateCount ->
-            toInsertResult(requests[index], updateCount)
+        }).map { updateCount ->
+            toInsertResult(updateCount)
         }
-    }
-
-    private fun existsCanonicalMessage(request: MessageWriteRequest): Boolean {
-        return jdbcTemplate.queryForObject(
-            EXISTS_SQL,
-            Boolean::class.java,
-            request.messageId,
-            request.chatRoomId,
-            request.roomSeq,
-            request.writeShard,
-        ) ?: false
     }
 
     private fun bindInsert(ps: PreparedStatement, request: MessageWriteRequest) {
@@ -54,16 +43,8 @@ class PartitionedMessageRepository(
         ps.setTimestamp(9, Timestamp.valueOf(request.createdAt))
     }
 
-    private fun toInsertResult(request: MessageWriteRequest, updateCount: Int): Boolean {
-        if (updateCount > 0 || updateCount == Statement.SUCCESS_NO_INFO) {
-            return true
-        }
-
-        if (existsCanonicalMessage(request)) {
-            return false
-        }
-
-        throw IllegalStateException("Message insert returned no row and no duplicate was found: ${request.messageId}")
+    private fun toInsertResult(updateCount: Int): Boolean {
+        return updateCount > 0 || updateCount == Statement.SUCCESS_NO_INFO
     }
 
     private companion object {
@@ -81,17 +62,6 @@ class PartitionedMessageRepository(
             )
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT DO NOTHING
-        """.trimIndent()
-
-        val EXISTS_SQL = """
-            SELECT EXISTS (
-                SELECT 1
-                FROM chat_messages
-                WHERE message_id = ?
-                  AND room_id = ?
-                  AND room_seq = ?
-                  AND write_shard = ?
-            )
         """.trimIndent()
     }
 }

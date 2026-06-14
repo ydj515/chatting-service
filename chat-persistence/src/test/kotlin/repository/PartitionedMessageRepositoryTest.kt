@@ -22,16 +22,6 @@ class PartitionedMessageRepositoryTest {
         val jdbcTemplate = mock(JdbcTemplate::class.java)
         val repository = PartitionedMessageRepository(jdbcTemplate)
         `when`(jdbcTemplate.batchUpdate(anyString(), anyBatchSetter())).thenReturn(intArrayOf(1, 0))
-        `when`(
-            jdbcTemplate.queryForObject(
-                anyString(),
-                booleanClass(),
-                anyString(),
-                anyLong(),
-                anyLong(),
-                anyInt(),
-            )
-        ).thenReturn(true)
 
         val results = repository.batchInsert(listOf(writeRequest("msg-1"), writeRequest("msg-2")))
 
@@ -98,21 +88,6 @@ class PartitionedMessageRepositoryTest {
     private fun captureBatchSetter(captor: ArgumentCaptor<BatchPreparedStatementSetter>): BatchPreparedStatementSetter {
         captor.capture()
         return uninitialized()
-    }
-
-    private fun booleanClass(): Class<Boolean> {
-        org.mockito.ArgumentMatchers.eq(Boolean::class.java)
-        return uninitialized()
-    }
-
-    private fun anyLong(): Long {
-        org.mockito.ArgumentMatchers.anyLong()
-        return 0L
-    }
-
-    private fun anyInt(): Int {
-        org.mockito.ArgumentMatchers.anyInt()
-        return 0
     }
 
     @Suppress("UNCHECKED_CAST")

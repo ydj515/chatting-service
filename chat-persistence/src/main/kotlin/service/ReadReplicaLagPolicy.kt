@@ -32,7 +32,10 @@ class ReadReplicaLagPolicy(
         val REPLICA_LAG_MILLIS_SQL = """
             SELECT CASE
                 WHEN pg_is_in_recovery()
-                THEN COALESCE(EXTRACT(EPOCH FROM (now() - pg_last_xact_replay_timestamp())) * 1000, 0)::bigint
+                THEN CASE
+                    WHEN pg_last_wal_receive_lsn() = pg_last_wal_replay_lsn() THEN 0
+                    ELSE COALESCE(EXTRACT(EPOCH FROM (now() - pg_last_xact_replay_timestamp())) * 1000, 0)::bigint
+                END
                 ELSE 0
             END
         """.trimIndent()
