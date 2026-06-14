@@ -8,6 +8,8 @@ Target warm p95: `<= 1000ms`
 
 Final warm result: passed.
 
+Phase 7 gate policy: warm p95 and cold p99 are separate release gates. A cold/post-restart p99 outlier does not get averaged into the warm p95 gate, and a passing warm p95 does not satisfy the cold p99 gate.
+
 ## Conditions
 
 - Date: `2026-06-14`
@@ -83,6 +85,15 @@ App-equivalent timestamp `EXPLAIN (ANALYZE, BUFFERS)` for the room-scoped FTS qu
 
 Phase 5 baseline cold query was about `6.5s`, so cold execution improved materially. The plan still reads many FTS candidates and then filters/rechecks `room_id` and time on several partitions, which explains why warm p95 improved while cold outliers remain visible.
 
+## Phase 7 Gate Split
+
+| Gate | Measurement Window | Threshold | Interpretation |
+| --- | --- | ---: | --- |
+| Warm admin search p95 | steady-state run after explicit warmup | `<= 1000ms` | Operator-facing normal search SLA |
+| Cold admin search p99 | app restart, DB cold-cache, or post-deploy synthetic run | `<= 6000ms` | Deployment/cold-start safety gate |
+
+The `post-restart` run in this document should be evaluated against the cold p99 gate, not the warm p95 gate. The final warm run should be evaluated against the warm p95 gate only.
+
 ## Complexity
 
 - Warm FTS search: approximately `O(log N_text + K log K)` for the matching candidate set that PostgreSQL returns before top-N sorting, where `K` is matched/rechecked rows.
@@ -93,7 +104,7 @@ Phase 5 baseline cold query was about `6.5s`, so cold execution improved materia
 
 > - Local Docker Compose results are regression signals, not production SLO proof.
 > - The first post-restart measurement can include app connection pool warmup, DB page cache warmup, and planner/cache effects.
-> - PostgreSQL FTS still has a cold p99 risk for high-match hot-room queries; Phase 7 should track slow query plans and cold-start p99 separately from steady-state p95.
+> - PostgreSQL FTS still has a cold p99 risk for high-match hot-room queries; Phase 7 tracks slow query plans and cold-start p99 separately from steady-state p95.
 > - `mode=CONTAINS` was not optimized in this task and should be treated as an operator fallback, not the default path.
 
 ## Alternatives

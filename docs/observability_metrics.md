@@ -108,7 +108,7 @@ Reconnect load test 시나리오와 정상 reconnect 실패율 계산 기준은 
 | --- | --- | --- | --- |
 | PostgreSQL partition write latency | Timer | `partitionType` | hot partition write 병목 |
 | PostgreSQL replica lag | Gauge | `replica` | read replica 신선도 |
-| admin search latency | Timer | `queryType` | 관리자 검색 SLA |
+| admin search latency | Timer | `queryType`, `cacheState=warm|cold`, `scenario=steady_state|post_restart|cold_cache` | 관리자 검색 SLA와 cold gate 분리 |
 | admin search scanned partitions | DistributionSummary | `queryType` | 파티션 pruning 여부 |
 | search projection lag | Gauge | `projection` | 검색 projection 지연 |
 | archive worker run duration | Timer | `result` | partition archive 안정성 |
@@ -116,7 +116,8 @@ Reconnect load test 시나리오와 정상 reconnect 실패율 계산 기준은 
 권장 alert 후보:
 
 - replica lag 3초 이상 지속
-- admin search p95가 1초 초과
+- admin search warm p95가 1초 초과
+- admin search cold p99가 6초 초과
 - archive worker 실패
 - 검색 projection lag 증가
 
@@ -143,7 +144,8 @@ Reconnect load test 시나리오와 정상 reconnect 실패율 계산 기준은 
 | writer lag | 정상 상황 3초 이하 |
 | replica lag | 정상 상황 3초 이하 |
 | hot room fan-out | batch fan-out p95 500ms 이하 |
-| admin search | 방별/시간대별 조회 p95 1초 이하 |
+| admin search warm p95 | steady-state warmup 이후 방별/시간대별 조회와 `FTS` 검색 p95 1초 이하 |
+| admin search cold p99 | app 재시작 또는 cold-cache synthetic run에서 방별/시간대별 조회와 `FTS` 검색 p99 6초 이하 |
 | ticket rate limit | 단일 key Lua script 기반 원자 처리, fail-closed, script failure metric 관측 |
 | ticket latency | `chat.websocket.ticket.issue.latency` p95/p99 관측 |
 | ticket reconnect success | 정상 reconnect ticket 발급 성공률 rolling 15분 `99.9%` 이상 |
