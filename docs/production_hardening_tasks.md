@@ -199,3 +199,68 @@ mise run verify:chat
 | app 재생성 후 nginx restart | 단순하고 즉시 효과가 있다 | nginx 연결이 재시작된다 | Compose local/staging에 적합 |
 | nginx dynamic DNS 설정 | nginx 재시작 빈도를 줄일 수 있다 | 설정 복잡도와 검증 비용이 늘어난다 | 필요 시 적용 |
 | Kubernetes Service/Ingress | 운영 표준에 가깝고 endpoint 추상화가 강하다 | 클러스터 운영 비용이 있다 | 최종 운영 환경 권장 |
+
+---
+
+## 3. Admin Export Atomic Manifest 전환
+
+### 상태
+
+- 분류: Reliability / Data Correctness Hardening
+- 적용 시점: Production Hardening task
+- 현재 구현 상태: 미적용. 현재는 chunk pagination + cursor checkpoint resume까지 완료
+- 관련 문서: [export_atomic_manifest_hardening.md](./export_atomic_manifest_hardening.md)
+
+### 문제
+
+현재 admin export worker는 chunk를 CSV 파일에 append한 뒤 DB checkpoint를 갱신한다. 이 구조는 worker crash 후 재개할 수 있지만 다음 짧은 장애 창은 남는다.
+
+```text
+chunk append 성공
+  -> DB checkpoint 저장 전 worker crash
+  -> job requeue
+  -> 이전 checkpoint부터 재시도
+  -> 마지막 chunk 중복 append 가능
+```
+
+이는 데이터 유실 문제가 아니라 duplicate 가능성 문제다. 현재 Phase 5/7 완료 조건에는 포함하지 않고, export 결과가 감사/법무/정산/외부 제출 자료가 되는 시점에 hardening gate로 승격한다.
+
+### 목표 구현
+
+Atomic manifest 방식으로 part file 작성과 final output 공개를 분리한다.
+
+1. chunk를 `part-000001.csv` 같은 독립 part file로 작성한다.
+2. part write와 checksum 검증이 끝난 뒤 manifest에 part metadata를 기록한다.
+3. resume 시 manifest에 기록된 complete part는 재사용하고, manifest에 없는 임시 파일은 폐기한다.
+4. 모든 part가 완료되면 manifest 기준으로 final CSV를 assemble한다.
+5. final object publish를 idempotent하게 처리한 뒤 job을 `COMPLETED`로 전환한다.
+
+### 완료 기준
+
+- chunk write와 checkpoint 저장 사이 crash가 발생해도 complete part 중복이 생기지 않는다.
+- manifest에 없는 partial file은 resume 대상에서 제외된다.
+- final CSV는 manifest에 기록된 complete part만 포함한다.
+- final output publish는 idempotent하다.
+- manifest checksum mismatch가 발생하면 job은 fail-closed로 실패한다.
+- retry/requeue 후 같은 job을 여러 번 실행해도 최종 row count가 변하지 않는다.
+
+### 복잡도
+
+- 시간 복잡도: export 대상 `M`건 기준 `O(M)`
+- 공간 복잡도: worker memory 기준 `O(chunkSize)`, manifest metadata 기준 `O(partCount)`
+
+### 주의사항
+
+> - atomic manifest 전환은 현재 완료 조건이 아니라 Production Hardening 후보이다.
+> - Object Storage는 일반 파일 시스템 rename과 semantics가 다르므로 conditional put, versioned object, staging path 전략을 별도 검증해야 한다.
+> - part cleanup 정책이 없으면 failed/retried job의 임시 파일이 누적될 수 있다.
+> - 정확성은 좋아지지만 manifest, checksum, lifecycle 관리로 운영 복잡도가 늘어난다.
+
+### 대안
+
+| 대안 | 장점 | 단점 | 판단 |
+| --- | --- | --- | --- |
+| 현재 chunk checkpoint 유지 | 단순하고 이미 구현되어 있다 | 파일 append 후 checkpoint 전 crash 시 중복 가능 | 현재 기본값 |
+| DB row-level export ledger | 중복 방지 강함 | export row 수만큼 DB write가 늘어 부담이 크다 | 비추천 |
+| manifest + part file 방식 | resume 안정성과 duplicate 방지가 좋다 | Object Storage/manifest 운영 복잡도 증가 | hardening 후보 |
+| 실패 시 final file 전체 재생성 | 구현이 비교적 단순하다 | 대량 export retry 비용이 크다 | 소규모 export에만 적합 |

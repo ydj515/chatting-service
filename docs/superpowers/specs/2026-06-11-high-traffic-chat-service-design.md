@@ -611,7 +611,7 @@ GET /chat-rooms/{roomId}/messages/gap?afterSeq=12345&limit=200
 5. CSV 또는 Parquet 파일을 Object Storage에 저장한다.
 6. 관리자에게 만료 시간이 있는 다운로드 URL을 제공한다.
 
-> Resume checkpoint는 chunk 단위 best-effort 보장이다. 파일 append 성공 후 DB checkpoint 저장 전에 프로세스가 죽는 매우 짧은 구간에서는 재시도 시 마지막 chunk가 중복될 수 있다. 이 경우 운영자는 해당 job을 재생성하거나 output 파일을 정리한 뒤 재시도한다.
+> Resume checkpoint는 chunk 단위 best-effort 보장이다. 파일 append 성공 후 DB checkpoint 저장 전에 프로세스가 죽는 매우 짧은 구간에서는 재시도 시 마지막 chunk가 중복될 수 있다. 이 경우 운영자는 해당 job을 재생성하거나 output 파일을 정리한 뒤 재시도한다. 이 duplicate window를 더 줄이는 atomic manifest 방식은 현재 완료 조건이 아니라 [Production Hardening task](../../export_atomic_manifest_hardening.md)로 분리한다.
 
 ## 9. Hot Room 대응 전략
 
