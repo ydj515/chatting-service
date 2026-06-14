@@ -2,6 +2,8 @@ package com.chat.persistence.service
 
 import com.chat.domain.dto.AdminExportJobDto
 import com.chat.domain.dto.AdminExportMessagesRequest
+import com.chat.domain.dto.AdminMessageCursor
+import com.chat.domain.dto.AdminMessageCursorCodec
 import com.chat.domain.dto.AdminMessageDto
 import com.chat.domain.dto.AdminMessageHistoryRequest
 import com.chat.domain.dto.AdminMessageSearchCursor
@@ -40,7 +42,11 @@ class AdminChatServiceImplTest {
                 limit = 3,
             ),
         ).thenReturn(
-            listOf(message(roomSeq = 12L), message(roomSeq = 11L), message(roomSeq = 10L)),
+            listOf(
+                message(messageId = "msg-12", roomSeq = 12L, createdAt = Instant.parse("2026-06-14T00:00:12Z")),
+                message(messageId = "msg-11", roomSeq = 11L, createdAt = Instant.parse("2026-06-14T00:00:11Z")),
+                message(messageId = "msg-10", roomSeq = 10L, createdAt = Instant.parse("2026-06-14T00:00:10Z")),
+            ),
         )
 
         val response = fixture.service.getRoomMessages(
@@ -55,7 +61,14 @@ class AdminChatServiceImplTest {
         )
 
         assertEquals(listOf(12L, 11L), response.messages.map { it.roomSeq })
-        assertEquals(11L, response.nextCursor)
+        assertEquals(
+            AdminMessageCursor(
+                createdAt = Instant.parse("2026-06-14T00:00:11Z"),
+                roomSeq = 11L,
+                messageId = "msg-11",
+            ),
+            AdminMessageCursorCodec.decode(response.nextCursor),
+        )
         assertEquals(true, response.hasNext)
         assertTrue(response.latencyMs >= 0)
         verify(fixture.auditRepository).record(
@@ -64,6 +77,45 @@ class AdminChatServiceImplTest {
             eqString("ROOM"),
             eqString("room:10"),
             containsString(""""roomId":10"""),
+        )
+    }
+
+    @Test
+    fun `history는 opaque cursor를 decode해서 repository로 전달한다`() {
+        val fixture = fixture()
+        val cursor = AdminMessageCursor(
+            createdAt = Instant.parse("2026-06-14T00:00:01Z"),
+            roomSeq = 1001L,
+            messageId = "msg-1001",
+        )
+        val encodedCursor = AdminMessageCursorCodec.encode(cursor)
+        `when`(
+            fixture.messageRepository.findRoomMessages(
+                roomId = 10L,
+                from = null,
+                to = null,
+                cursor = cursor,
+                limit = 51,
+            ),
+        ).thenReturn(emptyList())
+
+        fixture.service.getRoomMessages(
+            actor = "admin-local",
+            request = AdminMessageHistoryRequest(
+                roomId = 10L,
+                from = null,
+                to = null,
+                cursor = encodedCursor,
+                limit = 50,
+            ),
+        )
+
+        verify(fixture.messageRepository).findRoomMessages(
+            eq(10L),
+            eq(null),
+            eq(null),
+            eq(cursor),
+            eq(51),
         )
     }
 

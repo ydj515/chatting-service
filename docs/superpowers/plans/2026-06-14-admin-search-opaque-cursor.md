@@ -4,7 +4,7 @@
 
 **Goal:** Replace admin message search pagination with an opaque compound cursor so global search cannot skip or duplicate rows when `roomSeq` differs from global time ordering.
 
-**Architecture:** Room history keeps its existing `Long roomSeq` cursor. Admin search uses a Base64URL opaque cursor that encodes `createdAt`, `roomSeq`, and `messageId`; repository SQL applies the same tuple in both `WHERE` and `ORDER BY`.
+**Architecture:** Admin search uses a Base64URL opaque cursor that encodes `createdAt`, `roomSeq`, and `messageId`; repository SQL applies the same tuple in both `WHERE` and `ORDER BY`. At the time of this slice, room history kept its existing `Long roomSeq` cursor. That follow-up is superseded by `2026-06-14-admin-room-history-opaque-cursor.md`.
 
 **Tech Stack:** Kotlin/Spring Boot, PostgreSQL JDBC, Base64URL cursor encoding, Node test runner for client-admin and script/docs contract tests.
 
@@ -43,7 +43,7 @@
 
 - [x] Decode request cursor before repository call.
 - [x] Encode `nextCursor` from the last visible search message when `hasNext=true`.
-- [x] Keep room history `nextCursor` unchanged as `Long`.
+- [x] Keep room history `nextCursor` unchanged as `Long` for this slice. Follow-up completed in `2026-06-14-admin-room-history-opaque-cursor.md`.
 
 ### Task 4: Controller And Client Contract
 

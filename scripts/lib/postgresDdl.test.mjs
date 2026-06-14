@@ -16,3 +16,9 @@ test('message partition DDL includes admin search cursor ordering indexes', () =
   assert.match(ddl, /created_at DESC, room_seq DESC, message_id DESC/);
   assert.match(ddl, /ix_%s_admin_search_cursor/);
 });
+
+test('message partition DDL includes admin room history cursor ordering indexes', () => {
+  assert.match(ddl, /ix_chat_messages_default_admin_room_history_cursor/);
+  assert.match(ddl, /room_id, room_seq DESC, created_at DESC, message_id DESC/);
+  assert.match(ddl, /ix_%s_admin_room_history_cursor/);
+});

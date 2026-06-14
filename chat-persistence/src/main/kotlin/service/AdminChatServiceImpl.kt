@@ -2,6 +2,9 @@ package com.chat.persistence.service
 
 import com.chat.domain.dto.AdminExportJobDto
 import com.chat.domain.dto.AdminExportMessagesRequest
+import com.chat.domain.dto.AdminMessageCursor
+import com.chat.domain.dto.AdminMessageCursorCodec
+import com.chat.domain.dto.AdminMessageDto
 import com.chat.domain.dto.AdminMessageHistoryRequest
 import com.chat.domain.dto.AdminMessagePageResponse
 import com.chat.domain.dto.AdminMessageSearchCursor
@@ -35,7 +38,7 @@ class AdminChatServiceImpl(
                 roomId = request.roomId,
                 from = request.from,
                 to = request.to,
-                cursor = request.cursor,
+                cursor = AdminMessageCursorCodec.decode(request.cursor),
                 limit = request.limit + 1,
             )
             response = rows.toMessagePage(request.limit, 0)
@@ -122,7 +125,7 @@ class AdminChatServiceImpl(
         val messages = take(limit)
         return AdminMessagePageResponse(
             messages = messages,
-            nextCursor = if (size > limit) messages.lastOrNull()?.roomSeq else null,
+            nextCursor = if (size > limit) messages.lastOrNull()?.toAdminMessageCursor() else null,
             hasNext = size > limit,
             latencyMs = latencyMs,
         )
@@ -130,9 +133,19 @@ class AdminChatServiceImpl(
 
     private fun Long.toMillis(): Long = this / 1_000_000
 
-    private fun com.chat.domain.dto.AdminMessageDto.toSearchCursor(): String {
+    private fun AdminMessageDto.toSearchCursor(): String {
         return AdminMessageSearchCursorCodec.encode(
             AdminMessageSearchCursor(
+                createdAt = createdAt,
+                roomSeq = roomSeq,
+                messageId = messageId,
+            ),
+        )
+    }
+
+    private fun AdminMessageDto.toAdminMessageCursor(): String {
+        return AdminMessageCursorCodec.encode(
+            AdminMessageCursor(
                 createdAt = createdAt,
                 roomSeq = roomSeq,
                 messageId = messageId,

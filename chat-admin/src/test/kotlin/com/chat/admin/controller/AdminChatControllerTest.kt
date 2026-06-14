@@ -4,6 +4,8 @@ import com.chat.admin.config.AdminProperties
 import com.chat.admin.security.AdminTokenVerifier
 import com.chat.domain.dto.AdminExportJobDto
 import com.chat.domain.dto.AdminExportMessagesRequest
+import com.chat.domain.dto.AdminMessageCursor
+import com.chat.domain.dto.AdminMessageCursorCodec
 import com.chat.domain.dto.AdminMessageDto
 import com.chat.domain.dto.AdminMessageHistoryRequest
 import com.chat.domain.dto.AdminMessageSearchCursor
@@ -59,10 +61,18 @@ class AdminChatControllerTest {
 
     @Test
     fun `관리자 history 조회는 token을 검증하고 limit을 양수 범위로 보정한다`() {
+        val cursor = AdminMessageCursorCodec.encode(
+            AdminMessageCursor(
+                createdAt = Instant.parse("2026-06-14T00:00:01Z"),
+                roomSeq = 1001L,
+                messageId = "msg-1001",
+            ),
+        )
         mockMvc.get("/admin/chat-rooms/10/messages") {
             header("X-Admin-Token", "local-admin-token")
             param("from", "2026-06-14T00:00:00")
             param("to", "2026-06-15T00:00:00")
+            param("cursor", cursor)
             param("limit", "-5")
         }
             .andExpect {
@@ -72,7 +82,21 @@ class AdminChatControllerTest {
 
         assertEquals("admin-local", service.historyActor)
         assertEquals(10L, service.historyRequest?.roomId)
+        assertEquals(cursor, service.historyRequest?.cursor)
         assertEquals(1, service.historyRequest?.limit)
+    }
+
+    @Test
+    fun `관리자 history 조회는 잘못된 cursor를 400으로 거부한다`() {
+        mockMvc.get("/admin/chat-rooms/10/messages") {
+            header("X-Admin-Token", "local-admin-token")
+            param("cursor", "not-a-valid-cursor")
+        }
+            .andExpect {
+                status { isBadRequest() }
+            }
+
+        assertEquals(null, service.historyRequest)
     }
 
     @Test

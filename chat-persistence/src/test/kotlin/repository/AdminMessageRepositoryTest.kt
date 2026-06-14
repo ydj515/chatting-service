@@ -1,5 +1,6 @@
 package com.chat.persistence.repository
 
+import com.chat.domain.dto.AdminMessageCursor
 import com.chat.domain.dto.AdminMessageDto
 import com.chat.domain.dto.AdminMessageSearchCursor
 import com.chat.domain.dto.AdminMessageSearchMode
@@ -25,6 +26,11 @@ class AdminMessageRepositoryTest {
     fun `history query는 roomId와 created_at 범위와 cursor를 parameter로 바인딩한다`() {
         val jdbcTemplate = mock(JdbcTemplate::class.java)
         val repository = AdminMessageRepository(jdbcTemplate)
+        val cursor = AdminMessageCursor(
+            createdAt = Instant.parse("2026-06-14T00:00:01Z"),
+            roomSeq = 100L,
+            messageId = "msg-100",
+        )
         `when`(
             jdbcTemplate.query(
                 anyString(),
@@ -37,7 +43,7 @@ class AdminMessageRepositoryTest {
             roomId = 10L,
             from = Instant.parse("2026-06-14T00:00:00Z"),
             to = Instant.parse("2026-06-15T00:00:00Z"),
-            cursor = 100L,
+            cursor = cursor,
             limit = 50,
         )
 
@@ -49,6 +55,11 @@ class AdminMessageRepositoryTest {
             eq(Timestamp.from(Instant.parse("2026-06-14T00:00:00Z"))),
             eq(Timestamp.from(Instant.parse("2026-06-15T00:00:00Z"))),
             eq(100L),
+            eq(100L),
+            eq(Timestamp.from(cursor.createdAt)),
+            eq(100L),
+            eq(Timestamp.from(cursor.createdAt)),
+            eq("msg-100"),
             eq(50),
         )
         assertTrue(sqlCaptor.value.contains("FROM chat_messages cm"))
@@ -56,7 +67,39 @@ class AdminMessageRepositoryTest {
         assertTrue(sqlCaptor.value.contains("cm.created_at >= ?"))
         assertTrue(sqlCaptor.value.contains("cm.created_at < ?"))
         assertTrue(sqlCaptor.value.contains("cm.room_seq < ?"))
-        assertTrue(sqlCaptor.value.contains("ORDER BY cm.room_seq DESC"))
+        assertTrue(sqlCaptor.value.contains("cm.room_seq = ? AND cm.created_at < ?"))
+        assertTrue(sqlCaptor.value.contains("cm.room_seq = ? AND cm.created_at = ? AND cm.message_id < ?"))
+        assertTrue(sqlCaptor.value.contains("ORDER BY cm.room_seq DESC, cm.created_at DESC, cm.message_id DESC"))
+    }
+
+    @Test
+    fun `history query는 cursor가 없어도 안정적인 tuple ordering을 사용한다`() {
+        val jdbcTemplate = mock(JdbcTemplate::class.java)
+        val repository = AdminMessageRepository(jdbcTemplate)
+        `when`(
+            jdbcTemplate.query(
+                anyString(),
+                anyAdminMessageRowMapper(),
+                anyVararg(),
+            ),
+        ).thenReturn(emptyList())
+
+        repository.findRoomMessages(
+            roomId = 10L,
+            from = null,
+            to = null,
+            cursor = null,
+            limit = 50,
+        )
+
+        val sqlCaptor = ArgumentCaptor.forClass(String::class.java)
+        verify(jdbcTemplate).query(
+            sqlCaptor.capture(),
+            anyAdminMessageRowMapper(),
+            eq(10L),
+            eq(50),
+        )
+        assertTrue(sqlCaptor.value.contains("ORDER BY cm.room_seq DESC, cm.created_at DESC, cm.message_id DESC"))
     }
 
     @Test

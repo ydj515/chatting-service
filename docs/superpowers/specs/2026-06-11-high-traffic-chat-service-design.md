@@ -600,7 +600,7 @@ GET /chat-rooms/{roomId}/messages/gap?afterSeq=12345&limit=200
 3. 짧은 시간 범위의 정확 조회는 PostgreSQL partition table을 직접 조회한다.
 4. 키워드가 있으면 초기에는 PostgreSQL FTS/trigram index를 조회한다.
 5. OpenSearch 도입 이후에는 OpenSearch 결과의 `messageId` 목록을 기준으로 PostgreSQL canonical store에서 원본을 재조회한다.
-6. 관리자 화면에 pagination cursor와 함께 반환한다. Admin keyword/global search cursor는 `createdAt + roomSeq + messageId`를 Base64URL로 감싼 opaque cursor를 사용하고, 클라이언트는 값을 해석하지 않고 그대로 재전송한다. 방별 history cursor는 현재 `roomSeq` 기반 Long cursor를 유지한다.
+6. 관리자 화면에 pagination cursor와 함께 반환한다. Admin keyword/global search와 admin room history cursor는 `createdAt + roomSeq + messageId`를 Base64URL로 감싼 opaque cursor를 사용하고, 클라이언트는 값을 해석하지 않고 그대로 재전송한다. 일반 사용자 room history cursor는 별도 compatibility task에서 전환한다.
 
 대량 export:
 

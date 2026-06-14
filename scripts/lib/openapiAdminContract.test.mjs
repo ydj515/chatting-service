@@ -28,3 +28,17 @@ test('admin search cursor is documented as an opaque string', () => {
   assert.match(searchPath, /name: cursor[\s\S]*opaque[\s\S]*type: string/);
   assert.match(searchResponse, /nextCursor:[\s\S]*type: string[\s\S]*nullable: true/);
 });
+
+test('admin room history cursor is documented as an opaque string', () => {
+  const historyPath = openapi.slice(
+    openapi.indexOf('  /admin/chat-rooms/{roomId}/messages:'),
+    openapi.indexOf('  /admin/messages/search:'),
+  );
+  const historyResponse = openapi.slice(
+    openapi.indexOf('    AdminMessagePageResponse:'),
+    openapi.indexOf('    AdminMessageSearchResponse:'),
+  );
+
+  assert.match(historyPath, /name: cursor[\s\S]*opaque[\s\S]*type: string/);
+  assert.match(historyResponse, /nextCursor:[\s\S]*type: string[\s\S]*nullable: true/);
+});

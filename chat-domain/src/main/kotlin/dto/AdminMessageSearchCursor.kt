@@ -4,17 +4,19 @@ import java.nio.charset.StandardCharsets
 import java.time.Instant
 import java.util.Base64
 
-data class AdminMessageSearchCursor(
+data class AdminMessageCursor(
     val createdAt: Instant,
     val roomSeq: Long,
     val messageId: String,
 )
 
-object AdminMessageSearchCursorCodec {
+typealias AdminMessageSearchCursor = AdminMessageCursor
+
+object AdminMessageCursorCodec {
     private val encoder = Base64.getUrlEncoder().withoutPadding()
     private val decoder = Base64.getUrlDecoder()
 
-    fun encode(cursor: AdminMessageSearchCursor): String {
+    fun encode(cursor: AdminMessageCursor): String {
         require(cursor.messageId.isNotBlank()) { "messageId must not be blank" }
         val encodedMessageId = encodeText(cursor.messageId)
         val payload = listOf(
@@ -26,7 +28,7 @@ object AdminMessageSearchCursorCodec {
         return encodeText(payload)
     }
 
-    fun decode(value: String?): AdminMessageSearchCursor? {
+    fun decode(value: String?): AdminMessageCursor? {
         val normalized = value?.trim()?.takeIf { it.isNotEmpty() } ?: return null
         return try {
             val payload = decodeText(normalized)
@@ -38,7 +40,7 @@ object AdminMessageSearchCursorCodec {
             if (messageId.isBlank()) {
                 throw IllegalArgumentException(INVALID_CURSOR_MESSAGE)
             }
-            AdminMessageSearchCursor(
+            AdminMessageCursor(
                 createdAt = Instant.parse(parts[1]),
                 roomSeq = parts[2].toLong(),
                 messageId = messageId,
@@ -59,5 +61,15 @@ object AdminMessageSearchCursorCodec {
     private const val VERSION = "v1"
     private const val SEPARATOR = "\t"
     private const val EXPECTED_PARTS = 4
-    private const val INVALID_CURSOR_MESSAGE = "Invalid admin search cursor"
+    private const val INVALID_CURSOR_MESSAGE = "Invalid admin message cursor"
+}
+
+object AdminMessageSearchCursorCodec {
+    fun encode(cursor: AdminMessageSearchCursor): String {
+        return AdminMessageCursorCodec.encode(cursor)
+    }
+
+    fun decode(value: String?): AdminMessageSearchCursor? {
+        return AdminMessageCursorCodec.decode(value)
+    }
 }

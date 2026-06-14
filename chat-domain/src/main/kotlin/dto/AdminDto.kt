@@ -23,7 +23,7 @@ data class AdminMessageHistoryRequest(
     val roomId: Long,
     val from: Instant?,
     val to: Instant?,
-    val cursor: Long?,
+    val cursor: String?,
     val limit: Int,
 )
 
@@ -45,7 +45,7 @@ data class AdminMessageSearchRequest(
 
 data class AdminMessagePageResponse(
     val messages: List<AdminMessageDto>,
-    val nextCursor: Long?,
+    val nextCursor: String?,
     val hasNext: Boolean,
     val latencyMs: Long,
 )

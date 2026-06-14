@@ -5,6 +5,7 @@ import com.chat.admin.security.AdminTokenVerifier
 import com.chat.domain.dto.AdminExportJobDto
 import com.chat.domain.dto.AdminExportMessagesRequest
 import com.chat.domain.dto.AdminMessageHistoryRequest
+import com.chat.domain.dto.AdminMessageCursorCodec
 import com.chat.domain.dto.AdminMessageSearchCursorCodec
 import com.chat.domain.dto.AdminMessagePageResponse
 import com.chat.domain.dto.AdminMessageSearchRequest
@@ -42,7 +43,7 @@ class AdminChatController(
         @PathVariable roomId: Long,
         @RequestParam(required = false) from: String?,
         @RequestParam(required = false) to: String?,
-        @RequestParam(required = false) cursor: Long?,
+        @RequestParam(required = false) cursor: String?,
         @RequestParam(required = false) limit: Int?,
     ): AdminMessagePageResponse {
         val actor = adminTokenVerifier.requireActor(adminToken)
@@ -52,7 +53,7 @@ class AdminChatController(
                 roomId = roomId,
                 from = parseDateTime(from),
                 to = parseDateTime(to),
-                cursor = cursor,
+                cursor = parseHistoryCursor(cursor),
                 limit = boundedLimit(limit),
             ),
         )
@@ -165,6 +166,19 @@ class AdminChatController(
             throw ResponseStatusException(
                 HttpStatus.BAD_REQUEST,
                 "Invalid admin search cursor",
+            )
+        }
+    }
+
+    private fun parseHistoryCursor(value: String?): String? {
+        val cursor = value?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+        return runCatching {
+            AdminMessageCursorCodec.decode(cursor)
+            cursor
+        }.getOrElse {
+            throw ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "Invalid admin room history cursor",
             )
         }
     }

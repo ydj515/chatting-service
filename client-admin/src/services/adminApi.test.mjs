@@ -23,13 +23,13 @@ test('admin history URL includes room time range cursor and positive limit', () 
   const url = buildAdminHistoryUrl('/api', 10, {
     from: '2026-06-14T00:00:00',
     to: '2026-06-15T00:00:00',
-    cursor: 123,
+    cursor: 'opaque.history/with+symbols',
     limit: -1,
   });
 
   assert.equal(
     url,
-    '/api/admin/chat-rooms/10/messages?from=2026-06-14T00%3A00%3A00&to=2026-06-15T00%3A00%3A00&cursor=123&limit=1',
+    '/api/admin/chat-rooms/10/messages?from=2026-06-14T00%3A00%3A00&to=2026-06-15T00%3A00%3A00&cursor=opaque.history%2Fwith%2Bsymbols&limit=1',
   );
 });
 
