@@ -3,6 +3,7 @@
 -- table is prepared for the Message Writer Worker phase.
 
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
+CREATE EXTENSION IF NOT EXISTS btree_gin;
 
 CREATE TABLE IF NOT EXISTS chat_messages (
     message_id text NOT NULL,
@@ -94,6 +95,9 @@ ON chat_messages_default (sender_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS ix_chat_messages_default_content_tsv
 ON chat_messages_default USING gin (content_tsv);
 
+CREATE INDEX IF NOT EXISTS ix_chat_messages_default_room_content_tsv
+ON chat_messages_default USING gin (room_id int8_ops, content_tsv);
+
 CREATE INDEX IF NOT EXISTS ix_chat_messages_default_content_trgm
 ON chat_messages_default USING gin (content gin_trgm_ops);
 
@@ -162,6 +166,12 @@ BEGIN
         EXECUTE format(
             'CREATE INDEX IF NOT EXISTS %I ON %I USING gin (content_tsv)',
             format('ix_%s_content_tsv', child_name),
+            child_name
+        );
+
+        EXECUTE format(
+            'CREATE INDEX IF NOT EXISTS %I ON %I USING gin (room_id int8_ops, content_tsv)',
+            format('ix_%s_room_content_tsv', child_name),
             child_name
         );
 
