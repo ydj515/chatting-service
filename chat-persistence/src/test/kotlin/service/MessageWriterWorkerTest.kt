@@ -116,6 +116,57 @@ class MessageWriterWorkerTest {
         assertEquals(listOf("chat:stream:room:10:shard:0:message-writer:1749790000000-3"), consumer.acked)
     }
 
+    @Test
+    fun `writer worker는 batch 실패 후 record별 재시도로 이미 처리된 record를 ack한다`() {
+        val records = listOf(
+            streamRecord(recordId = "1749790000000-1", messageId = "msg-1"),
+            streamRecord(recordId = "1749790000000-2", messageId = "msg-2"),
+            streamRecord(recordId = "1749790000000-3", messageId = "msg-3"),
+        )
+        val consumer = FakeMessageStreamConsumer(records = records)
+        val writePort = FakeMessageWritePort { requests ->
+            if (requests.size > 1) {
+                throw IllegalStateException("batch failed after partial write")
+            }
+
+            when (requests.single().messageId) {
+                "msg-1" -> MessageWriteResult(
+                    outcomes = requests.map { request ->
+                        MessageWriteOutcome(request = request, written = false)
+                    },
+                )
+                "msg-2" -> throw IllegalStateException("missing user")
+                else -> MessageWriteResult(
+                    outcomes = requests.map { request ->
+                        MessageWriteOutcome(request = request, written = true)
+                    },
+                )
+            }
+        }
+        val worker = workerFixture(consumer, writePort)
+
+        val written = worker.pollAndWrite()
+
+        assertEquals(1, written)
+        assertEquals(
+            listOf(
+                "chat:stream:room:10:shard:0:message-writer:1749790000000-1",
+                "chat:stream:room:10:shard:0:message-writer:1749790000000-3",
+            ),
+            consumer.acked,
+        )
+        assertEquals(emptyList<String>(), consumer.deadLetters)
+        assertEquals(
+            listOf(
+                listOf("msg-1", "msg-2", "msg-3"),
+                listOf("msg-1"),
+                listOf("msg-2"),
+                listOf("msg-3"),
+            ),
+            writePort.requestBatches.map { batch -> batch.map { it.messageId } },
+        )
+    }
+
     private fun workerFixture(
         consumer: MessageStreamConsumer,
         writePort: MessageWritePort,
@@ -139,12 +190,13 @@ class MessageWriterWorkerTest {
     private fun streamRecord(
         recordId: String = "1749790000000-0",
         deliveryCount: Long = 1,
+        messageId: String = "msg-1",
     ): MessageStreamRecord {
         return MessageStreamRecord(
             streamKey = "chat:stream:room:10:shard:0",
             recordId = recordId,
             envelope = MessageStreamEnvelope(
-                messageId = "msg-1",
+                messageId = messageId,
                 clientMessageId = "client-1",
                 chatRoomId = 10L,
                 senderId = 7L,

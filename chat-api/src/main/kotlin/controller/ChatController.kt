@@ -99,8 +99,7 @@ class ChatController(
         val request = MessagePageRequest(
             chatRoomId = id,
             cursor = cursor,
-            limit = (limit ?: messagePaginationProperties.defaultLimit)
-                .coerceAtMost(messagePaginationProperties.maxLimit),
+            limit = boundedMessageLimit(limit),
             direction = direction ?: messagePaginationProperties.defaultDirection,
         )
         val authenticatedUserId = authenticatedUserResolver.resolveRequired(authorization)
@@ -116,8 +115,7 @@ class ChatController(
         @RequestParam(required = false) limit: Int?,
     ): ResponseEntity<List<MessageDto>> {
         val authenticatedUserId = authenticatedUserResolver.resolveRequired(authorization)
-        val boundedLimit = (limit ?: messagePaginationProperties.defaultLimit)
-            .coerceAtMost(messagePaginationProperties.maxLimit)
+        val boundedLimit = boundedMessageLimit(limit)
         val messages = chatService.getMessagesGap(
             roomId = id,
             userId = authenticatedUserId,
@@ -135,5 +133,10 @@ class ChatController(
         val authenticatedUserId = authenticatedUserResolver.resolveRequired(authorization)
         val chatRooms = chatService.searchChatRooms(q, authenticatedUserId)
         return ResponseEntity.ok(chatRooms)
+    }
+
+    private fun boundedMessageLimit(limit: Int?): Int {
+        val maxLimit = messagePaginationProperties.maxLimit.coerceAtLeast(1)
+        return (limit ?: messagePaginationProperties.defaultLimit).coerceIn(1, maxLimit)
     }
 }

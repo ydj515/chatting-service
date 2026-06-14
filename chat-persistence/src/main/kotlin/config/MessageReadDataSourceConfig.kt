@@ -53,6 +53,21 @@ class MessageReadDataSourceConfig {
 class MessageReadDataSourceHolder(
     properties: ChatReadDataSourceProperties,
 ) : DisposableBean {
+    init {
+        require(properties.url.isNotBlank()) {
+            "chat.datasource.read.url must be configured when chat.datasource.read.enabled=true"
+        }
+        require(properties.username.isNotBlank()) {
+            "chat.datasource.read.username must be configured when chat.datasource.read.enabled=true"
+        }
+        require(properties.password.isNotBlank()) {
+            "chat.datasource.read.password must be configured when chat.datasource.read.enabled=true"
+        }
+        require(properties.driverClassName.isNotBlank()) {
+            "chat.datasource.read.driver-class-name must be configured when chat.datasource.read.enabled=true"
+        }
+    }
+
     val dataSource: HikariDataSource = HikariDataSource().apply {
         jdbcUrl = properties.url
         username = properties.username

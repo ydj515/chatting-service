@@ -103,9 +103,40 @@ class MessageWriterWorker(
             records.forEach { record -> acknowledge(record, consumerGroup) }
             result.writtenCount
         } catch (e: Exception) {
-            records.forEach { handleFailure(it, consumerGroup, e) }
-            0
+            logger.warn(
+                "Message writer batch failed for ${records.size} records; retrying records individually",
+                e,
+            )
+            writeIndividually(records, consumerGroup, e)
         }
+    }
+
+    private fun writeIndividually(
+        records: List<MessageStreamRecord>,
+        consumerGroup: String,
+        batchFailure: Exception,
+    ): Int {
+        var writtenCount = 0
+        records.forEach { record ->
+            try {
+                val result = messageWritePort.write(listOf(record.envelope.toWriteRequest()))
+                if (result.outcomes.size != 1) {
+                    throw IllegalStateException(
+                        "MessageWritePort returned ${result.outcomes.size} outcomes for 1 record",
+                    )
+                }
+                acknowledge(record, consumerGroup)
+                if (result.outcomes.single().written) {
+                    writtenCount += 1
+                }
+            } catch (e: Exception) {
+                handleFailure(record, consumerGroup, e)
+            }
+        }
+        if (writtenCount == 0) {
+            logger.warn("Message writer individual retry wrote no records after batch failure: ${batchFailure.message}")
+        }
+        return writtenCount
     }
 
     private fun acknowledge(record: MessageStreamRecord, consumerGroup: String) {

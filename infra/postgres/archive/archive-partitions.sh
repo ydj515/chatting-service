@@ -12,6 +12,30 @@ run_once="${CHAT_PARTITION_ARCHIVE_RUN_ONCE:-false}"
 interval_seconds="${CHAT_PARTITION_ARCHIVE_INTERVAL_SECONDS:-86400}"
 hash_partitions="${CHAT_MESSAGE_HASH_PARTITIONS:-16}"
 
+require_unsigned_integer() {
+  value="$1"
+  name="$2"
+  case "$value" in
+    ''|*[!0-9]*)
+      echo "${name} must be an unsigned integer." >&2
+      exit 1
+      ;;
+  esac
+}
+
+require_positive_integer() {
+  value="$1"
+  name="$2"
+  require_unsigned_integer "$value" "$name"
+  if [ "$value" -lt 1 ]; then
+    echo "${name} must be greater than 0." >&2
+    exit 1
+  fi
+}
+
+require_unsigned_integer "$retention_days" "CHAT_MESSAGE_RETENTION_DAYS"
+require_positive_integer "$hash_partitions" "CHAT_MESSAGE_HASH_PARTITIONS"
+
 mkdir -p "$archive_dir"
 
 precreate_partitions() {
