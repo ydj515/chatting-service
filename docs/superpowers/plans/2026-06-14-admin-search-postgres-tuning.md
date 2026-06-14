@@ -30,16 +30,16 @@ cm.content_tsv @@ plainto_tsquery('simple', ?) OR cm.content ILIKE ?
 
 ## Work Items
 
-- [ ] Document tuning task and baseline findings.
-- [ ] Add RED tests proving default admin search uses FTS-only SQL.
-- [ ] Add explicit `CONTAINS` search mode for substring/trigram fallback.
-- [ ] Pass search mode through `chat-admin`, `chat-domain`, `chat-persistence`, audit metadata, and `client-admin`.
-- [ ] Add PostgreSQL `btree_gin` extension and room-aware FTS indexes to default and daily hash partitions.
-- [ ] Add measurement CLI support for search mode.
-- [ ] Update API and performance docs.
-- [ ] Run targeted tests.
-- [ ] Rebuild/restart local stack and rerun 10M admin search measurement.
-- [ ] Commit each slice separately.
+- [x] Document tuning task and baseline findings.
+- [x] Add RED tests proving default admin search uses FTS-only SQL.
+- [x] Add explicit `CONTAINS` search mode for substring/trigram fallback.
+- [x] Pass search mode through `chat-admin`, `chat-domain`, `chat-persistence`, audit metadata, and `client-admin`.
+- [x] Add PostgreSQL `btree_gin` extension and room-aware FTS indexes to default and daily hash partitions.
+- [x] Add measurement CLI support for search mode.
+- [x] Update API and performance docs.
+- [x] Run targeted tests.
+- [x] Rebuild/restart local stack and rerun 10M admin search measurement.
+- [x] Commit each slice separately.
 
 ## API Behavior
 
@@ -86,6 +86,15 @@ node scripts/measure-admin-search-p95.mjs \
   --target-p95-ms 1000 \
   --output docs/performance/admin_search_postgres_tuning_2026-06-14.json
 ```
+
+Final warm validation used `--warmup 30` and wrote `docs/performance/admin_search_postgres_tuning_warm_both_2026-06-14.json`.
+
+## Results
+
+- `FTS` warm validation with 10M local data passed: history p95 `14ms`, search p95 `490ms`.
+- The first post-restart run with `--warmup 10` recorded search p95 `1326ms` and max `5798ms`, showing that app/DB cold-start outliers can leak into the measured window.
+- App-equivalent timestamp `EXPLAIN (ANALYZE, BUFFERS)` for room-scoped `FTS` search executed in about `2.0s`, down from the Phase 5 cold baseline of about `6.5s`.
+- PostgreSQL still scans and rechecks many FTS candidates for high-match queries; OpenSearch remains deferred, not rejected forever.
 
 ## Complexity
 
