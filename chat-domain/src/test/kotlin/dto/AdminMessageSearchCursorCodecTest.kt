@@ -28,4 +28,17 @@ class AdminMessageSearchCursorCodecTest {
             AdminMessageCursorCodec.decode("not-a-valid-cursor")
         }
     }
+
+    @Test
+    fun `public message history cursor codec은 generic message cursor와 호환된다`() {
+        val cursor = MessageHistoryCursor(
+            createdAt = Instant.parse("2026-06-14T00:00:01Z"),
+            roomSeq = 42L,
+            messageId = "msg-42",
+        )
+
+        val encoded = MessageHistoryCursorCodec.encode(cursor)
+
+        assertEquals(cursor, MessageHistoryCursorCodec.decode(encoded))
+    }
 }

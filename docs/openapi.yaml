@@ -302,10 +302,16 @@ paths:
             example: 1
         - name: cursor
           in: query
-          description: Last roomSeq cursor
+          description: Deprecated numeric roomSeq cursor for legacy clients. cursorToken takes precedence when both are supplied.
           schema:
             type: integer
             example: 100
+        - name: cursorToken
+          in: query
+          description: opaque public room history cursor returned as nextCursorToken or prevCursorToken. Clients must pass it back unchanged.
+          schema:
+            type: string
+            example: "djEJMjAyNi0wNi0xNFQwMDowMDowMV..."
         - name: limit
           in: query
           schema:
@@ -788,10 +794,22 @@ components:
             $ref: '#/components/schemas/MessageDto'
         nextCursor:
           type: integer
+          deprecated: true
           example: 55
+        nextCursorToken:
+          type: string
+          nullable: true
+          description: opaque cursor for the next public room history page. Encodes createdAt, roomSeq, and messageId internally.
+          example: "djEJMjAyNi0wNi0xNFQwMDowMDowMV..."
         prevCursor:
           type: integer
+          deprecated: true
           example: 105
+        prevCursorToken:
+          type: string
+          nullable: true
+          description: opaque cursor for the previous public room history page. Encodes createdAt, roomSeq, and messageId internally.
+          example: "djEJMjAyNi0wNi0xNFQwMDowMDowMV..."
         hasNext:
           type: boolean
           example: true

@@ -40,7 +40,7 @@ OpenAPI 스펙은 [`openapi.yaml`](openapi.yaml)을 참고하세요.
 | 메서드 | 경로 | 설명 |
 | --- | --- | --- |
 | `GET` | `/api/chat-rooms/{id}/messages` | 메시지 조회 |
-| `GET` | `/api/chat-rooms/{id}/messages/cursor?cursor=...&limit=50&direction=BEFORE` | `roomSeq` 기준 커서 기반 메시지 페이징 (장기적으로 cursor는 보안 및 유연성을 위해 Long 대신 Base64 등 Opaque 문자열로 변경 검토) |
+| `GET` | `/api/chat-rooms/{id}/messages/cursor?cursorToken=...&limit=50&direction=BEFORE` | `roomSeq` 기준 커서 기반 메시지 페이징. 신규 client는 opaque `cursorToken`/`nextCursorToken`을 사용하고, legacy numeric `cursor`/`nextCursor`는 migration window 동안 유지 |
 | `GET` | `/api/chat-rooms/{id}/messages/gap?afterSeq=12345&limit=50` | 재연결 후 누락 메시지 보정용 gap fill |
 
 ### 관리자

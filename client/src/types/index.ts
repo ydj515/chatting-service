@@ -176,8 +176,10 @@ export interface PageResponse<T> {
 
 export interface CursorResponse<T> {
   messages: T[];
-  nextCursor?: string;
-  prevCursor?: string;
+  nextCursor?: number;
+  nextCursorToken?: string;
+  prevCursor?: number;
+  prevCursorToken?: string;
   hasNext: boolean;
   hasPrev: boolean;
 }

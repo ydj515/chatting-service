@@ -17,6 +17,7 @@ import org.springframework.transaction.support.TransactionSynchronization
 import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.security.SecureRandom
 import java.time.Instant
+import java.time.ZoneOffset
 import java.util.Base64
 
 /*
@@ -255,7 +256,7 @@ class ChatServiceImpl(
             throw IllegalArgumentException("채팅방 멤버가 아닙니다")
         }
 
-        val cursor = request.cursor // effective roomSeq cursor
+        val cursor = request.effectiveCursor() // effective roomSeq cursor
 
         val messages = when {
             cursor == null -> {
@@ -276,6 +277,8 @@ class ChatServiceImpl(
         // 다음/이전 커서는 repository ordering key와 같은 effective roomSeq를 사용한다.
         val nextCursor = if (messages.isNotEmpty()) messages.last().roomSeq else null
         val prevCursor = if (messages.isNotEmpty()) messages.first().roomSeq else null
+        val nextCursorToken = messages.lastOrNull()?.toHistoryCursorToken()
+        val prevCursorToken = messages.firstOrNull()?.toHistoryCursorToken()
 
         // 추가 데이터 존재 여부 확인
         val hasNext = messages.size == request.limit
@@ -284,9 +287,26 @@ class ChatServiceImpl(
         return MessagePageResponse(
             messages = messages,
             nextCursor = nextCursor,
+            nextCursorToken = nextCursorToken,
             prevCursor = prevCursor,
+            prevCursorToken = prevCursorToken,
             hasNext = hasNext,
             hasPrev = hasPrev
+        )
+    }
+
+    private fun MessagePageRequest.effectiveCursor(): Long? {
+        val tokenCursor = MessageHistoryCursorCodec.decode(cursorToken)
+        return tokenCursor?.roomSeq ?: cursor
+    }
+
+    private fun MessageDto.toHistoryCursorToken(): String {
+        return MessageHistoryCursorCodec.encode(
+            MessageHistoryCursor(
+                createdAt = createdAt.atOffset(ZoneOffset.UTC).toInstant(),
+                roomSeq = roomSeq,
+                messageId = messageId,
+            ),
         )
     }
 

@@ -11,6 +11,7 @@ data class AdminMessageCursor(
 )
 
 typealias AdminMessageSearchCursor = AdminMessageCursor
+typealias MessageHistoryCursor = AdminMessageCursor
 
 object AdminMessageCursorCodec {
     private val encoder = Base64.getUrlEncoder().withoutPadding()
@@ -71,5 +72,19 @@ object AdminMessageSearchCursorCodec {
 
     fun decode(value: String?): AdminMessageSearchCursor? {
         return AdminMessageCursorCodec.decode(value)
+    }
+}
+
+object MessageHistoryCursorCodec {
+    fun encode(cursor: MessageHistoryCursor): String {
+        return AdminMessageCursorCodec.encode(cursor)
+    }
+
+    fun decode(value: String?): MessageHistoryCursor? {
+        return try {
+            AdminMessageCursorCodec.decode(value)
+        } catch (e: IllegalArgumentException) {
+            throw IllegalArgumentException("Invalid message history cursor", e)
+        }
     }
 }

@@ -208,17 +208,20 @@ export const messageApi = {
   // 커서 기반 메시지 조회 (성능 최적화)
   getMessagesByCursor: async (
     chatRoomId: number,
-    cursor?: string,
+    cursorToken?: string,
     limit = 50,
-    direction: 'BEFORE' | 'AFTER' = 'BEFORE'
+    direction: 'BEFORE' | 'AFTER' = 'BEFORE',
+    legacyCursor?: number
   ): Promise<CursorResponse<Message>> => {
     const params = new URLSearchParams({
       limit: limit.toString(),
       direction,
     });
     
-    if (cursor) {
-      params.append('cursor', cursor);
+    if (cursorToken) {
+      params.append('cursorToken', cursorToken);
+    } else if (legacyCursor !== undefined) {
+      params.append('cursor', legacyCursor.toString());
     }
 
     const response: AxiosResponse<CursorResponse<Message>> = await api.get(

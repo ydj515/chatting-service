@@ -91,14 +91,15 @@ class ChatController(
     fun getMessagesByCursor(
         @RequestHeader(HttpHeaders.AUTHORIZATION, required = false) authorization: String?,
         @PathVariable id: Long,
-        // TODO: 향후 Long 타입을 Opaque cursor로 변경 검토
         @RequestParam(required = false) cursor: Long?,
+        @RequestParam(required = false) cursorToken: String?,
         @RequestParam(required = false) limit: Int?,
         @RequestParam(required = false) direction: MessageDirection?,
     ): ResponseEntity<MessagePageResponse> {
         val request = MessagePageRequest(
             chatRoomId = id,
             cursor = cursor,
+            cursorToken = parseCursorToken(cursorToken),
             limit = boundedMessageLimit(limit),
             direction = direction ?: messagePaginationProperties.defaultDirection,
         )
@@ -138,5 +139,11 @@ class ChatController(
     private fun boundedMessageLimit(limit: Int?): Int {
         val maxLimit = messagePaginationProperties.maxLimit.coerceAtLeast(1)
         return (limit ?: messagePaginationProperties.defaultLimit).coerceIn(1, maxLimit)
+    }
+
+    private fun parseCursorToken(value: String?): String? {
+        val cursorToken = value?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+        MessageHistoryCursorCodec.decode(cursorToken)
+        return cursorToken
     }
 }

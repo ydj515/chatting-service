@@ -1,6 +1,8 @@
 package com.chat.persistence.service
 
 import com.chat.domain.dto.MessageDirection
+import com.chat.domain.dto.MessageHistoryCursor
+import com.chat.domain.dto.MessageHistoryCursorCodec
 import com.chat.domain.dto.MessagePageRequest
 import com.chat.domain.model.ChatRoom
 import com.chat.domain.model.ChatRoomMember
@@ -32,6 +34,7 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.data.redis.listener.RedisMessageListenerContainer
 import org.springframework.test.context.ContextConfiguration
+import java.time.Instant
 import java.time.LocalDateTime
 
 @DataJpaTest
@@ -96,6 +99,7 @@ class ChatServiceImplCursorPaginationTest {
             MessagePageRequest(
                 chatRoomId = chatRoom.id,
                 cursor = firstPage.nextCursor,
+                cursorToken = firstPage.nextCursorToken,
                 limit = 1,
                 direction = MessageDirection.BEFORE,
             ),
@@ -104,6 +108,14 @@ class ChatServiceImplCursorPaginationTest {
 
         assertEquals(listOf(highRoomSeqMessage.id), firstPage.messages.map { it.id })
         assertEquals(1001L, firstPage.nextCursor)
+        assertEquals(
+            MessageHistoryCursor(
+                createdAt = Instant.parse("2026-06-12T12:00:00Z"),
+                roomSeq = 1001L,
+                messageId = "msg-high",
+            ),
+            MessageHistoryCursorCodec.decode(firstPage.nextCursorToken),
+        )
         assertEquals(listOf(lowRoomSeqMessage.id), secondPage.messages.map { it.id })
         assertEquals(2L, secondPage.nextCursor)
     }

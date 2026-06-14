@@ -2,6 +2,8 @@ package com.chat.persistence.service
 
 import com.chat.domain.dto.MessageDirection
 import com.chat.domain.dto.MessageDto
+import com.chat.domain.dto.MessageHistoryCursor
+import com.chat.domain.dto.MessageHistoryCursorCodec
 import com.chat.domain.dto.MessagePageRequest
 import com.chat.domain.dto.UserDto
 import com.chat.domain.model.MessageType
@@ -25,6 +27,7 @@ import org.springframework.data.domain.PageImpl
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.data.redis.listener.RedisMessageListenerContainer
+import java.time.Instant
 import java.time.LocalDateTime
 
 class ChatServiceImplCanonicalHistoryTest {
@@ -69,6 +72,45 @@ class ChatServiceImplCanonicalHistoryTest {
 
         assertEquals(listOf(9L), response.messages.map { it.roomSeq })
         assertEquals(listOf("before:10:10:50"), readPort.calls)
+    }
+
+    @Test
+    fun `getMessagesByCursor는 cursorToken이 있으면 numeric cursor보다 우선한다`() {
+        val readPort = FakeMessageReadPort(
+            before = listOf(messageDto(roomSeq = 9L)),
+        )
+        val fixture = chatServiceFixture(readPort)
+        `when`(fixture.chatRoomMemberRepository.existsByChatRoomIdAndUserIdAndIsActiveTrue(10L, 7L))
+            .thenReturn(true)
+        val cursorToken = MessageHistoryCursorCodec.encode(
+            MessageHistoryCursor(
+                createdAt = Instant.parse("2026-06-14T00:00:01Z"),
+                roomSeq = 10L,
+                messageId = "msg-10",
+            ),
+        )
+
+        val response = fixture.chatService.getMessagesByCursor(
+            request = MessagePageRequest(
+                chatRoomId = 10L,
+                cursor = 999L,
+                cursorToken = cursorToken,
+                limit = 50,
+                direction = MessageDirection.BEFORE,
+            ),
+            userId = 7L,
+        )
+
+        assertEquals(listOf(9L), response.messages.map { it.roomSeq })
+        assertEquals(listOf("before:10:10:50"), readPort.calls)
+        assertEquals(
+            MessageHistoryCursor(
+                createdAt = Instant.parse("2026-06-13T12:00:00Z"),
+                roomSeq = 9L,
+                messageId = "msg-9",
+            ),
+            MessageHistoryCursorCodec.decode(response.nextCursorToken),
+        )
     }
 
     @Test

@@ -6,6 +6,8 @@ import com.chat.domain.dto.AuthenticatedSession
 import com.chat.domain.dto.ChatRoomDto
 import com.chat.domain.dto.ChatRoomMemberDto
 import com.chat.domain.dto.CreateChatRoomRequest
+import com.chat.domain.dto.MessageHistoryCursor
+import com.chat.domain.dto.MessageHistoryCursorCodec
 import com.chat.domain.dto.MessageDto
 import com.chat.domain.dto.MessagePageRequest
 import com.chat.domain.dto.MessagePageResponse
@@ -23,6 +25,7 @@ import org.springframework.http.HttpHeaders
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.setup.MockMvcBuilders
+import java.time.Instant
 import java.time.LocalDateTime
 
 class ChatControllerTest {
@@ -84,6 +87,43 @@ class ChatControllerTest {
         assertEquals(1, chatService.capturedPageRequest?.limit)
     }
 
+    @Test
+    fun `cursor 조회는 opaque cursorToken을 service request로 전달한다`() {
+        val cursorToken = MessageHistoryCursorCodec.encode(
+            MessageHistoryCursor(
+                createdAt = Instant.parse("2026-06-14T00:00:01Z"),
+                roomSeq = 1001L,
+                messageId = "msg-1001",
+            ),
+        )
+
+        mockMvc.get("/chat-rooms/10/messages/cursor") {
+            header(HttpHeaders.AUTHORIZATION, "Bearer session-token")
+            param("cursor", "999")
+            param("cursorToken", cursorToken)
+            param("limit", "50")
+        }
+            .andExpect {
+                status { isOk() }
+            }
+
+        assertEquals(999L, chatService.capturedPageRequest?.cursor)
+        assertEquals(cursorToken, chatService.capturedPageRequest?.cursorToken)
+    }
+
+    @Test
+    fun `cursor 조회는 잘못된 cursorToken을 400으로 거부한다`() {
+        mockMvc.get("/chat-rooms/10/messages/cursor") {
+            header(HttpHeaders.AUTHORIZATION, "Bearer session-token")
+            param("cursorToken", "not-a-valid-cursor")
+        }
+            .andExpect {
+                status { isBadRequest() }
+            }
+
+        assertEquals(null, chatService.capturedPageRequest)
+    }
+
     private class RecordingChatService : ChatService {
         var capturedGapLimit: Int? = null
         var capturedPageRequest: MessagePageRequest? = null
@@ -93,7 +133,9 @@ class ChatControllerTest {
             return MessagePageResponse(
                 messages = emptyList(),
                 nextCursor = null,
+                nextCursorToken = null,
                 prevCursor = null,
+                prevCursorToken = null,
                 hasNext = false,
                 hasPrev = false,
             )
