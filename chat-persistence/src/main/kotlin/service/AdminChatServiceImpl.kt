@@ -11,8 +11,7 @@ import com.chat.domain.service.AdminChatService
 import com.chat.persistence.repository.AdminAuditLogRepository
 import com.chat.persistence.repository.AdminExportJobRepository
 import com.chat.persistence.repository.AdminMessageRepository
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import com.fasterxml.jackson.databind.ObjectMapper
 import org.springframework.stereotype.Service
 import kotlin.system.measureNanoTime
 
@@ -21,9 +20,8 @@ class AdminChatServiceImpl(
     private val messageRepository: AdminMessageRepository,
     private val auditLogRepository: AdminAuditLogRepository,
     private val exportJobRepository: AdminExportJobRepository,
+    private val objectMapper: ObjectMapper,
 ) : AdminChatService {
-
-    private val objectMapper = jacksonObjectMapper().registerModule(JavaTimeModule())
 
     override fun getRoomMessages(
         actor: String,

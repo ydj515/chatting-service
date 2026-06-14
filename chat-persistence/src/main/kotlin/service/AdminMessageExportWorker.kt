@@ -11,6 +11,7 @@ import com.fasterxml.jackson.module.kotlin.readValue
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
+import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
 
@@ -72,7 +73,7 @@ class AdminMessageExportWorker(
         Files.createDirectories(directory)
         val output = directory.resolve("$jobId.csv").toAbsolutePath().normalize()
 
-        Files.newBufferedWriter(output).use { writer ->
+        Files.newBufferedWriter(output, StandardCharsets.UTF_8).use { writer ->
             writer.appendLine(
                 listOf(
                     "messageId",

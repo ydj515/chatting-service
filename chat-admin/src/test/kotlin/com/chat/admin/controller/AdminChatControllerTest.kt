@@ -21,6 +21,7 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
 import org.springframework.test.web.servlet.setup.MockMvcBuilders
+import java.time.Instant
 import java.time.LocalDateTime
 
 class AdminChatControllerTest {
@@ -64,6 +65,33 @@ class AdminChatControllerTest {
         assertEquals("admin-local", service.historyActor)
         assertEquals(10L, service.historyRequest?.roomId)
         assertEquals(1, service.historyRequest?.limit)
+    }
+
+    @Test
+    fun `관리자 history 조회는 offset date-time을 instant로 보존한다`() {
+        mockMvc.get("/admin/chat-rooms/10/messages") {
+            header("X-Admin-Token", "local-admin-token")
+            param("from", "2026-06-14T09:00:00+09:00")
+            param("to", "2026-06-14T10:00:00+09:00")
+        }
+            .andExpect {
+                status { isOk() }
+            }
+
+        assertEquals(Instant.parse("2026-06-14T00:00:00Z"), service.historyRequest?.from)
+        assertEquals(Instant.parse("2026-06-14T01:00:00Z"), service.historyRequest?.to)
+    }
+
+    @Test
+    fun `관리자 search 조회는 잘못된 날짜 형식을 400으로 거부한다`() {
+        mockMvc.get("/admin/messages/search") {
+            header("X-Admin-Token", "local-admin-token")
+            param("q", "hello")
+            param("from", "not-a-date")
+        }
+            .andExpect {
+                status { isBadRequest() }
+            }
     }
 
     @Test
@@ -232,7 +260,7 @@ class AdminChatControllerTest {
                 messageType = MessageType.TEXT,
                 content = "hello",
                 isDeleted = false,
-                createdAt = LocalDateTime.parse("2026-06-14T00:00:00"),
+                createdAt = Instant.parse("2026-06-14T00:00:00Z"),
             )
         }
     }

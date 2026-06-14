@@ -11,7 +11,7 @@ import org.springframework.jdbc.core.RowMapper
 import org.springframework.stereotype.Repository
 import java.sql.ResultSet
 import java.sql.Timestamp
-import java.time.LocalDateTime
+import java.time.Instant
 
 @Repository
 class AdminMessageRepository(
@@ -21,8 +21,8 @@ class AdminMessageRepository(
 
     fun findRoomMessages(
         roomId: Long,
-        from: LocalDateTime?,
-        to: LocalDateTime?,
+        from: Instant?,
+        to: Instant?,
         cursor: Long?,
         limit: Int,
     ): List<AdminMessageDto> {
@@ -30,11 +30,11 @@ class AdminMessageRepository(
         val args = mutableListOf<Any>(roomId)
         if (from != null) {
             where += "cm.created_at >= ?"
-            args += Timestamp.valueOf(from)
+            args += Timestamp.from(from)
         }
         if (to != null) {
             where += "cm.created_at < ?"
-            args += Timestamp.valueOf(to)
+            args += Timestamp.from(to)
         }
         if (cursor != null) {
             where += "cm.room_seq < ?"
@@ -58,8 +58,8 @@ class AdminMessageRepository(
         query: String,
         searchMode: AdminMessageSearchMode,
         roomId: Long?,
-        from: LocalDateTime?,
-        to: LocalDateTime?,
+        from: Instant?,
+        to: Instant?,
         senderId: Long?,
         cursor: Long?,
         limit: Int,
@@ -67,14 +67,16 @@ class AdminMessageRepository(
         val normalizedQuery = query.trim()
         val where = mutableListOf<String>()
         val args = mutableListOf<Any>()
-        when (searchMode) {
-            AdminMessageSearchMode.FTS -> {
-                where += "cm.content_tsv @@ plainto_tsquery('simple', ?)"
-                args += normalizedQuery
-            }
-            AdminMessageSearchMode.CONTAINS -> {
-                where += "cm.content ILIKE ?"
-                args += "%$normalizedQuery%"
+        if (normalizedQuery.isNotEmpty()) {
+            when (searchMode) {
+                AdminMessageSearchMode.FTS -> {
+                    where += "cm.content_tsv @@ plainto_tsquery('simple', ?)"
+                    args += normalizedQuery
+                }
+                AdminMessageSearchMode.CONTAINS -> {
+                    where += "cm.content ILIKE ?"
+                    args += "%$normalizedQuery%"
+                }
             }
         }
         if (roomId != null) {
@@ -83,11 +85,11 @@ class AdminMessageRepository(
         }
         if (from != null) {
             where += "cm.created_at >= ?"
-            args += Timestamp.valueOf(from)
+            args += Timestamp.from(from)
         }
         if (to != null) {
             where += "cm.created_at < ?"
-            args += Timestamp.valueOf(to)
+            args += Timestamp.from(to)
         }
         if (senderId != null) {
             where += "cm.sender_id = ?"
@@ -96,6 +98,9 @@ class AdminMessageRepository(
         if (cursor != null) {
             where += "cm.room_seq < ?"
             args += cursor
+        }
+        if (where.isEmpty()) {
+            return emptyList()
         }
         args += limit
 
@@ -180,7 +185,7 @@ class AdminMessageRepository(
                 messageType = MessageType.valueOf(rs.getString("message_type")),
                 content = rs.getString("content"),
                 isDeleted = rs.getBoolean("is_deleted"),
-                createdAt = rs.localDateTime("created_at") ?: error("created_at is required"),
+                createdAt = rs.instant("created_at") ?: error("created_at is required"),
             )
         }
 
@@ -197,8 +202,8 @@ class AdminMessageRepository(
             )
         }
 
-        fun ResultSet.localDateTime(column: String): LocalDateTime? {
-            return getTimestamp(column)?.toLocalDateTime()
+        fun ResultSet.instant(column: String): Instant? {
+            return getTimestamp(column)?.toInstant()
         }
 
         fun ResultSet.nullableInt(column: String): Int? {

@@ -22,8 +22,10 @@ import org.springframework.web.bind.annotation.RequestHeader
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
+import java.time.Instant
 import java.time.LocalDateTime
 import java.time.OffsetDateTime
+import java.time.ZoneId
 
 @RestController
 @RequestMapping("/admin")
@@ -116,12 +118,18 @@ class AdminChatController(
         return (limit ?: adminProperties.defaultLimit).coerceIn(1, maxLimit)
     }
 
-    private fun parseDateTime(value: String?): LocalDateTime? {
+    private fun parseDateTime(value: String?): Instant? {
         if (value.isNullOrBlank()) {
             return null
         }
-        return runCatching { OffsetDateTime.parse(value).toLocalDateTime() }
-            .getOrElse { LocalDateTime.parse(value) }
+        return runCatching { OffsetDateTime.parse(value).toInstant() }
+            .recoverCatching { LocalDateTime.parse(value).atZone(DEFAULT_TIME_ZONE).toInstant() }
+            .getOrElse {
+                throw ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Invalid date format: $value",
+                )
+            }
     }
 
     private fun parseSearchMode(value: String?): AdminMessageSearchMode {
@@ -147,5 +155,6 @@ class AdminChatController(
 
     private companion object {
         const val ADMIN_TOKEN_HEADER = "X-Admin-Token"
+        val DEFAULT_TIME_ZONE: ZoneId = ZoneId.of("Asia/Seoul")
     }
 }

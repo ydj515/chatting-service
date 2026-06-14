@@ -20,7 +20,7 @@ import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
 import java.nio.file.Files
 import java.nio.file.Path
-import java.time.LocalDateTime
+import java.time.Instant
 
 class AdminMessageExportWorkerTest {
 
@@ -42,13 +42,13 @@ class AdminMessageExportWorkerTest {
             AdminExportJobRecord(
                 jobId = "export-1",
                 actor = "admin-local",
-                requestJson = """{"roomId":10,"from":"2026-06-14T00:00:00","to":null,"query":null,"senderId":null}""",
+                requestJson = """{"roomId":10,"from":"2026-06-14T00:00:00Z","to":null,"query":null,"senderId":null}""",
             ),
         )
         `when`(
             messageRepository.findRoomMessages(
                 roomId = 10L,
-                from = LocalDateTime.parse("2026-06-14T00:00:00"),
+                from = Instant.parse("2026-06-14T00:00:00Z"),
                 to = null,
                 cursor = null,
                 limit = 10_000,
@@ -66,7 +66,7 @@ class AdminMessageExportWorkerTest {
         assertTrue(outputCaptor.value.startsWith("file://"))
         val csvPath = Path.of(java.net.URI.create(outputCaptor.value))
         assertTrue(Files.exists(csvPath))
-        val csv = Files.readString(csvPath)
+        val csv = Files.readString(csvPath, Charsets.UTF_8)
         assertTrue(csv.contains("messageId,clientMessageId,roomId"))
         assertTrue(csv.contains("msg-1,client-1,10,100"))
     }
@@ -84,7 +84,7 @@ class AdminMessageExportWorkerTest {
             messageType = MessageType.TEXT,
             content = "hello",
             isDeleted = false,
-            createdAt = LocalDateTime.parse("2026-06-14T00:00:00"),
+            createdAt = Instant.parse("2026-06-14T00:00:00Z"),
         )
     }
 

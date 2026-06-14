@@ -1,6 +1,7 @@
 package com.chat.domain.dto
 
 import com.chat.domain.model.MessageType
+import java.time.Instant
 import java.time.LocalDateTime
 
 data class AdminMessageDto(
@@ -15,13 +16,13 @@ data class AdminMessageDto(
     val messageType: MessageType,
     val content: String?,
     val isDeleted: Boolean,
-    val createdAt: LocalDateTime,
+    val createdAt: Instant,
 )
 
 data class AdminMessageHistoryRequest(
     val roomId: Long,
-    val from: LocalDateTime?,
-    val to: LocalDateTime?,
+    val from: Instant?,
+    val to: Instant?,
     val cursor: Long?,
     val limit: Int,
 )
@@ -35,8 +36,8 @@ data class AdminMessageSearchRequest(
     val query: String,
     val searchMode: AdminMessageSearchMode = AdminMessageSearchMode.FTS,
     val roomId: Long?,
-    val from: LocalDateTime?,
-    val to: LocalDateTime?,
+    val from: Instant?,
+    val to: Instant?,
     val senderId: Long?,
     val cursor: Long?,
     val limit: Int,
@@ -70,8 +71,8 @@ data class AdminRoomStatusDto(
 
 data class AdminExportMessagesRequest(
     val roomId: Long?,
-    val from: LocalDateTime?,
-    val to: LocalDateTime?,
+    val from: Instant?,
+    val to: Instant?,
     val query: String?,
     val senderId: Long?,
 )

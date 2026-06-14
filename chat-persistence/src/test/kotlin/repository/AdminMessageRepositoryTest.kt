@@ -11,11 +11,12 @@ import org.mockito.ArgumentMatchers.anyString
 import org.mockito.ArgumentMatchers.eq
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
+import org.mockito.Mockito.verifyNoInteractions
 import org.mockito.Mockito.`when`
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.jdbc.core.RowMapper
 import java.sql.Timestamp
-import java.time.LocalDateTime
+import java.time.Instant
 
 class AdminMessageRepositoryTest {
 
@@ -33,8 +34,8 @@ class AdminMessageRepositoryTest {
 
         repository.findRoomMessages(
             roomId = 10L,
-            from = LocalDateTime.parse("2026-06-14T00:00:00"),
-            to = LocalDateTime.parse("2026-06-15T00:00:00"),
+            from = Instant.parse("2026-06-14T00:00:00Z"),
+            to = Instant.parse("2026-06-15T00:00:00Z"),
             cursor = 100L,
             limit = 50,
         )
@@ -44,8 +45,8 @@ class AdminMessageRepositoryTest {
             sqlCaptor.capture(),
             anyAdminMessageRowMapper(),
             eq(10L),
-            eq(Timestamp.valueOf(LocalDateTime.parse("2026-06-14T00:00:00"))),
-            eq(Timestamp.valueOf(LocalDateTime.parse("2026-06-15T00:00:00"))),
+            eq(Timestamp.from(Instant.parse("2026-06-14T00:00:00Z"))),
+            eq(Timestamp.from(Instant.parse("2026-06-15T00:00:00Z"))),
             eq(100L),
             eq(50),
         )
@@ -55,6 +56,61 @@ class AdminMessageRepositoryTest {
         assertTrue(sqlCaptor.value.contains("cm.created_at < ?"))
         assertTrue(sqlCaptor.value.contains("cm.room_seq < ?"))
         assertTrue(sqlCaptor.value.contains("ORDER BY cm.room_seq DESC"))
+    }
+
+    @Test
+    fun `search query는 빈 query일 때 room 필터만으로 조회한다`() {
+        val jdbcTemplate = mock(JdbcTemplate::class.java)
+        val repository = AdminMessageRepository(jdbcTemplate)
+        `when`(
+            jdbcTemplate.query(
+                anyString(),
+                anyAdminMessageRowMapper(),
+                anyVararg(),
+            ),
+        ).thenReturn(emptyList())
+
+        repository.searchMessages(
+            query = "   ",
+            searchMode = AdminMessageSearchMode.FTS,
+            roomId = 10L,
+            from = null,
+            to = null,
+            senderId = null,
+            cursor = null,
+            limit = 25,
+        )
+
+        val sqlCaptor = ArgumentCaptor.forClass(String::class.java)
+        verify(jdbcTemplate).query(
+            sqlCaptor.capture(),
+            anyAdminMessageRowMapper(),
+            eq(10L),
+            eq(25),
+        )
+        assertTrue(!sqlCaptor.value.contains("plainto_tsquery"))
+        assertTrue(!sqlCaptor.value.contains("ILIKE"))
+        assertTrue(sqlCaptor.value.contains("cm.room_id = ?"))
+    }
+
+    @Test
+    fun `search query는 query와 필터가 모두 없으면 전체 scan을 피한다`() {
+        val jdbcTemplate = mock(JdbcTemplate::class.java)
+        val repository = AdminMessageRepository(jdbcTemplate)
+
+        val result = repository.searchMessages(
+            query = "   ",
+            searchMode = AdminMessageSearchMode.FTS,
+            roomId = null,
+            from = null,
+            to = null,
+            senderId = null,
+            cursor = null,
+            limit = 25,
+        )
+
+        assertEquals(emptyList<AdminMessageDto>(), result)
+        verifyNoInteractions(jdbcTemplate)
     }
 
     @Test

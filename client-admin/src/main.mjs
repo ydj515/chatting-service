@@ -4,6 +4,7 @@ import {
   fetchAdminRoomStatus,
   searchAdminMessages,
 } from './services/adminApi.mjs';
+import { appendMetric } from './services/rendering.mjs';
 
 const state = {
   baseUrl: localStorage.getItem('client_admin_base_url') || '/api',
@@ -73,10 +74,7 @@ async function loadStatus() {
     ['Replica Lag', status.replicaLagMs == null ? 'n/a' : `${status.replicaLagMs}ms`],
     ['Search p95', status.searchP95LatencyMs == null ? 'n/a' : `${status.searchP95LatencyMs}ms`],
   ].forEach(([label, value]) => {
-    const item = document.createElement('div');
-    item.className = 'metric';
-    item.innerHTML = `<span>${label}</span><strong>${value}</strong>`;
-    statusGrid.appendChild(item);
+    appendMetric(statusGrid, document, label, value);
   });
 }
 

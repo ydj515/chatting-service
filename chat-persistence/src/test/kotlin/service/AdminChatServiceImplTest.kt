@@ -10,6 +10,8 @@ import com.chat.domain.model.MessageType
 import com.chat.persistence.repository.AdminAuditLogRepository
 import com.chat.persistence.repository.AdminExportJobRepository
 import com.chat.persistence.repository.AdminMessageRepository
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
+import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -19,6 +21,7 @@ import org.mockito.ArgumentMatchers.eq
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
+import java.time.Instant
 import java.time.LocalDateTime
 
 class AdminChatServiceImplTest {
@@ -133,7 +136,7 @@ class AdminChatServiceImplTest {
             actor = "admin-local",
             request = AdminExportMessagesRequest(
                 roomId = 10L,
-                from = null,
+                from = Instant.parse("2026-06-14T00:00:00Z"),
                 to = null,
                 query = "hello",
                 senderId = null,
@@ -162,6 +165,7 @@ class AdminChatServiceImplTest {
                 messageRepository = messageRepository,
                 auditLogRepository = auditRepository,
                 exportJobRepository = exportJobRepository,
+                objectMapper = jacksonObjectMapper().registerModule(JavaTimeModule()),
             ),
         )
     }
@@ -179,7 +183,7 @@ class AdminChatServiceImplTest {
             messageType = MessageType.TEXT,
             content = "hello",
             isDeleted = false,
-            createdAt = LocalDateTime.parse("2026-06-14T00:00:00"),
+            createdAt = Instant.parse("2026-06-14T00:00:00Z"),
         )
     }
 
