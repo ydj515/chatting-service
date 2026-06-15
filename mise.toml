@@ -1,7 +1,7 @@
 [tools]
 java = "21.0.2"
 gradle = "8.14.5"
-node = "24.12.0"
+node = "24.13.0"
 
 [task_config]
 dir = "{{ config_root }}"
