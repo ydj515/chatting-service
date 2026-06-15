@@ -1,14 +1,14 @@
 plugins {
-    kotlin("jvm")
-    kotlin("plugin.spring")
-    kotlin("plugin.jpa")
-    id("org.springframework.boot") version "3.3.4"
-    id("io.spring.dependency-management")
+    alias(libs.plugins.kotlin.jvm)
+    alias(libs.plugins.kotlin.spring)
+    alias(libs.plugins.kotlin.jpa)
+    alias(libs.plugins.spring.boot)
+    alias(libs.plugins.spring.dependency.management)
 }
 
 dependencyManagement {
     imports {
-        mavenBom("org.springframework.boot:spring-boot-dependencies:3.3.4")
+        mavenBom(libs.spring.boot.dependencies.get().toString())
     }
 }
 
@@ -17,10 +17,10 @@ dependencies {
     implementation(project(":chat-domain"))
     implementation(project(":chat-persistence"))
 
-    implementation("org.springframework.boot:spring-boot-starter-web")
-    implementation("org.springframework.boot:spring-boot-starter-actuator")
-    implementation("org.springframework.boot:spring-boot-starter-data-jpa")
+    implementation(libs.spring.boot.starter.web)
+    implementation(libs.spring.boot.starter.actuator)
+    implementation(libs.spring.boot.starter.data.jpa)
 
-    runtimeOnly("org.postgresql:postgresql")
-    runtimeOnly("com.h2database:h2")
+    runtimeOnly(libs.postgresql)
+    runtimeOnly(libs.h2)
 }

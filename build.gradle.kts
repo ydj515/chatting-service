@@ -1,10 +1,12 @@
 plugins {
-    kotlin("jvm") version "2.0.21" apply false
-    kotlin("plugin.spring") version "2.0.21" apply false
-    id("org.springframework.boot") version "3.3.4" apply false
-    id("io.spring.dependency-management") version "1.1.6" apply false
-    kotlin("plugin.jpa") version "2.0.21" apply false
+    alias(libs.plugins.kotlin.jvm) apply false
+    alias(libs.plugins.kotlin.spring) apply false
+    alias(libs.plugins.spring.boot) apply false
+    alias(libs.plugins.spring.dependency.management) apply false
+    alias(libs.plugins.kotlin.jpa) apply false
 }
+
+val rootLibs = libs
 
 allprojects {
     group = "com.chat"
@@ -24,11 +26,11 @@ subprojects {
         val testImplementation by configurations
         val testRuntimeOnly by configurations
 
-        implementation("org.jetbrains.kotlin:kotlin-reflect")
-        implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
-        testImplementation("org.springframework.boot:spring-boot-starter-test")
-        testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
-        testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+        implementation(rootLibs.kotlin.reflect)
+        implementation(rootLibs.jackson.module.kotlin)
+        testImplementation(rootLibs.spring.boot.starter.test)
+        testImplementation(rootLibs.kotlin.test.junit5)
+        testRuntimeOnly(rootLibs.junit.platform.launcher)
     }
 
     tasks.withType<Test> {

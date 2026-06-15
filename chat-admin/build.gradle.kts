@@ -1,20 +1,20 @@
 plugins {
-    kotlin("jvm")
-    kotlin("plugin.spring")
-    id("io.spring.dependency-management")
+    alias(libs.plugins.kotlin.jvm)
+    alias(libs.plugins.kotlin.spring)
+    alias(libs.plugins.spring.dependency.management)
 }
 
 dependencyManagement {
     imports {
-        mavenBom("org.springframework.boot:spring-boot-dependencies:3.3.4")
+        mavenBom(libs.spring.boot.dependencies.get().toString())
     }
 }
 
 dependencies {
     implementation(project(":chat-domain"))
 
-    implementation("org.springframework.boot:spring-boot-starter-web")
-    implementation("org.springframework.boot:spring-boot-starter-validation")
-    implementation("org.springframework.data:spring-data-commons")
-    implementation("org.springframework.boot:spring-boot-starter-actuator")
+    implementation(libs.spring.boot.starter.web)
+    implementation(libs.spring.boot.starter.validation)
+    implementation(libs.spring.data.commons)
+    implementation(libs.spring.boot.starter.actuator)
 }

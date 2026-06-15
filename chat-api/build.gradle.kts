@@ -1,12 +1,12 @@
 plugins {
-    kotlin("jvm")
-    kotlin("plugin.spring")
-    id("io.spring.dependency-management")
+    alias(libs.plugins.kotlin.jvm)
+    alias(libs.plugins.kotlin.spring)
+    alias(libs.plugins.spring.dependency.management)
 }
 
 dependencyManagement {
     imports {
-        mavenBom("org.springframework.boot:spring-boot-dependencies:3.3.4")
+        mavenBom(libs.spring.boot.dependencies.get().toString())
     }
 }
 
@@ -15,13 +15,13 @@ dependencies {
     implementation(project(":chat-domain"))
 
     // REST API 기능
-    implementation("org.springframework.boot:spring-boot-starter-web")
+    implementation(libs.spring.boot.starter.web)
 
     // 입력 데이터 검증
-    implementation("org.springframework.boot:spring-boot-starter-validation")
+    implementation(libs.spring.boot.starter.validation)
 
     // 페이징 지원
-    implementation("org.springframework.data:spring-data-commons")
+    implementation(libs.spring.data.commons)
 
-    implementation("org.springframework.boot:spring-boot-starter-actuator")
+    implementation(libs.spring.boot.starter.actuator)
 }
