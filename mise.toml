@@ -3,47 +3,85 @@ java = "21.0.2"
 gradle = "8.14.5"
 node = "24.12.0"
 
+[task_config]
+dir = "{{ config_root }}"
+
 [tasks.default]
 description = "사용 가능한 mise 태스크 목록을 출력한다."
 run = "mise tasks"
 
+# ---------- setup ----------
+
 [tasks.setup]
-description = "프로젝트 도구와 클라이언트 의존성을 설치한다."
-depends = ["setup:tools", "setup:client"]
+description = "개발 도구 설치 후 클라이언트 의존성을 설치한다."
+run = [
+  { task = "setup:tools" },
+  { tasks = ["setup:client", "setup:client-admin"] },
+]
 
 [tasks."setup:tools"]
 description = "mise.toml에 정의된 개발 도구를 설치한다."
 run = "mise install"
 
 [tasks."setup:client"]
-description = "React 클라이언트 npm 의존성을 설치한다."
+description = "일반 사용자 클라이언트 의존성을 lockfile 기준으로 설치한다."
 dir = "client"
 run = "npm ci"
 
+[tasks."setup:client-admin"]
+description = "관리자 클라이언트 의존성을 lockfile 기준으로 설치한다."
+dir = "client-admin"
+run = "npm ci"
+
+# ---------- build ----------
+
 [tasks.build]
 description = "백엔드와 클라이언트를 모두 빌드한다."
-depends = ["build:backend", "build:client"]
+run = [
+  { tasks = ["build:backend", "build:client", "build:client-admin"] },
+]
 
 [tasks."build:backend"]
-description = "Gradle 백엔드 전체 빌드를 실행한다."
+description = "Gradle 백엔드를 빌드한다."
 run = "./gradlew clean build --no-daemon"
 
 [tasks."build:client"]
-description = "React 클라이언트 프로덕션 빌드를 실행한다."
+description = "일반 사용자 클라이언트 프로덕션 빌드를 실행한다."
 dir = "client"
 run = "npm run build"
 
+[tasks."build:client-admin"]
+description = "관리자 클라이언트 프로덕션 빌드를 실행한다."
+dir = "client-admin"
+run = "npm run build"
+
+# ---------- test / check ----------
+
 [tasks.test]
-description = "백엔드 테스트를 실행한다."
-depends = ["test:backend"]
+description = "전체 테스트를 실행한다."
+run = [
+  { task = "test:backend" },
+]
 
 [tasks."test:backend"]
 description = "Gradle 백엔드 테스트를 실행한다."
 run = "./gradlew test --no-daemon"
 
 [tasks.check]
-description = "빌드와 Docker Compose 설정 검증을 실행한다."
-depends = ["build", "verify:compose"]
+description = "빠른 로컬 검증을 실행한다."
+run = [
+  { task = "test:backend" },
+  { task = "verify:compose" },
+]
+
+[tasks."check:ci"]
+description = "CI 수준의 전체 빌드와 검증을 실행한다."
+run = [
+  { task = "build" },
+  { task = "verify:compose" },
+]
+
+# ---------- verify ----------
 
 [tasks."verify:compose"]
 description = "Docker Compose 설정 파일을 검증한다."
@@ -51,41 +89,66 @@ run = "docker compose config --quiet"
 
 [tasks."verify:postgres-replica"]
 description = "PostgreSQL primary/read-replica와 partition archive worker 구성을 검증한다."
-run = """
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
 docker compose up -d postgres postgres-primary-setup postgres-replica postgres-partition-archive
-docker compose exec -T postgres psql -U ${DB_USERNAME:-chatuser} -d ${DB_NAME:-chatdb} -Atc "select usename,state,sync_state from pg_stat_replication;"
-docker compose exec -T postgres-replica psql -U ${DB_USERNAME:-chatuser} -d ${DB_NAME:-chatdb} -Atc "select pg_is_in_recovery(), to_regclass('public.chat_messages') is not null;"
-docker compose run --rm -e CHAT_PARTITION_ARCHIVE_RUN_ONCE=true postgres-partition-archive
-"""
+
+docker compose exec -T postgres \
+  psql -U "${DB_USERNAME:-chatuser}" -d "${DB_NAME:-chatdb}" \
+  -Atc "select usename,state,sync_state from pg_stat_replication;"
+
+docker compose exec -T postgres-replica \
+  psql -U "${DB_USERNAME:-chatuser}" -d "${DB_NAME:-chatdb}" \
+  -Atc "select pg_is_in_recovery(), to_regclass('public.chat_messages') is not null;"
+
+docker compose run --rm \
+  -e CHAT_PARTITION_ARCHIVE_RUN_ONCE=true \
+  postgres-partition-archive
+'''
 
 [tasks."verify:chat"]
 description = "실행 중인 채팅 클러스터의 REST, WebSocket, 메시지 저장 흐름을 검증한다."
 run = "node scripts/verify-chat.mjs"
 
-[tasks.start]
-description = "전체 채팅 클러스터를 백그라운드로 기동한다."
-depends = ["start:all"]
+# ---------- start / stop ----------
 
-[tasks."start:all"]
-description = "PostgreSQL, Redis, 역할별 애플리케이션, nginx를 모두 빌드 및 기동한 뒤 nginx upstream DNS를 갱신한다."
-run = """
+[tasks.start]
+description = "백엔드 인프라 및 앱을 기동한 뒤 일반 사용자 및 관리자 클라이언트 개발 서버까지 모두 실행한다."
+run = [
+  { task = "start:backend" },
+  { tasks = ["start:client", "start:client-admin"] },
+]
+
+[tasks."start:backend"]
+description = "Docker Compose 백엔드 클러스터를 빌드 및 기동한다."
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
 docker compose up -d --build --wait --wait-timeout 180
 docker compose restart nginx
 docker compose up -d --wait --wait-timeout 60 nginx
-"""
-
-[tasks."restart:nginx"]
-description = "Docker Compose nginx를 재시작해 app 컨테이너 재생성 후 upstream DNS를 갱신한다."
-run = "docker compose restart nginx"
+'''
 
 [tasks."start:infra"]
 description = "로컬 개발용 PostgreSQL primary/read-replica, partition archive worker, Redis를 기동한다."
 run = "docker compose up -d postgres postgres-primary-setup postgres-replica postgres-partition-archive redis"
 
 [tasks."start:client"]
-description = "React 클라이언트 개발 서버를 기동한다."
+description = "일반 사용자 클라이언트 개발 서버를 실행한다."
 dir = "client"
 run = "npm start"
+
+[tasks."start:client-admin"]
+description = "관리자 클라이언트 개발 서버를 실행한다."
+dir = "client-admin"
+run = "npm run build && npx serve dist -p 5174"
+
+[tasks."restart:nginx"]
+description = "nginx를 재시작해 upstream DNS를 갱신한다."
+run = "docker compose restart nginx"
 
 [tasks.ps]
 description = "Docker Compose 서비스 상태를 확인한다."
@@ -101,4 +164,5 @@ run = "docker compose down"
 
 [tasks."clean:infra"]
 description = "Docker Compose 서비스와 볼륨을 함께 제거한다."
+confirm = "Docker 볼륨까지 삭제합니다. 로컬 DB 데이터가 사라질 수 있습니다. 계속할까요?"
 run = "docker compose down --volumes --remove-orphans"
