@@ -69,6 +69,8 @@ Nginx는 역할별 upstream으로 트래픽을 분리합니다.
 
 `chat-worker-app-1`은 외부 HTTP 트래픽을 받지 않고, Redis/DB 기반 비동기 작업을 담당합니다.
 
+전체 시스템 아키텍처 구조와 구체적인 메시지 전송 및 실시간 전파 흐름은 [architecture_overview.md](./architecture_overview.md)를 참고하시기 바랍니다.
+
 ### Docker Compose Nginx DNS Stale
 
 로컬 Compose에서 app 컨테이너를 재생성하면 컨테이너 IP가 바뀔 수 있습니다. Nginx는 일반적인 `upstream` 설정에서 hostname을 시작 시점에 resolve하므로, nginx를 재시작하지 않으면 이전 IP를 계속 바라볼 수 있습니다.
@@ -128,3 +130,4 @@ mise run verify:chat
 | [redis_cluster_key_naming.md](./redis_cluster_key_naming.md) | Redis Cluster key naming, hash slot, hash tag 정책 |
 | [observability_metrics.md](./observability_metrics.md) | Phase 7 dashboard metric, alert, cardinality 정책 |
 | [phase7_reconnect_load_test_scenarios.md](./phase7_reconnect_load_test_scenarios.md) | 정상 reconnect 실패율과 ticket rate limit 원자성 판단용 synthetic load test 시나리오 |
+| [architecture_overview.md](./architecture_overview.md) | 분산 웹소켓 서버 아키텍처 및 실시간 채팅 데이터 흐름 (Mermaid 다이어그램) |
