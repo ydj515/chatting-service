@@ -3,6 +3,7 @@ import { User, ChatRoom, LoginResponse, Notification } from './types/index';
 import LoginForm from './components/LoginForm.tsx';
 import ChatRoomList from './components/ChatRoomList.tsx';
 import { ChatWindow } from './components/ChatWindow.tsx';
+import InfoTooltip from './components/ui/InfoTooltip.tsx';
 import { healthApi, setSessionToken as setApiSessionToken } from './services/api.ts';
 import { appConfig } from './config/appConfig.ts';
 import { 
@@ -111,18 +112,37 @@ function App() {
     loadUserFromStorage();
   }, [loadUserFromStorage]);
 
-  // 테마 적용
+  // 테마 적용 (DOM 클래스만 토글 — 저장은 수동 토글 시에만)
   useEffect(() => {
     if (theme === 'dark') {
       document.documentElement.classList.add('dark');
     } else {
       document.documentElement.classList.remove('dark');
     }
-    localStorage.setItem('chat_theme', theme);
   }, [theme]);
 
+  // OS 테마 변경 실시간 반영 — 사용자가 직접 토글한 적이 없을 때만 OS를 따른다.
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    const handler = (event: MediaQueryListEvent) => {
+      if (!localStorage.getItem('chat_theme')) {
+        setTheme(event.matches ? 'dark' : 'light');
+      }
+    };
+    mq.addEventListener?.('change', handler);
+    return () => mq.removeEventListener?.('change', handler);
+  }, []);
+
   const toggleTheme = () => {
-    setTheme(prev => prev === 'light' ? 'dark' : 'light');
+    setTheme(prev => {
+      const next = prev === 'light' ? 'dark' : 'light';
+      try {
+        localStorage.setItem('chat_theme', next);
+      } catch {
+        // localStorage 비활성 환경은 무시
+      }
+      return next;
+    });
   };
 
   // 서버 상태 확인
@@ -359,7 +379,7 @@ function App() {
       {/* 메인 컨텐츠 */}
       {!currentUser ? (
         // 로그인 화면
-        <div className="flex justify-center items-center h-screen w-screen bg-gradient-to-br from-primary to-secondary p-6">
+        <div className="flex justify-center items-center h-screen w-screen bg-bg-secondary p-6">
           {serverStatus === 'offline' ? (
             <div className="text-center p-8 bg-bg-secondary rounded-lg shadow-lg max-w-[400px]">
               <div className="text-5xl mb-4">
@@ -396,11 +416,12 @@ function App() {
             onError={handleError}
           />
           {selectedChatRoom && sessionToken ? (
-            <ChatWindow 
+            <ChatWindow
               chatRoom={selectedChatRoom}
               currentUser={currentUser}
               sessionToken={sessionToken}
               onError={handleError}
+              onSuccess={handleSuccess}
             />
           ) : (
             <div className="flex-1 flex flex-col justify-center items-center bg-bg-tertiary text-text-secondary p-8 animate-fade-in">
@@ -415,12 +436,21 @@ function App() {
                 <h4 className="m-0 mb-4 text-text-primary text-base font-semibold">
                   주요 기능
                 </h4>
-                <ul className="m-0 pl-4 text-sm text-text-secondary leading-relaxed">
-                  <li>실시간 메시지 전송</li>
-                  <li>타이핑 인디케이터</li>
-                  <li>채팅방 생성 및 관리</li>
-                  <li>분산 서버 지원</li>
-                  <li>커서 기반 페이징</li>
+                <ul className="m-0 flex flex-col gap-1.5 text-sm text-text-secondary leading-relaxed list-none p-0">
+                  <li className="flex items-center gap-1.5">실시간 메시지 전송</li>
+                  <li className="flex items-center gap-1.5">
+                    타이핑 인디케이터
+                    <InfoTooltip tip="상대방이 메시지를 입력 중일 때 '입력 중...' 표시를 실시간으로 보여주는 기능입니다." />
+                  </li>
+                  <li className="flex items-center gap-1.5">채팅방 생성 및 관리</li>
+                  <li className="flex items-center gap-1.5">
+                    분산 서버 지원
+                    <InfoTooltip tip="여러 대의 채팅 서버에 연결이 나뉘어도 메시지가 모든 서버의 사용자에게 전달됩니다. 트래픽이 늘어나면 서버를 늘려 수평 확장할 수 있습니다." />
+                  </li>
+                  <li className="flex items-center gap-1.5">
+                    커서 기반 페이징
+                    <InfoTooltip tip="페이지 번호 대신 마지막으로 읽은 메시지 위치(커서)를 기준으로 다음 묶음을 불러오는 방식입니다. 메시지가 계속 쌓여도 누락이나 중복 없이 안정적으로 페이징됩니다." />
+                  </li>
                 </ul>
               </div>
             </div>

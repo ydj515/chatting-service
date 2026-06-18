@@ -82,3 +82,6 @@ logs/
 
 # Playwright
 .playwright-mcp
+
+# DesignSystem
+design-system

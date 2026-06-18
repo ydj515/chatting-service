@@ -15,6 +15,150 @@ const searchBody = document.querySelector('#search-body');
 const statusGrid = document.querySelector('#status-grid');
 const notice = document.querySelector('#notice');
 
+const THEME_STORAGE_KEY = 'admin_theme';
+const themeToggle = document.querySelector('#theme-toggle');
+const prefersDark = window.matchMedia('(prefers-color-scheme: dark)');
+
+function hasExplicitTheme() {
+  try {
+    return Boolean(localStorage.getItem(THEME_STORAGE_KEY));
+  } catch (error) {
+    return false;
+  }
+}
+
+if (themeToggle) {
+  themeToggle.addEventListener('click', () => {
+    const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    try {
+      localStorage.setItem(THEME_STORAGE_KEY, next);
+    } catch (error) {
+      // localStorage 비활성 환경은 무시
+    }
+  });
+}
+
+// OS 테마 변경 실시간 반영 — 사용자가 직접 토글한 적이 없을 때만 OS를 따른다.
+const handlePrefersChange = (event) => {
+  if (hasExplicitTheme()) {
+    return;
+  }
+  document.documentElement.setAttribute('data-theme', event.matches ? 'dark' : 'light');
+};
+if (typeof prefersDark.addEventListener === 'function') {
+  prefersDark.addEventListener('change', handlePrefersChange);
+} else if (typeof prefersDark.addListener === 'function') {
+  prefersDark.addListener(handlePrefersChange); // 구형 Safari 폴백
+}
+
+// 도움말 아이콘: 'i' 표기 + 가장자리 감지로 툴팁 위치 자동 보정
+const helpEls = document.querySelectorAll('.help');
+function positionTip(el) {
+  const rect = el.getBoundingClientRect();
+  el.classList.remove('tip-start', 'tip-end', 'tip-below');
+  if (rect.left < 150) {
+    el.classList.add('tip-start');
+  } else if (window.innerWidth - rect.right < 150) {
+    el.classList.add('tip-end');
+  }
+  if (rect.top < 120) {
+    el.classList.add('tip-below');
+  }
+}
+helpEls.forEach((el) => {
+  el.textContent = 'i';
+  el.addEventListener('mouseenter', () => positionTip(el));
+  el.addEventListener('focus', () => positionTip(el));
+});
+
+// 상세 필터 — 접힌 상태에서도 적용 중인 항목을 개수 배지 + 개별 칩(X로 제거)으로 표시
+const advancedBadge = document.querySelector('#advanced-badge');
+const activeFilters = document.querySelector('#active-filters');
+
+// 상세 필터 정의: id, 표시 라벨, 기본값(이 값이면 비활성으로 간주), 칩 표시 변환
+const advancedDefs = [
+  { id: 'sender-id', label: 'Sender ID', def: '' },
+  { id: 'from', label: 'From', def: '', display: (v) => v.replace('T', ' ') },
+  { id: 'to', label: 'To', def: '', display: (v) => v.replace('T', ' ') },
+  { id: 'limit', label: 'Limit', def: '50' },
+];
+
+function activeAdvanced() {
+  return advancedDefs
+    .map((def) => {
+      const el = document.querySelector('#' + def.id);
+      return { ...def, el, value: el.value.trim() };
+    })
+    .filter((def) => def.value !== '' && def.value !== def.def);
+}
+
+function clearAdvanced(def) {
+  def.el.value = def.def;
+  updateAdvancedFilters();
+}
+
+function updateAdvancedFilters() {
+  const active = activeAdvanced();
+
+  // 토글 옆 개수 배지
+  if (active.length > 0) {
+    advancedBadge.textContent = String(active.length);
+    advancedBadge.hidden = false;
+  } else {
+    advancedBadge.hidden = true;
+  }
+
+  // 개별 칩
+  activeFilters.innerHTML = '';
+  if (active.length === 0) {
+    activeFilters.hidden = true;
+    return;
+  }
+  activeFilters.hidden = false;
+
+  active.forEach((def) => {
+    const shown = def.display ? def.display(def.value) : def.value;
+    const chip = document.createElement('span');
+    chip.className = 'filter-chip';
+
+    const text = document.createElement('span');
+    text.append(`${def.label} · `);
+    const strong = document.createElement('b');
+    strong.textContent = shown; // 사용자 입력 — textContent로 안전하게 삽입
+    text.appendChild(strong);
+
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'chip-remove';
+    remove.setAttribute('aria-label', `${def.label} 필터 제거`);
+    remove.innerHTML =
+      '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>';
+    remove.addEventListener('click', () => clearAdvanced(def));
+
+    chip.appendChild(text);
+    chip.appendChild(remove);
+    activeFilters.appendChild(chip);
+  });
+
+  const reset = document.createElement('button');
+  reset.type = 'button';
+  reset.className = 'chips-reset';
+  reset.textContent = '전체 해제';
+  reset.addEventListener('click', () => {
+    advancedDefs.forEach((def) => {
+      document.querySelector('#' + def.id).value = def.def;
+    });
+    updateAdvancedFilters();
+  });
+  activeFilters.appendChild(reset);
+}
+
+['sender-id', 'from', 'to', 'limit'].forEach((id) => {
+  document.querySelector('#' + id).addEventListener('input', updateAdvancedFilters);
+});
+updateAdvancedFilters();
+
 document.querySelector('#base-url').value = state.baseUrl;
 document.querySelector('#admin-token').value = state.token;
 document.querySelector('#room-id').value = state.roomId;
