@@ -4,6 +4,10 @@ const messageKey = (message: Message): string => {
   return message.messageId ?? `legacy:${message.id}`;
 };
 
+export const messageRenderKey = (message: Message): string => {
+  return messageKey(message);
+};
+
 const eventTimestampToIso = (timestamp: string | number | undefined): string => {
   if (typeof timestamp === 'number') {
     return new Date(timestamp).toISOString();

@@ -54,7 +54,7 @@
 - 전체 원본 보장: 수락된 메시지는 모두 PostgreSQL canonical store에 저장하고, history/gap fill/admin/export에서 전체 조회를 보장한다.
 - 모든 메시지 실시간 전달: 일반 방 또는 중간 규모 방에서는 가능하면 제공하되, hot room에서는 bounded live feed와 backpressure를 우선한다.
 - 메시지 정렬: `roomSeq`와 `createdAt`으로 방별 결정적 정렬을 제공한다.
-- sequence 정책: 완전 연속 gapless sequence를 필수 조건으로 두지 않는다. 장애, sequence block 선할당, 재시도 때문에 gap을 허용한다.
+- sequence 정책: 완전 연속 gapless sequence를 필수 조건으로 두지 않는다. 다만 같은 방의 `roomSeq` 상대 순서는 서버 수락 순서를 따라야 하므로 Gateway별 sequence block 선할당은 사용하지 않는다. Redis counter `INCR 1` 실패나 Streams append 실패로 생기는 gap은 허용한다.
 - 복구 정책: WebSocket 실시간 전달은 유실/중복 가능성을 인정하고, `messageId` 중복 제거와 `roomSeq` gap fill API로 보정한다.
 - 관리자/감사: 수락된 메시지는 모두 PostgreSQL canonical store에 저장하고, 관리자 조회는 canonical store 기준으로 정확성을 확보한다.
 
@@ -275,25 +275,25 @@ fan-out batch 예시:
 권장 방식:
 
 - `messageId`: time-sortable ID를 사용한다. 예: ULID, UUIDv7, Snowflake 계열 ID
-- `roomSeq`: Redis Cluster의 `INCRBY`로 sequence block을 할당한다.
+- `roomSeq`: Redis Cluster의 방별 단일 counter에 메시지마다 `INCR 1`을 호출한다.
 
 예시:
 
-1. Gateway/API Pod가 `room:{roomId}:seq`에 대해 `INCRBY 1000`을 호출한다.
-2. 반환값이 `5000`이면 해당 Pod는 `4001..5000` 범위의 sequence block을 가진다.
-3. 이후 메시지 1000개는 로컬 메모리에서 순차 할당한다.
-4. block이 소진되면 다시 Redis에서 block을 받는다.
+1. Gateway/API Pod가 `room:{roomId}:seq`에 대해 `INCR 1`을 호출한다.
+2. 반환값을 해당 메시지의 canonical `roomSeq`로 사용한다.
+3. Redis Streams append가 실패하면 메시지 수락도 실패한다. 이때 이미 발급된 sequence gap은 허용한다.
 
 장점:
 
-- 메시지마다 Redis `INCR`을 호출하지 않는다.
-- 방별 순서가 유지된다.
-- hot room에서도 sequence 발급 비용을 줄일 수 있다.
+- WebSocket Gateway가 여러 대여도 같은 방의 수락 순서가 `roomSeq`에 반영된다.
+- 클라이언트, history, gap fill, admin/export가 같은 ordering key를 사용한다.
+- sequence gap은 허용하되, 실제 수락 순서와 화면 정렬 순서가 뒤집히지 않는다.
 
 주의할 점:
 
-- Pod가 sequence block을 받은 뒤 장애가 나면 일부 sequence가 비게 된다.
-- sequence는 반드시 연속일 필요가 없고, 정렬 가능한 단조 증가값이면 충분하다는 정책을 명시해야 한다.
+- 메시지마다 Redis counter 호출이 1회 발생한다.
+- hot room이 Redis 단일 counter를 압박하기 시작하면 slow mode, room rate limit, ingest partition ownership, 별도 sequencer service를 검토한다.
+- sequence는 반드시 연속일 필요가 없지만, 발급된 sequence의 상대 순서는 방 단위 서버 수락 순서를 나타내야 한다.
 
 ### 6.5 Redis Cluster
 
@@ -303,7 +303,7 @@ fan-out batch 예시:
 - Gateway별 구독 방 목록 저장
 - room routing 정보 저장
 - rate limit counter 저장
-- sequence block 발급
+- room sequence counter 발급
 - Redis Streams ingest buffer
 - Redis Sharded Pub/Sub fan-out
 
@@ -1429,7 +1429,7 @@ curl -fsS http://localhost/api/actuator/health
   - `writeShard`
   - `fanoutShard`
   - `createdAt`
-- `MessageSequenceService`를 Redis `INCRBY` 기반 sequence block 할당 방식으로 바꾼다.
+- `MessageSequenceService`는 같은 방의 모든 WebSocket Gateway가 공유하는 Redis counter에 메시지마다 `INCR 1`을 수행해 `roomSeq`를 발급한다.
 - `clientMessageId + senderId + roomId`에 대한 idempotency 정책을 추가한다.
 - 같은 `clientMessageId` 재전송은 같은 `messageId`와 같은 결과를 반환한다.
 - `MESSAGE_ACCEPTED` ACK 이벤트 계약을 추가한다.
@@ -1459,7 +1459,7 @@ curl -fsS http://localhost/api/actuator/health
 
 - 새 메시지는 `messageId`, `clientMessageId`, `roomSeq`를 가진다.
 - 같은 `clientMessageId` 재전송이 중복 저장되지 않는다.
-- sequence block을 받은 Pod가 죽어도 gap은 허용되고 정렬은 유지된다.
+- sequence gap은 허용되지만, 같은 방에서 나중에 수락된 메시지가 먼저 수락된 메시지보다 낮은 `roomSeq`를 받지 않는다.
 - 클라이언트는 ACK와 실제 broadcast event를 별도로 처리한다.
 - 클라이언트는 단건 event와 batch event를 모두 파싱할 수 있다.
 - 기존 `mise run verify:chat` 흐름이 새 계약으로 통과한다.
@@ -1469,7 +1469,7 @@ curl -fsS http://localhost/api/actuator/health
 ```bash
 ./gradlew test --no-daemon
 ./gradlew test --tests '*MessageSequenceServiceTest' --no-daemon
-cd client && npm test -- --run
+npm --prefix client run test:unit
 mise run verify:chat
 ```
 
@@ -1828,9 +1828,11 @@ node scripts/load-chat.mjs --room hot --viewers 10000 --messages-per-sec 10000 -
 - Dockerfile을 `APP_MODULE` 기반으로 특정 실행 모듈을 빌드/복사하도록 변경 완료.
 - Nginx 라우팅을 `/api/ws/` -> `chat-websocket-application`, `/api/admin/` -> `chat-admin-application`, 일반 `/api/` -> `chat-api-application`으로 분리 완료.
 - Compose 서비스를 `chat-api-app-*`, `chat-websocket-app-*`, `chat-worker-app-*`, `chat-admin-app-*`로 분리 완료.
-- Phase 2 구현 완료: 새 메시지는 `messageId`, `clientMessageId`, `roomSeq`, `streamShard`, `writeShard`, `fanoutShard`를 가지며, Redis `INCRBY` sequence block과 `(roomId, senderId, clientMessageId)` idempotency를 사용한다. WebSocket은 `MESSAGE_ACCEPTED`, `CHAT_MESSAGE`, `CHAT_MESSAGE_BATCH` 계약을 갖고, 클라이언트는 `messageId` 중복 제거와 `roomSeq` 정렬을 수행한다.
+- Phase 2 구현 완료: 새 메시지는 `messageId`, `clientMessageId`, `roomSeq`, `streamShard`, `writeShard`, `fanoutShard`를 가지며, Redis room sequence와 `(roomId, senderId, clientMessageId)` idempotency를 사용한다. WebSocket은 `MESSAGE_ACCEPTED`, `CHAT_MESSAGE`, `CHAT_MESSAGE_BATCH` 계약을 갖고, 클라이언트는 `messageId` 중복 제거와 `roomSeq` 정렬을 수행한다.
 - Phase 2.5 구현 완료: `POST /api/ws-tickets`로 WebSocket one-time ticket을 발급하고, Redis에는 `sha256(ticket)` key와 TTL 30초 user context만 저장한다. WebSocket handshake는 ticket을 원자 consume하며, docker/production 설정에서는 reusable session token query fallback을 비활성화한다. 클라이언트와 verify script는 connect/reconnect 직전에 새 ticket을 발급받는다.
 - Phase 3 vertical slice 구현 완료: Redis Streams append gate, stream key index, `MessageWriterWorker` consumer group, `HotRoomFanoutWorker` batch fan-out, pending claim, dead letter stream, 역할 기반 worker scheduler를 도입했다. 메시지 인입 경로는 Streams append 성공 후 동기 JPA 저장이나 직접 Pub/Sub fan-out 없이 수락 DTO를 반환하고, compatibility history 저장과 batch fan-out은 worker가 담당한다.
+- Phase 6 ordering 정정 완료: 방 `id=3`에서 WebSocket Gateway별 sequence block 선할당으로 `room_seq=1001..1016` 메시지보다 나중에 생성된 `room_seq=46..53` 메시지가 화면에서 먼저 표시되는 문제가 확인되었다. 트위치 같은 스트리밍 채팅에서는 같은 방의 live feed가 서버 수락 순서를 따라야 하므로 `MessageSequenceService`는 로컬 block cache를 제거하고 메시지마다 Redis `INCR 1`로 `roomSeq`를 발급한다. 실시간 fanout payload는 `id=roomSeq`를 내려보내고, 클라이언트 렌더 key는 `messageId`를 우선 사용한다.
+- 기존 데이터 주의: 이 코드 변경은 앞으로 수락되는 메시지의 순서를 바로잡는다. 이미 block 선할당 정책으로 저장된 방 `id=3` 같은 과거 데이터는 자동으로 재번호화되지 않으며, 시각 검증에 계속 사용할 방이면 `(created_at, message_id)` 기준 one-off repair가 필요하다. 운영 데이터에서는 cursor, gap fill, export, audit 영향을 확인한 뒤 백업을 두고 별도 마이그레이션으로 처리한다.
 
 남은 변경을 Phase별로 정리하면 다음과 같다.
 

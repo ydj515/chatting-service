@@ -59,6 +59,7 @@ class HotRoomFanoutWorkerTest {
         val batch = batchCaptor.value
         assertEquals(10L, batch.chatRoomId)
         assertEquals(listOf(11L, 12L), batch.messages.map { it.roomSeq })
+        assertEquals(listOf(11L, 12L), batch.messages.map { it.id })
         assertEquals(listOf("msg-11", "msg-12"), batch.messages.map { it.messageId })
     }
 

@@ -5,6 +5,7 @@ import { useWebSocket } from '../hooks/useWebSocket.ts';
 import {
   applyWebSocketMessageEvent,
   createClientMessageId,
+  messageRenderKey,
   sortMessagesForDisplay,
 } from '../utils/messageEvents.ts';
 import { Copy, Check } from 'lucide-react';
@@ -245,7 +246,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
           messages.map((message) => {
             const isOwn = message.sender?.id === currentUser.id;
             return (
-              <div key={message.id} className="flex flex-col">
+              <div key={messageRenderKey(message)} className="flex flex-col">
                 {!isOwn && (
                   <div className="text-xs text-text-secondary mb-1 ml-1">
                     {message.sender?.displayName || message.sender?.username}

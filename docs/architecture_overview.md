@@ -1,6 +1,6 @@
 # 분산 채팅 시스템 아키텍처 및 데이터 흐름 개요
 
-이 문서는 사용자가 분산 환경에서 웹소켓을 통해 접속하고, Redis Pub/Sub을 사용하여 실시간으로 메시지를 주고받는 전체 시스템 구조와 상세 데이터 흐름을 다룹니다.
+이 문서는 사용자가 분산 환경에서 웹소켓을 통해 접속하고, Redis Streams와 Redis Pub/Sub을 사용하여 실시간으로 메시지를 주고받는 전체 시스템 구조와 상세 데이터 흐름을 다룹니다.
 
 ---
 
@@ -25,8 +25,13 @@ graph TD
     end
 
     subgraph Infra ["데이터 및 메시지 브로커 영역"]
-        Redis["Redis (Pub/Sub)"]
+        Redis["Redis<br>(Streams / Pub/Sub / Sequence)"]
         Postgres["PostgreSQL (DB)"]
+    end
+
+    subgraph Workers ["워커 영역"]
+        Writer["Message Writer Worker"]
+        Fanout["Hot Room Fanout Worker"]
     end
 
     %% 연결 관계
@@ -36,11 +41,14 @@ graph TD
     Nginx -->|2. WS Load Balancing| WS1
     Nginx -->|2. WS Load Balancing| WS2
 
-    WS1 <==>|3. Room Topic 구독 및 발행| Redis
-    WS2 <==>|3. Room Topic 구독 및 발행| Redis
+    WS1 <==>|3. Room Topic 구독| Redis
+    WS2 <==>|3. Room Topic 구독| Redis
 
-    WS1 -->|4. 메시지 영속화| Postgres
-    WS2 -->|4. 메시지 영속화| Postgres
+    WS1 -->|4. SEND_MESSAGE append| Redis
+    Redis -->|5a. Stream poll| Writer
+    Writer -->|6a. 메시지 영속화| Postgres
+    Redis -->|5b. Stream poll| Fanout
+    Fanout -->|6b. Room Topic 발행| Redis
 ```
 
 ---
@@ -54,31 +62,41 @@ sequenceDiagram
     autonumber
     actor ClientA as 클라이언트 A (User 1)
     participant WS1 as WebSocket 서버 1
+    participant Redis as Redis Streams / Pub/Sub
+    participant Writer as Message Writer
+    participant Fanout as Fanout Worker
     participant DB as PostgreSQL
-    participant Redis as Redis Pub/Sub
     participant WS2 as WebSocket 서버 2
     actor ClientB as 클라이언트 B (User 2)
 
     Note over ClientA, WS1: Client A는 서버 1에 연결되어 있고, 1번 방에 참여 중
     Note over ClientB, WS2: Client B는 서버 2에 연결되어 있고, 1번 방에 참여 중
 
-    %% 메시지 송신 및 영속화
+    %% 메시지 송신 및 수락
     ClientA->>WS1: 웹소켓 메시지 전송 (SEND_MESSAGE, roomId=1, content="안녕")
     activate WS1
-    WS1->>DB: 메시지 저장 (chatService.sendMessage)
+    WS1->>Redis: INCR room sequence + XADD room stream
+    Redis-->>WS1: append 성공
+    WS1-->>ClientA: MESSAGE_ACCEPTED
+    deactivate WS1
+
+    %% Worker 저장
+    Writer->>Redis: XREADGROUP room stream (message-writer group)
+    Writer->>DB: 메시지 저장 (canonical store)
     activate DB
-    DB-->>WS1: 저장 성공 및 Sequence ID 발급
+    DB-->>Writer: 저장 성공
     deactivate DB
 
-    %% Redis 발행
-    WS1->>Redis: Publish (Topic: room:1, SenderServerId=server-1, Payload)
-    deactivate WS1
+    %% Worker fanout
+    Fanout->>Redis: XREADGROUP room stream (fanout group)
+    Fanout->>Redis: Publish (Topic: room:1, Payload)
     
     %% Redis 전파 (Fanout)
     activate Redis
     Redis-->>WS1: Deliver Message (수신처: 서버 1)
     activate WS1
-    Note over WS1: 본인이 발행한 메시지임을 감지<br>(ExcludeServerId 검증으로 로컬 재전송 방지)
+    WS1->>WS1: 로컬 세션 조회 (sessionIdsByRoomId[1])
+    WS1->>ClientA: 웹소켓 메시지 최종 송신 ("안녕")
     deactivate WS1
 
     Redis-->>WS2: Deliver Message (수신처: 서버 2)
@@ -99,23 +117,25 @@ sequenceDiagram
    - 클라이언트 A와 B가 접속할 때, Nginx는 부하 분산 기준에 따라 클라이언트 A를 `서버 1`로, 클라이언트 B를 `서버 2`로 보냅니다.
    - 각 서버는 클라이언트가 속해 있는 채팅방(예: 1번 방)을 감지하고, 해당 방에 대한 Redis 토픽 구독(`room:1`)을 수행합니다.
 
-2. **메시지 발송 및 저장**:
-   - 클라이언트 A가 웹소켓을 통해 메시지를 전송하면, 해당 웹소켓 세션을 소유한 `서버 1`이 이를 수신하여 데이터베이스(PostgreSQL)에 즉시 저장합니다.
+2. **메시지 발송 및 수락**:
+   - 클라이언트 A가 웹소켓을 통해 메시지를 전송하면, 해당 웹소켓 세션을 소유한 `서버 1`이 Redis room sequence counter에서 `roomSeq`를 메시지마다 `INCR 1`로 발급하고 Redis Streams에 append합니다.
+   - Streams append 성공이 `MESSAGE_ACCEPTED` 기준입니다. PostgreSQL 저장과 fanout은 worker가 비동기로 처리합니다.
 
-3. **이벤트 전파 (Pub/Sub)**:
-   - `서버 1`은 데이터베이스 저장이 완료된 후 Redis의 해당 방 토픽(`room:1`)으로 메시지 이벤트를 발행합니다.
+3. **저장 및 이벤트 전파**:
+   - `MessageWriterWorker`는 Redis Streams를 `message-writer` consumer group으로 읽어 PostgreSQL canonical store에 저장합니다.
+   - `HotRoomFanoutWorker`는 같은 Streams를 `fanout` consumer group으로 읽어 Redis의 해당 방 토픽(`room:1`)으로 메시지 이벤트를 발행합니다.
 
 4. **수신 및 클라이언트 전달**:
    - Redis는 `room:1` 토픽을 구독 중인 모든 서버(`서버 1`, `서버 2`)에 이벤트를 브로드캐스트합니다.
    - `서버 2`는 이 이벤트를 받아서 로컬 메모리에 있는 1번 방 접속 사용자 목록에서 클라이언트 B의 웹소켓 세션을 찾아 데이터를 최종 전송합니다.
-   - `서버 1`은 자기가 발행한 메시지이므로 무시합니다.
+   - `서버 1`도 같은 이벤트를 받아 로컬 메모리에 있는 클라이언트 A의 웹소켓 세션으로 최종 송신합니다. 클라이언트는 `MESSAGE_ACCEPTED`를 목록에 추가하지 않고, worker fanout으로 내려온 `CHAT_MESSAGE` 또는 `CHAT_MESSAGE_BATCH`만 표시합니다.
 
 ---
 
 ## 4. 아키텍처 주의사항 및 대안
 
 ### 주의사항
-> - **메시지 중복 및 순서**: 분산 서버 환경에서 분산 락(Distributed Lock)이나 데이터베이스 시퀀스 넘버링 규칙 없이 병렬로 요청을 처리하면 메시지 순서가 뒤바뀔 위험이 있습니다. 이 시스템은 DB 저장 후 순서 번호를 발급받아 이벤트에 포함시키는 방식으로 순서를 정렬합니다.
+> - **메시지 중복 및 순서**: 분산 WebSocket Gateway 환경에서 Gateway별 sequence block을 로컬 소진하면 같은 방의 실제 수락 순서와 `roomSeq` 정렬 순서가 뒤바뀔 수 있습니다. 방 `id=3`에서 `room_seq=1001..1016`이 먼저 생성되고 `room_seq=46..53`이 나중 생성되었지만 화면에서는 46..53이 먼저 보이는 문제가 확인되었습니다. 이 시스템은 메시지마다 Redis room sequence counter에 `INCR 1`을 수행해 방 단위 수락 순서를 보장합니다.
 > - **인메모리 세션의 한계**: 웹소켓 세션이 서버 로컬 메모리에만 유지되기 때문에 특정 서버가 다운되면 해당 서버에 연결되어 있던 클라이언트의 웹소켓 세션은 끊어집니다. 클라이언트의 자동 재연결(Reconnection) 로직 구현이 필수적입니다.
 
 ### 대안

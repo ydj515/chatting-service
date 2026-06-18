@@ -121,7 +121,9 @@
 ## 9. 단조 증가 시퀀스(roomSeq) 발급 성능
 
 **Q. `roomSeq`를 발급할 때마다 Redis의 `INCR`를 호출하면 결국 Redis가 병목이 되거나 터지지 않을까요?**
-**A.** `INCRBY` 명령어를 사용하여 한 번에 블록 단위(Block Allocation, 예: 1000개)로 시퀀스를 뭉텅이로 가져온 뒤, 각 API 인스턴스의 로컬 메모리에서 하나씩 소진합니다. 덕분에 Redis 통신 비용을 O(1/1000) 수준으로 획기적으로 줄여 Hot Room의 성능을 극대화합니다. (단, API 인스턴스가 중간에 죽으면 남은 시퀀스가 통째로 날아가 Sequence Gap이 발생할 수 있으나, 단조 증가는 유지되므로 클라이언트 측 정렬 로직에는 문제가 없습니다.)
+**A.** Phase 6 기준으로는 메시지마다 Redis `INCR 1`을 호출합니다. 이전 설계는 `INCRBY`로 Gateway별 block을 선할당해 Redis 호출 수를 줄이는 방식이었지만, 방 `id=3`에서 실제 생성 시간은 `room_seq=1001..1016` 이후 `room_seq=46..53`인데 클라이언트가 `roomSeq` 오름차순으로 정렬하면서 나중 메시지가 먼저 보이는 문제가 확인되었습니다. 트위치 같은 스트리밍 채팅에서는 같은 방의 live feed가 서버 수락 순서를 따라야 하므로, canonical display sequence에는 block allocation을 사용하지 않습니다.
+
+성능이 문제가 되는 hot room은 sequence block으로 순서 계약을 약화하기보다 room rate limit, slow mode, ingest partition ownership, dedicated sequencer service를 검토합니다. Redis `INCR 1`은 `O(1)` 단일 key 연산이며, gapless를 보장하지는 않지만 발급된 `roomSeq`의 상대 순서는 방 단위 서버 수락 순서를 나타냅니다.
 
 ---
 

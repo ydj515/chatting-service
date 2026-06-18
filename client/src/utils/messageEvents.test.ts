@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { applyWebSocketMessageEvent } from './messageEvents.ts';
+import { applyWebSocketMessageEvent, messageRenderKey } from './messageEvents.ts';
 import type { Message, WebSocketMessage } from '../types/index.ts';
 
 const existingMessage = (overrides: Partial<Message> = {}): Message => ({
@@ -123,4 +123,12 @@ test('CHAT_MESSAGE_BATCH는 현재 방 메시지만 병합한다', () => {
 
   assert.equal(next.length, 2);
   assert.deepEqual(next.map((message) => message.messageId), ['msg-1', 'msg-2']);
+});
+
+test('렌더 key는 실시간 fanout id가 같아도 messageId를 우선 사용한다', () => {
+  const first = existingMessage({ id: 0, messageId: 'msg-live-1' });
+  const second = existingMessage({ id: 0, messageId: 'msg-live-2' });
+
+  assert.equal(messageRenderKey(first), 'msg-live-1');
+  assert.equal(messageRenderKey(second), 'msg-live-2');
 });

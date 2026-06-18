@@ -113,7 +113,7 @@ class HotRoomFanoutWorker(
 
     private fun MessageStreamEnvelope.toChatMessage(): ChatMessage {
         return ChatMessage(
-            id = 0L,
+            id = roomSeq,
             messageId = messageId,
             clientMessageId = clientMessageId,
             content = content ?: "",

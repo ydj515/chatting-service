@@ -15,12 +15,12 @@ import java.time.Duration
 class MessageSequenceServiceTest {
 
     @Test
-    fun `시퀀스 키 prefix와 TTL은 설정값을 사용한다`() {
+    fun `시퀀스 키 prefix와 TTL은 첫 메시지에 설정값을 사용한다`() {
         val redisTemplate = redisTemplate()
         val valueOperations = valueOperations()
         val ttl = Duration.ofHours(2)
         `when`(redisTemplate.opsForValue()).thenReturn(valueOperations)
-        `when`(valueOperations.increment("custom:sequence:1", 1000L)).thenReturn(1000L)
+        `when`(valueOperations.increment("custom:sequence:1", 1L)).thenReturn(1L)
 
         val service = MessageSequenceService(
             redisTemplate = redisTemplate,
@@ -39,7 +39,7 @@ class MessageSequenceServiceTest {
         val redisTemplate = redisTemplate()
         val valueOperations = valueOperations()
         `when`(redisTemplate.opsForValue()).thenReturn(valueOperations)
-        `when`(valueOperations.increment("chat:sequence:1", 1000L)).thenReturn(2000L)
+        `when`(valueOperations.increment("chat:sequence:1", 1L)).thenReturn(2L)
 
         val service = MessageSequenceService(
             redisTemplate = redisTemplate,
@@ -49,16 +49,18 @@ class MessageSequenceServiceTest {
 
         val sequence = service.getNextSequence(chatRoomId = 1)
 
-        assertEquals(1001L, sequence)
+        assertEquals(2L, sequence)
         verify(redisTemplate, never()).expire("chat:sequence:1", Duration.ofHours(24))
     }
 
     @Test
-    fun `시퀀스는 Redis INCRBY로 block을 할당하고 local block에서 순서대로 반환한다`() {
+    fun `시퀀스는 메시지마다 Redis INCR 1로 방 단위 전역 순서를 반환한다`() {
         val redisTemplate = redisTemplate()
         val valueOperations = valueOperations()
         `when`(redisTemplate.opsForValue()).thenReturn(valueOperations)
-        `when`(valueOperations.increment("chat:sequence:9", 1000L)).thenReturn(1000L)
+        `when`(valueOperations.increment("chat:sequence:9", 1L))
+            .thenReturn(1L)
+            .thenReturn(2L)
 
         val service = MessageSequenceService(
             redisTemplate = redisTemplate,
@@ -69,8 +71,36 @@ class MessageSequenceServiceTest {
         assertEquals(1L, service.getNextSequence(chatRoomId = 9))
         assertEquals(2L, service.getNextSequence(chatRoomId = 9))
 
-        verify(valueOperations).increment("chat:sequence:9", 1000L)
+        verify(valueOperations, org.mockito.Mockito.times(2)).increment("chat:sequence:9", 1L)
         verify(redisTemplate).expire("chat:sequence:9", Duration.ofHours(24))
+    }
+
+    @Test
+    fun `서로 다른 서비스 인스턴스도 같은 방에서는 Redis 증가 순서를 공유한다`() {
+        val redisTemplate = redisTemplate()
+        val valueOperations = valueOperations()
+        `when`(redisTemplate.opsForValue()).thenReturn(valueOperations)
+        `when`(valueOperations.increment("chat:sequence:3", 1L))
+            .thenReturn(1L)
+            .thenReturn(2L)
+            .thenReturn(3L)
+
+        val firstGateway = MessageSequenceService(
+            redisTemplate = redisTemplate,
+            redisProperties = ChatRedisProperties(),
+            sequenceProperties = MessageSequenceProperties(),
+        )
+        val secondGateway = MessageSequenceService(
+            redisTemplate = redisTemplate,
+            redisProperties = ChatRedisProperties(),
+            sequenceProperties = MessageSequenceProperties(),
+        )
+
+        assertEquals(1L, firstGateway.getNextSequence(chatRoomId = 3))
+        assertEquals(2L, secondGateway.getNextSequence(chatRoomId = 3))
+        assertEquals(3L, firstGateway.getNextSequence(chatRoomId = 3))
+
+        verify(valueOperations, org.mockito.Mockito.times(3)).increment("chat:sequence:3", 1L)
     }
 
     @Suppress("UNCHECKED_CAST")

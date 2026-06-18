@@ -200,7 +200,7 @@ class ChatServiceImplMessageContractTest {
         val redisTemplate = mock(RedisTemplate::class.java) as RedisTemplate<String, String>
         val valueOperations = mock(ValueOperations::class.java) as ValueOperations<String, String>
         `when`(redisTemplate.opsForValue()).thenReturn(valueOperations)
-        `when`(valueOperations.increment("chat:sequence:10", 1000L)).thenReturn(1000L)
+        `when`(valueOperations.increment("chat:sequence:10", 1L)).thenReturn(1L)
 
         val objectMapper = ObjectMapper()
             .registerModule(JavaTimeModule())
