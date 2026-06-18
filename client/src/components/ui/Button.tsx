@@ -29,7 +29,6 @@ const Button: React.FC<ButtonProps> = ({
   onClick,
   type = 'button',
   className = '',
-  style,
   ...props
 }) => {
   // disabled 또는 loading 상태에 따른 커서/투명도 클래스
@@ -58,7 +57,6 @@ const Button: React.FC<ButtonProps> = ({
     <button
       type={type}
       className={combinedClassName}
-      style={style}
       onClick={handleClick}
       disabled={disabled || loading}
       {...props}

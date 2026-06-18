@@ -37,50 +37,13 @@ const InfoTooltip: React.FC<InfoTooltipProps> = ({ tip, label = '도움말' }) =
   }, [place]);
   const hide = useCallback(() => setOpen(false), []);
 
-  const bubbleStyle: React.CSSProperties = {
-    position: 'absolute',
-    zIndex: 50,
-    width: 'max-content',
-    maxWidth: 260,
-    padding: '9px 11px',
-    fontSize: 12,
-    fontWeight: 500,
-    lineHeight: 1.5,
-    letterSpacing: '-0.01em',
-    textAlign: 'left',
-    whiteSpace: 'normal',
-    background: 'var(--color-gray-900)',
-    color: 'var(--color-gray-50)',
-    borderRadius: 'var(--radius-sm)',
-    boxShadow: 'var(--shadow-lg)',
-    ...(v === 'above' ? { bottom: 'calc(100% + 9px)' } : { top: 'calc(100% + 9px)' }),
-    ...(h === 'center'
-      ? { left: '50%', transform: 'translateX(-50%)' }
-      : h === 'start'
-        ? { left: -6 }
-        : { right: -6 }),
-  };
-
-  const arrowStyle: React.CSSProperties = {
-    position: 'absolute',
-    zIndex: 51,
-    width: 0,
-    height: 0,
-    left: '50%',
-    transform: 'translateX(-50%)',
-    border: '6px solid transparent',
-    ...(v === 'above'
-      ? { bottom: 'calc(100% + 3px)', borderTopColor: 'var(--color-gray-900)' }
-      : { top: 'calc(100% + 3px)', borderBottomColor: 'var(--color-gray-900)' }),
-  };
-
   return (
     <span
       ref={ref}
       tabIndex={0}
       role="img"
       aria-label={label}
-      className="relative inline-flex items-center justify-center shrink-0 align-middle text-text-tertiary cursor-help rounded-full outline-none transition-colors duration-150 hover:text-primary focus-visible:text-primary"
+      className={`info-tooltip info-tooltip--${v} info-tooltip--${h} outline-none`}
       onMouseEnter={show}
       onMouseLeave={hide}
       onFocus={show}
@@ -89,8 +52,8 @@ const InfoTooltip: React.FC<InfoTooltipProps> = ({ tip, label = '도움말' }) =
       <Info size={15} strokeWidth={2} />
       {open && (
         <>
-          <span style={arrowStyle} aria-hidden="true" />
-          <span style={bubbleStyle} role="tooltip">
+          <span className="info-tooltip__arrow" aria-hidden="true" />
+          <span className="info-tooltip__bubble" role="tooltip">
             {tip}
           </span>
         </>

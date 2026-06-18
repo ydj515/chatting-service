@@ -1,24 +1,27 @@
 @import "tailwindcss";
 
-/* Wanted Sans (브랜드 서체) + Pretendard (폴백) — jsDelivr */
-@import url('https://cdn.jsdelivr.net/gh/wanteddev/wanted-sans@v1.0.3/packages/wanted-sans/fonts/webfonts/variable/split/WantedSansVariable.min.css');
-@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css');
+@font-face {
+  font-family: 'Chat App Sans';
+  src: url('/fonts/chat-app-sans-variable.woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
 
 /* ============================================
-   테마 토큰 — Wanted Design System
-   하나의 액션 컬러(Wanted Blue)와 cool-grey 중립 체계.
-   토큰 이름은 유지하고 값만 Wanted 팔레트로 매핑한다.
+   테마 토큰
+   하나의 액션 컬러와 cool-grey 중립 체계.
    ============================================ */
 @theme {
-  /* 기본 색상 — Wanted Blue (#3366FF) 단일 액션 컬러 */
+  /* 기본 색상 */
   --color-primary: #3366FF;
   --color-primary-hover: #005EEB;   /* primary-strong */
   --color-primary-light: #EAF2FE;   /* primary-surface (pale blue) */
-  /* 보조 액센트 — Wanted Violet */
+  /* 보조 액센트 */
   --color-secondary: #6541F2;
   --color-secondary-hover: #5331D9;
   --color-secondary-light: #F0ECFE;
-  /* 상태 — Wanted green / red / orange */
+  /* 상태 */
   --color-success: #00BF40;
   --color-success-hover: #00A038;
   --color-success-light: #E6F8ED;
@@ -69,12 +72,12 @@
   --color-text-tertiary: #989BA2;
   --color-text-inverse: #FFFFFF;
 
-  /* 폰트 — Wanted Sans */
-  --font-sans: 'Wanted Sans Variable', 'Wanted Sans', 'Pretendard', 'Pretendard JP',
+  /* 폰트 */
+  --font-sans: 'Chat App Sans',
     -apple-system, BlinkMacSystemFont, system-ui, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
   --font-mono: 'SF Mono', ui-monospace, SFMono-Regular, Consolas, Menlo, monospace;
 
-  /* 그림자 — 중립·저확산 (Wanted house style) */
+  /* 그림자 — 중립·저확산 */
   --shadow-sm: 0 1px 2px rgba(23, 23, 25, 0.06), 0 1px 3px rgba(23, 23, 25, 0.07);
   --shadow-md: 0 2px 8px rgba(23, 23, 25, 0.08), 0 1px 2px rgba(23, 23, 25, 0.06);
   --shadow-lg: 0 8px 24px rgba(23, 23, 25, 0.10), 0 2px 6px rgba(23, 23, 25, 0.06);
@@ -127,6 +130,29 @@
 /* ============================================
    기본 스타일
    ============================================ */
+@layer base {
+  html {
+    font-family: var(--font-sans);
+    background-color: var(--color-background);
+    color: var(--color-text-primary);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    margin: 0;
+    padding: 0;
+    background-color: var(--color-background);
+    color: var(--color-text-primary);
+  }
+
+  button,
+  input,
+  textarea,
+  select {
+    font: inherit;
+  }
+}
 
 /* 커스텀 스크롤바 */
 ::-webkit-scrollbar {
@@ -148,7 +174,7 @@
 
 /* 선택 영역 */
 ::selection {
-  background-color: #EAF2FE;
+  background-color: var(--color-primary-light);
   color: inherit;
 }
 
@@ -156,6 +182,93 @@
 :focus-visible {
   outline: 2px solid var(--color-primary);
   outline-offset: 2px;
+}
+
+.info-tooltip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--color-text-tertiary);
+  vertical-align: middle;
+  border-radius: var(--radius-full);
+  cursor: help;
+  transition: color 150ms ease;
+}
+
+.info-tooltip:hover,
+.info-tooltip:focus-visible {
+  color: var(--color-primary);
+}
+
+.info-tooltip__bubble {
+  position: absolute;
+  z-index: 50;
+  width: max-content;
+  max-width: 260px;
+  padding: 9px 11px;
+  background: var(--color-gray-900);
+  color: var(--color-gray-50);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-lg);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.5;
+  letter-spacing: 0;
+  text-align: left;
+  white-space: normal;
+}
+
+.info-tooltip__arrow {
+  position: absolute;
+  z-index: 51;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border: 6px solid transparent;
+  transform: translateX(-50%);
+}
+
+.info-tooltip--above .info-tooltip__bubble {
+  bottom: calc(100% + 9px);
+}
+
+.info-tooltip--below .info-tooltip__bubble {
+  top: calc(100% + 9px);
+}
+
+.info-tooltip--center .info-tooltip__bubble {
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.info-tooltip--start .info-tooltip__bubble {
+  left: -6px;
+}
+
+.info-tooltip--end .info-tooltip__bubble {
+  right: -6px;
+}
+
+.info-tooltip--above .info-tooltip__arrow {
+  bottom: calc(100% + 3px);
+  border-top-color: var(--color-gray-900);
+}
+
+.info-tooltip--below .info-tooltip__arrow {
+  top: calc(100% + 3px);
+  border-bottom-color: var(--color-gray-900);
+}
+
+.clipboard-fallback-textarea {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
 }
 
 /* ============================================
@@ -183,7 +296,7 @@
    ============================================ */
 @layer base {
   .dark {
-    /* 액션 컬러 — 다크 테마에서는 한 단계 밝은 블루 */
+    /* 액션 컬러 — 다크 테마에서는 한 단계 밝게 조정 */
     --color-primary: #5B84FF;
     --color-primary-hover: #7B9CFF;
     --color-primary-light: #1E2A4A;

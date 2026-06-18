@@ -1,12 +1,15 @@
-/* Wanted Sans (브랜드 서체) + Pretendard (폴백) — jsDelivr */
-@import url('https://cdn.jsdelivr.net/gh/wanteddev/wanted-sans@v1.0.3/packages/wanted-sans/fonts/webfonts/variable/split/WantedSansVariable.min.css');
-@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css');
+@font-face {
+  font-family: 'Chat App Sans';
+  src: url('../fonts/chat-app-sans-variable.woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
 
 /* ============================================
-   Wanted Design System — Admin
-   하나의 액션 컬러(Wanted Blue) + cool-grey 중립 체계.
+   Admin theme tokens
+   하나의 액션 컬러 + cool-grey 중립 체계.
    라이트/다크 테마 모두 지원([data-theme="dark"]).
-   필터는 DS admin-dashboard처럼 상단 가로 영역에 배치.
    ============================================ */
 :root {
   color-scheme: light;
@@ -18,7 +21,7 @@
   --line-subtle: rgba(112, 115, 124, 0.08);    /* 옅은 라인 */
   --text: #171717;                             /* 본문 */
   --muted: rgba(55, 56, 60, 0.61);             /* 보조 텍스트 */
-  --accent: #3366ff;                           /* Wanted Blue */
+  --accent: #3366ff;                           /* action blue */
   --accent-strong: #005eeb;                    /* hover / pressed */
   --accent-surface: #eaf2fe;                   /* 선택 틴트 */
   --danger: #ff4242;
@@ -30,13 +33,13 @@
   --shadow: 0 2px 8px rgba(23, 23, 25, 0.08), 0 1px 2px rgba(23, 23, 25, 0.06);
   --radius-control: 10px;
   --radius-card: 16px;
-  font-family: 'Wanted Sans Variable', 'Wanted Sans', 'Pretendard', 'Pretendard JP',
+  font-family: 'Chat App Sans',
     -apple-system, BlinkMacSystemFont, system-ui, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* ---- 다크 테마 — Wanted cool-neutral 다크 토큰 ---- */
+/* ---- 다크 테마 ---- */
 [data-theme="dark"] {
   color-scheme: dark;
   --bg: #0f0f10;
@@ -67,7 +70,7 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
 }
 
 button,
@@ -164,7 +167,7 @@ label {
   margin: 0;
   font-size: 20px;
   font-weight: 700;
-  letter-spacing: -0.012em;
+  letter-spacing: 0;
 }
 
 .topbar-actions {
@@ -312,7 +315,7 @@ label {
   font-weight: 500;
   font-style: normal;
   line-height: 1.5;
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
   text-align: left;
   white-space: normal;
   border-radius: 8px;
@@ -455,7 +458,7 @@ label {
   display: none;
 }
 
-/* 적용 중인 상세 필터 칩 (DS active-filter chips 패턴) */
+/* 적용 중인 상세 필터 칩 */
 .chips-row {
   display: flex;
   align-items: center;
@@ -596,7 +599,7 @@ label {
   margin: 0;
   font-size: 16px;
   font-weight: 600;
-  letter-spacing: -0.012em;
+  letter-spacing: 0;
 }
 
 .latency {
@@ -628,7 +631,7 @@ label {
 .metric strong {
   font-size: 18px;
   font-weight: 700;
-  letter-spacing: -0.012em;
+  letter-spacing: 0;
   font-variant-numeric: tabular-nums;
 }
 

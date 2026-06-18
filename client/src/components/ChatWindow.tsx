@@ -43,8 +43,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
         // 구형 브라우저 폴백
         const textarea = document.createElement('textarea');
         textarea.value = id;
-        textarea.style.position = 'fixed';
-        textarea.style.opacity = '0';
+        textarea.className = 'clipboard-fallback-textarea';
         document.body.appendChild(textarea);
         textarea.select();
         document.execCommand('copy');

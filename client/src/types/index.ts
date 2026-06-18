@@ -282,7 +282,6 @@ export interface AppError {
 // 컴포넌트 Props 타입
 export interface BaseComponentProps {
   className?: string;
-  style?: React.CSSProperties;
   children?: React.ReactNode;
 }
 

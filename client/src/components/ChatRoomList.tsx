@@ -218,7 +218,7 @@ const ChatRoomList: React.FC<ChatRoomListProps> = ({
             value={searchQuery}
             onChange={setSearchQuery}
             placeholder="채팅방 검색..."
-            style={{ paddingLeft: '40px' }}
+            className="pl-10"
           />
         </div>
       </div>

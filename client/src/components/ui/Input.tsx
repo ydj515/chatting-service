@@ -11,7 +11,6 @@ const Input = forwardRef<HTMLInputElement, InputProps>(({
   maxLength,
   autoFocus = false,
   className = '',
-  style,
   ...props
 }, ref) => {
   // 값 변경 핸들러
@@ -40,7 +39,6 @@ const Input = forwardRef<HTMLInputElement, InputProps>(({
         maxLength={maxLength}
         autoFocus={autoFocus}
         className={inputClassName}
-        style={style}
         {...props}
       />
       {error && (
