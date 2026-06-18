@@ -94,6 +94,12 @@ Reconnect load test 시나리오와 정상 reconnect 실패율 계산 기준은 
 | writer batch latency | Timer | `workerRole` | 저장 batch latency |
 | fanout worker lag | Gauge | `fanoutShard` | fan-out 지연 |
 | fanout batch size | DistributionSummary | `fanoutShard` | batch 효율 |
+| `chat.fanout.owner.lease.acquire` | Counter | `outcome=success|failure`, `reason` | owner lease 획득 성공/실패 |
+| `chat.fanout.owner.lease.renew` | Counter | `outcome=success|failure|lost` | owner lease 갱신 상태 |
+| `chat.fanout.owner.lease.lost` | Counter | `reason=expired|token_mismatch|redis_error` | stale owner 또는 lease 상실 감지 |
+| `chat.fanout.owner.rooms` | Gauge | `workerRole`, `roomHeat` | worker별 보유 owner room 수 |
+| `chat.fanout.owner.takeovers` | Counter | `reason=ttl_expired|pending_claim|worker_restart` | owner 장애 후 takeover |
+| `chat.fanout.owner.token_mismatch` | Counter | `stage=before_publish|before_ack` | publish/ack 직전 fencing token 불일치 |
 
 권장 alert 후보:
 
@@ -101,6 +107,9 @@ Reconnect load test 시나리오와 정상 reconnect 실패율 계산 기준은 
 - pending count가 계속 증가
 - writer failure rate 증가
 - fanout worker lag가 release 기준 초과
+- `chat.fanout.owner.lease.lost`가 짧은 시간에 급증
+- token mismatch가 발생하면서 fanout worker lag도 증가
+- 특정 worker의 `chat.fanout.owner.rooms`가 계속 0이거나 한 worker에만 과도하게 집중
 
 ### 3.4 PostgreSQL / Search / Admin
 

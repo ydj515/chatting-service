@@ -75,6 +75,19 @@
 
 > 2026-06-18 기준으로 `CHAT_MESSAGE_SEQUENCE_BLOCK_SIZE` 설정은 제거했다. 방 `id=3`에서 WebSocket Gateway별 sequence block 선할당 때문에 실제 생성 시간은 `room_seq=1001..1016` 이후 `room_seq=46..53`이었지만, 클라이언트가 `roomSeq`로 정렬하면서 나중 메시지가 먼저 보이는 문제가 확인되었다. 트위치 같은 스트리밍 채팅에서는 같은 방의 실시간 feed가 서버 수락 순서를 따라야 하므로, 처리량 최적화용 block 선할당보다 방 단위 전역 `INCR 1` 순서를 우선한다.
 
+### Phase 6 예정: Fanout Owner Lease
+
+Production에서 `fanout` worker를 여러 replica로 늘릴 때는 Redis TTL lease 기반 방별 owner를 먼저 활성화한다. 아래 변수는 Phase 6 구현 대상이며, 현재 문서는 운영 기본값을 고정하기 위한 기준이다.
+
+| 변수 | 기본값 | 설명 |
+| --- | --- | --- |
+| `CHAT_WORKER_FANOUT_OWNER_LEASE_ENABLED` | `true` | fanout worker 다중화 시 방/stream shard별 owner lease 사용 여부 |
+| `CHAT_WORKER_FANOUT_OWNER_LEASE_TTL_MILLIS` | `10000` | owner lease TTL. 이 시간이 지나면 다른 worker가 takeover 가능 |
+| `CHAT_WORKER_FANOUT_OWNER_LEASE_RENEW_INTERVAL_MILLIS` | `3000` | owner worker가 lease를 갱신하는 주기 |
+| `CHAT_WORKER_FANOUT_OWNER_LEASE_KEY_PREFIX` | `chat:fanout:owner:room:` | owner lease Redis key prefix. 최종 key는 `<prefix><roomId>:shard:<streamShard>` |
+
+> Redis Streams consumer group만으로 fanout worker를 여러 대 띄우면 같은 방의 batch publish 순서가 뒤집힐 수 있다. owner lease는 같은 room/stream shard에서 owner worker 하나만 `XREADGROUP`, publish, `XACK`를 수행하도록 강제하기 위한 production safety gate다.
+
 ## Client
 
 | 변수 | 기본값 | 설명 |
