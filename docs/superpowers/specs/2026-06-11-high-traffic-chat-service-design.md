@@ -758,6 +758,7 @@ hot room 메시지는 같은 partition에 몰리면 안 된다.
 - very hot room은 메시지 발행량이 임계치를 넘으면 자동 downgrade 정책을 적용할 수 있다.
 - 자동 downgrade는 live feed window를 줄이는 표시 정책과 방별 rate limit/slow mode를 강화하는 수락 정책을 분리해서 적용한다.
 - admin override가 적용된 방은 기본적으로 `autoPolicyEnabled=false`가 되어 `room-policy` worker가 수동 정책을 덮어쓰지 않는다. 운영자가 다시 자동 정책을 허용하려면 admin policy API에서 `autoPolicyEnabled=true`로 되돌린다.
+- 수동 admission 제한 해제는 admin policy API에서 `clearRateLimit=true`, `clearUserRateLimit=true`, `clearSlowMode=true`로 명시한다. `null` 또는 필드 누락은 기존 값 유지로 해석한다. Phase 6 리뷰에서 기존 `COALESCE` 기반 PATCH가 수동 rate limit/slow mode를 해제하지 못해 운영자가 DB 직접 수정이나 자동 정책 재활성화에 의존해야 하는 문제가 확인되어 별도 clear flag를 둔다.
 - hot room Gateway는 slow client의 밀린 메시지를 무한 queueing하지 않고, 최신 batch 우선으로 전환하거나 연결을 재수립하게 한다.
 - 화면에서 빠진 메시지는 누락이 아니라 live feed window 밖으로 밀려난 것으로 본다. 전체 메시지는 history/gap fill/admin/export 경로에서 보장한다.
 - WebSocket 전달 실패는 history gap fill로 복구한다.
@@ -1766,8 +1767,8 @@ node scripts/seed-admin-search-messages.mjs --messages 10000000 --rooms normal:6
 - `chat-persistence/src/main/kotlin/service/RateLimitService.kt`
 - `chat-persistence/src/main/kotlin/service/LiveFeedPolicyService.kt`
 - `chat-persistence/src/main/kotlin/service/HotRoomFanoutWorker.kt`
-- `chat-persistence/src/main/kotlin/config/WorkerProperties.kt`
-- `chat-admin/src/main/kotlin/com/chat/admin/controller/AdminRoomPolicyController.kt`
+- `chat-persistence/src/main/kotlin/config/ChatWorkerProperties.kt`
+- `chat-admin/src/main/kotlin/com/chat/admin/controller/AdminChatController.kt`
 - `chat-websocket/src/main/kotlin/handler/ChatWebSocketHandler.kt`
 - `client/src/hooks/useWebSocket.ts`
 - `client/src/components/ChatWindow.tsx`

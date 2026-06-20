@@ -20,6 +20,7 @@ import com.chat.persistence.repository.AdminMessageRepository
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.springframework.cache.annotation.CacheEvict
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 import kotlin.system.measureNanoTime
 
 @Service
@@ -104,6 +105,7 @@ class AdminChatServiceImpl(
         return status
     }
 
+    @Transactional
     @CacheEvict(value = ["roomAdmissionPolicies"], key = "#roomId")
     override fun updateRoomPolicy(
         actor: String,

@@ -1,8 +1,14 @@
 export class RawWebSocketFrameDecoder {
-  constructor({ onText = () => {}, onPing = () => {}, onClose = () => {} } = {}) {
+  constructor({
+    onText = () => {},
+    onPing = () => {},
+    onClose = () => {},
+    maxPayloadBytes = 8 * 1024 * 1024,
+  } = {}) {
     this.onText = onText;
     this.onPing = onPing;
     this.onClose = onClose;
+    this.maxPayloadBytes = maxPayloadBytes;
     this.buffer = Buffer.alloc(0);
     this.fragmentedText = [];
   }
@@ -24,9 +30,14 @@ export class RawWebSocketFrameDecoder {
         offset += 2;
       } else if (length === 127) {
         if (this.buffer.length < offset + 8) return;
-        length = Number(this.buffer.readBigUInt64BE(offset));
+        const wideLength = this.buffer.readBigUInt64BE(offset);
+        if (wideLength > BigInt(Number.MAX_SAFE_INTEGER)) {
+          throw new Error(`WebSocket frame payload too large: ${wideLength.toString()} bytes`);
+        }
+        length = Number(wideLength);
         offset += 8;
       }
+      this.rejectOversizedPayload(length);
 
       const maskOffset = masked ? 4 : 0;
       if (this.buffer.length < offset + maskOffset + length) return;
@@ -39,6 +50,12 @@ export class RawWebSocketFrameDecoder {
         payload = Buffer.from(payload.map((byte, index) => byte ^ mask[index % 4]));
       }
       this.handleFrame({ fin, opcode, payload });
+    }
+  }
+
+  rejectOversizedPayload(length) {
+    if (length > this.maxPayloadBytes) {
+      throw new Error(`WebSocket frame payload too large: ${length} bytes`);
     }
   }
 

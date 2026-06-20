@@ -10,6 +10,7 @@ import {
   buildLoadUsername,
   flattenChatMessages,
   parseLoadChatArgs,
+  readJsonResponse,
 } from './lib/loadChatPlan.mjs';
 import { RawWebSocketFrameDecoder } from './lib/rawWebSocketFrameDecoder.mjs';
 
@@ -31,12 +32,7 @@ async function requestJson(path, options = {}) {
       ...(options.headers ?? {}),
     },
   });
-  const text = await response.text();
-  const body = text ? JSON.parse(text) : null;
-  if (!response.ok) {
-    throw new Error(`${options.method ?? 'GET'} ${url} failed: ${response.status} ${text}`);
-  }
-  return body;
+  return readJsonResponse(response, { method: options.method ?? 'GET', url });
 }
 
 async function registerUser(prefix) {

@@ -1055,14 +1055,29 @@ components:
           type: integer
           minimum: 1
           nullable: true
+          description: Omit or send null to keep the existing value. Use clearRateLimit=true to remove the room rate limit.
         userRateLimitPerSecond:
           type: integer
           minimum: 1
           nullable: true
+          description: Omit or send null to keep the existing value. Use clearUserRateLimit=true to remove the per-user rate limit.
         slowModeSeconds:
           type: integer
           minimum: 1
           nullable: true
+          description: Omit or send null to keep the existing value. Use clearSlowMode=true to remove slow mode.
+        clearRateLimit:
+          type: boolean
+          nullable: true
+          description: When true, clears rateLimitPerSecond. Must not be sent together with rateLimitPerSecond.
+        clearUserRateLimit:
+          type: boolean
+          nullable: true
+          description: When true, clears userRateLimitPerSecond. Must not be sent together with userRateLimitPerSecond.
+        clearSlowMode:
+          type: boolean
+          nullable: true
+          description: When true, clears slowModeSeconds. Must not be sent together with slowModeSeconds.
         autoPolicyEnabled:
           type: boolean
           nullable: true

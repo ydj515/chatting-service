@@ -21,7 +21,7 @@ class AdminMessageRepository(
     @Qualifier("messageReadJdbcTemplate")
     private val jdbcTemplate: JdbcTemplate,
     @Qualifier("jdbcTemplate")
-    private val writeJdbcTemplate: JdbcTemplate = jdbcTemplate,
+    private val writeJdbcTemplate: JdbcTemplate,
 ) {
 
     fun findRoomMessages(
@@ -174,6 +174,13 @@ class AdminMessageRepository(
         roomId: Long,
         request: AdminRoomPolicyUpdateRequest,
     ): AdminRoomStatusDto {
+        val clearRateLimit = request.clearRateLimit == true
+        val clearUserRateLimit = request.clearUserRateLimit == true
+        val clearSlowMode = request.clearSlowMode == true
+        val insertedRateLimit = request.rateLimitPerSecond.takeUnless { clearRateLimit }
+        val insertedUserRateLimit = request.userRateLimitPerSecond.takeUnless { clearUserRateLimit }
+        val insertedSlowMode = request.slowModeSeconds.takeUnless { clearSlowMode }
+
         return writeJdbcTemplate.queryForObject(
             """
             INSERT INTO room_storage_configs (
@@ -204,9 +211,9 @@ class AdminMessageRepository(
                 hot_room_policy = COALESCE(?, room_storage_configs.hot_room_policy),
                 live_feed_max_messages = COALESCE(?, room_storage_configs.live_feed_max_messages),
                 live_feed_max_age_seconds = COALESCE(?, room_storage_configs.live_feed_max_age_seconds),
-                room_rate_limit_per_second = COALESCE(?, room_storage_configs.room_rate_limit_per_second),
-                user_rate_limit_per_second = COALESCE(?, room_storage_configs.user_rate_limit_per_second),
-                slow_mode_seconds = COALESCE(?, room_storage_configs.slow_mode_seconds),
+                room_rate_limit_per_second = CASE WHEN ? THEN NULL ELSE COALESCE(?, room_storage_configs.room_rate_limit_per_second) END,
+                user_rate_limit_per_second = CASE WHEN ? THEN NULL ELSE COALESCE(?, room_storage_configs.user_rate_limit_per_second) END,
+                slow_mode_seconds = CASE WHEN ? THEN NULL ELSE COALESCE(?, room_storage_configs.slow_mode_seconds) END,
                 auto_policy_enabled = ?,
                 moderator_priority = COALESCE(?, room_storage_configs.moderator_priority),
                 updated_at = now()
@@ -228,16 +235,19 @@ class AdminMessageRepository(
             request.heatLevel,
             request.liveFeedMaxMessages,
             request.liveFeedMaxAgeSeconds,
-            request.rateLimitPerSecond,
-            request.userRateLimitPerSecond,
-            request.slowModeSeconds,
+            insertedRateLimit,
+            insertedUserRateLimit,
+            insertedSlowMode,
             request.autoPolicyEnabled ?: false,
             request.moderatorPriority,
             request.heatLevel,
             request.liveFeedMaxMessages,
             request.liveFeedMaxAgeSeconds,
+            clearRateLimit,
             request.rateLimitPerSecond,
+            clearUserRateLimit,
             request.userRateLimitPerSecond,
+            clearSlowMode,
             request.slowModeSeconds,
             request.autoPolicyEnabled ?: false,
             request.moderatorPriority,

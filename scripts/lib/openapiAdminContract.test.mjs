@@ -57,4 +57,7 @@ test('admin room policy documents automatic policy guard and moderator priority'
   assert.match(statusSchema, /moderatorPriority:[\s\S]*type: boolean/);
   assert.match(requestSchema, /autoPolicyEnabled:[\s\S]*type: boolean/);
   assert.match(requestSchema, /moderatorPriority:[\s\S]*type: boolean/);
+  assert.match(requestSchema, /clearRateLimit:[\s\S]*type: boolean/);
+  assert.match(requestSchema, /clearUserRateLimit:[\s\S]*type: boolean/);
+  assert.match(requestSchema, /clearSlowMode:[\s\S]*type: boolean/);
 });

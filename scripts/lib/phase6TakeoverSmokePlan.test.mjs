@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
   buildLoadChatArgs,
+  buildRunCapturedOptions,
   findOwnerContainer,
   parseDockerInspectRows,
   parseLoadChatJson,
@@ -105,4 +106,33 @@ test('parseLoadChatJson extracts the final JSON summary from mixed stdout', () =
     sent: 10,
     receivedPerViewer: [10, 10],
   });
+});
+
+test('parseLoadChatJson handles nested objects in the final JSON summary', () => {
+  const summary = parseLoadChatJson([
+    'load started with {non-json} marker',
+    '{',
+    '  "ok": true,',
+    '  "roomId": 7,',
+    '  "metadata": { "owner": "worker-1" }',
+    '}',
+  ].join('\n'));
+
+  assert.deepEqual(summary, {
+    ok: true,
+    roomId: 7,
+    metadata: { owner: 'worker-1' },
+  });
+});
+
+test('buildRunCapturedOptions adds a timeout to blocking docker commands', () => {
+  assert.deepEqual(
+    buildRunCapturedOptions({ env: { A: 'B' }, timeoutMs: 1234 }),
+    {
+      env: { A: 'B' },
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+      timeout: 1234,
+    },
+  );
 });

@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
 import com.fasterxml.jackson.module.kotlin.KotlinModule
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -42,6 +43,15 @@ import java.time.LocalDateTime
 import java.util.Optional
 
 class ChatServiceImplMessageContractTest {
+
+    @Test
+    fun `메시지 수락 정책과 traffic stats 의존성은 constructor default로 fail open 되지 않는다`() {
+        val hasDefaultConstructorBridge = ChatServiceImpl::class.java.declaredConstructors.any { constructor ->
+            constructor.parameterTypes.any { it.name == "kotlin.jvm.internal.DefaultConstructorMarker" }
+        }
+
+        assertFalse(hasDefaultConstructorBridge)
+    }
 
     @Test
     fun `메시지 전송은 Streams append 이후 동기 저장 없이 수락 계약을 반환한다`() {
@@ -178,6 +188,32 @@ class ChatServiceImplMessageContractTest {
         }
 
         assertEquals(emptyList<Long>(), roomTrafficStatsService.recordedRoomIds)
+    }
+
+    @Test
+    fun `room traffic counter 기록 실패는 이미 수락된 메시지 응답을 실패시키지 않는다`() {
+        val fixture = chatServiceFixture(roomTrafficStatsService = ThrowingRoomTrafficStatsService())
+        val clientMessageId = "client-message-1"
+        `when`(
+            fixture.messageRepository.findByChatRoomIdAndSenderIdAndClientMessageId(
+                10L,
+                7L,
+                clientMessageId,
+            )
+        ).thenReturn(Optional.empty())
+
+        val message = fixture.chatService.sendMessage(
+            SendMessageRequest(
+                chatRoomId = 10L,
+                type = MessageType.TEXT,
+                content = "hello",
+                clientMessageId = clientMessageId,
+            ),
+            senderId = 7L,
+        )
+
+        assertEquals(clientMessageId, message.clientMessageId)
+        assertEquals(1L, message.roomSeq)
     }
 
 
@@ -497,6 +533,22 @@ class ChatServiceImplMessageContractTest {
 
         override fun recordAccepted(roomId: Long) {
             recordedRoomIds += roomId
+        }
+
+        override fun activeRoomIds(): Set<Long> = emptySet()
+
+        override fun snapshot(roomId: Long): RoomTrafficSnapshot {
+            return RoomTrafficSnapshot(
+                roomId = roomId,
+                roomMessagesPerSecond = 0,
+                roomMessagesP95PerSecond = 0,
+            )
+        }
+    }
+
+    private class ThrowingRoomTrafficStatsService : RoomTrafficStatsService {
+        override fun recordAccepted(roomId: Long) {
+            throw IllegalStateException("traffic stats unavailable")
         }
 
         override fun activeRoomIds(): Set<Long> = emptySet()

@@ -88,6 +88,14 @@ export function buildLoadUsername(prefix, entropy) {
   return `${safePrefix}_${safeEntropy}`.slice(0, 20);
 }
 
+export async function readJsonResponse(response, { method = 'GET', url }) {
+  const text = await response.text();
+  if (!response.ok) {
+    throw new Error(`${method} ${url} failed: ${response.status} ${text}`);
+  }
+  return text ? JSON.parse(text) : null;
+}
+
 function positiveInteger(value, name) {
   const parsed = Number(value);
   if (!Number.isInteger(parsed) || parsed <= 0) {

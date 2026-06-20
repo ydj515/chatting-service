@@ -6,6 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   buildLoadChatArgs,
+  buildRunCapturedOptions,
   findOwnerContainer,
   parseDockerInspectRows,
   parseLoadChatJson,
@@ -18,19 +19,21 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function main() {
   const options = parseTakeoverSmokeArgs(process.argv.slice(2));
+  const commandTimeoutMs = Number(process.env.CHAT_TAKEOVER_COMMAND_TIMEOUT_MS ?? 30000);
   const env = {
     ...process.env,
     CHAT_ADMIN_TOKEN: process.env.CHAT_ADMIN_TOKEN ?? 'test',
   };
+  const runOptions = buildRunCapturedOptions({ env, timeoutMs: commandTimeoutMs });
   const metadataFile = path.join(os.tmpdir(), `phase6-load-${Date.now()}-${process.pid}.json`);
-  const workerIds = parseWorkerContainerIds(runCaptured('docker', ['compose', 'ps', '-q', options.service], { env }));
+  const workerIds = parseWorkerContainerIds(runCaptured('docker', ['compose', 'ps', '-q', options.service], runOptions));
   const workerRows = parseDockerInspectRows(
     runCaptured('docker', [
       'inspect',
       '--format',
       '{{.Id}}|{{.Config.Hostname}}|{{.Name}}',
       ...workerIds,
-    ], { env }),
+    ], runOptions),
   );
   const loadScript = fileURLToPath(new URL('./load-chat.mjs', import.meta.url));
   const loadArgs = [
@@ -65,7 +68,7 @@ async function main() {
     const owner = await waitForOwnerLease({
       roomId: metadata.roomId,
       keyPrefix: options.ownerLeaseKeyPrefix,
-      env,
+      runOptions,
     });
     const ownerContainer = findOwnerContainer(owner.value, workerRows);
     if (!ownerContainer) {
@@ -73,7 +76,7 @@ async function main() {
     }
     killedContainer = ownerContainer;
     console.error(`Killing fanout owner ${ownerContainer.name} for room ${metadata.roomId}`);
-    runCaptured('docker', ['kill', ownerContainer.id], { env });
+    runCaptured('docker', ['kill', ownerContainer.id], runOptions);
 
     const exitCode = await loadExit;
     if (exitCode !== 0) {
@@ -100,18 +103,14 @@ async function main() {
       runCaptured(
         'docker',
         ['compose', 'up', '-d', '--scale', `${options.service}=${options.restoreScale}`, '--no-build'],
-        { env },
+        runOptions,
       );
     }
   }
 }
 
-function runCaptured(command, args, { env }) {
-  return execFileSync(command, args, {
-    env,
-    encoding: 'utf8',
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
+function runCaptured(command, args, options) {
+  return execFileSync(command, args, options);
 }
 
 async function waitForMetadata(metadataFile) {
@@ -126,14 +125,14 @@ async function waitForMetadata(metadataFile) {
   throw new Error(`Timed out waiting for load-chat metadata file: ${metadataFile}`);
 }
 
-async function waitForOwnerLease({ roomId, keyPrefix, env }) {
+async function waitForOwnerLease({ roomId, keyPrefix, runOptions }) {
   const deadline = Date.now() + 20_000;
   const pattern = redisOwnerScanPattern({ roomId, keyPrefix });
   while (Date.now() < deadline) {
     const keys = runCaptured(
       'docker',
       ['compose', 'exec', '-T', 'redis', 'redis-cli', '--raw', '--scan', '--pattern', pattern],
-      { env },
+      runOptions,
     )
       .split(/\r?\n/)
       .map((line) => line.trim())
@@ -142,7 +141,7 @@ async function waitForOwnerLease({ roomId, keyPrefix, env }) {
       const value = runCaptured(
         'docker',
         ['compose', 'exec', '-T', 'redis', 'redis-cli', '--raw', 'GET', key],
-        { env },
+        runOptions,
       ).trim();
       if (value) {
         return { key, value };

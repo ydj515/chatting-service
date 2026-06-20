@@ -6,6 +6,7 @@ import {
   buildLoadUsername,
   flattenChatMessages,
   parseLoadChatArgs,
+  readJsonResponse,
 } from './loadChatPlan.mjs';
 
 test('parseLoadChatArgs maps Phase 6 load-chat options', () => {
@@ -16,15 +17,15 @@ test('parseLoadChatArgs maps Phase 6 load-chat options', () => {
     '3',
     '--messages-per-sec',
     '100',
-      '--duration',
-      '30',
-      '--metadata-file',
-      '/tmp/phase6-load.json',
-      '--drain-wait',
-      '12',
-      '--min-received-ratio',
-      '0.9',
-      '--assert-room-seq-order',
+    '--duration',
+    '30',
+    '--metadata-file',
+    '/tmp/phase6-load.json',
+    '--drain-wait',
+    '12',
+    '--min-received-ratio',
+    '0.9',
+    '--assert-room-seq-order',
   ]);
 
   assert.deepEqual(options, {
@@ -71,5 +72,19 @@ test('assertMinimumReceived rejects weak fanout verification samples', () => {
   assert.throws(
     () => assertMinimumReceived([[{ roomSeq: 1 }]], 200, 0.9),
     /received only 1\/200/,
+  );
+});
+
+test('readJsonResponse reports HTTP status and raw body before parsing JSON', async () => {
+  await assert.rejects(
+    () => readJsonResponse(
+      {
+        ok: false,
+        status: 502,
+        text: async () => '<html>bad gateway</html>',
+      },
+      { method: 'POST', url: 'http://localhost/api/test' },
+    ),
+    /POST http:\/\/localhost\/api\/test failed: 502 <html>bad gateway<\/html>/,
   );
 });

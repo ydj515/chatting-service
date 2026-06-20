@@ -102,12 +102,27 @@ export function findOwnerContainer(leaseValue, containers) {
 }
 
 export function parseLoadChatJson(stdout) {
-  const start = stdout.lastIndexOf('{');
   const end = stdout.lastIndexOf('}');
-  if (start === -1 || end === -1 || end < start) {
+  if (end === -1) {
     throw new Error('load-chat output did not contain a JSON summary');
   }
-  return JSON.parse(stdout.slice(start, end + 1));
+  for (let start = stdout.lastIndexOf('{', end); start !== -1; start = stdout.lastIndexOf('{', start - 1)) {
+    try {
+      return JSON.parse(stdout.slice(start, end + 1));
+    } catch {
+      // Keep walking left until the outer JSON object is found.
+    }
+  }
+  throw new Error('load-chat output did not contain a JSON summary');
+}
+
+export function buildRunCapturedOptions({ env, timeoutMs = 30_000 }) {
+  return {
+    env,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+    timeout: timeoutMs,
+  };
 }
 
 function positiveInteger(value, name) {

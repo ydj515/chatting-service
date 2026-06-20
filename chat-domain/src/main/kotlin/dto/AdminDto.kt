@@ -79,6 +79,9 @@ data class AdminRoomPolicyUpdateRequest(
     val rateLimitPerSecond: Int? = null,
     val userRateLimitPerSecond: Int? = null,
     val slowModeSeconds: Int? = null,
+    val clearRateLimit: Boolean? = null,
+    val clearUserRateLimit: Boolean? = null,
+    val clearSlowMode: Boolean? = null,
     val autoPolicyEnabled: Boolean? = null,
     val moderatorPriority: Boolean? = null,
 )

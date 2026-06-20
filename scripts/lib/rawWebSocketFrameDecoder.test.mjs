@@ -34,6 +34,17 @@ test('RawWebSocketFrameDecoder keeps partial frame data until the next chunk arr
   assert.deepEqual(messages, ['hello']);
 });
 
+test('RawWebSocketFrameDecoder rejects frames above the payload size ceiling', () => {
+  const decoder = new RawWebSocketFrameDecoder({
+    maxPayloadBytes: 1024,
+  });
+
+  assert.throws(
+    () => decoder.read(extendedLengthHeader({ opcode: 0x1, length: 1025 })),
+    /payload too large/,
+  );
+});
+
 function frame({ opcode, payload, fin = true }) {
   const body = Buffer.from(payload);
   if (body.length >= 126) {
@@ -43,4 +54,12 @@ function frame({ opcode, payload, fin = true }) {
     Buffer.from([(fin ? 0x80 : 0) | opcode, body.length]),
     body,
   ]);
+}
+
+function extendedLengthHeader({ opcode, length, fin = true }) {
+  const header = Buffer.alloc(4);
+  header[0] = (fin ? 0x80 : 0) | opcode;
+  header[1] = 126;
+  header.writeUInt16BE(length, 2);
+  return header;
 }

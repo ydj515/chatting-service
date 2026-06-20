@@ -176,6 +176,8 @@ class ChatServiceImplCanonicalHistoryTest {
                 messagePersistenceService = MessagePersistenceService(messageRepository),
                 webSocketSessionManager = webSocketSessionManager,
                 messageStreamProducer = mock(MessageStreamProducer::class.java),
+                messageAdmissionPolicyService = MessageAdmissionPolicyService.Noop,
+                roomTrafficStatsService = RoomTrafficStatsService.Noop,
             ),
             chatRoomMemberRepository = chatRoomMemberRepository,
         )

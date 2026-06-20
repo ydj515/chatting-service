@@ -39,8 +39,8 @@ class ChatServiceImpl(
     private val messagePersistenceService: MessagePersistenceService,
     private val webSocketSessionManager: WebSocketSessionManager,
     private val messageStreamProducer: MessageStreamProducer,
-    private val messageAdmissionPolicyService: MessageAdmissionPolicyService = MessageAdmissionPolicyService.Noop,
-    private val roomTrafficStatsService: RoomTrafficStatsService = RoomTrafficStatsService.Noop,
+    private val messageAdmissionPolicyService: MessageAdmissionPolicyService,
+    private val roomTrafficStatsService: RoomTrafficStatsService,
 ) : ChatService {
 
     private val logger = LoggerFactory.getLogger(ChatServiceImpl::class.java)
@@ -375,9 +375,17 @@ class ChatServiceImpl(
         )
 
         messageStreamProducer.append(messageToStreamEnvelope(message))
-        roomTrafficStatsService.recordAccepted(request.chatRoomId)
+        recordAcceptedBestEffort(request.chatRoomId)
 
         return messageToDto(message)
+    }
+
+    private fun recordAcceptedBestEffort(roomId: Long) {
+        try {
+            roomTrafficStatsService.recordAccepted(roomId)
+        } catch (e: RuntimeException) {
+            logger.warn("Failed to record accepted room traffic stats for room {}", roomId, e)
+        }
     }
 
     private fun messageToStreamEnvelope(message: Message): MessageStreamEnvelope {

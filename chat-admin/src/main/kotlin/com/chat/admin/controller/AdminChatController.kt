@@ -154,6 +154,25 @@ class AdminChatController(
                 throw ResponseStatusException(HttpStatus.BAD_REQUEST, "정책 숫자 값은 1 이상이어야 합니다.")
             }
         }
+        rejectClearConflict(request.rateLimitPerSecond, request.clearRateLimit, "rateLimitPerSecond", "clearRateLimit")
+        rejectClearConflict(
+            request.userRateLimitPerSecond,
+            request.clearUserRateLimit,
+            "userRateLimitPerSecond",
+            "clearUserRateLimit",
+        )
+        rejectClearConflict(request.slowModeSeconds, request.clearSlowMode, "slowModeSeconds", "clearSlowMode")
+    }
+
+    private fun rejectClearConflict(
+        value: Int?,
+        clear: Boolean?,
+        valueName: String,
+        clearName: String,
+    ) {
+        if (value != null && clear == true) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "$valueName 와 $clearName 는 동시에 지정할 수 없습니다.")
+        }
     }
 
     private fun boundedLimit(limit: Int?): Int {

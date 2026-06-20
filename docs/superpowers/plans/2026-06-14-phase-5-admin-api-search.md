@@ -139,7 +139,7 @@ Expected: tests pass.
 @Test
 fun `history query는 roomId와 created_at 범위와 cursor를 사용한다`() {
     val jdbcTemplate = mock(JdbcTemplate::class.java)
-    val repository = AdminMessageRepository(jdbcTemplate)
+    val repository = AdminMessageRepository(jdbcTemplate = jdbcTemplate, writeJdbcTemplate = jdbcTemplate)
 
     repository.findRoomMessages(
         roomId = 10L,

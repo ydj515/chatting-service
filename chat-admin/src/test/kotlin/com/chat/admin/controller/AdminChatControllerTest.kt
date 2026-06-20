@@ -287,6 +287,50 @@ class AdminChatControllerTest {
     }
 
     @Test
+    fun `관리자 room policy override는 admission 제한 clear flag를 전달한다`() {
+        mockMvc.patch("/admin/rooms/10/policy") {
+            header("X-Admin-Token", "local-admin-token")
+            contentType = MediaType.APPLICATION_JSON
+            content = """
+                {
+                  "clearRateLimit": true,
+                  "clearUserRateLimit": true,
+                  "clearSlowMode": true
+                }
+            """.trimIndent()
+        }
+            .andExpect {
+                status { isOk() }
+            }
+
+        assertEquals(
+            AdminRoomPolicyUpdateRequest(
+                clearRateLimit = true,
+                clearUserRateLimit = true,
+                clearSlowMode = true,
+            ),
+            service.policyRequest,
+        )
+    }
+
+    @Test
+    fun `관리자 room policy override는 clear flag와 새 값을 동시에 지정하면 400으로 거부한다`() {
+        mockMvc.patch("/admin/rooms/10/policy") {
+            header("X-Admin-Token", "local-admin-token")
+            contentType = MediaType.APPLICATION_JSON
+            content = """
+                {
+                  "rateLimitPerSecond": 100,
+                  "clearRateLimit": true
+                }
+            """.trimIndent()
+        }
+            .andExpect {
+                status { isBadRequest() }
+            }
+    }
+
+    @Test
     fun `관리자 token이 없으면 401로 거부한다`() {
         mockMvc.get("/admin/messages/search") {
             param("q", "hello")

@@ -29,7 +29,7 @@ class AdminMessageRepositoryTest {
     @Test
     fun `history query는 roomId와 created_at 범위와 cursor를 parameter로 바인딩한다`() {
         val jdbcTemplate = mock(JdbcTemplate::class.java)
-        val repository = AdminMessageRepository(jdbcTemplate)
+        val repository = AdminMessageRepository(jdbcTemplate = jdbcTemplate, writeJdbcTemplate = jdbcTemplate)
         val cursor = AdminMessageCursor(
             createdAt = Instant.parse("2026-06-14T00:00:01Z"),
             roomSeq = 100L,
@@ -79,7 +79,7 @@ class AdminMessageRepositoryTest {
     @Test
     fun `history query는 cursor가 없어도 안정적인 tuple ordering을 사용한다`() {
         val jdbcTemplate = mock(JdbcTemplate::class.java)
-        val repository = AdminMessageRepository(jdbcTemplate)
+        val repository = AdminMessageRepository(jdbcTemplate = jdbcTemplate, writeJdbcTemplate = jdbcTemplate)
         `when`(
             jdbcTemplate.query(
                 anyString(),
@@ -109,7 +109,7 @@ class AdminMessageRepositoryTest {
     @Test
     fun `search query는 빈 query일 때 room 필터만으로 조회한다`() {
         val jdbcTemplate = mock(JdbcTemplate::class.java)
-        val repository = AdminMessageRepository(jdbcTemplate)
+        val repository = AdminMessageRepository(jdbcTemplate = jdbcTemplate, writeJdbcTemplate = jdbcTemplate)
         `when`(
             jdbcTemplate.query(
                 anyString(),
@@ -144,7 +144,7 @@ class AdminMessageRepositoryTest {
     @Test
     fun `search query는 query와 필터가 모두 없으면 전체 scan을 피한다`() {
         val jdbcTemplate = mock(JdbcTemplate::class.java)
-        val repository = AdminMessageRepository(jdbcTemplate)
+        val repository = AdminMessageRepository(jdbcTemplate = jdbcTemplate, writeJdbcTemplate = jdbcTemplate)
 
         val result = repository.searchMessages(
             query = "   ",
@@ -164,7 +164,7 @@ class AdminMessageRepositoryTest {
     @Test
     fun `search query 기본 모드는 FTS 필터만 parameter로 바인딩한다`() {
         val jdbcTemplate = mock(JdbcTemplate::class.java)
-        val repository = AdminMessageRepository(jdbcTemplate)
+        val repository = AdminMessageRepository(jdbcTemplate = jdbcTemplate, writeJdbcTemplate = jdbcTemplate)
         `when`(
             jdbcTemplate.query(
                 anyString(),
@@ -203,7 +203,7 @@ class AdminMessageRepositoryTest {
     @Test
     fun `search query CONTAINS 모드는 trigram fallback 필터를 parameter로 바인딩한다`() {
         val jdbcTemplate = mock(JdbcTemplate::class.java)
-        val repository = AdminMessageRepository(jdbcTemplate)
+        val repository = AdminMessageRepository(jdbcTemplate = jdbcTemplate, writeJdbcTemplate = jdbcTemplate)
         `when`(
             jdbcTemplate.query(
                 anyString(),
@@ -238,7 +238,7 @@ class AdminMessageRepositoryTest {
     @Test
     fun `search query cursor는 정렬 tuple과 같은 key로 predicate를 만든다`() {
         val jdbcTemplate = mock(JdbcTemplate::class.java)
-        val repository = AdminMessageRepository(jdbcTemplate)
+        val repository = AdminMessageRepository(jdbcTemplate = jdbcTemplate, writeJdbcTemplate = jdbcTemplate)
         val cursor = AdminMessageSearchCursor(
             createdAt = Instant.parse("2026-06-14T00:00:01Z"),
             roomSeq = 1001L,
@@ -285,7 +285,7 @@ class AdminMessageRepositoryTest {
     @Test
     fun `room status는 room_storage_configs 기준 정책 값을 조회한다`() {
         val jdbcTemplate = mock(JdbcTemplate::class.java)
-        val repository = AdminMessageRepository(jdbcTemplate)
+        val repository = AdminMessageRepository(jdbcTemplate = jdbcTemplate, writeJdbcTemplate = jdbcTemplate)
         `when`(
             jdbcTemplate.queryForObject(
                 anyString(),
@@ -320,7 +320,7 @@ class AdminMessageRepositoryTest {
     @Test
     fun `room policy override는 room_storage_configs를 upsert하고 갱신된 status를 반환한다`() {
         val jdbcTemplate = mock(JdbcTemplate::class.java)
-        val repository = AdminMessageRepository(jdbcTemplate)
+        val repository = AdminMessageRepository(jdbcTemplate = jdbcTemplate, writeJdbcTemplate = jdbcTemplate)
         val expectedStatus = AdminRoomStatusDto(
             roomId = 10L,
             heatLevel = "VERY_HOT",
@@ -349,8 +349,11 @@ class AdminMessageRepositoryTest {
                 eq("VERY_HOT"),
                 eq(500),
                 eq(30),
+                eq(false),
                 eq(1000),
+                eq(false),
                 eq(2),
+                eq(false),
                 eq(5),
                 eq(false),
                 isNull<Boolean>(),
@@ -386,8 +389,11 @@ class AdminMessageRepositoryTest {
             eq("VERY_HOT"),
             eq(500),
             eq(30),
+            eq(false),
             eq(1000),
+            eq(false),
             eq(2),
+            eq(false),
             eq(5),
             eq(false),
             isNull<Boolean>(),
@@ -395,14 +401,14 @@ class AdminMessageRepositoryTest {
         assertTrue(sqlCaptor.value.contains("INSERT INTO room_storage_configs"))
         assertTrue(sqlCaptor.value.contains("ON CONFLICT (room_id) DO UPDATE"))
         assertTrue(sqlCaptor.value.contains("hot_room_policy = COALESCE(?, room_storage_configs.hot_room_policy)"))
-        assertTrue(sqlCaptor.value.contains("slow_mode_seconds = COALESCE(?, room_storage_configs.slow_mode_seconds)"))
+        assertTrue(sqlCaptor.value.contains("slow_mode_seconds = CASE WHEN ? THEN NULL"))
         assertTrue(sqlCaptor.value.contains("RETURNING"))
     }
 
     @Test
     fun `room policy override는 기본적으로 자동 room policy 적용을 비활성화한다`() {
         val jdbcTemplate = mock(JdbcTemplate::class.java)
-        val repository = AdminMessageRepository(jdbcTemplate)
+        val repository = AdminMessageRepository(jdbcTemplate = jdbcTemplate, writeJdbcTemplate = jdbcTemplate)
         val expectedStatus = AdminRoomStatusDto(
             roomId = 10L,
             heatLevel = "VERY_HOT",
@@ -431,8 +437,11 @@ class AdminMessageRepositoryTest {
                 eq("VERY_HOT"),
                 eq(500),
                 eq(30),
+                eq(false),
                 eq(1000),
+                eq(false),
                 eq(2),
+                eq(false),
                 eq(5),
                 eq(false),
                 isNull<Boolean>(),
@@ -468,13 +477,104 @@ class AdminMessageRepositoryTest {
             eq("VERY_HOT"),
             eq(500),
             eq(30),
+            eq(false),
             eq(1000),
+            eq(false),
             eq(2),
+            eq(false),
             eq(5),
             eq(false),
             isNull<Boolean>(),
         )
         assertTrue(sqlCaptor.value.contains("auto_policy_enabled"))
+    }
+
+    @Test
+    fun `room policy override는 명시적 clear flag로 admission 제한을 해제한다`() {
+        val jdbcTemplate = mock(JdbcTemplate::class.java)
+        val repository = AdminMessageRepository(jdbcTemplate = jdbcTemplate, writeJdbcTemplate = jdbcTemplate)
+        val expectedStatus = AdminRoomStatusDto(
+            roomId = 10L,
+            heatLevel = "VERY_HOT",
+            liveFeedMaxMessages = 500,
+            liveFeedMaxAgeSeconds = 30,
+            rateLimitPerSecond = null,
+            slowModeSeconds = null,
+            replicaLagMs = 0,
+            searchP95LatencyMs = null,
+            userRateLimitPerSecond = null,
+            autoPolicyEnabled = false,
+        )
+        `when`(
+            jdbcTemplate.queryForObject(
+                anyString(),
+                anyRoomStatusRowMapper(),
+                eq(10L),
+                eq("VERY_HOT"),
+                eq(500),
+                eq(30),
+                isNull<Int>(),
+                isNull<Int>(),
+                isNull<Int>(),
+                eq(false),
+                isNull<Boolean>(),
+                eq("VERY_HOT"),
+                eq(500),
+                eq(30),
+                eq(true),
+                isNull<Int>(),
+                eq(true),
+                isNull<Int>(),
+                eq(true),
+                isNull<Int>(),
+                eq(false),
+                isNull<Boolean>(),
+            ),
+        ).thenReturn(expectedStatus)
+
+        val status = repository.updateRoomPolicy(
+            roomId = 10L,
+            request = AdminRoomPolicyUpdateRequest(
+                heatLevel = "VERY_HOT",
+                liveFeedMaxMessages = 500,
+                liveFeedMaxAgeSeconds = 30,
+                clearRateLimit = true,
+                clearUserRateLimit = true,
+                clearSlowMode = true,
+            ),
+        )
+
+        assertEquals(null, status.rateLimitPerSecond)
+        assertEquals(null, status.userRateLimitPerSecond)
+        assertEquals(null, status.slowModeSeconds)
+        val sqlCaptor = ArgumentCaptor.forClass(String::class.java)
+        verify(jdbcTemplate).queryForObject(
+            sqlCaptor.capture(),
+            anyRoomStatusRowMapper(),
+            eq(10L),
+            eq("VERY_HOT"),
+            eq(500),
+            eq(30),
+            isNull<Int>(),
+            isNull<Int>(),
+            isNull<Int>(),
+            eq(false),
+            isNull<Boolean>(),
+            eq("VERY_HOT"),
+            eq(500),
+            eq(30),
+            eq(true),
+            isNull<Int>(),
+            eq(true),
+            isNull<Int>(),
+            eq(true),
+            isNull<Int>(),
+            eq(false),
+            isNull<Boolean>(),
+        )
+        assertTrue(sqlCaptor.value.contains("room_rate_limit_per_second = CASE WHEN ? THEN NULL"))
+        assertTrue(sqlCaptor.value.contains("user_rate_limit_per_second = CASE WHEN ? THEN NULL"))
+        assertTrue(sqlCaptor.value.contains("slow_mode_seconds = CASE WHEN ? THEN NULL"))
     }
 
     @Test
@@ -513,8 +613,11 @@ class AdminMessageRepositoryTest {
                 eq("VERY_HOT"),
                 eq(500),
                 eq(30),
+                eq(false),
                 eq(1000),
+                eq(false),
                 eq(2),
+                eq(false),
                 eq(5),
                 eq(false),
                 isNull<Boolean>(),
@@ -548,8 +651,11 @@ class AdminMessageRepositoryTest {
             eq("VERY_HOT"),
             eq(500),
             eq(30),
+            eq(false),
             eq(1000),
+            eq(false),
             eq(2),
+            eq(false),
             eq(5),
             eq(false),
             isNull<Boolean>(),
