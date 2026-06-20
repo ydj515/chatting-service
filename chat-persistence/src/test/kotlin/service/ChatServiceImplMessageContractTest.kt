@@ -1,8 +1,10 @@
 package com.chat.persistence.service
 
 import com.chat.domain.dto.SendMessageRequest
+import com.chat.domain.exception.MessageAdmissionRejectedException
 import com.chat.domain.model.ChatRoom
 import com.chat.domain.model.ChatRoomMember
+import com.chat.domain.model.MemberRole
 import com.chat.domain.model.Message
 import com.chat.domain.model.MessageType
 import com.chat.domain.model.User
@@ -119,6 +121,67 @@ class ChatServiceImplMessageContractTest {
     }
 
     @Test
+    fun `메시지 전송은 Streams append 성공 후 room traffic counter를 기록한다`() {
+        val roomTrafficStatsService = RecordingRoomTrafficStatsService()
+        val fixture = chatServiceFixture(roomTrafficStatsService = roomTrafficStatsService)
+        val clientMessageId = "client-message-1"
+        `when`(
+            fixture.messageRepository.findByChatRoomIdAndSenderIdAndClientMessageId(
+                10L,
+                7L,
+                clientMessageId,
+            )
+        ).thenReturn(Optional.empty())
+
+        fixture.chatService.sendMessage(
+            SendMessageRequest(
+                chatRoomId = 10L,
+                type = MessageType.TEXT,
+                content = "hello",
+                clientMessageId = clientMessageId,
+            ),
+            senderId = 7L,
+        )
+
+        assertEquals(listOf(10L), roomTrafficStatsService.recordedRoomIds)
+    }
+
+    @Test
+    fun `Streams append 실패 시 room traffic counter를 기록하지 않는다`() {
+        val messageStreamProducer = mock(MessageStreamProducer::class.java)
+        `when`(messageStreamProducer.append(anyMessageStreamEnvelope()))
+            .thenThrow(IllegalStateException("stream append failed"))
+        val roomTrafficStatsService = RecordingRoomTrafficStatsService()
+        val fixture = chatServiceFixture(
+            messageStreamProducer = messageStreamProducer,
+            roomTrafficStatsService = roomTrafficStatsService,
+        )
+        val clientMessageId = "client-message-1"
+        `when`(
+            fixture.messageRepository.findByChatRoomIdAndSenderIdAndClientMessageId(
+                10L,
+                7L,
+                clientMessageId,
+            )
+        ).thenReturn(Optional.empty())
+
+        assertThrows(IllegalStateException::class.java) {
+            fixture.chatService.sendMessage(
+                SendMessageRequest(
+                    chatRoomId = 10L,
+                    type = MessageType.TEXT,
+                    content = "hello",
+                    clientMessageId = clientMessageId,
+                ),
+                senderId = 7L,
+            )
+        }
+
+        assertEquals(emptyList<Long>(), roomTrafficStatsService.recordedRoomIds)
+    }
+
+
+    @Test
     fun `Redis Streams append 실패 시 메시지를 저장하거나 fanout하지 않는다`() {
         val messageStreamProducer = mock(MessageStreamProducer::class.java)
         `when`(messageStreamProducer.append(anyMessageStreamEnvelope()))
@@ -193,9 +256,118 @@ class ChatServiceImplMessageContractTest {
         verify(fixture.messageRepository, never()).saveAndFlush(any(Message::class.java))
     }
 
+    @Test
+    fun `메시지 수락 정책 거부 시 sequence 발급과 stream append를 수행하지 않는다`() {
+        val messageStreamProducer = mock(MessageStreamProducer::class.java)
+        val admissionPolicyService = RejectingMessageAdmissionPolicyService("room rate limit exceeded")
+        val fixture = chatServiceFixture(
+            messageStreamProducer = messageStreamProducer,
+            messageAdmissionPolicyService = admissionPolicyService,
+        )
+        val clientMessageId = "client-message-1"
+        `when`(
+            fixture.messageRepository.findByChatRoomIdAndSenderIdAndClientMessageId(
+                10L,
+                7L,
+                clientMessageId,
+            )
+        ).thenReturn(Optional.empty())
+
+        val exception = assertThrows(MessageAdmissionRejectedException::class.java) {
+            fixture.chatService.sendMessage(
+                SendMessageRequest(
+                    chatRoomId = 10L,
+                    type = MessageType.TEXT,
+                    content = "hello",
+                    clientMessageId = clientMessageId,
+                ),
+                senderId = 7L,
+            )
+        }
+
+        assertEquals("room rate limit exceeded", exception.message)
+        verify(messageStreamProducer, never()).append(anyMessageStreamEnvelope())
+        verify(fixture.redisTemplate.opsForValue(), never()).increment("chat:sequence:10", 1L)
+        verify(fixture.messageRepository, never()).saveAndFlush(any(Message::class.java))
+    }
+
+    @Test
+    fun `같은 clientMessageId 재전송은 메시지 수락 정책을 다시 검사하지 않는다`() {
+        val admissionPolicyService = RecordingMessageAdmissionPolicyService()
+        val fixture = chatServiceFixture(messageAdmissionPolicyService = admissionPolicyService)
+        val clientMessageId = "client-message-1"
+        val existingMessage = Message(
+            id = 101L,
+            messageId = "msg-existing",
+            clientMessageId = clientMessageId,
+            chatRoom = fixture.chatRoom,
+            sender = fixture.sender,
+            type = MessageType.TEXT,
+            content = "hello",
+            sequenceNumber = 5L,
+            roomSeq = 5L,
+            streamShard = 1,
+            writeShard = 2,
+            fanoutShard = 3,
+            createdAt = LocalDateTime.parse("2026-06-12T12:00:00"),
+        )
+        `when`(
+            fixture.messageRepository.findByChatRoomIdAndSenderIdAndClientMessageId(
+                10L,
+                7L,
+                clientMessageId,
+            )
+        ).thenReturn(Optional.of(existingMessage))
+
+        fixture.chatService.sendMessage(
+            SendMessageRequest(
+                chatRoomId = 10L,
+                type = MessageType.TEXT,
+                content = "hello",
+                clientMessageId = clientMessageId,
+            ),
+            senderId = 7L,
+        )
+
+        assertEquals(0, admissionPolicyService.callCount)
+    }
+
+    @Test
+    fun `메시지 수락 정책은 채팅방 멤버 역할을 함께 전달받는다`() {
+        val admissionPolicyService = RecordingMessageAdmissionPolicyService()
+        val fixture = chatServiceFixture(
+            messageAdmissionPolicyService = admissionPolicyService,
+            memberRole = MemberRole.ADMIN,
+        )
+        val clientMessageId = "client-message-1"
+        `when`(
+            fixture.messageRepository.findByChatRoomIdAndSenderIdAndClientMessageId(
+                10L,
+                7L,
+                clientMessageId,
+            )
+        ).thenReturn(Optional.empty())
+
+        fixture.chatService.sendMessage(
+            SendMessageRequest(
+                chatRoomId = 10L,
+                type = MessageType.TEXT,
+                content = "hello",
+                clientMessageId = clientMessageId,
+            ),
+            senderId = 7L,
+        )
+
+        assertEquals(MemberRole.ADMIN, admissionPolicyService.lastMemberRole)
+    }
+
+
     @Suppress("UNCHECKED_CAST")
     private fun chatServiceFixture(
         messageStreamProducer: MessageStreamProducer = successfulMessageStreamProducer(),
+        messageAdmissionPolicyService: MessageAdmissionPolicyService = MessageAdmissionPolicyService.Noop,
+        roomTrafficStatsService: RoomTrafficStatsService = RoomTrafficStatsService.Noop,
+        memberRole: MemberRole = MemberRole.MEMBER,
     ): Fixture {
         val redisTemplate = mock(RedisTemplate::class.java) as RedisTemplate<String, String>
         val valueOperations = mock(ValueOperations::class.java) as ValueOperations<String, String>
@@ -217,7 +389,7 @@ class ChatServiceImplMessageContractTest {
 
         val sender = user(7L)
         val chatRoom = chatRoom(10L)
-        val member = ChatRoomMember(chatRoom = chatRoom, user = sender)
+        val member = ChatRoomMember(chatRoom = chatRoom, user = sender, role = memberRole)
 
         val chatRoomRepository = mock(ChatRoomRepository::class.java)
         val userRepository = mock(UserRepository::class.java)
@@ -254,6 +426,8 @@ class ChatServiceImplMessageContractTest {
                 messagePersistenceService = MessagePersistenceService(messageRepository),
                 webSocketSessionManager = webSocketSessionManager,
                 messageStreamProducer = messageStreamProducer,
+                messageAdmissionPolicyService = messageAdmissionPolicyService,
+                roomTrafficStatsService = roomTrafficStatsService,
             ),
             messageRepository = messageRepository,
             chatRoom = chatRoom,
@@ -295,6 +469,45 @@ class ChatServiceImplMessageContractTest {
         val messageStreamProducer = mock(MessageStreamProducer::class.java)
         `when`(messageStreamProducer.append(anyMessageStreamEnvelope())).thenReturn("1749790000000-0")
         return messageStreamProducer
+    }
+
+    private class RejectingMessageAdmissionPolicyService(
+        private val message: String,
+    ) : MessageAdmissionPolicyService {
+
+        override fun requireAllowed(roomId: Long, senderId: Long, memberRole: MemberRole) {
+            throw MessageAdmissionRejectedException(message)
+        }
+    }
+
+    private class RecordingMessageAdmissionPolicyService : MessageAdmissionPolicyService {
+        var callCount: Int = 0
+            private set
+        var lastMemberRole: MemberRole? = null
+            private set
+
+        override fun requireAllowed(roomId: Long, senderId: Long, memberRole: MemberRole) {
+            callCount += 1
+            lastMemberRole = memberRole
+        }
+    }
+
+    private class RecordingRoomTrafficStatsService : RoomTrafficStatsService {
+        val recordedRoomIds = mutableListOf<Long>()
+
+        override fun recordAccepted(roomId: Long) {
+            recordedRoomIds += roomId
+        }
+
+        override fun activeRoomIds(): Set<Long> = emptySet()
+
+        override fun snapshot(roomId: Long): RoomTrafficSnapshot {
+            return RoomTrafficSnapshot(
+                roomId = roomId,
+                roomMessagesPerSecond = 0,
+                roomMessagesP95PerSecond = 0,
+            )
+        }
     }
 
     @Suppress("UNCHECKED_CAST")

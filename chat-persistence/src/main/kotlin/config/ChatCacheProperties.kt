@@ -10,4 +10,5 @@ data class ChatCacheProperties(
     val chatRoomsTtl: Duration = Duration.ofMinutes(15),
     val chatRoomMembersTtl: Duration = Duration.ofMinutes(10),
     val messagesTtl: Duration = Duration.ofMinutes(5),
+    val roomAdmissionPoliciesTtl: Duration = Duration.ofSeconds(10),
 )

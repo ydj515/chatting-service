@@ -4,6 +4,7 @@ import com.chat.domain.dto.AdminMessageDto
 import com.chat.domain.dto.AdminMessageCursor
 import com.chat.domain.dto.AdminMessageSearchCursor
 import com.chat.domain.dto.AdminMessageSearchMode
+import com.chat.domain.dto.AdminRoomPolicyUpdateRequest
 import com.chat.domain.dto.AdminRoomStatusDto
 import com.chat.domain.model.MessageType
 import org.springframework.beans.factory.annotation.Qualifier
@@ -19,6 +20,8 @@ import java.time.Instant
 class AdminMessageRepository(
     @Qualifier("messageReadJdbcTemplate")
     private val jdbcTemplate: JdbcTemplate,
+    @Qualifier("jdbcTemplate")
+    private val writeJdbcTemplate: JdbcTemplate = jdbcTemplate,
 ) {
 
     fun findRoomMessages(
@@ -147,10 +150,13 @@ class AdminMessageRepository(
                 SELECT
                     room_id,
                     hot_room_policy AS heat_level,
-                    1000::integer AS live_feed_max_messages,
-                    60::integer AS live_feed_max_age_seconds,
-                    NULL::integer AS rate_limit_per_second,
-                    NULL::integer AS slow_mode_seconds,
+                    live_feed_max_messages,
+                    live_feed_max_age_seconds,
+                    room_rate_limit_per_second AS rate_limit_per_second,
+                    user_rate_limit_per_second,
+                    slow_mode_seconds,
+                    auto_policy_enabled,
+                    moderator_priority,
                     0::bigint AS replica_lag_ms,
                     NULL::bigint AS search_p95_latency_ms
                 FROM room_storage_configs
@@ -164,6 +170,80 @@ class AdminMessageRepository(
         }
     }
 
+    fun updateRoomPolicy(
+        roomId: Long,
+        request: AdminRoomPolicyUpdateRequest,
+    ): AdminRoomStatusDto {
+        return writeJdbcTemplate.queryForObject(
+            """
+            INSERT INTO room_storage_configs (
+                room_id,
+                hot_room_policy,
+                live_feed_max_messages,
+                live_feed_max_age_seconds,
+                room_rate_limit_per_second,
+                user_rate_limit_per_second,
+                slow_mode_seconds,
+                auto_policy_enabled,
+                moderator_priority,
+                updated_at
+            )
+            VALUES (
+                ?,
+                COALESCE(?, 'NORMAL'),
+                COALESCE(?, 1000),
+                COALESCE(?, 60),
+                ?,
+                ?,
+                ?,
+                ?,
+                COALESCE(?, true),
+                now()
+            )
+            ON CONFLICT (room_id) DO UPDATE SET
+                hot_room_policy = COALESCE(?, room_storage_configs.hot_room_policy),
+                live_feed_max_messages = COALESCE(?, room_storage_configs.live_feed_max_messages),
+                live_feed_max_age_seconds = COALESCE(?, room_storage_configs.live_feed_max_age_seconds),
+                room_rate_limit_per_second = COALESCE(?, room_storage_configs.room_rate_limit_per_second),
+                user_rate_limit_per_second = COALESCE(?, room_storage_configs.user_rate_limit_per_second),
+                slow_mode_seconds = COALESCE(?, room_storage_configs.slow_mode_seconds),
+                auto_policy_enabled = ?,
+                moderator_priority = COALESCE(?, room_storage_configs.moderator_priority),
+                updated_at = now()
+            RETURNING
+                room_id,
+                hot_room_policy AS heat_level,
+                live_feed_max_messages,
+                live_feed_max_age_seconds,
+                room_rate_limit_per_second AS rate_limit_per_second,
+                user_rate_limit_per_second,
+                slow_mode_seconds,
+                auto_policy_enabled,
+                moderator_priority,
+                0::bigint AS replica_lag_ms,
+                NULL::bigint AS search_p95_latency_ms
+            """.trimIndent(),
+            roomStatusRowMapper,
+            roomId,
+            request.heatLevel,
+            request.liveFeedMaxMessages,
+            request.liveFeedMaxAgeSeconds,
+            request.rateLimitPerSecond,
+            request.userRateLimitPerSecond,
+            request.slowModeSeconds,
+            request.autoPolicyEnabled ?: false,
+            request.moderatorPriority,
+            request.heatLevel,
+            request.liveFeedMaxMessages,
+            request.liveFeedMaxAgeSeconds,
+            request.rateLimitPerSecond,
+            request.userRateLimitPerSecond,
+            request.slowModeSeconds,
+            request.autoPolicyEnabled ?: false,
+            request.moderatorPriority,
+        ) ?: defaultRoomStatus(roomId)
+    }
+
     private fun defaultRoomStatus(roomId: Long): AdminRoomStatusDto {
         return AdminRoomStatusDto(
             roomId = roomId,
@@ -174,6 +254,9 @@ class AdminMessageRepository(
             slowModeSeconds = null,
             replicaLagMs = 0,
             searchP95LatencyMs = null,
+            userRateLimitPerSecond = null,
+            autoPolicyEnabled = true,
+            moderatorPriority = true,
         )
     }
 
@@ -223,6 +306,9 @@ class AdminMessageRepository(
                 slowModeSeconds = rs.nullableInt("slow_mode_seconds"),
                 replicaLagMs = rs.nullableLong("replica_lag_ms"),
                 searchP95LatencyMs = rs.nullableLong("search_p95_latency_ms"),
+                userRateLimitPerSecond = rs.nullableInt("user_rate_limit_per_second"),
+                autoPolicyEnabled = rs.getBoolean("auto_policy_enabled"),
+                moderatorPriority = rs.getBoolean("moderator_priority"),
             )
         }
 

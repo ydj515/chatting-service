@@ -39,6 +39,8 @@ class ChatServiceImpl(
     private val messagePersistenceService: MessagePersistenceService,
     private val webSocketSessionManager: WebSocketSessionManager,
     private val messageStreamProducer: MessageStreamProducer,
+    private val messageAdmissionPolicyService: MessageAdmissionPolicyService = MessageAdmissionPolicyService.Noop,
+    private val roomTrafficStatsService: RoomTrafficStatsService = RoomTrafficStatsService.Noop,
 ) : ChatService {
 
     private val logger = LoggerFactory.getLogger(ChatServiceImpl::class.java)
@@ -334,7 +336,7 @@ class ChatServiceImpl(
         val sender = userRepository.findById(senderId)
             .orElseThrow { IllegalArgumentException("사용자를 찾을 수 없습니다: $senderId") }
 
-        chatRoomMemberRepository.findByChatRoomIdAndUserIdAndIsActiveTrue(request.chatRoomId, senderId)
+        val member = chatRoomMemberRepository.findByChatRoomIdAndUserIdAndIsActiveTrue(request.chatRoomId, senderId)
             .orElseThrow { IllegalArgumentException("채팅방에 참여하지 않은 사용자입니다.") }
 
         if (requestedClientMessageId != null) {
@@ -347,6 +349,12 @@ class ChatServiceImpl(
                 return existingMessage
             }
         }
+
+        messageAdmissionPolicyService.requireAllowed(
+            roomId = request.chatRoomId,
+            senderId = senderId,
+            memberRole = member.role,
+        )
 
         val messageId = generateMessageId()
         val clientMessageId = requestedClientMessageId ?: "server:$messageId"
@@ -367,6 +375,7 @@ class ChatServiceImpl(
         )
 
         messageStreamProducer.append(messageToStreamEnvelope(message))
+        roomTrafficStatsService.recordAccepted(request.chatRoomId)
 
         return messageToDto(message)
     }

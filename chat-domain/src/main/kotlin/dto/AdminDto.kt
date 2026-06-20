@@ -67,6 +67,20 @@ data class AdminRoomStatusDto(
     val slowModeSeconds: Int?,
     val replicaLagMs: Long?,
     val searchP95LatencyMs: Long?,
+    val userRateLimitPerSecond: Int? = null,
+    val autoPolicyEnabled: Boolean = true,
+    val moderatorPriority: Boolean = true,
+)
+
+data class AdminRoomPolicyUpdateRequest(
+    val heatLevel: String? = null,
+    val liveFeedMaxMessages: Int? = null,
+    val liveFeedMaxAgeSeconds: Int? = null,
+    val rateLimitPerSecond: Int? = null,
+    val userRateLimitPerSecond: Int? = null,
+    val slowModeSeconds: Int? = null,
+    val autoPolicyEnabled: Boolean? = null,
+    val moderatorPriority: Boolean? = null,
 )
 
 data class AdminExportMessagesRequest(

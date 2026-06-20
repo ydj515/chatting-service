@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test
 import org.mockito.ArgumentCaptor
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
+import org.mockito.Mockito.verifyNoInteractions
 import java.time.LocalDateTime
 
 class HotRoomFanoutWorkerTest {
@@ -89,6 +90,125 @@ class HotRoomFanoutWorkerTest {
         assertEquals(listOf("chat:stream:room:10:shard:0:fanout:worker-1:30000"), consumer.claims)
     }
 
+    @Test
+    fun `fanout worker는 owner lease를 획득하지 못한 stream을 읽거나 claim하지 않는다`() {
+        val consumer = FakeMessageStreamConsumer(
+            records = listOf(streamRecord(recordId = "1749790000000-0", roomSeq = 12L)),
+        )
+        val redisMessageBroker = mock(RedisMessageBroker::class.java)
+        val leaseService = FakeFanoutOwnerLeaseService(acquireResult = null)
+        val worker = HotRoomFanoutWorker(
+            messageStreamConsumer = consumer,
+            redisMessageBroker = redisMessageBroker,
+            workerProperties = ChatWorkerProperties(
+                consumerName = "worker-1",
+                fanout = ChatWorkerProperties.StreamConsumer(
+                    consumerGroup = "fanout",
+                    readCount = 10,
+                ),
+            ),
+            fanoutOwnerLeaseService = leaseService,
+        )
+
+        val broadcastCount = worker.pollAndFanout()
+
+        assertEquals(0, broadcastCount)
+        assertEquals(listOf("10:0"), leaseService.acquireAttempts)
+        assertEquals(emptyList<String>(), consumer.ensuredGroups)
+        assertEquals(emptyList<String>(), consumer.reads)
+        assertEquals(emptyList<String>(), consumer.claims)
+        assertEquals(emptyList<String>(), consumer.acked)
+        verifyNoInteractions(redisMessageBroker)
+    }
+
+    @Test
+    fun `fanout worker는 publish 직전 owner token이 유효하지 않으면 broadcast와 ack를 하지 않는다`() {
+        val consumer = FakeMessageStreamConsumer(
+            records = listOf(streamRecord(recordId = "1749790000000-0", roomSeq = 12L)),
+        )
+        val redisMessageBroker = mock(RedisMessageBroker::class.java)
+        val leaseService = FakeFanoutOwnerLeaseService(
+            acquireResult = FanoutOwnerLease(
+                key = "chat:fanout:owner:room:10:shard:0",
+                value = "worker-1:token",
+                roomId = 10L,
+                streamShard = 0,
+            ),
+            validationResults = mutableMapOf(
+                FanoutOwnerLeaseValidationStage.BEFORE_PUBLISH to false,
+            ),
+        )
+        val worker = HotRoomFanoutWorker(
+            messageStreamConsumer = consumer,
+            redisMessageBroker = redisMessageBroker,
+            workerProperties = ChatWorkerProperties(
+                consumerName = "worker-1",
+                fanout = ChatWorkerProperties.StreamConsumer(
+                    consumerGroup = "fanout",
+                    readCount = 10,
+                ),
+            ),
+            fanoutOwnerLeaseService = leaseService,
+        )
+
+        val broadcastCount = worker.pollAndFanout()
+
+        assertEquals(0, broadcastCount)
+        assertEquals(listOf("chat:stream:room:10:shard:0:fanout:worker-1"), consumer.reads)
+        assertEquals(listOf(FanoutOwnerLeaseValidationStage.BEFORE_PUBLISH), leaseService.validations)
+        assertEquals(emptyList<String>(), consumer.acked)
+        verifyNoInteractions(redisMessageBroker)
+    }
+
+    @Test
+    fun `fanout worker는 publish 후 ack 직전 owner token이 유효하지 않으면 ack하지 않는다`() {
+        val consumer = FakeMessageStreamConsumer(
+            records = listOf(streamRecord(recordId = "1749790000000-0", roomSeq = 12L)),
+        )
+        val redisMessageBroker = mock(RedisMessageBroker::class.java)
+        val leaseService = FakeFanoutOwnerLeaseService(
+            acquireResult = FanoutOwnerLease(
+                key = "chat:fanout:owner:room:10:shard:0",
+                value = "worker-1:token",
+                roomId = 10L,
+                streamShard = 0,
+            ),
+            validationResults = mutableMapOf(
+                FanoutOwnerLeaseValidationStage.BEFORE_PUBLISH to true,
+                FanoutOwnerLeaseValidationStage.BEFORE_ACK to false,
+            ),
+        )
+        val worker = HotRoomFanoutWorker(
+            messageStreamConsumer = consumer,
+            redisMessageBroker = redisMessageBroker,
+            workerProperties = ChatWorkerProperties(
+                consumerName = "worker-1",
+                fanout = ChatWorkerProperties.StreamConsumer(
+                    consumerGroup = "fanout",
+                    readCount = 10,
+                ),
+            ),
+            fanoutOwnerLeaseService = leaseService,
+        )
+
+        val broadcastCount = worker.pollAndFanout()
+
+        assertEquals(1, broadcastCount)
+        assertEquals(
+            listOf(
+                FanoutOwnerLeaseValidationStage.BEFORE_PUBLISH,
+                FanoutOwnerLeaseValidationStage.BEFORE_ACK,
+            ),
+            leaseService.validations,
+        )
+        assertEquals(emptyList<String>(), consumer.acked)
+        verify(redisMessageBroker).broadcastToRoom(
+            roomId = org.mockito.ArgumentMatchers.eq(10L),
+            message = anyBatch(),
+            excludeServerId = org.mockito.ArgumentMatchers.isNull(),
+        )
+    }
+
     private fun streamRecord(recordId: String, roomSeq: Long): MessageStreamRecord {
         return MessageStreamRecord(
             streamKey = "chat:stream:room:10:shard:0",
@@ -162,8 +282,36 @@ class HotRoomFanoutWorkerTest {
         }
     }
 
+    private class FakeFanoutOwnerLeaseService(
+        private val acquireResult: FanoutOwnerLease?,
+        private val validationResults: MutableMap<FanoutOwnerLeaseValidationStage, Boolean> = mutableMapOf(),
+    ) : FanoutOwnerLeaseService {
+        val acquireAttempts = mutableListOf<String>()
+        val validations = mutableListOf<FanoutOwnerLeaseValidationStage>()
+
+        override fun acquire(roomId: Long, streamShard: Int): FanoutOwnerLease? {
+            acquireAttempts += "$roomId:$streamShard"
+            return acquireResult
+        }
+
+        override fun validate(
+            lease: FanoutOwnerLease,
+            stage: FanoutOwnerLeaseValidationStage,
+        ): Boolean {
+            validations += stage
+            return validationResults[stage] ?: true
+        }
+
+        override fun release(lease: FanoutOwnerLease) = Unit
+    }
+
     private fun captureBatch(captor: ArgumentCaptor<ChatMessageBatch>): ChatMessageBatch {
         captor.capture()
+        return uninitialized()
+    }
+
+    private fun anyBatch(): ChatMessageBatch {
+        org.mockito.ArgumentMatchers.any(ChatMessageBatch::class.java)
         return uninitialized()
     }
 

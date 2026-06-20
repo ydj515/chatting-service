@@ -1,6 +1,7 @@
 package com.chat.api.controller
 
 import com.chat.domain.dto.CreateUserRequest
+import com.chat.domain.exception.MessageAdmissionRejectedException
 import jakarta.validation.Valid
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -78,6 +79,18 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    fun `메시지 수락 정책 거부는 429 응답으로 변환한다`() {
+        mockMvc.get("/test/message-admission-rejected")
+            .andExpect {
+                status { isTooManyRequests() }
+                jsonPath("$.status") { value(429) }
+                jsonPath("$.error") { value("TOO_MANY_REQUESTS") }
+                jsonPath("$.message") { value("room rate limit exceeded") }
+                jsonPath("$.path") { value("/test/message-admission-rejected") }
+            }
+    }
+
+    @Test
     fun `예상하지 못한 예외는 상세 내용을 숨긴 500 응답으로 변환한다`() {
         mockMvc.get("/test/server-error")
             .andExpect {
@@ -102,6 +115,11 @@ class GlobalExceptionHandlerTest {
         @GetMapping("/test/conflict")
         fun conflict(): String {
             throw IllegalStateException("이미 참여한 채팅방입니다")
+        }
+
+        @GetMapping("/test/message-admission-rejected")
+        fun messageAdmissionRejected(): String {
+            throw MessageAdmissionRejectedException("room rate limit exceeded")
         }
 
         @GetMapping("/test/server-error")

@@ -2,15 +2,19 @@ package com.chat.persistence.repository
 
 import com.chat.domain.dto.AdminMessageCursor
 import com.chat.domain.dto.AdminMessageDto
+import com.chat.domain.dto.AdminRoomPolicyUpdateRequest
+import com.chat.domain.dto.AdminRoomStatusDto
 import com.chat.domain.dto.AdminMessageSearchCursor
 import com.chat.domain.dto.AdminMessageSearchMode
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentCaptor
 import org.mockito.ArgumentMatchers.any
 import org.mockito.ArgumentMatchers.anyString
 import org.mockito.ArgumentMatchers.eq
+import org.mockito.ArgumentMatchers.isNull
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.verifyNoInteractions
@@ -313,12 +317,252 @@ class AdminMessageRepositoryTest {
         assertTrue(sqlCaptor.value.contains("room_storage_configs"))
     }
 
+    @Test
+    fun `room policy override는 room_storage_configs를 upsert하고 갱신된 status를 반환한다`() {
+        val jdbcTemplate = mock(JdbcTemplate::class.java)
+        val repository = AdminMessageRepository(jdbcTemplate)
+        val expectedStatus = AdminRoomStatusDto(
+            roomId = 10L,
+            heatLevel = "VERY_HOT",
+            liveFeedMaxMessages = 500,
+            liveFeedMaxAgeSeconds = 30,
+            rateLimitPerSecond = 1000,
+            slowModeSeconds = 5,
+            replicaLagMs = 0,
+            searchP95LatencyMs = null,
+            userRateLimitPerSecond = 2,
+            autoPolicyEnabled = false,
+        )
+        `when`(
+            jdbcTemplate.queryForObject(
+                anyString(),
+                anyRoomStatusRowMapper(),
+                eq(10L),
+                eq("VERY_HOT"),
+                eq(500),
+                eq(30),
+                eq(1000),
+                eq(2),
+                eq(5),
+                eq(false),
+                isNull<Boolean>(),
+                eq("VERY_HOT"),
+                eq(500),
+                eq(30),
+                eq(1000),
+                eq(2),
+                eq(5),
+                eq(false),
+                isNull<Boolean>(),
+            ),
+        ).thenReturn(expectedStatus)
+
+        val status = repository.updateRoomPolicy(
+            roomId = 10L,
+            request = AdminRoomPolicyUpdateRequest(
+                heatLevel = "VERY_HOT",
+                liveFeedMaxMessages = 500,
+                liveFeedMaxAgeSeconds = 30,
+                rateLimitPerSecond = 1000,
+                userRateLimitPerSecond = 2,
+                slowModeSeconds = 5,
+            ),
+        )
+
+        assertEquals(expectedStatus, status)
+        val sqlCaptor = ArgumentCaptor.forClass(String::class.java)
+        verify(jdbcTemplate).queryForObject(
+            sqlCaptor.capture(),
+            anyRoomStatusRowMapper(),
+            eq(10L),
+            eq("VERY_HOT"),
+            eq(500),
+            eq(30),
+            eq(1000),
+            eq(2),
+            eq(5),
+            eq(false),
+            isNull<Boolean>(),
+            eq("VERY_HOT"),
+            eq(500),
+            eq(30),
+            eq(1000),
+            eq(2),
+            eq(5),
+            eq(false),
+            isNull<Boolean>(),
+        )
+        assertTrue(sqlCaptor.value.contains("INSERT INTO room_storage_configs"))
+        assertTrue(sqlCaptor.value.contains("ON CONFLICT (room_id) DO UPDATE"))
+        assertTrue(sqlCaptor.value.contains("hot_room_policy = COALESCE(?, room_storage_configs.hot_room_policy)"))
+        assertTrue(sqlCaptor.value.contains("slow_mode_seconds = COALESCE(?, room_storage_configs.slow_mode_seconds)"))
+        assertTrue(sqlCaptor.value.contains("RETURNING"))
+    }
+
+    @Test
+    fun `room policy override는 기본적으로 자동 room policy 적용을 비활성화한다`() {
+        val jdbcTemplate = mock(JdbcTemplate::class.java)
+        val repository = AdminMessageRepository(jdbcTemplate)
+        val expectedStatus = AdminRoomStatusDto(
+            roomId = 10L,
+            heatLevel = "VERY_HOT",
+            liveFeedMaxMessages = 500,
+            liveFeedMaxAgeSeconds = 30,
+            rateLimitPerSecond = 1000,
+            slowModeSeconds = 5,
+            replicaLagMs = 0,
+            searchP95LatencyMs = null,
+            userRateLimitPerSecond = 2,
+            autoPolicyEnabled = false,
+        )
+        `when`(
+            jdbcTemplate.queryForObject(
+                anyString(),
+                anyRoomStatusRowMapper(),
+                eq(10L),
+                eq("VERY_HOT"),
+                eq(500),
+                eq(30),
+                eq(1000),
+                eq(2),
+                eq(5),
+                eq(false),
+                isNull<Boolean>(),
+                eq("VERY_HOT"),
+                eq(500),
+                eq(30),
+                eq(1000),
+                eq(2),
+                eq(5),
+                eq(false),
+                isNull<Boolean>(),
+            ),
+        ).thenReturn(expectedStatus)
+
+        val status = repository.updateRoomPolicy(
+            roomId = 10L,
+            request = AdminRoomPolicyUpdateRequest(
+                heatLevel = "VERY_HOT",
+                liveFeedMaxMessages = 500,
+                liveFeedMaxAgeSeconds = 30,
+                rateLimitPerSecond = 1000,
+                userRateLimitPerSecond = 2,
+                slowModeSeconds = 5,
+            ),
+        )
+
+        assertFalse(status.autoPolicyEnabled)
+        val sqlCaptor = ArgumentCaptor.forClass(String::class.java)
+        verify(jdbcTemplate).queryForObject(
+            sqlCaptor.capture(),
+            anyRoomStatusRowMapper(),
+            eq(10L),
+            eq("VERY_HOT"),
+            eq(500),
+            eq(30),
+            eq(1000),
+            eq(2),
+            eq(5),
+            eq(false),
+            isNull<Boolean>(),
+            eq("VERY_HOT"),
+            eq(500),
+            eq(30),
+            eq(1000),
+            eq(2),
+            eq(5),
+            eq(false),
+            isNull<Boolean>(),
+        )
+        assertTrue(sqlCaptor.value.contains("auto_policy_enabled"))
+    }
+
+    @Test
+    fun `room policy override는 read replica가 아니라 primary jdbcTemplate로 갱신한다`() {
+        val readJdbcTemplate = mock(JdbcTemplate::class.java)
+        val writeJdbcTemplate = mock(JdbcTemplate::class.java)
+        val repository = AdminMessageRepository(
+            jdbcTemplate = readJdbcTemplate,
+            writeJdbcTemplate = writeJdbcTemplate,
+        )
+        val expectedStatus = AdminRoomStatusDto(
+            roomId = 10L,
+            heatLevel = "VERY_HOT",
+            liveFeedMaxMessages = 500,
+            liveFeedMaxAgeSeconds = 30,
+            rateLimitPerSecond = 1000,
+            slowModeSeconds = 5,
+            replicaLagMs = 0,
+            searchP95LatencyMs = null,
+            userRateLimitPerSecond = 2,
+            autoPolicyEnabled = false,
+        )
+        `when`(
+            writeJdbcTemplate.queryForObject(
+                anyString(),
+                anyRoomStatusRowMapper(),
+                eq(10L),
+                eq("VERY_HOT"),
+                eq(500),
+                eq(30),
+                eq(1000),
+                eq(2),
+                eq(5),
+                eq(false),
+                isNull<Boolean>(),
+                eq("VERY_HOT"),
+                eq(500),
+                eq(30),
+                eq(1000),
+                eq(2),
+                eq(5),
+                eq(false),
+                isNull<Boolean>(),
+            ),
+        ).thenReturn(expectedStatus)
+
+        repository.updateRoomPolicy(
+            roomId = 10L,
+            request = AdminRoomPolicyUpdateRequest(
+                heatLevel = "VERY_HOT",
+                liveFeedMaxMessages = 500,
+                liveFeedMaxAgeSeconds = 30,
+                rateLimitPerSecond = 1000,
+                userRateLimitPerSecond = 2,
+                slowModeSeconds = 5,
+            ),
+        )
+
+        verify(writeJdbcTemplate).queryForObject(
+            anyString(),
+            anyRoomStatusRowMapper(),
+            eq(10L),
+            eq("VERY_HOT"),
+            eq(500),
+            eq(30),
+            eq(1000),
+            eq(2),
+            eq(5),
+            eq(false),
+            isNull<Boolean>(),
+            eq("VERY_HOT"),
+            eq(500),
+            eq(30),
+            eq(1000),
+            eq(2),
+            eq(5),
+            eq(false),
+            isNull<Boolean>(),
+        )
+        verifyNoInteractions(readJdbcTemplate)
+    }
+
     private fun anyAdminMessageRowMapper(): RowMapper<AdminMessageDto> {
         any(RowMapper::class.java)
         return uninitialized()
     }
 
-    private fun anyRoomStatusRowMapper(): RowMapper<com.chat.domain.dto.AdminRoomStatusDto> {
+    private fun anyRoomStatusRowMapper(): RowMapper<AdminRoomStatusDto> {
         any(RowMapper::class.java)
         return uninitialized()
     }

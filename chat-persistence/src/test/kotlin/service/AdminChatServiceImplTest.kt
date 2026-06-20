@@ -10,6 +10,8 @@ import com.chat.domain.dto.AdminMessageSearchCursor
 import com.chat.domain.dto.AdminMessageSearchCursorCodec
 import com.chat.domain.dto.AdminMessageSearchRequest
 import com.chat.domain.dto.AdminMessageSearchMode
+import com.chat.domain.dto.AdminRoomPolicyUpdateRequest
+import com.chat.domain.dto.AdminRoomStatusDto
 import com.chat.domain.model.MessageType
 import com.chat.persistence.repository.AdminAuditLogRepository
 import com.chat.persistence.repository.AdminExportJobRepository
@@ -264,6 +266,51 @@ class AdminChatServiceImplTest {
             eqString("EXPORT_JOB"),
             eqString("export-1"),
             containsString(""""query":"hello""""),
+        )
+    }
+
+    @Test
+    fun `room policy override는 repository를 갱신하고 audit log를 남긴다`() {
+        val fixture = fixture()
+        val request = AdminRoomPolicyUpdateRequest(
+            heatLevel = "VERY_HOT",
+            liveFeedMaxMessages = 500,
+            liveFeedMaxAgeSeconds = 30,
+            rateLimitPerSecond = 1000,
+            userRateLimitPerSecond = 2,
+            slowModeSeconds = 5,
+        )
+        val updatedStatus = AdminRoomStatusDto(
+            roomId = 10L,
+            heatLevel = "VERY_HOT",
+            liveFeedMaxMessages = 500,
+            liveFeedMaxAgeSeconds = 30,
+            rateLimitPerSecond = 1000,
+            slowModeSeconds = 5,
+            replicaLagMs = 0,
+            searchP95LatencyMs = null,
+            userRateLimitPerSecond = 2,
+        )
+        `when`(
+            fixture.messageRepository.updateRoomPolicy(
+                roomId = 10L,
+                request = request,
+            ),
+        ).thenReturn(updatedStatus)
+
+        val status = fixture.service.updateRoomPolicy(
+            actor = "admin-local",
+            roomId = 10L,
+            request = request,
+        )
+
+        assertEquals(updatedStatus, status)
+        verify(fixture.auditRepository).record(
+            eqString("admin-local"),
+            eqString("ADMIN_ROOM_POLICY_UPDATED"),
+            eqString("ROOM"),
+            eqString("room:10"),
+            containsString(""""heatLevel":"VERY_HOT""""),
         )
     }
 

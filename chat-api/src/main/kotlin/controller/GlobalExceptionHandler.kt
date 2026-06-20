@@ -1,5 +1,6 @@
 package com.chat.api.controller
 
+import com.chat.domain.exception.MessageAdmissionRejectedException
 import com.fasterxml.jackson.annotation.JsonInclude
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.validation.ConstraintViolationException
@@ -72,6 +73,18 @@ class GlobalExceptionHandler {
         return buildResponse(
             status = HttpStatus.CONFLICT,
             message = exception.message ?: "요청 상태가 현재 리소스 상태와 충돌합니다.",
+            path = request.requestURI,
+        )
+    }
+
+    @ExceptionHandler(MessageAdmissionRejectedException::class)
+    fun handleMessageAdmissionRejectedException(
+        exception: MessageAdmissionRejectedException,
+        request: HttpServletRequest,
+    ): ResponseEntity<ApiErrorResponse> {
+        return buildResponse(
+            status = HttpStatus.TOO_MANY_REQUESTS,
+            message = exception.message ?: "메시지 전송 제한을 초과했습니다.",
             path = request.requestURI,
         )
     }

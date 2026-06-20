@@ -2,10 +2,12 @@ package com.chat.persistence.service
 
 import com.chat.domain.dto.ChatMessage
 import com.chat.domain.dto.ChatMessageBatch
+import com.chat.persistence.config.ChatRedisProperties
 import com.chat.persistence.config.ChatWorkerProperties
 import com.chat.persistence.redis.MessageStreamConsumer
 import com.chat.persistence.redis.MessageStreamEnvelope
 import com.chat.persistence.redis.MessageStreamRecord
+import com.chat.persistence.redis.MessageStreamKeyResolver
 import com.chat.persistence.redis.RedisMessageBroker
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
@@ -15,6 +17,8 @@ class HotRoomFanoutWorker(
     private val messageStreamConsumer: MessageStreamConsumer,
     private val redisMessageBroker: RedisMessageBroker,
     private val workerProperties: ChatWorkerProperties,
+    private val messageStreamKeyResolver: MessageStreamKeyResolver = MessageStreamKeyResolver(ChatRedisProperties()),
+    private val fanoutOwnerLeaseService: FanoutOwnerLeaseService = FanoutOwnerLeaseService.Noop,
 ) {
     private val logger = LoggerFactory.getLogger(HotRoomFanoutWorker::class.java)
     private var lastPendingClaimAtMillis = 0L
@@ -25,23 +29,36 @@ class HotRoomFanoutWorker(
             return 0
         }
 
+        val leasesByStreamKey = acquireOwnerLeases(streamKeys)
+        if (leasesByStreamKey.isEmpty()) {
+            return 0
+        }
+
+        val ownedStreamKeys = leasesByStreamKey.keys
         val consumerGroup = workerProperties.fanout.consumerGroup
-        streamKeys.forEach { streamKey ->
+        ownedStreamKeys.forEach { streamKey ->
             messageStreamConsumer.ensureConsumerGroup(streamKey, consumerGroup)
         }
 
         val records = messageStreamConsumer.readNew(
             consumerGroup = consumerGroup,
             consumerName = workerProperties.consumerName,
-            streamKeys = streamKeys,
+            streamKeys = ownedStreamKeys,
             count = workerProperties.fanout.readCount,
-        ) + claimPendingIfDue(consumerGroup, streamKeys)
+        ) + claimPendingIfDue(consumerGroup, ownedStreamKeys)
 
         var broadcastCount = 0
-        records.groupBy { it.envelope.chatRoomId }.forEach { (roomId, roomRecords) ->
+        records.groupBy { it.streamKey }.forEach { (streamKey, streamRecords) ->
+            val lease = leasesByStreamKey[streamKey] ?: return@forEach
+            if (!fanoutOwnerLeaseService.validate(lease, FanoutOwnerLeaseValidationStage.BEFORE_PUBLISH)) {
+                logger.warn("Skipped fanout publish for $streamKey because owner lease is no longer valid")
+                return@forEach
+            }
+
+            val roomId = streamRecords.first().envelope.chatRoomId
             val batch = ChatMessageBatch(
                 chatRoomId = roomId,
-                messages = roomRecords
+                messages = streamRecords
                     .map { it.envelope }
                     .sortedBy { it.roomSeq }
                     .map { it.toChatMessage() },
@@ -54,7 +71,12 @@ class HotRoomFanoutWorker(
                 )
                 broadcastCount += 1
 
-                roomRecords.forEach { record ->
+                if (!fanoutOwnerLeaseService.validate(lease, FanoutOwnerLeaseValidationStage.BEFORE_ACK)) {
+                    logger.warn("Skipped fanout ack for $streamKey because owner lease is no longer valid")
+                    return@forEach
+                }
+
+                streamRecords.forEach { record ->
                     messageStreamConsumer.acknowledge(
                         streamKey = record.streamKey,
                         consumerGroup = consumerGroup,
@@ -62,13 +84,34 @@ class HotRoomFanoutWorker(
                     )
                 }
             } catch (e: Exception) {
-                roomRecords.forEach { record ->
+                if (!fanoutOwnerLeaseService.validate(lease, FanoutOwnerLeaseValidationStage.BEFORE_ACK)) {
+                    logger.warn("Skipped fanout failure handling for $streamKey because owner lease is no longer valid")
+                    return@forEach
+                }
+                streamRecords.forEach { record ->
                     handleFailure(record, consumerGroup, e)
                 }
             }
         }
 
         return broadcastCount
+    }
+
+    private fun acquireOwnerLeases(streamKeys: Set<String>): Map<String, FanoutOwnerLease> {
+        return streamKeys.mapNotNull { streamKey ->
+            val parsed = messageStreamKeyResolver.parseRoomStreamKey(streamKey)
+            if (parsed == null) {
+                logger.warn("Skipping fanout stream with unexpected key format: $streamKey")
+                return@mapNotNull null
+            }
+
+            val lease = fanoutOwnerLeaseService.acquire(
+                roomId = parsed.roomId,
+                streamShard = parsed.streamShard,
+            ) ?: return@mapNotNull null
+
+            streamKey to lease
+        }.toMap()
     }
 
     private fun claimPendingIfDue(

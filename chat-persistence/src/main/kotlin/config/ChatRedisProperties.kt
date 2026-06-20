@@ -11,6 +11,7 @@ data class ChatRedisProperties(
     val membershipTopic: String = "chat.membership",
     val broker: Broker = Broker(),
     val streams: Streams = Streams(),
+    val admission: Admission = Admission(),
 ) {
     data class Broker(
         val serverId: String? = null,
@@ -24,5 +25,10 @@ data class ChatRedisProperties(
         val knownStreamsKey: String = "chat:stream:rooms",
         val deadLetterStreamKeyPrefix: String = "chat:stream:dlq:",
         val shardCount: Int = 1,
+    )
+
+    data class Admission(
+        val keyPrefix: String = "chat:admission:room:",
+        val rateLimitWindowTtl: Duration = Duration.ofSeconds(2),
     )
 }

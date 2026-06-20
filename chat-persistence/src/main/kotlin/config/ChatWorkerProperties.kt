@@ -4,7 +4,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties
 
 @ConfigurationProperties(prefix = "chat.worker")
 data class ChatWorkerProperties(
-    val roles: Set<String> = setOf("message-writer", "fanout", "admin-export"),
+    val roles: Set<String> = setOf("message-writer", "fanout", "admin-export", "room-policy"),
     val consumerName: String = "worker-local",
     val pollDelayMillis: Long = 100,
     val writer: StreamConsumer = StreamConsumer(
@@ -22,5 +22,13 @@ data class ChatWorkerProperties(
         val minIdleMillis: Long = 30_000,
         val claimIntervalMillis: Long = 10_000,
         val maxDeliveryCount: Long = 5,
+        val ownerLease: FanoutOwnerLease = FanoutOwnerLease(),
+    )
+
+    data class FanoutOwnerLease(
+        val enabled: Boolean = true,
+        val ttlMillis: Long = 10_000,
+        val renewIntervalMillis: Long = 3_000,
+        val keyPrefix: String = "chat:fanout:owner:room:",
     )
 }

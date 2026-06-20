@@ -3,6 +3,7 @@ package com.chat.websocket.handler
 import com.chat.domain.dto.ErrorMessage
 import com.chat.domain.dto.MessageAccepted
 import com.chat.domain.dto.SendMessageRequest
+import com.chat.domain.exception.MessageAdmissionRejectedException
 import com.chat.domain.model.MessageType
 import com.chat.domain.service.ChatService
 import com.chat.persistence.service.WebSocketSessionManager
@@ -164,15 +165,24 @@ class ChatWebSocketHandler(
         val chatRoomId = request.chatRoomId ?: throw IllegalArgumentException("chatRoomId is required")
         val messageType = request.messageType ?: throw IllegalArgumentException("messageType is required")
 
-        val savedMessage = chatService.sendMessage(
-            SendMessageRequest(
-                chatRoomId = chatRoomId,
-                type = messageType,
-                content = request.content,
-                clientMessageId = request.clientMessageId,
-            ),
-            userId,
-        )
+        val savedMessage = try {
+            chatService.sendMessage(
+                SendMessageRequest(
+                    chatRoomId = chatRoomId,
+                    type = messageType,
+                    content = request.content,
+                    clientMessageId = request.clientMessageId,
+                ),
+                userId,
+            )
+        } catch (e: MessageAdmissionRejectedException) {
+            sendErrorMessage(
+                session = session,
+                errorMessage = e.message ?: "메시지 전송 제한을 초과했습니다.",
+                errorCode = WebSocketErrorCode.MESSAGE_ADMISSION_REJECTED.name,
+            )
+            return
+        }
         sendAcceptedMessage(session, savedMessage)
     }
 
@@ -211,6 +221,7 @@ class ChatWebSocketHandler(
     private enum class WebSocketErrorCode {
         UNKNOWN_MESSAGE_TYPE,
         INVALID_MESSAGE_FORMAT,
+        MESSAGE_ADMISSION_REJECTED,
     }
 
     private fun writeWebSocketMessage(message: com.chat.domain.dto.WebSocketMessage): String {

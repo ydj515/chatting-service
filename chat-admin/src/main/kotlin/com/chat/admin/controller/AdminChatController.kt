@@ -11,12 +11,14 @@ import com.chat.domain.dto.AdminMessagePageResponse
 import com.chat.domain.dto.AdminMessageSearchRequest
 import com.chat.domain.dto.AdminMessageSearchResponse
 import com.chat.domain.dto.AdminMessageSearchMode
+import com.chat.domain.dto.AdminRoomPolicyUpdateRequest
 import com.chat.domain.dto.AdminRoomStatusDto
 import com.chat.domain.service.AdminChatService
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.server.ResponseStatusException
 import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.PatchMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
@@ -96,6 +98,17 @@ class AdminChatController(
         return adminChatService.getRoomStatus(actor = actor, roomId = roomId)
     }
 
+    @PatchMapping("/rooms/{roomId}/policy")
+    fun updateRoomPolicy(
+        @RequestHeader(ADMIN_TOKEN_HEADER, required = false) adminToken: String?,
+        @PathVariable roomId: Long,
+        @RequestBody request: AdminRoomPolicyUpdateRequest,
+    ): AdminRoomStatusDto {
+        val actor = adminTokenVerifier.requireActor(adminToken)
+        validateRoomPolicyRequest(request)
+        return adminChatService.updateRoomPolicy(actor = actor, roomId = roomId, request = request)
+    }
+
     @PostMapping("/exports/messages")
     fun createMessageExport(
         @RequestHeader(ADMIN_TOKEN_HEADER, required = false) adminToken: String?,
@@ -122,6 +135,24 @@ class AdminChatController(
                 HttpStatus.BAD_REQUEST,
                 "roomId or query is required for admin message export",
             )
+        }
+    }
+
+    private fun validateRoomPolicyRequest(request: AdminRoomPolicyUpdateRequest) {
+        val validHeatLevels = setOf("NORMAL", "HOT", "VERY_HOT", "OVERLOAD")
+        if (request.heatLevel != null && request.heatLevel !in validHeatLevels) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "지원하지 않는 heatLevel입니다.")
+        }
+        listOfNotNull(
+            request.liveFeedMaxMessages,
+            request.liveFeedMaxAgeSeconds,
+            request.rateLimitPerSecond,
+            request.userRateLimitPerSecond,
+            request.slowModeSeconds,
+        ).forEach { value ->
+            if (value <= 0) {
+                throw ResponseStatusException(HttpStatus.BAD_REQUEST, "정책 숫자 값은 1 이상이어야 합니다.")
+            }
         }
     }
 

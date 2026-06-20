@@ -14,6 +14,7 @@ import com.chat.domain.dto.AdminMessagePageResponse
 import com.chat.domain.dto.AdminMessageSearchRequest
 import com.chat.domain.dto.AdminMessageSearchResponse
 import com.chat.domain.dto.AdminMessageSearchMode
+import com.chat.domain.dto.AdminRoomPolicyUpdateRequest
 import com.chat.domain.dto.AdminRoomStatusDto
 import com.chat.domain.model.MessageType
 import com.chat.domain.service.AdminChatService
@@ -23,6 +24,7 @@ import org.junit.jupiter.api.Test
 import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
+import org.springframework.test.web.servlet.patch
 import org.springframework.test.web.servlet.post
 import org.springframework.test.web.servlet.setup.MockMvcBuilders
 import java.time.Instant
@@ -246,6 +248,45 @@ class AdminChatControllerTest {
     }
 
     @Test
+    fun `관리자 room policy override는 token을 검증하고 정책 변경 요청을 전달한다`() {
+        mockMvc.patch("/admin/rooms/10/policy") {
+            header("X-Admin-Token", "local-admin-token")
+            contentType = MediaType.APPLICATION_JSON
+            content = """
+                {
+                  "heatLevel": "VERY_HOT",
+                  "liveFeedMaxMessages": 500,
+                  "liveFeedMaxAgeSeconds": 30,
+                  "rateLimitPerSecond": 1000,
+                  "userRateLimitPerSecond": 2,
+                  "slowModeSeconds": 5
+                }
+            """.trimIndent()
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.roomId") { value(10) }
+                jsonPath("$.heatLevel") { value("VERY_HOT") }
+                jsonPath("$.liveFeedMaxMessages") { value(500) }
+                jsonPath("$.liveFeedMaxAgeSeconds") { value(30) }
+            }
+
+        assertEquals("admin-local", service.policyActor)
+        assertEquals(10L, service.policyRoomId)
+        assertEquals(
+            AdminRoomPolicyUpdateRequest(
+                heatLevel = "VERY_HOT",
+                liveFeedMaxMessages = 500,
+                liveFeedMaxAgeSeconds = 30,
+                rateLimitPerSecond = 1000,
+                userRateLimitPerSecond = 2,
+                slowModeSeconds = 5,
+            ),
+            service.policyRequest,
+        )
+    }
+
+    @Test
     fun `관리자 token이 없으면 401로 거부한다`() {
         mockMvc.get("/admin/messages/search") {
             param("q", "hello")
@@ -264,6 +305,9 @@ class AdminChatControllerTest {
         var exportRequest: AdminExportMessagesRequest? = null
         var statusActor: String? = null
         var statusRoomId: Long? = null
+        var policyActor: String? = null
+        var policyRoomId: Long? = null
+        var policyRequest: AdminRoomPolicyUpdateRequest? = null
 
         override fun getRoomMessages(
             actor: String,
@@ -306,6 +350,27 @@ class AdminChatControllerTest {
                 slowModeSeconds = null,
                 replicaLagMs = 0,
                 searchP95LatencyMs = null,
+            )
+        }
+
+        override fun updateRoomPolicy(
+            actor: String,
+            roomId: Long,
+            request: AdminRoomPolicyUpdateRequest,
+        ): AdminRoomStatusDto {
+            policyActor = actor
+            policyRoomId = roomId
+            policyRequest = request
+            return AdminRoomStatusDto(
+                roomId = roomId,
+                heatLevel = request.heatLevel ?: "NORMAL",
+                liveFeedMaxMessages = request.liveFeedMaxMessages ?: 1000,
+                liveFeedMaxAgeSeconds = request.liveFeedMaxAgeSeconds ?: 60,
+                rateLimitPerSecond = request.rateLimitPerSecond,
+                slowModeSeconds = request.slowModeSeconds,
+                replicaLagMs = 0,
+                searchP95LatencyMs = null,
+                userRateLimitPerSecond = request.userRateLimitPerSecond,
             )
         }
 
