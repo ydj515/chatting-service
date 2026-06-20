@@ -1,5 +1,13 @@
 import type { Message, WebSocketMessage } from '../types/index.ts';
 
+const DEFAULT_LIVE_FEED_MAX_MESSAGES = 1000;
+const DEFAULT_LIVE_FEED_MAX_AGE_SECONDS = 60;
+
+interface LiveFeedPolicy {
+  maxMessages?: number;
+  maxAgeSeconds?: number;
+}
+
 const messageKey = (message: Message): string => {
   return message.messageId ?? `legacy:${message.id}`;
 };
@@ -73,6 +81,27 @@ export const sortMessagesForDisplay = (messages: Message[]): Message[] => {
   });
 };
 
+export const boundedLiveFeedMessages = (
+  messages: Message[],
+  policy: LiveFeedPolicy = {},
+): Message[] => {
+  const sorted = sortMessagesForDisplay(messages);
+  if (sorted.length === 0) {
+    return sorted;
+  }
+
+  const maxMessages = Math.max(1, policy.maxMessages ?? DEFAULT_LIVE_FEED_MAX_MESSAGES);
+  const maxAgeSeconds = Math.max(1, policy.maxAgeSeconds ?? DEFAULT_LIVE_FEED_MAX_AGE_SECONDS);
+  const latestTimestamp = sorted.reduce((latest, message) => {
+    const timestamp = new Date(message.createdAt).getTime();
+    return timestamp > latest ? timestamp : latest;
+  }, 0);
+  const cutoffTimestamp = latestTimestamp - maxAgeSeconds * 1000;
+  const ageBounded = sorted.filter((message) => new Date(message.createdAt).getTime() >= cutoffTimestamp);
+
+  return ageBounded.slice(-maxMessages);
+};
+
 export const mergeMessages = (previous: Message[], incoming: Message[]): Message[] => {
   const byMessageId = new Map<string, Message>();
   previous.forEach((message) => {
@@ -83,7 +112,7 @@ export const mergeMessages = (previous: Message[], incoming: Message[]): Message
     byMessageId.set(messageKey(message), message);
   });
 
-  return sortMessagesForDisplay([...byMessageId.values()]);
+  return boundedLiveFeedMessages([...byMessageId.values()]);
 };
 
 export const applyWebSocketMessageEvent = (

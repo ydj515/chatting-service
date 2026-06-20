@@ -101,10 +101,10 @@ mise run verify:chat
 | --- | --- | --- |
 | `chat-api-app-1~2` | `chat-api-application` | 사용자/방/메시지 REST API |
 | `chat-websocket-app-1~2` | `chat-websocket-application` | WebSocket 연결 유지와 fan-out |
-| `chat-worker-app-1` | `chat-worker-application` | writer/fanout/search/archive worker |
+| `chat-worker-app-1` | `chat-worker-application` | message writer, fanout owner, admin export, room policy worker |
 | `chat-admin-app-1` | `chat-admin-application` | 관리자 API |
 
-로컬 Compose에서는 고정된 서비스 이름으로 replica를 표현합니다. Kubernetes로 옮길 때는 동일 실행 모듈을 Deployment별 replica 수로 조정합니다.
+로컬 Compose에서는 API/WebSocket처럼 고정된 서비스 이름으로 replica를 표현하거나, worker처럼 `docker compose up --scale chat-worker-app-1=2`로 동일 서비스 replica를 늘려 fanout owner lease를 검증할 수 있습니다. Phase 6 owner kill takeover는 `scripts/phase6-fanout-takeover-smoke.mjs`가 Redis owner lease value를 실제 worker container에 매핑해 검증합니다. Kubernetes로 옮길 때는 동일 실행 모듈을 Deployment별 replica 수로 조정합니다.
 
 ---
 

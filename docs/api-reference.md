@@ -52,6 +52,7 @@ OpenAPI 스펙은 [`openapi.yaml`](openapi.yaml)을 참고하세요.
 | `GET` | `/api/admin/chat-rooms/{roomId}/messages?from=...&to=...&cursor=...&limit=50` | canonical store 기준 방별/시간대별 history 조회. `cursor`는 `createdAt + roomSeq + messageId` 기반 opaque cursor이며 클라이언트는 그대로 재전송 |
 | `GET` | `/api/admin/messages/search?q=hello&mode=FTS&roomId=1&senderId=7&from=...&to=...&cursor=...&limit=50` | PostgreSQL 메시지 검색. 기본 `mode=FTS`, 부분 문자열 fallback은 `mode=CONTAINS`. `cursor`는 `createdAt + roomSeq + messageId` 기반 opaque cursor이며 클라이언트는 그대로 재전송 |
 | `GET` | `/api/admin/rooms/{roomId}/status` | room heat, bounded live feed, rate limit, replica/search latency 상태 조회 |
+| `PATCH` | `/api/admin/rooms/{roomId}/policy` | bounded live feed, room/user rate limit, slow mode, moderator priority 정책 override. 기본적으로 `autoPolicyEnabled=false`가 되어 room-policy worker가 해당 방의 수동 정책을 덮어쓰지 않음. `rateLimitPerSecond`, `userRateLimitPerSecond`, `slowModeSeconds`의 누락/null은 기존 값 유지이며, 제한 해제는 `clearRateLimit=true`, `clearUserRateLimit=true`, `clearSlowMode=true`로 명시 |
 | `POST` | `/api/admin/exports/messages` | 메시지 export job 생성. `admin-export` worker가 pending job을 claim해 CSV 산출물을 생성 |
 
 관리자 프론트는 일반 사용자용 `client`와 분리된 `client-admin` 모듈입니다.

@@ -11,13 +11,16 @@ import com.chat.domain.dto.AdminMessageSearchCursor
 import com.chat.domain.dto.AdminMessageSearchCursorCodec
 import com.chat.domain.dto.AdminMessageSearchRequest
 import com.chat.domain.dto.AdminMessageSearchResponse
+import com.chat.domain.dto.AdminRoomPolicyUpdateRequest
 import com.chat.domain.dto.AdminRoomStatusDto
 import com.chat.domain.service.AdminChatService
 import com.chat.persistence.repository.AdminAuditLogRepository
 import com.chat.persistence.repository.AdminExportJobRepository
 import com.chat.persistence.repository.AdminMessageRepository
 import com.fasterxml.jackson.databind.ObjectMapper
+import org.springframework.cache.annotation.CacheEvict
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 import kotlin.system.measureNanoTime
 
 @Service
@@ -98,6 +101,24 @@ class AdminChatServiceImpl(
             targetType = "ROOM",
             targetId = "room:$roomId",
             metadataJson = """{"roomId":$roomId}""",
+        )
+        return status
+    }
+
+    @Transactional
+    @CacheEvict(value = ["roomAdmissionPolicies"], key = "#roomId")
+    override fun updateRoomPolicy(
+        actor: String,
+        roomId: Long,
+        request: AdminRoomPolicyUpdateRequest,
+    ): AdminRoomStatusDto {
+        val status = messageRepository.updateRoomPolicy(roomId = roomId, request = request)
+        auditLogRepository.record(
+            actor = actor,
+            action = "ADMIN_ROOM_POLICY_UPDATED",
+            targetType = "ROOM",
+            targetId = "room:$roomId",
+            metadataJson = objectMapper.writeValueAsString(request),
         )
         return status
     }

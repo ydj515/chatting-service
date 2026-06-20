@@ -10,6 +10,8 @@ import com.chat.domain.dto.AdminMessageSearchCursor
 import com.chat.domain.dto.AdminMessageSearchCursorCodec
 import com.chat.domain.dto.AdminMessageSearchRequest
 import com.chat.domain.dto.AdminMessageSearchMode
+import com.chat.domain.dto.AdminRoomPolicyUpdateRequest
+import com.chat.domain.dto.AdminRoomStatusDto
 import com.chat.domain.model.MessageType
 import com.chat.persistence.repository.AdminAuditLogRepository
 import com.chat.persistence.repository.AdminExportJobRepository
@@ -17,6 +19,7 @@ import com.chat.persistence.repository.AdminMessageRepository
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentMatchers.anyString
@@ -25,10 +28,23 @@ import org.mockito.ArgumentMatchers.eq
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
+import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
 import java.time.LocalDateTime
 
 class AdminChatServiceImplTest {
+
+    @Test
+    fun `room policy update는 정책 DB 갱신과 audit log를 하나의 transaction으로 묶는다`() {
+        val method = AdminChatServiceImpl::class.java.getMethod(
+            "updateRoomPolicy",
+            String::class.java,
+            java.lang.Long.TYPE,
+            AdminRoomPolicyUpdateRequest::class.java,
+        )
+
+        assertNotNull(method.getAnnotation(Transactional::class.java))
+    }
 
     @Test
     fun `history는 limit보다 1건 더 조회해 hasNext와 nextCursor를 계산하고 audit log를 남긴다`() {
@@ -264,6 +280,51 @@ class AdminChatServiceImplTest {
             eqString("EXPORT_JOB"),
             eqString("export-1"),
             containsString(""""query":"hello""""),
+        )
+    }
+
+    @Test
+    fun `room policy override는 repository를 갱신하고 audit log를 남긴다`() {
+        val fixture = fixture()
+        val request = AdminRoomPolicyUpdateRequest(
+            heatLevel = "VERY_HOT",
+            liveFeedMaxMessages = 500,
+            liveFeedMaxAgeSeconds = 30,
+            rateLimitPerSecond = 1000,
+            userRateLimitPerSecond = 2,
+            slowModeSeconds = 5,
+        )
+        val updatedStatus = AdminRoomStatusDto(
+            roomId = 10L,
+            heatLevel = "VERY_HOT",
+            liveFeedMaxMessages = 500,
+            liveFeedMaxAgeSeconds = 30,
+            rateLimitPerSecond = 1000,
+            slowModeSeconds = 5,
+            replicaLagMs = 0,
+            searchP95LatencyMs = null,
+            userRateLimitPerSecond = 2,
+        )
+        `when`(
+            fixture.messageRepository.updateRoomPolicy(
+                roomId = 10L,
+                request = request,
+            ),
+        ).thenReturn(updatedStatus)
+
+        val status = fixture.service.updateRoomPolicy(
+            actor = "admin-local",
+            roomId = 10L,
+            request = request,
+        )
+
+        assertEquals(updatedStatus, status)
+        verify(fixture.auditRepository).record(
+            eqString("admin-local"),
+            eqString("ADMIN_ROOM_POLICY_UPDATED"),
+            eqString("ROOM"),
+            eqString("room:10"),
+            containsString(""""heatLevel":"VERY_HOT""""),
         )
     }
 

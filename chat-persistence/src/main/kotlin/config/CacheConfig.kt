@@ -22,15 +22,10 @@ class CacheConfig(
 
     @Bean
     fun cacheManager(connectionFactory: RedisConnectionFactory): CacheManager {
-        val objectMapper = ObjectMapper().apply {
-            registerModule(KotlinModule.Builder().build())
-            registerModule(JavaTimeModule())
-        }
-
         val configuration = RedisCacheConfiguration.defaultCacheConfig()
             .entryTtl(cacheProperties.defaultTtl)
             .serializeKeysWith(RedisSerializationContext.SerializationPair.fromSerializer(StringRedisSerializer()))
-            .serializeValuesWith(RedisSerializationContext.SerializationPair.fromSerializer(GenericJackson2JsonRedisSerializer(objectMapper)))
+            .serializeValuesWith(RedisSerializationContext.SerializationPair.fromSerializer(redisCacheValueSerializer()))
             .disableCachingNullValues()
 
         return RedisCacheManager.builder(connectionFactory)
@@ -39,6 +34,21 @@ class CacheConfig(
             .withCacheConfiguration("chatRooms", configuration.entryTtl(cacheProperties.chatRoomsTtl))
             .withCacheConfiguration("chatRoomMembers", configuration.entryTtl(cacheProperties.chatRoomMembersTtl))
             .withCacheConfiguration("messages", configuration.entryTtl(cacheProperties.messagesTtl))
+            .withCacheConfiguration("roomAdmissionPolicies", configuration.entryTtl(cacheProperties.roomAdmissionPoliciesTtl))
             .build()
+    }
+
+    companion object {
+        fun redisCacheValueSerializer(): GenericJackson2JsonRedisSerializer {
+            val objectMapper = ObjectMapper().apply {
+                registerModule(KotlinModule.Builder().build())
+                registerModule(JavaTimeModule())
+            }
+
+            return GenericJackson2JsonRedisSerializer.builder()
+                .objectMapper(objectMapper)
+                .defaultTyping(true)
+                .build()
+        }
     }
 }

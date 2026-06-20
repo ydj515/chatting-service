@@ -25,13 +25,14 @@ graph TD
     end
 
     subgraph Infra ["데이터 및 메시지 브로커 영역"]
-        Redis["Redis<br>(Streams / Pub/Sub / Sequence)"]
+        Redis["Redis<br>(Streams / Pub/Sub / Sequence / Admission / Lease)"]
         Postgres["PostgreSQL (DB)"]
     end
 
     subgraph Workers ["워커 영역"]
         Writer["Message Writer Worker"]
         Fanout["Hot Room Fanout Worker"]
+        Owner["Fanout Owner Lease<br>(room/shard TTL)"]
     end
 
     %% 연결 관계
@@ -47,8 +48,10 @@ graph TD
     WS1 -->|4. SEND_MESSAGE append| Redis
     Redis -->|5a. Stream poll| Writer
     Writer -->|6a. 메시지 영속화| Postgres
-    Redis -->|5b. Stream poll| Fanout
-    Fanout -->|6b. Room Topic 발행| Redis
+    Fanout <==>|5b. SET NX PX / renew token| Owner
+    Owner <==>|5c. Lease key| Redis
+    Redis -->|5d. Owner만 Stream poll| Fanout
+    Fanout -->|6b. Owner만 Room Topic 발행| Redis
 ```
 
 ---
@@ -62,7 +65,7 @@ sequenceDiagram
     autonumber
     actor ClientA as 클라이언트 A (User 1)
     participant WS1 as WebSocket 서버 1
-    participant Redis as Redis Streams / Pub/Sub
+    participant Redis as Redis Streams / Pub/Sub / Lease
     participant Writer as Message Writer
     participant Fanout as Fanout Worker
     participant DB as PostgreSQL
@@ -75,7 +78,7 @@ sequenceDiagram
     %% 메시지 송신 및 수락
     ClientA->>WS1: 웹소켓 메시지 전송 (SEND_MESSAGE, roomId=1, content="안녕")
     activate WS1
-    WS1->>Redis: INCR room sequence + XADD room stream
+    WS1->>Redis: admission Lua + INCR room sequence + XADD room stream
     Redis-->>WS1: append 성공
     WS1-->>ClientA: MESSAGE_ACCEPTED
     deactivate WS1
@@ -88,8 +91,12 @@ sequenceDiagram
     deactivate DB
 
     %% Worker fanout
-    Fanout->>Redis: XREADGROUP room stream (fanout group)
+    Fanout->>Redis: SET NX PX fanout owner lease + renew
+    Redis-->>Fanout: owner token 확인
+    Fanout->>Redis: XREADGROUP room stream (fanout group, owner only)
+    Fanout->>Redis: owner token 재확인
     Fanout->>Redis: Publish (Topic: room:1, Payload)
+    Fanout->>Redis: owner token 재확인 + XACK
     
     %% Redis 전파 (Fanout)
     activate Redis
@@ -118,12 +125,14 @@ sequenceDiagram
    - 각 서버는 클라이언트가 속해 있는 채팅방(예: 1번 방)을 감지하고, 해당 방에 대한 Redis 토픽 구독(`room:1`)을 수행합니다.
 
 2. **메시지 발송 및 수락**:
-   - 클라이언트 A가 웹소켓을 통해 메시지를 전송하면, 해당 웹소켓 세션을 소유한 `서버 1`이 Redis room sequence counter에서 `roomSeq`를 메시지마다 `INCR 1`로 발급하고 Redis Streams에 append합니다.
+   - 클라이언트 A가 웹소켓을 통해 메시지를 전송하면, 해당 웹소켓 세션을 소유한 `서버 1`이 Redis admission policy로 방/사용자 rate limit과 slow mode를 먼저 확인합니다.
+   - admission이 통과하면 Redis room sequence counter에서 `roomSeq`를 메시지마다 `INCR 1`로 발급하고 Redis Streams에 append합니다.
    - Streams append 성공이 `MESSAGE_ACCEPTED` 기준입니다. PostgreSQL 저장과 fanout은 worker가 비동기로 처리합니다.
 
 3. **저장 및 이벤트 전파**:
    - `MessageWriterWorker`는 Redis Streams를 `message-writer` consumer group으로 읽어 PostgreSQL canonical store에 저장합니다.
-   - `HotRoomFanoutWorker`는 같은 Streams를 `fanout` consumer group으로 읽어 Redis의 해당 방 토픽(`room:1`)으로 메시지 이벤트를 발행합니다.
+   - `HotRoomFanoutWorker`는 Redis TTL lease로 해당 방/stream shard의 fanout owner를 획득한 경우에만 같은 Streams를 `fanout` consumer group으로 읽어 Redis의 해당 방 토픽(`room:1`)으로 메시지 이벤트를 발행합니다.
+   - owner lease value는 `<workerId>:<leaseToken>` 형식이며, publish 직전과 `XACK` 직전에 token을 다시 확인해 stale owner의 발행을 막습니다.
 
 4. **수신 및 클라이언트 전달**:
    - Redis는 `room:1` 토픽을 구독 중인 모든 서버(`서버 1`, `서버 2`)에 이벤트를 브로드캐스트합니다.
@@ -136,12 +145,17 @@ sequenceDiagram
 
 ### 주의사항
 > - **메시지 중복 및 순서**: 분산 WebSocket Gateway 환경에서 Gateway별 sequence block을 로컬 소진하면 같은 방의 실제 수락 순서와 `roomSeq` 정렬 순서가 뒤바뀔 수 있습니다. 방 `id=3`에서 `room_seq=1001..1016`이 먼저 생성되고 `room_seq=46..53`이 나중 생성되었지만 화면에서는 46..53이 먼저 보이는 문제가 확인되었습니다. 이 시스템은 메시지마다 Redis room sequence counter에 `INCR 1`을 수행해 방 단위 수락 순서를 보장합니다.
+> - **메시지 수락 제한**: room/user rate limit과 slow mode는 sequence 발급과 Streams append 전에 적용됩니다. 제한 초과 메시지는 canonical store에 저장되지 않고 HTTP 429 또는 WebSocket 에러 이벤트로 실패를 알려야 합니다.
+> - **Fanout worker 다중화 순서**: Redis Streams consumer group은 record 분배를 보장하지만, 같은 방의 batch publish 순서를 보장하지 않습니다. production에서 fanout worker를 여러 대로 늘릴 때는 Redis TTL lease 기반 방별 owner를 먼저 적용해야 합니다.
 > - **인메모리 세션의 한계**: 웹소켓 세션이 서버 로컬 메모리에만 유지되기 때문에 특정 서버가 다운되면 해당 서버에 연결되어 있던 클라이언트의 웹소켓 세션은 끊어집니다. 클라이언트의 자동 재연결(Reconnection) 로직 구현이 필수적입니다.
 
 ### 대안
 - **메시지 큐(Kafka/RabbitMQ) 도입**:
   - *장점*: Redis Pub/Sub과 달리 영속성을 제공하고 대용량 버퍼링이 가능하므로, 일시적인 웹소켓 서버 다운 시에도 미수신 메시지를 안전하게 재전송할 수 있습니다.
   - *단점*: 인프라 구성 및 유지 관리 비용이 증가합니다.
+- **Kafka partition 기반 fanout**:
+  - *장점*: 방 또는 room shard를 partition key로 두면 consumer group 안에서 순서 보장이 명확합니다.
+  - *단점*: 현재 전제인 Kafka 미사용과 다르고, Redis 기반 현재 구현보다 운영 컴포넌트가 커집니다.
 - **분산 세션 클러스터링**:
   - *장점*: 로컬 메모리에만 세션을 두지 않고 전역 세션 정보를 저장하여 무중단 배포 시 커넥션 유실 충격을 최소화합니다.
   - *단점*: 실시간 웹소켓 세션 자체를 완전히 공유하기는 기술적으로 어렵고 복잡도가 매우 높아집니다.

@@ -44,12 +44,62 @@ $$;
 CREATE TABLE IF NOT EXISTS room_storage_configs (
     room_id bigint PRIMARY KEY,
     current_shard_count integer NOT NULL DEFAULT 1,
+    fanout_shard_count integer NOT NULL DEFAULT 1,
     hot_room_policy varchar(50) NOT NULL DEFAULT 'NORMAL',
+    live_feed_max_messages integer NOT NULL DEFAULT 1000,
+    live_feed_max_age_seconds integer NOT NULL DEFAULT 60,
+    room_rate_limit_per_second integer,
+    user_rate_limit_per_second integer,
+    slow_mode_seconds integer,
+    batch_interval_ms integer NOT NULL DEFAULT 100,
+    max_batch_size integer NOT NULL DEFAULT 100,
+    auto_policy_enabled boolean NOT NULL DEFAULT true,
+    subscriber_only boolean NOT NULL DEFAULT false,
+    moderator_priority boolean NOT NULL DEFAULT true,
     bucket_granularity varchar(20) NOT NULL DEFAULT 'DAY',
     retention_days integer NOT NULL DEFAULT 100,
     archive_enabled boolean NOT NULL DEFAULT true,
     updated_at timestamptz NOT NULL DEFAULT now()
 );
+
+ALTER TABLE IF EXISTS room_storage_configs
+ADD COLUMN IF NOT EXISTS fanout_shard_count integer NOT NULL DEFAULT 1;
+
+ALTER TABLE IF EXISTS room_storage_configs
+ADD COLUMN IF NOT EXISTS live_feed_max_messages integer NOT NULL DEFAULT 1000;
+
+ALTER TABLE IF EXISTS room_storage_configs
+ADD COLUMN IF NOT EXISTS live_feed_max_age_seconds integer NOT NULL DEFAULT 60;
+
+ALTER TABLE IF EXISTS room_storage_configs
+ADD COLUMN IF NOT EXISTS room_rate_limit_per_second integer;
+
+ALTER TABLE IF EXISTS room_storage_configs
+ADD COLUMN IF NOT EXISTS user_rate_limit_per_second integer;
+
+ALTER TABLE IF EXISTS room_storage_configs
+ADD COLUMN IF NOT EXISTS slow_mode_seconds integer;
+
+ALTER TABLE IF EXISTS room_storage_configs
+ADD COLUMN IF NOT EXISTS batch_interval_ms integer NOT NULL DEFAULT 100;
+
+ALTER TABLE IF EXISTS room_storage_configs
+ADD COLUMN IF NOT EXISTS max_batch_size integer NOT NULL DEFAULT 100;
+
+ALTER TABLE IF EXISTS room_storage_configs
+ADD COLUMN IF NOT EXISTS auto_policy_enabled boolean NOT NULL DEFAULT true;
+
+ALTER TABLE IF EXISTS room_storage_configs
+ALTER COLUMN auto_policy_enabled SET DEFAULT true;
+
+ALTER TABLE IF EXISTS room_storage_configs
+ADD COLUMN IF NOT EXISTS subscriber_only boolean NOT NULL DEFAULT false;
+
+ALTER TABLE IF EXISTS room_storage_configs
+ADD COLUMN IF NOT EXISTS moderator_priority boolean NOT NULL DEFAULT true;
+
+ALTER TABLE IF EXISTS room_storage_configs
+ALTER COLUMN moderator_priority SET DEFAULT true;
 
 CREATE TABLE IF NOT EXISTS admin_audit_logs (
     id bigserial PRIMARY KEY,

@@ -29,3 +29,10 @@ test('admin export jobs include resume checkpoint columns', () => {
   assert.match(ddl, /ADD COLUMN IF NOT EXISTS cursor_token text/);
   assert.match(ddl, /ADD COLUMN IF NOT EXISTS exported_rows integer NOT NULL DEFAULT 0/);
 });
+
+test('room storage configs include Phase 6 room policy guard columns', () => {
+  assert.match(ddl, /auto_policy_enabled boolean NOT NULL DEFAULT true/);
+  assert.match(ddl, /moderator_priority boolean NOT NULL DEFAULT true/);
+  assert.match(ddl, /ALTER COLUMN auto_policy_enabled SET DEFAULT true/);
+  assert.match(ddl, /ALTER COLUMN moderator_priority SET DEFAULT true/);
+});

@@ -1,5 +1,6 @@
 package com.chat.websocket.handler
 
+import com.chat.domain.exception.MessageAdmissionRejectedException
 import com.chat.domain.dto.MessageDto
 import com.chat.domain.dto.SendMessageRequest
 import com.chat.domain.dto.UserDto
@@ -73,6 +74,60 @@ class ChatWebSocketHandlerTest {
         assertSame(session, outboundInvocation.arguments[0])
         assertTrue(payload.contains("\"type\":\"MESSAGE_ACCEPTED\""), payload)
         assertTrue(mockingDetails(session).invocations.none { it.method.name == "sendMessage" })
+    }
+
+    @Test
+    fun `메시지 수락 정책 거부는 MESSAGE_ACCEPTED 없이 전송 제한 에러를 outbound 경로로 전송한다`() {
+        val sessionManager = mock(WebSocketSessionManager::class.java)
+        val chatService = mock(ChatService::class.java)
+        val objectMapper = ObjectMapper()
+            .registerModule(JavaTimeModule())
+            .registerModule(KotlinModule.Builder().build())
+            .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+        val handler = ChatWebSocketHandler(
+            sessionManager = sessionManager,
+            chatService = chatService,
+            objectMapper = objectMapper,
+            webSocketProperties = WebSocketProperties(userIdAttribute = "userId"),
+        )
+        val session = mock(WebSocketSession::class.java)
+        `when`(session.id).thenReturn("session-1")
+        `when`(session.attributes).thenReturn(mutableMapOf<String, Any>("userId" to 7L))
+        `when`(
+            chatService.sendMessage(
+                SendMessageRequest(
+                    chatRoomId = 10L,
+                    type = MessageType.TEXT,
+                    content = "hello",
+                    clientMessageId = "client-1",
+                ),
+                7L,
+            )
+        ).thenThrow(MessageAdmissionRejectedException("slow mode active"))
+
+        handler.handleMessage(
+            session,
+            TextMessage(
+                """
+                {
+                  "type": "SEND_MESSAGE",
+                  "chatRoomId": 10,
+                  "messageType": "TEXT",
+                  "content": "hello",
+                  "clientMessageId": "client-1"
+                }
+                """.trimIndent(),
+            ),
+        )
+
+        val outboundInvocation = mockingDetails(sessionManager).invocations
+            .single { it.method.name == "sendTextToSession" }
+        val payload = outboundInvocation.arguments[1] as String
+        assertSame(session, outboundInvocation.arguments[0])
+        assertTrue(payload.contains("\"type\":\"ERROR\""), payload)
+        assertTrue(payload.contains("\"code\":\"MESSAGE_ADMISSION_REJECTED\""), payload)
+        assertTrue(payload.contains("\"message\":\"slow mode active\""), payload)
+        assertTrue(!payload.contains("\"type\":\"MESSAGE_ACCEPTED\""), payload)
     }
 
     private fun messageDto(): MessageDto {

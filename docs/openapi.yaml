@@ -518,6 +518,34 @@ paths:
               schema:
                 $ref: '#/components/schemas/AdminRoomStatusDto'
 
+  /admin/rooms/{roomId}/policy:
+    patch:
+      summary: Update admin room live feed and admission policy
+      tags:
+        - Admin
+      security:
+        - adminToken: []
+      parameters:
+        - name: roomId
+          in: path
+          required: true
+          schema:
+            type: integer
+            example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminRoomPolicyUpdateRequest'
+      responses:
+        '200':
+          description: Updated room operational status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminRoomStatusDto'
+
   /admin/exports/messages:
     post:
       summary: Create admin message export job
@@ -986,9 +1014,20 @@ components:
         rateLimitPerSecond:
           type: integer
           nullable: true
+        userRateLimitPerSecond:
+          type: integer
+          nullable: true
         slowModeSeconds:
           type: integer
           nullable: true
+        autoPolicyEnabled:
+          type: boolean
+          description: Whether the room-policy worker may automatically update heat/live feed/rate/slow-mode policy for this room.
+          example: true
+        moderatorPriority:
+          type: boolean
+          description: Whether OWNER/ADMIN members bypass Redis admission rate limit and slow mode for this room.
+          example: true
         replicaLagMs:
           type: integer
           nullable: true
@@ -996,6 +1035,57 @@ components:
         searchP95LatencyMs:
           type: integer
           nullable: true
+
+    AdminRoomPolicyUpdateRequest:
+      type: object
+      properties:
+        heatLevel:
+          type: string
+          enum: [NORMAL, HOT, VERY_HOT, OVERLOAD]
+          nullable: true
+        liveFeedMaxMessages:
+          type: integer
+          minimum: 1
+          nullable: true
+        liveFeedMaxAgeSeconds:
+          type: integer
+          minimum: 1
+          nullable: true
+        rateLimitPerSecond:
+          type: integer
+          minimum: 1
+          nullable: true
+          description: Omit or send null to keep the existing value. Use clearRateLimit=true to remove the room rate limit.
+        userRateLimitPerSecond:
+          type: integer
+          minimum: 1
+          nullable: true
+          description: Omit or send null to keep the existing value. Use clearUserRateLimit=true to remove the per-user rate limit.
+        slowModeSeconds:
+          type: integer
+          minimum: 1
+          nullable: true
+          description: Omit or send null to keep the existing value. Use clearSlowMode=true to remove slow mode.
+        clearRateLimit:
+          type: boolean
+          nullable: true
+          description: When true, clears rateLimitPerSecond. Must not be sent together with rateLimitPerSecond.
+        clearUserRateLimit:
+          type: boolean
+          nullable: true
+          description: When true, clears userRateLimitPerSecond. Must not be sent together with userRateLimitPerSecond.
+        clearSlowMode:
+          type: boolean
+          nullable: true
+          description: When true, clears slowModeSeconds. Must not be sent together with slowModeSeconds.
+        autoPolicyEnabled:
+          type: boolean
+          nullable: true
+          description: Defaults to false for an admin override when omitted; set true to allow automatic room-policy updates again.
+        moderatorPriority:
+          type: boolean
+          nullable: true
+          description: When false, OWNER/ADMIN members are subject to admission limits like regular members.
 
     AdminExportMessagesRequest:
       type: object
