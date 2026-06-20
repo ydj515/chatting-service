@@ -121,6 +121,52 @@ class FanoutOwnerLeaseServiceTest {
     }
 
     @Test
+    fun `renew 중 Redis 일시 오류가 발생하면 기존 owner token을 로컬에 유지한다`() {
+        val redis = redisTemplate()
+        val clock = MutableClock(Instant.parse("2026-06-19T00:00:00Z"))
+        val service = leaseService(redis.template, clock = clock)
+        val firstLease = service.acquire(roomId = 10L, streamShard = 0)
+            ?: throw AssertionError("first lease should be acquired")
+        redis.scriptFailures += true
+        clock.advance(Duration.ofMillis(3_000))
+
+        val leaseDuringRedisError = service.acquire(roomId = 10L, streamShard = 0)
+        val leaseAfterRecovery = service.acquire(roomId = 10L, streamShard = 0)
+
+        assertEquals(firstLease, leaseDuringRedisError)
+        assertEquals(firstLease, leaseAfterRecovery)
+        assertEquals(listOf(SetIfAbsentCall("chat:fanout:owner:room:10:shard:0", firstLease.value, Duration.ofMillis(10_000))), redis.setIfAbsentCalls)
+        assertEquals(
+            listOf(
+                ScriptCall("chat:fanout:owner:room:10:shard:0", listOf(firstLease.value, "10000")),
+                ScriptCall("chat:fanout:owner:room:10:shard:0", listOf(firstLease.value, "10000")),
+            ),
+            redis.scriptCalls,
+        )
+    }
+
+    @Test
+    fun `validate 중 Redis 일시 오류가 발생해도 기존 owner token으로 renew를 재시도한다`() {
+        val redis = redisTemplate()
+        val clock = MutableClock(Instant.parse("2026-06-19T00:00:00Z"))
+        val service = leaseService(redis.template, clock = clock)
+        val lease = service.acquire(roomId = 10L, streamShard = 0)
+            ?: throw AssertionError("lease should be acquired")
+        redis.getFailures += true
+
+        assertFalse(service.validate(lease, FanoutOwnerLeaseValidationStage.BEFORE_PUBLISH))
+        clock.advance(Duration.ofMillis(3_000))
+
+        val renewedLease = service.acquire(roomId = 10L, streamShard = 0)
+
+        assertEquals(lease, renewedLease)
+        assertEquals(
+            listOf(ScriptCall("chat:fanout:owner:room:10:shard:0", listOf(lease.value, "10000"))),
+            redis.scriptCalls,
+        )
+    }
+
+    @Test
     fun `publish 전 token 검증 실패는 false를 반환하고 metric을 기록한다`() {
         val redis = redisTemplate()
         val meterRegistry = SimpleMeterRegistry()
@@ -194,6 +240,8 @@ class FanoutOwnerLeaseServiceTest {
         val storage = linkedMapOf<String, String>()
         val setIfAbsentCalls = mutableListOf<SetIfAbsentCall>()
         val scriptCalls = mutableListOf<ScriptCall>()
+        val scriptFailures = ArrayDeque<Boolean>()
+        val getFailures = ArrayDeque<Boolean>()
 
         `when`(template.opsForValue()).thenReturn(valueOperations)
         doAnswer { invocation ->
@@ -209,6 +257,9 @@ class FanoutOwnerLeaseServiceTest {
             }
         }.`when`(valueOperations).setIfAbsent(anyString(), anyString(), any(Duration::class.java))
         doAnswer { invocation ->
+            if (getFailures.removeFirstOrNull() == true) {
+                throw IllegalStateException("redis get unavailable")
+            }
             storage[invocation.arguments[0] as String]
         }.`when`(valueOperations).get(anyString())
         doAnswer { invocation ->
@@ -216,6 +267,9 @@ class FanoutOwnerLeaseServiceTest {
             val key = keys.single() as String
             val args = invocation.arguments.drop(2).map { it as String }
             scriptCalls += ScriptCall(key, args)
+            if (scriptFailures.removeFirstOrNull() == true) {
+                throw IllegalStateException("redis script unavailable")
+            }
             if (storage[key] == args.first()) {
                 1L
             } else {
@@ -228,6 +282,8 @@ class FanoutOwnerLeaseServiceTest {
             storage = storage,
             setIfAbsentCalls = setIfAbsentCalls,
             scriptCalls = scriptCalls,
+            scriptFailures = scriptFailures,
+            getFailures = getFailures,
         )
     }
 
@@ -242,6 +298,8 @@ class FanoutOwnerLeaseServiceTest {
         val storage: MutableMap<String, String>,
         val setIfAbsentCalls: List<SetIfAbsentCall>,
         val scriptCalls: List<ScriptCall>,
+        val scriptFailures: ArrayDeque<Boolean>,
+        val getFailures: ArrayDeque<Boolean>,
     )
 
     private data class SetIfAbsentCall(

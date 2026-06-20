@@ -92,7 +92,10 @@ export const boundedLiveFeedMessages = (
 
   const maxMessages = Math.max(1, policy.maxMessages ?? DEFAULT_LIVE_FEED_MAX_MESSAGES);
   const maxAgeSeconds = Math.max(1, policy.maxAgeSeconds ?? DEFAULT_LIVE_FEED_MAX_AGE_SECONDS);
-  const latestTimestamp = Math.max(...sorted.map((message) => new Date(message.createdAt).getTime()));
+  const latestTimestamp = sorted.reduce((latest, message) => {
+    const timestamp = new Date(message.createdAt).getTime();
+    return timestamp > latest ? timestamp : latest;
+  }, 0);
   const cutoffTimestamp = latestTimestamp - maxAgeSeconds * 1000;
   const ageBounded = sorted.filter((message) => new Date(message.createdAt).getTime() >= cutoffTimestamp);
 

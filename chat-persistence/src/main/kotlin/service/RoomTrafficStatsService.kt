@@ -39,14 +39,11 @@ class RedisRoomTrafficStatsService(
         try {
             val epochSecond = nowEpochSecond()
             val key = trafficCounterKey(roomId, epochSecond)
-            redisTemplate.opsForValue().increment(key, 1L)
-            redisTemplate.expire(key, Duration.ofSeconds(properties.trafficCounterTtlSeconds))
-            redisTemplate.opsForZSet().add(properties.activeRoomsKey, roomId.toString(), epochSecond.toDouble())
-            redisTemplate.opsForZSet().removeRangeByScore(
-                properties.activeRoomsKey,
-                0.0,
-                (epochSecond - properties.trafficWindowSeconds).toDouble(),
-            )
+            val count = redisTemplate.opsForValue().increment(key, 1L)
+            if (count == 1L) {
+                redisTemplate.expire(key, Duration.ofSeconds(properties.trafficCounterTtlSeconds))
+                redisTemplate.opsForZSet().add(properties.activeRoomsKey, roomId.toString(), epochSecond.toDouble())
+            }
         } catch (e: Exception) {
             logger.warn("Failed to record room traffic for roomId={}", roomId, e)
         }
@@ -54,10 +51,21 @@ class RedisRoomTrafficStatsService(
 
     override fun activeRoomIds(): Set<Long> {
         val epochSecond = nowEpochSecond()
+        val cutoffEpochSecond = epochSecond - properties.trafficWindowSeconds
+        try {
+            redisTemplate.opsForZSet().removeRangeByScore(
+                properties.activeRoomsKey,
+                0.0,
+                cutoffEpochSecond.toDouble(),
+            )
+        } catch (e: Exception) {
+            logger.warn("Failed to cleanup active room index", e)
+        }
+
         return redisTemplate.opsForZSet()
             .rangeByScore(
                 properties.activeRoomsKey,
-                (epochSecond - properties.trafficWindowSeconds).toDouble(),
+                cutoffEpochSecond.toDouble(),
                 epochSecond.toDouble(),
             )
             .orEmpty()

@@ -101,12 +101,17 @@ class RedisFanoutOwnerLeaseService(
             if (!isRenewDue(existingLease)) {
                 return existingLease.lease
             }
-            if (renew(existingLease.lease)) {
-                existingLease.lastRenewedAtMillis = nowMillis()
-                return existingLease.lease
+            when (renew(existingLease.lease)) {
+                true -> {
+                    existingLease.lastRenewedAtMillis = nowMillis()
+                    return existingLease.lease
+                }
+                false -> {
+                    ownedLeases.remove(key, existingLease)
+                    lostBeforeAcquire = true
+                }
+                null -> return existingLease.lease
             }
-            ownedLeases.remove(key, existingLease)
-            lostBeforeAcquire = true
         }
 
         val lease = FanoutOwnerLease(
@@ -157,7 +162,6 @@ class RedisFanoutOwnerLeaseService(
         val currentValue = try {
             redisTemplate.opsForValue().get(lease.key)
         } catch (e: Exception) {
-            ownedLeases.remove(lease.key)
             recordLost(REASON_REDIS_ERROR)
             logger.warn("Failed to validate fanout owner lease ${lease.key}", e)
             return false
@@ -196,7 +200,7 @@ class RedisFanoutOwnerLeaseService(
         ownedLeases.values.toList().forEach { release(it.lease) }
     }
 
-    private fun renew(lease: FanoutOwnerLease): Boolean {
+    private fun renew(lease: FanoutOwnerLease): Boolean? {
         val ttlMillis = workerProperties.fanout.ownerLease.ttlMillis.toString()
         val renewed = try {
             redisTemplate.execute(
@@ -209,7 +213,7 @@ class RedisFanoutOwnerLeaseService(
             recordRenew(outcome = OUTCOME_FAILURE)
             recordLost(REASON_REDIS_ERROR)
             logger.warn("Failed to renew fanout owner lease ${lease.key}", e)
-            return false
+            return null
         }
 
         if (renewed) {

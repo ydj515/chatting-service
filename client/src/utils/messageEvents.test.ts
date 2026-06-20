@@ -183,3 +183,25 @@ test('bounded live feed는 최신 메시지 시간 기준 60초보다 오래된 
     ['msg-window-start', 'msg-latest'],
   );
 });
+
+test('bounded live feed는 많은 메시지도 spread 없이 최신 시간을 계산한다', () => {
+  const messages = Array.from({ length: 20000 }, (_, index) =>
+    existingMessage({
+      id: index + 1,
+      messageId: `msg-${index + 1}`,
+      roomSeq: index + 1,
+      sequenceNumber: index + 1,
+      createdAt: new Date(Date.UTC(2026, 5, 12, 12, 0, index)).toISOString(),
+    }),
+  );
+
+  const bounded = boundedLiveFeedMessages(messages, {
+    maxMessages: 3,
+    maxAgeSeconds: 2,
+  });
+
+  assert.deepEqual(
+    bounded.map((message) => message.messageId),
+    ['msg-19998', 'msg-19999', 'msg-20000'],
+  );
+});

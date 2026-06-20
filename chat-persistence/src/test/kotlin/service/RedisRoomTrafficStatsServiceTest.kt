@@ -8,6 +8,7 @@ import org.mockito.ArgumentMatchers.anyDouble
 import org.mockito.ArgumentMatchers.anyString
 import org.mockito.ArgumentMatchers.eq
 import org.mockito.Mockito.mock
+import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
 import org.springframework.data.redis.core.RedisTemplate
@@ -25,6 +26,7 @@ class RedisRoomTrafficStatsServiceTest {
     @Test
     fun `accepted message 기록은 room second counter와 active room index를 갱신한다`() {
         val redis = redisTemplate()
+        `when`(redis.valueOperations.increment("chat:room-traffic:{10}:sec:1781740860", 1L)).thenReturn(1L)
         val service = RedisRoomTrafficStatsService(
             redisTemplate = redis.template,
             properties = ChatRoomPolicyProperties(),
@@ -36,7 +38,25 @@ class RedisRoomTrafficStatsServiceTest {
         verify(redis.valueOperations).increment("chat:room-traffic:{10}:sec:1781740860", 1L)
         verify(redis.template).expire("chat:room-traffic:{10}:sec:1781740860", Duration.ofSeconds(120))
         verify(redis.zSetOperations).add("chat:room-traffic:active-rooms", "10", 1781740860.0)
-        verify(redis.zSetOperations).removeRangeByScore("chat:room-traffic:active-rooms", 0.0, 1781740800.0)
+        verify(redis.zSetOperations, never()).removeRangeByScore(anyString(), anyDouble(), anyDouble())
+    }
+
+    @Test
+    fun `accepted message 기록은 같은 초의 두 번째 메시지부터 TTL과 active room index를 갱신하지 않는다`() {
+        val redis = redisTemplate()
+        `when`(redis.valueOperations.increment("chat:room-traffic:{10}:sec:1781740860", 1L)).thenReturn(2L)
+        val service = RedisRoomTrafficStatsService(
+            redisTemplate = redis.template,
+            properties = ChatRoomPolicyProperties(),
+            clock = clock,
+        )
+
+        service.recordAccepted(roomId = 10L)
+
+        verify(redis.valueOperations).increment("chat:room-traffic:{10}:sec:1781740860", 1L)
+        verify(redis.template, never()).expire(anyString(), any(Duration::class.java))
+        verify(redis.zSetOperations, never()).add(anyString(), anyString(), anyDouble())
+        verify(redis.zSetOperations, never()).removeRangeByScore(anyString(), anyDouble(), anyDouble())
     }
 
     @Test
@@ -78,6 +98,7 @@ class RedisRoomTrafficStatsServiceTest {
         )
 
         assertEquals(setOf(10L, 11L), service.activeRoomIds())
+        verify(redis.zSetOperations).removeRangeByScore("chat:room-traffic:active-rooms", 0.0, 1781740800.0)
     }
 
     @Suppress("UNCHECKED_CAST")
