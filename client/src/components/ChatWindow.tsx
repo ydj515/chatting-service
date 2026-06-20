@@ -4,9 +4,9 @@ import { messageApi } from '../services/api.ts';
 import { useWebSocket } from '../hooks/useWebSocket.ts';
 import {
   applyWebSocketMessageEvent,
+  boundedLiveFeedMessages,
   createClientMessageId,
   messageRenderKey,
-  sortMessagesForDisplay,
 } from '../utils/messageEvents.ts';
 import { Copy, Check } from 'lucide-react';
 
@@ -110,8 +110,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
     setIsLoadingMessages(true);
     try {
       const response = await messageApi.getMessages(chatRoom.id, 0, 50);
-      const sortedMessages = sortMessagesForDisplay(response.content);
-      setMessages(sortedMessages);
+      setMessages(boundedLiveFeedMessages(response.content));
     } catch (error: any) {
       onError(error.response?.data?.message || '메시지를 불러올 수 없습니다.');
     } finally {

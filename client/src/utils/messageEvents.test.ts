@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { applyWebSocketMessageEvent, messageRenderKey } from './messageEvents.ts';
+import { applyWebSocketMessageEvent, boundedLiveFeedMessages, messageRenderKey } from './messageEvents.ts';
 import type { Message, WebSocketMessage } from '../types/index.ts';
 
 const existingMessage = (overrides: Partial<Message> = {}): Message => ({
@@ -131,4 +131,55 @@ test('렌더 key는 실시간 fanout id가 같아도 messageId를 우선 사용�
 
   assert.equal(messageRenderKey(first), 'msg-live-1');
   assert.equal(messageRenderKey(second), 'msg-live-2');
+});
+
+test('bounded live feed는 최신 roomSeq 기준 최대 메시지 개수를 유지한다', () => {
+  const messages = Array.from({ length: 1005 }, (_, index) =>
+    existingMessage({
+      id: index + 1,
+      messageId: `msg-${index + 1}`,
+      roomSeq: index + 1,
+      sequenceNumber: index + 1,
+      createdAt: `2026-06-12T12:${String(Math.floor(index / 60)).padStart(2, '0')}:${String(index % 60).padStart(2, '0')}`,
+    }),
+  );
+
+  const bounded = boundedLiveFeedMessages(messages, { maxAgeSeconds: 2000 });
+
+  assert.equal(bounded.length, 1000);
+  assert.equal(bounded[0].messageId, 'msg-6');
+  assert.equal(bounded.at(-1)?.messageId, 'msg-1005');
+});
+
+test('bounded live feed는 최신 메시지 시간 기준 60초보다 오래된 메시지를 제외한다', () => {
+  const messages = [
+    existingMessage({
+      id: 1,
+      messageId: 'msg-old',
+      roomSeq: 1,
+      sequenceNumber: 1,
+      createdAt: '2026-06-12T11:58:59',
+    }),
+    existingMessage({
+      id: 2,
+      messageId: 'msg-window-start',
+      roomSeq: 2,
+      sequenceNumber: 2,
+      createdAt: '2026-06-12T11:59:00',
+    }),
+    existingMessage({
+      id: 3,
+      messageId: 'msg-latest',
+      roomSeq: 3,
+      sequenceNumber: 3,
+      createdAt: '2026-06-12T12:00:00',
+    }),
+  ];
+
+  const bounded = boundedLiveFeedMessages(messages);
+
+  assert.deepEqual(
+    bounded.map((message) => message.messageId),
+    ['msg-window-start', 'msg-latest'],
+  );
 });
