@@ -39,10 +39,10 @@
 **A1.** 과거 데이터는 건드리지 않고, 새로운 메시지(Time Bucket)부터 변경된 샤드 개수(Modulo)를 적용하는 **Forward-only sharding** 방식을 취합니다. `room_storage_configs` 설정이 변경되면 이후 들어오는 메시지부터 변경된 샤드 개수로 해시되어 분산됩니다.
 
 **Q2. OVERLOAD 상태에서 일반 사용자 메시지를 제한할 때 클라이언트에게는 어떤 응답(ACK)을 내려주나요?**
-**A2.** 성공 응답인 `MESSAGE_ACCEPTED`를 보내지 않습니다. 대신 드랍(Drop)된 사유(`rate limit reject reason` 등)를 포함하여 HTTP 429 에러나 웹소켓 에러 이벤트를 클라이언트에게 내려보내어 전송 실패를 알립니다.
+**A2.** 성공 응답인 `MESSAGE_ACCEPTED`를 보내지 않습니다. 대신 드랍(Drop)된 사유(`room_rate_limited`, `user_rate_limited`, `slow_mode_active` 등)를 포함하여 HTTP 429 에러나 웹소켓 `MESSAGE_ADMISSION_REJECTED` 이벤트를 클라이언트에게 내려보내어 전송 실패를 알립니다. 구현상 제한 초과는 sequence 발급과 Redis Streams append 전에 `MessageAdmissionRejectedException`으로 fail-closed 처리합니다. `OWNER/ADMIN` 역할은 방 정책의 `moderatorPriority=true`일 때만 admission 제한을 우회하고, false이면 일반 사용자처럼 제한 대상이 됩니다.
 
 **Q3. 최근 10초 EWMA나 1분 p95 같은 통계 데이터는 어디에서 어떻게 집계하나요?**
-**A3.** Redis를 중앙 카운터로 사용합니다. 메시지가 들어올 때마다 Redis에 초 단위 카운터 키(`rate:room:{roomId}:sec:{epochSecond}`)를 INCR 하고, 백그라운드 Worker나 모니터링 Job이 주기적으로 이 카운터들을 읽어와서 통계(EWMA, p95)를 연산하여 방 등급을 갱신합니다.
+**A3.** Redis를 중앙 카운터로 사용합니다. 메시지 수락 정책은 `chat:admission:room:{roomId}:rate:room:{epochSecond}`, `chat:admission:room:{roomId}:rate:user:{userId}:{epochSecond}`, `chat:admission:room:{roomId}:slow:user:{userId}`를 같은 Redis Cluster slot에 묶어 Lua script 하나로 판단합니다. 별도의 백그라운드 Worker나 모니터링 Job은 이 수락량과 Streams lag를 이용해 EWMA, p95를 연산하고 방 등급을 갱신합니다.
 
 ---
 
@@ -52,7 +52,7 @@
 **A1.** 방의 상태와 새로운 정책이 담긴 **제어 메시지(Control Event, 예: `ROOM_STATE_CHANGED`)** 를 생성하여 Redis Pub/Sub 채널을 통해 모든 웹소켓 Gateway로 브로드캐스트합니다. 클라이언트는 이 이벤트를 받아 UI를 갱신합니다.
 
 **Q2. `room_storage_configs` 설정 변경 시 수십 대의 Pod가 폴링(Polling) 없이 어떻게 동기화하나요?**
-**A2.** **Redis 캐시 + Redis Pub/Sub** 조합을 사용합니다. 설정이 변경되면 DB와 Redis 캐시를 업데이트한 직후, Redis Pub/Sub을 통해 설정 변경 이벤트를 발행합니다. 각 Pod는 이 이벤트를 수신하면 로컬 캐시를 무효화(Evict)하여, 폴링 없이 즉각적으로 최신 상태를 동기화합니다.
+**A2.** Phase 6 현재 구현은 DB update 후 `roomAdmissionPolicies` cache를 해당 room 기준으로 evict합니다. 정책 조회는 짧은 TTL cache를 사용하므로 메시지 hot path에서 매번 DB를 읽지 않습니다. 여러 Pod의 즉시 동기화가 더 중요해지는 시점에는 Redis Pub/Sub 제어 이벤트로 각 Pod의 로컬 캐시까지 evict하는 구조를 추가합니다.
 
 **Q3. 샤드 개수가 늘어날 때 MessageWriterWorker는 컨슈머 개수를 어떻게 맞추고 Scale-out 하나요?**
 **A3.** `MessageWriterWorker`는 **Redis Streams Consumer Group**과 **Kubernetes HPA**로 수평 확장합니다. 워커들은 동적으로 신규 샤드의 스트림을 감지하여 구독하고, 트래픽이 몰려 Redis Streams의 큐가 밀리면 K8s HPA가 새로운 Writer Pod를 띄웁니다. Writer 경로는 `messageId` 기반 멱등 저장을 전제로 하므로 consumer group 재분배와 pending claim을 사용해도 안전합니다.
@@ -151,7 +151,7 @@
 **A1.** 두 워커 모두 Redis Streams를 사용하지만, production scale-out 방식은 다르게 가져갑니다.
 
 - `MessageWriterWorker`: consumer group으로 record를 분배받고, `messageId` 멱등 저장과 pending claim으로 장애를 복구합니다. Writer는 파드를 늘려도 같은 메시지가 중복 저장되지 않게 DB 계층에서 흡수할 수 있습니다.
-- `HotRoomFanoutWorker`: consumer group만으로는 부족합니다. 같은 방의 batch publish는 사용자 화면 순서에 직접 영향을 주므로, Phase 6에서 Redis TTL lease 기반 방별 owner를 둡니다. owner key는 `chat:fanout:owner:room:<roomId>:shard:<streamShard>`이고, owner value는 `<workerId>:<leaseToken>`입니다. owner 획득은 `SET NX PX`, renew/release는 token 비교 Lua script로 처리합니다.
+- `HotRoomFanoutWorker`: consumer group만으로는 부족합니다. 같은 방의 batch publish는 사용자 화면 순서에 직접 영향을 주므로, Phase 6에서 Redis TTL lease 기반 방별 owner를 둡니다. owner key는 `chat:fanout:owner:room:<roomId>:shard:<streamShard>`이고, owner value는 `<workerId>:<leaseToken>`입니다. owner 획득은 `SET NX PX`, renew/release는 token 비교 Lua script로 처리합니다. 운영 기본값은 TTL 10초, renew interval 3초이며, worker는 보유 lease별 마지막 renew 시각을 기준으로 interval 이후에만 TTL을 갱신합니다.
 
 정리하면 Writer는 record 단위 분산이 가능하고, Fanout은 방 단위 owner 분산이 안전합니다. 이 차이를 두어야 fanout worker를 여러 대로 늘려도 Twitch식 live feed 순서를 지킬 수 있습니다.
 

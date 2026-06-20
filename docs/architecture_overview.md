@@ -25,7 +25,7 @@ graph TD
     end
 
     subgraph Infra ["데이터 및 메시지 브로커 영역"]
-        Redis["Redis<br>(Streams / Pub/Sub / Sequence / Lease)"]
+        Redis["Redis<br>(Streams / Pub/Sub / Sequence / Admission / Lease)"]
         Postgres["PostgreSQL (DB)"]
     end
 
@@ -78,7 +78,7 @@ sequenceDiagram
     %% 메시지 송신 및 수락
     ClientA->>WS1: 웹소켓 메시지 전송 (SEND_MESSAGE, roomId=1, content="안녕")
     activate WS1
-    WS1->>Redis: INCR room sequence + XADD room stream
+    WS1->>Redis: admission Lua + INCR room sequence + XADD room stream
     Redis-->>WS1: append 성공
     WS1-->>ClientA: MESSAGE_ACCEPTED
     deactivate WS1
@@ -125,7 +125,8 @@ sequenceDiagram
    - 각 서버는 클라이언트가 속해 있는 채팅방(예: 1번 방)을 감지하고, 해당 방에 대한 Redis 토픽 구독(`room:1`)을 수행합니다.
 
 2. **메시지 발송 및 수락**:
-   - 클라이언트 A가 웹소켓을 통해 메시지를 전송하면, 해당 웹소켓 세션을 소유한 `서버 1`이 Redis room sequence counter에서 `roomSeq`를 메시지마다 `INCR 1`로 발급하고 Redis Streams에 append합니다.
+   - 클라이언트 A가 웹소켓을 통해 메시지를 전송하면, 해당 웹소켓 세션을 소유한 `서버 1`이 Redis admission policy로 방/사용자 rate limit과 slow mode를 먼저 확인합니다.
+   - admission이 통과하면 Redis room sequence counter에서 `roomSeq`를 메시지마다 `INCR 1`로 발급하고 Redis Streams에 append합니다.
    - Streams append 성공이 `MESSAGE_ACCEPTED` 기준입니다. PostgreSQL 저장과 fanout은 worker가 비동기로 처리합니다.
 
 3. **저장 및 이벤트 전파**:
@@ -144,6 +145,7 @@ sequenceDiagram
 
 ### 주의사항
 > - **메시지 중복 및 순서**: 분산 WebSocket Gateway 환경에서 Gateway별 sequence block을 로컬 소진하면 같은 방의 실제 수락 순서와 `roomSeq` 정렬 순서가 뒤바뀔 수 있습니다. 방 `id=3`에서 `room_seq=1001..1016`이 먼저 생성되고 `room_seq=46..53`이 나중 생성되었지만 화면에서는 46..53이 먼저 보이는 문제가 확인되었습니다. 이 시스템은 메시지마다 Redis room sequence counter에 `INCR 1`을 수행해 방 단위 수락 순서를 보장합니다.
+> - **메시지 수락 제한**: room/user rate limit과 slow mode는 sequence 발급과 Streams append 전에 적용됩니다. 제한 초과 메시지는 canonical store에 저장되지 않고 HTTP 429 또는 WebSocket 에러 이벤트로 실패를 알려야 합니다.
 > - **Fanout worker 다중화 순서**: Redis Streams consumer group은 record 분배를 보장하지만, 같은 방의 batch publish 순서를 보장하지 않습니다. production에서 fanout worker를 여러 대로 늘릴 때는 Redis TTL lease 기반 방별 owner를 먼저 적용해야 합니다.
 > - **인메모리 세션의 한계**: 웹소켓 세션이 서버 로컬 메모리에만 유지되기 때문에 특정 서버가 다운되면 해당 서버에 연결되어 있던 클라이언트의 웹소켓 세션은 끊어집니다. 클라이언트의 자동 재연결(Reconnection) 로직 구현이 필수적입니다.
 

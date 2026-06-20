@@ -87,7 +87,9 @@ Reconnect load test 시나리오와 정상 reconnect 실패율 계산 기준은 
 | --- | --- | --- | --- |
 | messages accepted/sec | Counter | `roomHeat` | 수락 처리량 |
 | messages rejected/sec | Counter | `reason`, `roomHeat` | rate limit, moderation, validation 실패 |
+| `chat.message.admission.rejected` | Counter | `reason=room_rate_limited|user_rate_limited|slow_mode_active|redis_error|script_error` | Redis admission policy가 메시지 수락을 거부한 이유 |
 | room messages/sec | Counter | `roomHeat` 또는 top N room | hot room 판정 |
+| room traffic snapshot p95 | Gauge 또는 synthetic 계산 | `roomHeat` 또는 top N room | `room-policy` worker의 자동 downgrade 입력값 |
 | Redis Streams lag | Gauge | `streamShard`, `consumerGroup` | writer/fanout backlog |
 | Redis Streams pending count | Gauge | `streamShard`, `consumerGroup` | 재처리 필요 메시지 |
 | writer success/failure count | Counter | `workerRole`, `reason` | DB 저장 성공/실패 |
@@ -101,11 +103,20 @@ Reconnect load test 시나리오와 정상 reconnect 실패율 계산 기준은 
 | `chat.fanout.owner.takeovers` | Counter | `reason=ttl_expired|pending_claim|worker_restart` | owner 장애 후 takeover |
 | `chat.fanout.owner.token_mismatch` | Counter | `stage=before_publish|before_ack` | publish/ack 직전 fencing token 불일치 |
 
+Phase 7 명시 task:
+
+- `chat.fanout.owner.takeovers`의 production 의미를 코드와 문서에서 정합하게 확정한다. 현재 Phase 6 구현은 owner lease 기능, fencing, owner kill smoke를 갖추었지만, metric semantics는 release gate 전에 별도로 검증해야 한다.
+- 일반적인 worker death takeover, 즉 worker A 사망 후 TTL 만료와 worker B 신규 acquire가 발생한 경우를 `takeovers` counter가 직접 세는지 확인한다.
+- 직접 계측이 어렵다면 `lease.lost`, `pending claim`, smoke runner summary를 조합한 derived signal로 정의하고, 문서의 reason tag를 실제 구현 가능한 값으로 낮춘다.
+- 이 task는 fanout 기능 완료 조건이 아니라 Phase 7 observability/release gate 조건이다.
+
 권장 alert 후보:
 
 - Redis Streams lag가 3초 이상 지속
 - pending count가 계속 증가
 - writer failure rate 증가
+- `chat.message.admission.rejected{reason="redis_error"}`가 5분 동안 1건 이상 발생
+- `room_rate_limited`, `user_rate_limited`, `slow_mode_active`가 배포 직후 기준선보다 급증
 - fanout worker lag가 release 기준 초과
 - `chat.fanout.owner.lease.lost`가 짧은 시간에 급증
 - token mismatch가 발생하면서 fanout worker lag도 증가
@@ -156,6 +167,8 @@ Reconnect load test 시나리오와 정상 reconnect 실패율 계산 기준은 
 | admin search warm p95 | steady-state warmup 이후 방별/시간대별 조회와 `FTS` 검색 p95 1초 이하 |
 | admin search cold p99 | app 재시작 또는 cold-cache synthetic run에서 방별/시간대별 조회와 `FTS` 검색 p99 6초 이하 |
 | ticket rate limit | 단일 key Lua script 기반 원자 처리, fail-closed, script failure metric 관측 |
+| message admission | room 단위 hash tag Lua script 기반 원자 처리, fail-closed, reject reason metric 관측 |
+| fanout owner takeover observability | `chat.fanout.owner.takeovers`의 실제 계측 semantics가 문서와 일치하거나, `lease.lost`/pending claim 기반 derived signal로 대체 정의됨 |
 | ticket latency | `chat.websocket.ticket.issue.latency` p95/p99 관측 |
 | ticket reconnect success | 정상 reconnect ticket 발급 성공률 rolling 15분 `99.9%` 이상 |
 | ticket rate limit UX | rate limit으로 인한 정상 reconnect 실패율 `0.1%` 이하, NAT/proxy/mobile carrier cohort p95 `0.3%` 이하 |

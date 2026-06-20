@@ -42,3 +42,19 @@ test('admin room history cursor is documented as an opaque string', () => {
   assert.match(historyPath, /name: cursor[\s\S]*opaque[\s\S]*type: string/);
   assert.match(historyResponse, /nextCursor:[\s\S]*type: string[\s\S]*nullable: true/);
 });
+
+test('admin room policy documents automatic policy guard and moderator priority', () => {
+  const statusSchema = openapi.slice(
+    openapi.indexOf('    AdminRoomStatusDto:'),
+    openapi.indexOf('    AdminRoomPolicyUpdateRequest:'),
+  );
+  const requestSchema = openapi.slice(
+    openapi.indexOf('    AdminRoomPolicyUpdateRequest:'),
+    openapi.indexOf('    AdminExportMessagesRequest:'),
+  );
+
+  assert.match(statusSchema, /autoPolicyEnabled:[\s\S]*type: boolean/);
+  assert.match(statusSchema, /moderatorPriority:[\s\S]*type: boolean/);
+  assert.match(requestSchema, /autoPolicyEnabled:[\s\S]*type: boolean/);
+  assert.match(requestSchema, /moderatorPriority:[\s\S]*type: boolean/);
+});
