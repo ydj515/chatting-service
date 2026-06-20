@@ -1815,6 +1815,18 @@ node scripts/load-chat.mjs --room hot --viewers 10000 --messages-per-sec 10000 -
 - 장애와 부하 상황에서 데이터 손실, fan-out 지연, 검색 지연을 계측하고 릴리즈 기준을 만족한다.
 - 실서비스 전 운영 runbook과 rollback 기준을 정한다.
 
+초기 작업 순서:
+
+1. Nginx stale upstream 대응을 가장 먼저 처리한다. 2026-06-20 사전 점검에서 `phase6-fanout-takeover-smoke.mjs`가 복구 과정에서 `docker compose up -d --scale ...`을 수행한 뒤 Nginx가 예전 컨테이너 IP로 라우팅해 `POST /api/users/register`가 404를 반환했다. Nginx 재시작 후 정상 복구되었으므로, Phase 7 첫 작업은 app rebuild/recreate/scale 이후에도 `/api/`, `/api/ws/`, `/api/admin/`가 올바른 role로 라우팅되는 자동 검증과 대응 절차를 확정하는 것이다. 관련 경로는 `scripts/phase6-fanout-takeover-smoke.mjs`의 restore scale 로직과 `infra/nginx/nginx.conf`의 정적 upstream 설정이다.
+2. Fanout owner kill takeover flake를 두 번째로 처리한다. 2026-06-20 사전 점검에서 첫 owner kill takeover smoke가 `roomSeq order violated: 77 came after 600`으로 실패했고, 동일 조건 재실행은 통과했다. 무장애 다중 worker load는 통과했으므로 일반 fanout 경로보다 worker kill 직후 pending 재처리 구간의 flaky 위험으로 기록한다. 관련 경로는 `HotRoomFanoutWorker`의 publish 후 ack 흐름과 `loadChatPlan.mjs`의 raw receive order 검증이다.
+
+Production takeover 검증 기준:
+
+- steady-state와 무장애 다중 worker 경로에서는 raw delivery 기준 `roomSeq` 역전이 없어야 한다.
+- owner kill/takeover 경로는 raw delivery 검증과 client-visible 검증을 분리한다. raw delivery 순서 검증은 publish-before-ack, pending claim, duplicate replay 여부를 드러내는 diagnostic gate로 유지한다.
+- release blocking 기준은 client dedupe/render 이후의 사용자 가시 결과다. 클라이언트가 `messageId`로 중복 제거하고 `roomSeq`로 정렬한 뒤, 중복 메시지 없이 bounded live feed와 gap fill이 최신 화면을 복구해야 한다.
+- takeover 중 raw delivery 역전이 재현되면, 그것이 이미 전달된 message의 duplicate replay인지, 처음 보는 과거 message가 뒤늦게 도착한 것인지 분리해 기록한다. duplicate replay는 client-visible gate가 통과하고 비율이 제한될 때만 허용 가능하며, 처음 보는 과거 message가 최신 메시지 뒤에 도착해 화면을 흔들면 release fail로 본다.
+
 구현 작업:
 
 - k6/Gatling/Node 기반 load test를 추가한다.
@@ -1831,6 +1843,7 @@ node scripts/load-chat.mjs --room hot --viewers 10000 --messages-per-sec 10000 -
 - chaos test: Gateway kill, Worker kill, Redis 재시작, replica 지연을 검증한다.
 - archive worker one-shot 실행과 partition detach/drop dry-run을 검증한다.
 - Docker Compose 또는 staging 배포에서 Nginx upstream DNS stale 대응 절차를 검증한다.
+- Owner kill takeover smoke는 raw delivery order summary와 client dedupe/render summary를 모두 남기도록 확장한다.
 - 장애별 runbook을 작성한다.
 
 검증 시나리오:
@@ -1844,6 +1857,7 @@ node scripts/load-chat.mjs --room hot --viewers 10000 --messages-per-sec 10000 -
 - 관리자 검색 warm p95, cold p99, writer lag, replica lag, fanout lag 측정
 - baseline reconnect, Gateway rolling restart, Gateway hard kill, NAT/proxy cohort, mobile carrier flap, Redis latency/script failure, abuse mixed traffic 측정
 - app 컨테이너 재생성 후 `/api/`, `/api/ws/`, `/api/admin/`가 올바른 role로 라우팅되는지 검증
+- Fanout owner kill 후 raw delivery 역전/duplicate replay와 client-visible roomSeq 정렬 결과를 분리 측정
 
 릴리즈 기준:
 
