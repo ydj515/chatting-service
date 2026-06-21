@@ -10,10 +10,22 @@ export function parseTakeoverSmokeArgs(argv) {
     drainWaitSeconds: 12,
     minReceivedRatio: 0.9,
     ownerLeaseKeyPrefix: 'chat:fanout:owner:room:',
+    verifyRoutingAfterRestore: false,
+    routingCheckBaseUrl: process.env.CHAT_PHASE7_BASE_URL ?? 'http://localhost',
+    routingCheckAdminToken: process.env.CHAT_ADMIN_TOKEN ?? 'test',
+    routingCheckTimeoutMs: positiveInteger(
+      process.env.CHAT_PHASE7_ROUTE_TIMEOUT_MS ?? '3000',
+      'CHAT_PHASE7_ROUTE_TIMEOUT_MS',
+    ),
   };
 
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
+    if (arg === '--verify-routing-after-restore') {
+      options.verifyRoutingAfterRestore = true;
+      continue;
+    }
+
     const value = argv[index + 1];
     if (value === undefined) {
       throw new Error(`Missing value for ${arg}`);
@@ -40,6 +52,12 @@ export function parseTakeoverSmokeArgs(argv) {
       options.minReceivedRatio = ratio(value, arg);
     } else if (arg === '--owner-lease-key-prefix') {
       options.ownerLeaseKeyPrefix = value;
+    } else if (arg === '--routing-check-base-url') {
+      options.routingCheckBaseUrl = value;
+    } else if (arg === '--routing-check-admin-token') {
+      options.routingCheckAdminToken = value;
+    } else if (arg === '--routing-check-timeout-ms') {
+      options.routingCheckTimeoutMs = positiveInteger(value, arg);
     } else {
       throw new Error(`Unknown argument: ${arg}`);
     }
@@ -64,6 +82,25 @@ export function buildLoadChatArgs(options) {
     String(options.minReceivedRatio),
     '--assert-room-seq-order',
   ];
+}
+
+export function buildRoutingCheckArgs(options) {
+  return [
+    '--base-url',
+    options.routingCheckBaseUrl,
+    '--admin-token',
+    options.routingCheckAdminToken,
+    '--timeout-ms',
+    String(options.routingCheckTimeoutMs),
+    '--json',
+  ];
+}
+
+export function coerceRoutingCheckOutput(output) {
+  if (output == null) {
+    return '';
+  }
+  return Buffer.isBuffer(output) ? output.toString('utf8') : String(output);
 }
 
 export function parseWorkerContainerIds(output) {

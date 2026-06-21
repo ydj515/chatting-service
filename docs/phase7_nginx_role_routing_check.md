@@ -78,7 +78,25 @@ node scripts/phase7-role-routing-check.mjs --base-url http://localhost --admin-t
 
 두 번째 check도 실패하면 해당 배포는 release gate fail로 본다. 이때 JSON summary의 `failed` 배열과 각 check의 `reason`을 우선 확인한다.
 
-## 5. 실패 해석
+## 5. Takeover Smoke와 함께 실행
+
+worker owner kill smoke의 restore 직후 routing check를 함께 검증하려면 opt-in 옵션을 사용한다.
+
+```bash
+node scripts/phase6-fanout-takeover-smoke.mjs \
+  --room phase7-routing \
+  --viewers 3 \
+  --messages-per-sec 20 \
+  --duration 20 \
+  --kill-after 5 \
+  --verify-routing-after-restore \
+  --routing-check-base-url http://localhost \
+  --routing-check-admin-token "${CHAT_ADMIN_TOKEN:-test}"
+```
+
+기본값에서는 routing check가 실행되지 않는다. 이 옵션은 Phase 7 release gate용이며, Phase 6 fanout takeover smoke의 기존 동작을 바꾸지 않는다.
+
+## 6. 실패 해석
 
 | Reason | 의미 | 우선 확인 |
 | --- | --- | --- |
@@ -90,30 +108,32 @@ node scripts/phase7-role-routing-check.mjs --base-url http://localhost --admin-t
 
 `websocket-invalid-ticket-handshake`에서 `404`가 나오면 WebSocket role 대신 API/Admin role로 라우팅됐을 가능성이 높다.
 
-## 6. 복잡도
+## 7. 복잡도
 
 - route check 시간 복잡도: `O(R)`
 - summary 생성 시간 복잡도: `O(R)`
+- takeover smoke opt-in 연결 인자 파싱: `O(A)`
 - 공간 복잡도: `O(R)`
 
-여기서 `R`은 route check 개수다. 기본값은 4개다.
+여기서 `R`은 route check 개수이고 `A`는 takeover smoke CLI 인자 수다. 기본 route check 개수는 4개다.
 
-## 7. 주의사항
+## 8. 주의사항
 
 > - 이 check는 Compose 운영 기간의 stale upstream release gate다. Kubernetes 전환 후에는 Service/Ingress가 안정 endpoint를 제공하므로 회귀 방지용으로 축소될 수 있다.
 > - WebSocket check는 일반 HTTP 요청이 아니라 raw Upgrade handshake 형식으로 보낸다. 올바른 WebSocket role에서 invalid ticket이 `401`로 거부되는 것을 정상으로 본다.
 > - `POST /api/ws-tickets`는 인증 header 없이 호출하므로 ticket을 실제로 발급하지 않는다.
 > - `CHAT_ADMIN_TOKEN` 원문을 로그에 남기지 않는다. 현재 check summary에는 token 값을 출력하지 않는다.
+> - `--verify-routing-after-restore`는 opt-in이다. Nginx가 없는 Phase 6 takeover smoke 환경을 깨지 않기 위해 기본값에서는 실행하지 않는다.
 
-## 8. 대안
+## 9. 대안
 
 | 대안 | 장점 | 단점 | 판단 |
 | --- | --- | --- | --- |
 | Nginx recreate 후 check | 단순하고 Compose 기간에 충분하다 | Nginx가 자동으로 DNS를 재해석하는 구조는 아니다 | 기본 |
 | Nginx resolver 기반 동적 upstream | restart 의존도를 줄일 수 있다 | Compose 한정 복잡도가 커지고 WebSocket proxy 검증 비용이 늘어난다 | 반복 장애 시 별도 슬라이스 |
 | check만 실행하고 대응 절차 없음 | 구현 범위가 작다 | 실패 후 표준 복구 절차가 없어 release gate로 부족하다 | 사용하지 않음 |
+| takeover smoke에서 항상 실행 | restore 직후 stale upstream을 절대 놓치지 않는다 | 기존 Phase 6 smoke가 Nginx에 강하게 의존한다 | 사용하지 않음 |
 
-## 9. 후속 질문
+## 10. 후속 질문
 
-- `phase6-fanout-takeover-smoke.mjs` 복구 후 이 check를 자동 실행할 것인가?
 - 다음 슬라이스를 fanout owner kill takeover summary 확장으로 둘 것인가?

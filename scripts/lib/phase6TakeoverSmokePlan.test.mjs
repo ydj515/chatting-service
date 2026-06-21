@@ -2,7 +2,9 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
   buildLoadChatArgs,
+  buildRoutingCheckArgs,
   buildRunCapturedOptions,
+  coerceRoutingCheckOutput,
   findOwnerContainer,
   parseDockerInspectRows,
   parseLoadChatJson,
@@ -34,6 +36,52 @@ test('parseTakeoverSmokeArgs keeps Phase 6 production lease defaults in the smok
   assert.equal(options.killAfterSeconds, 5);
   assert.equal(options.drainWaitSeconds, 12);
   assert.equal(options.minReceivedRatio, 0.9);
+  assert.equal(options.verifyRoutingAfterRestore, false);
+  assert.equal(options.routingCheckBaseUrl, 'http://localhost');
+  assert.equal(options.routingCheckAdminToken, 'test');
+  assert.equal(options.routingCheckTimeoutMs, 3000);
+});
+
+test('parseTakeoverSmokeArgs maps Phase 7 routing check opt-in options', () => {
+  const options = parseTakeoverSmokeArgs([
+    '--verify-routing-after-restore',
+    '--routing-check-base-url',
+    'http://localhost:8088',
+    '--routing-check-admin-token',
+    'secret',
+    '--routing-check-timeout-ms',
+    '1200',
+  ]);
+
+  assert.equal(options.verifyRoutingAfterRestore, true);
+  assert.equal(options.routingCheckBaseUrl, 'http://localhost:8088');
+  assert.equal(options.routingCheckAdminToken, 'secret');
+  assert.equal(options.routingCheckTimeoutMs, 1200);
+});
+
+test('buildRoutingCheckArgs maps takeover options to phase7 routing check CLI args', () => {
+  assert.deepEqual(
+    buildRoutingCheckArgs({
+      routingCheckBaseUrl: 'http://localhost:8088',
+      routingCheckAdminToken: 'secret',
+      routingCheckTimeoutMs: 1200,
+    }),
+    [
+      '--base-url',
+      'http://localhost:8088',
+      '--admin-token',
+      'secret',
+      '--timeout-ms',
+      '1200',
+      '--json',
+    ],
+  );
+});
+
+test('coerceRoutingCheckOutput keeps captured routing check JSON printable', () => {
+  assert.equal(coerceRoutingCheckOutput('{"ok":true}\n'), '{"ok":true}\n');
+  assert.equal(coerceRoutingCheckOutput(Buffer.from('{"ok":true}\n')), '{"ok":true}\n');
+  assert.equal(coerceRoutingCheckOutput(null), '');
 });
 
 test('buildLoadChatArgs always verifies roomSeq order and minimum fanout receipt', () => {

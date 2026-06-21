@@ -6,7 +6,9 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   buildLoadChatArgs,
+  buildRoutingCheckArgs,
   buildRunCapturedOptions,
+  coerceRoutingCheckOutput,
   findOwnerContainer,
   parseDockerInspectRows,
   parseLoadChatJson,
@@ -105,12 +107,29 @@ async function main() {
         ['compose', 'up', '-d', '--scale', `${options.service}=${options.restoreScale}`, '--no-build'],
         runOptions,
       );
+      if (options.verifyRoutingAfterRestore) {
+        runRoutingCheckAfterRestore({ options, env, runOptions });
+      }
     }
   }
 }
 
 function runCaptured(command, args, options) {
   return execFileSync(command, args, options);
+}
+
+function runRoutingCheckAfterRestore({ options, env, runOptions }) {
+  const routingCheckScript = fileURLToPath(new URL('./phase7-role-routing-check.mjs', import.meta.url));
+  try {
+    const output = runCaptured(
+      process.execPath,
+      [routingCheckScript, ...buildRoutingCheckArgs(options)],
+      { ...runOptions, env },
+    );
+    process.stdout.write(coerceRoutingCheckOutput(output));
+  } catch (error) {
+    throw new Error(`phase7 routing check after restore failed\n${error.stderr ?? error.message}`);
+  }
 }
 
 async function waitForMetadata(metadataFile) {
