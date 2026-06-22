@@ -1,5 +1,5 @@
 # Build stage
-FROM gradle:8.14-jdk17 AS build
+FROM gradle:8.14-jdk21 AS build
 
 WORKDIR /app
 COPY . .
@@ -10,7 +10,7 @@ ARG APP_MODULE=chat-application
 RUN ./gradlew ":${APP_MODULE}:bootJar" -x test --no-daemon
 
 # Runtime stage
-FROM amazoncorretto:17-alpine-jdk
+FROM amazoncorretto:21-alpine-jdk
 
 WORKDIR /app
 
