@@ -8,6 +8,7 @@ import {
   buildLoadChatArgs,
   buildRoutingCheckArgs,
   buildRunCapturedOptions,
+  buildTakeoverSmokeSummary,
   coerceRoutingCheckOutput,
   findOwnerContainer,
   parseDockerInspectRows,
@@ -87,16 +88,14 @@ async function main() {
     }
 
     const summary = parseLoadChatJson(stdout);
-    console.log(JSON.stringify({
-      ok: true,
-      killedContainer: killedContainer.name,
-      killedContainerId: killedContainer.id.slice(0, 12),
-      roomId: summary.roomId,
-      sent: summary.sent,
-      receivedPerViewer: summary.receivedPerViewer,
-      minReceivedRatio: summary.minReceivedRatio,
-      assertedRoomSeqOrder: summary.assertedRoomSeqOrder,
-    }, null, 2));
+    const finalSummary = buildTakeoverSmokeSummary({
+      killedContainer,
+      loadSummary: summary,
+    });
+    console.log(JSON.stringify(finalSummary, null, 2));
+    if (!finalSummary.ok) {
+      throw new Error('takeover delivery release gate failed');
+    }
   } catch (error) {
     primaryError = error;
   } finally {

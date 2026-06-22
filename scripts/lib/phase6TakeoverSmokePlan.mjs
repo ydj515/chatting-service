@@ -86,8 +86,24 @@ export function buildLoadChatArgs(options) {
     String(options.drainWaitSeconds),
     '--min-received-ratio',
     String(options.minReceivedRatio),
-    '--assert-room-seq-order',
+    '--takeover-delivery-summary',
   ];
+}
+
+export function buildTakeoverSmokeSummary({ killedContainer, loadSummary }) {
+  const releaseBlocking = loadSummary.takeoverDelivery?.releaseBlocking === true;
+  return {
+    ok: !releaseBlocking,
+    killedContainer: killedContainer.name,
+    killedContainerId: killedContainer.id.slice(0, 12),
+    roomId: loadSummary.roomId,
+    sent: loadSummary.sent,
+    receivedPerViewer: loadSummary.receivedPerViewer,
+    minReceivedRatio: loadSummary.minReceivedRatio,
+    assertedRoomSeqOrder: loadSummary.assertedRoomSeqOrder,
+    takeoverDeliverySummary: loadSummary.takeoverDeliverySummary === true,
+    ...(loadSummary.takeoverDelivery ? { takeoverDelivery: loadSummary.takeoverDelivery } : {}),
+  };
 }
 
 export function buildRoutingCheckArgs(options) {

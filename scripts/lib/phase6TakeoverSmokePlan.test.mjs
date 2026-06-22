@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import {
   buildLoadChatArgs,
   buildRoutingCheckArgs,
+  buildTakeoverSmokeSummary,
   buildRunCapturedOptions,
   coerceRoutingCheckOutput,
   findOwnerContainer,
@@ -114,7 +115,7 @@ test('coerceRoutingCheckOutput keeps captured routing check JSON printable', () 
   assert.equal(coerceRoutingCheckOutput(null), '');
 });
 
-test('buildLoadChatArgs always verifies roomSeq order and minimum fanout receipt', () => {
+test('buildLoadChatArgs asks load-chat for takeover delivery summary and minimum fanout receipt', () => {
   assert.deepEqual(
     buildLoadChatArgs({
       room: 'phase6',
@@ -137,9 +138,36 @@ test('buildLoadChatArgs always verifies roomSeq order and minimum fanout receipt
       '12',
       '--min-received-ratio',
       '0.9',
-      '--assert-room-seq-order',
+      '--takeover-delivery-summary',
     ],
   );
+});
+
+test('buildTakeoverSmokeSummary carries takeover delivery and flips ok on release blocking summary', () => {
+  const summary = buildTakeoverSmokeSummary({
+    killedContainer: {
+      name: 'chatting-service-chat-worker-app-1-1',
+      id: 'abcdef1234567890',
+    },
+    loadSummary: {
+      roomId: 7,
+      sent: 10,
+      receivedPerViewer: [10, 11],
+      minReceivedRatio: 0.9,
+      assertedRoomSeqOrder: false,
+      takeoverDeliverySummary: true,
+      takeoverDelivery: {
+        releaseBlocking: true,
+        aggregate: { firstSeenLateDeliveryCount: 1 },
+        viewers: [],
+      },
+    },
+  });
+
+  assert.equal(summary.ok, false);
+  assert.equal(summary.killedContainer, 'chatting-service-chat-worker-app-1-1');
+  assert.equal(summary.killedContainerId, 'abcdef123456');
+  assert.equal(summary.takeoverDelivery.releaseBlocking, true);
 });
 
 test('parseWorkerContainerIds requires at least two worker replicas', () => {
