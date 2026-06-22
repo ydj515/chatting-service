@@ -333,6 +333,27 @@ services:
     networks:
       - chat-network
 
+  # Nginx (로컬 개발용) - 백엔드를 호스트 gradle bootRun으로 띄우는 dev 모드 전용.
+  # upstream이 host.docker.internal:8080~8082(호스트 포트)를 가리킨다.
+  # profiles로 격리해 일반 `docker compose up`(전체 클러스터)에서는 기동되지 않는다.
+  nginx-dev:
+    image: ${NGINX_IMAGE:-nginx:1.27-alpine}
+    container_name: chat-nginx-dev
+    profiles: [ "dev" ]
+    environment:
+      TZ: ${TZ:-Asia/Seoul}
+    volumes:
+      - ./infra/nginx/nginx.dev.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "${NGINX_HTTP_PORT:-80}:80"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: [ "CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1/health" ]
+      interval: ${NGINX_HEALTHCHECK_INTERVAL:-30s}
+      timeout: ${NGINX_HEALTHCHECK_TIMEOUT:-10s}
+      retries: ${NGINX_HEALTHCHECK_RETRIES:-3}
+
 
 # 볼륨 정의
 volumes:
