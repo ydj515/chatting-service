@@ -7,8 +7,10 @@ node = "24.13.0"
 dir = "{{ config_root }}"
 
 [tasks.default]
-description = "사용 가능한 mise 태스크 목록을 출력한다."
-run = "mise tasks"
+description = "인프라·백엔드·클라이언트를 모두 빌드하고 서버까지 기동한다."
+run = [
+  { task = "start" },
+]
 
 # ---------- setup ----------
 
