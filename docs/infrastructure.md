@@ -3,25 +3,34 @@
 ## mise 태스크
 
 ```bash
-mise run setup                     # 도구 설치 및 클라이언트 의존성 설치
-mise run build                     # 백엔드와 클라이언트 빌드
+mise run setup                     # 도구(JDK 21 등) 설치 및 클라이언트 의존성 설치
+mise run                           # (기본) 로컬 개발: 인프라(도커)+백엔드(gradle)+클라이언트 = mise run dev
+mise run dev:api                   # 단일 앱만 기동(인프라 자동). websocket/admin/worker 동일
+mise run start:infra               # PostgreSQL primary/read-replica, archive worker, Redis만 기동
+mise run start                     # 전체 도커 클러스터(이미지 빌드+nginx+멀티 인스턴스)+클라이언트 기동
+mise run build                     # 백엔드와 클라이언트 산출물 빌드
 mise run clean:infra               # 인프라 볼륨 정리 (깨끗하게 재시작할 때)
-mise run start:all                 # 빌드 + 인프라 + 앱 전체 기동
-mise run start                     # 전체 클러스터 기동
-mise run start:infra               # PostgreSQL primary/read-replica, archive worker, Redis 기동
 mise run verify:postgres-replica   # PostgreSQL replica/archive 구성 검증
 mise run verify:chat               # REST/WebSocket 채팅 흐름 검증
 mise run stop                      # 전체 클러스터 종료
 ```
 
-### 빠른 실행
+### 두 가지 실행 모드
 
-기존 인프라를 정리하고 처음부터 깨끗하게 시작하려면:
+- **로컬 개발(기본)**: 인프라와 nginx 게이트웨이(`:80`)만 Docker, 백엔드는 호스트 Gradle `bootRun`. 이미지 빌드가 없어 코드 변경이 바로 반영된다. dev용 nginx는 `nginx.dev.conf`로 upstream을 `host.docker.internal:8080~8082`(호스트 백엔드)로 라우팅한다. 멀티 인스턴스는 포함하지 않는다.
 
-```bash
-mise run clean:infra   # 볼륨 정리
-mise run start:all     # 빌드 + 전체 기동
-```
+  ```bash
+  mise run            # = mise run dev
+                      #   nginx 게이트웨이 http://localhost/api
+                      #   호스트 백엔드 api:8080 / websocket:8081 / admin:8082 / worker:8083
+  ```
+
+- **전체 도커 클러스터**: 이미지를 빌드해 nginx 게이트웨이와 다중 인스턴스를 포함한 전체 클러스터를 기동한다. 통합/최종 검증용.
+
+  ```bash
+  mise run clean:infra   # (선택) 볼륨 정리
+  mise run start         # 이미지 빌드 + 전체 기동 (http://localhost 게이트웨이)
+  ```
 
 ---
 
@@ -77,7 +86,7 @@ Nginx는 역할별 upstream으로 트래픽을 분리합니다.
 
 이전 API 컨테이너 IP가 WebSocket 컨테이너 같은 다른 role에 재사용되면 `/api/users/register` 같은 REST 요청이 잘못된 role로 전달되어 `404`가 발생할 수 있습니다. 이는 controller mapping 문제가 아니라 nginx upstream endpoint가 stale 상태가 된 것입니다.
 
-현재 Compose runbook은 app rebuild 후 app health를 기다리고, nginx를 재시작한 뒤 nginx health까지 다시 기다리는 방식입니다. `mise run start`와 `mise run start:all`은 `docker compose up -d --build --wait` 이후 `docker compose restart nginx`를 실행합니다.
+현재 Compose runbook은 app rebuild 후 app health를 기다리고, nginx를 재시작한 뒤 nginx health까지 다시 기다리는 방식입니다. `mise run start`(내부적으로 `start:backend`)는 `docker compose up -d --build --wait` 이후 `docker compose restart nginx`를 실행합니다.
 
 ```bash
 mise run start
@@ -118,7 +127,8 @@ mise run verify:chat
 | `infra/postgres/message-partitions.sql` | 메시지 파티션 DDL |
 | `infra/postgres/archive/` | 파티션 archive worker |
 | `infra/redis/redis.conf` | Redis 설정 |
-| `infra/nginx/nginx.conf` | Nginx 템플릿 설정. Compose에서 `SERVER_PORT`를 `CHAT_BACKEND_PORT`로 전달해 upstream 포트를 생성 |
+| `infra/nginx/nginx.conf` | Nginx 템플릿 설정(전체 클러스터용). Compose에서 `SERVER_PORT`를 `CHAT_BACKEND_PORT`로 전달해 upstream 포트를 생성 |
+| `infra/nginx/nginx.dev.conf` | 로컬 개발용 Nginx 설정. upstream을 `host.docker.internal:8080~8082`(호스트 gradle 백엔드)로 라우팅. compose `nginx-dev`(profile `dev`) 서비스가 사용 |
 | `start-cluster.sh` | 클러스터 실행 스크립트 |
 
 ---

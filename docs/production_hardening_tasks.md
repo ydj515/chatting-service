@@ -129,7 +129,7 @@ Redis Cluster에서 Lua script가 여러 key를 받으면 모든 key가 같은 h
 
 - 분류: Infra / Deployment Hardening
 - 적용 시점: 별도 Infra Hardening task
-- 현재 구현 상태: `mise run start`, `mise run start:all`, `start-cluster.sh`에 nginx restart 반영 완료
+- 현재 구현 상태: `mise run start`(내부 `start:backend`), `start-cluster.sh`에 nginx restart 반영 완료
 - 관련 문서: [infrastructure.md](./infrastructure.md)
 
 ### 문제
