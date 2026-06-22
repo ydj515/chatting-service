@@ -4,7 +4,7 @@ import {
   buildAdminHistoryUrl,
   buildAdminSearchUrl,
   createAdminHeaders,
-} from './adminApi.mjs';
+} from './adminApi.ts';
 
 test('admin search URL includes query filters and bounded limit', () => {
   const url = buildAdminSearchUrl('/api', {
