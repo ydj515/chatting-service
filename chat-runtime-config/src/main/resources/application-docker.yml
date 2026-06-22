@@ -132,12 +132,18 @@ chat:
       allowed-headers: ${CHAT_API_CORS_ALLOWED_HEADERS:*}
       max-age: ${CHAT_API_CORS_MAX_AGE:3600}
   admin:
-    token: ${CHAT_ADMIN_TOKEN}
+    token: ${CHAT_ADMIN_TOKEN:my-secure-admin-token-change-me}
     actor: ${CHAT_ADMIN_ACTOR:admin-local}
     default-limit: ${CHAT_ADMIN_DEFAULT_LIMIT:50}
     max-limit: ${CHAT_ADMIN_MAX_LIMIT:100}
     export:
       directory: ${CHAT_ADMIN_EXPORT_DIRECTORY:/tmp/chat-admin-exports}
+    cors:
+      mapping: ${CHAT_ADMIN_CORS_MAPPING:/**}
+      allowed-origins: ${CHAT_ADMIN_CORS_ALLOWED_ORIGINS:*}
+      allowed-methods: ${CHAT_ADMIN_CORS_ALLOWED_METHODS:GET,POST,PUT,DELETE,PATCH,OPTIONS}
+      allowed-headers: ${CHAT_ADMIN_CORS_ALLOWED_HEADERS:*}
+      max-age: ${CHAT_ADMIN_CORS_MAX_AGE:3600}
   websocket:
     endpoint: ${CHAT_WEBSOCKET_ENDPOINT:/ws/chat}
     allowed-origins: ${CHAT_WEBSOCKET_ALLOWED_ORIGINS:*}
