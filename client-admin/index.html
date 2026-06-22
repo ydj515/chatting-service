@@ -19,6 +19,11 @@
         }
       })();
     </script>
+    <!-- base-url 기본값 주입 지점. build.mjs가 ADMIN_DEFAULT_BASE_URL 값으로 토큰을 치환한다.
+         빈 값이면 adminState가 상대경로 '/api'로 폴백한다. -->
+    <script>
+      window.__ADMIN_DEFAULT_BASE_URL__ = '%%ADMIN_DEFAULT_BASE_URL%%';
+    </script>
   </head>
   <body>
     <div class="shell">
