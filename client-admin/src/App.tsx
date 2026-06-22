@@ -85,10 +85,15 @@ function App() {
 
   // ----- 테마 -----
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
-    return (
-      (localStorage.getItem(THEME_STORAGE_KEY) as 'light' | 'dark') ||
-      (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
-    );
+    try {
+      return (
+        (localStorage.getItem(THEME_STORAGE_KEY) as 'light' | 'dark') ||
+        (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+      );
+    } catch {
+      // localStorage 비활성 환경은 기본 테마로 폴백
+      return 'light';
+    }
   });
 
   useEffect(() => {
@@ -171,11 +176,15 @@ function App() {
     setNoticeError(isError);
   };
 
-  const run = async (successMessage: string, operation: () => Promise<void>) => {
+  // successMessage는 함수로도 받아 작업 결과(예: export job id)를 성공 메시지에 반영할 수 있다.
+  const run = async (
+    successMessage: string | (() => string),
+    operation: () => Promise<void>,
+  ) => {
     try {
       setBusy(true);
       await operation();
-      showNotice(successMessage);
+      showNotice(typeof successMessage === 'function' ? successMessage() : successMessage);
     } catch (error) {
       showNotice(error instanceof Error ? error.message : String(error), true);
     } finally {
@@ -223,6 +232,11 @@ function App() {
   const handleRefresh = async (event: React.FormEvent) => {
     event.preventDefault();
     const { baseUrl: effectiveBaseUrl, roomId: effectiveRoomId } = persistState();
+    // roomId가 숫자가 아니면 /admin/rooms/NaN/... 같은 잘못된 요청이 나가므로 사전 검증한다.
+    if (numberOrNull(effectiveRoomId) === null) {
+      showNotice('Room ID는 숫자여야 합니다.', true);
+      return;
+    }
     await run('Admin data loaded', async () => {
       await Promise.all([
         loadStatus(effectiveBaseUrl, effectiveRoomId),
@@ -234,10 +248,14 @@ function App() {
 
   const handleExport = async () => {
     const { baseUrl: effectiveBaseUrl } = persistState();
-    await run('Export job created', async () => {
-      const job = await createAdminExport(effectiveBaseUrl, token, buildFilters());
-      showNotice(`Export ${job.jobId} ${job.status}`);
-    });
+    let successMessage = 'Export job created';
+    await run(
+      () => successMessage,
+      async () => {
+        const job = await createAdminExport(effectiveBaseUrl, token, buildFilters());
+        successMessage = `Export ${job.jobId} ${job.status}`;
+      },
+    );
   };
 
   const handleHistoryNext = async () => {

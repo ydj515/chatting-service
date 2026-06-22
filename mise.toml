@@ -83,7 +83,8 @@ run = "./gradlew :chat-websocket-application:bootRun"
 [tasks."dev:admin"]
 description = "chat-admin을 호스트(JDK 21)에서 실행한다. (:8082)"
 depends = ["start:infra"]
-env = { SPRING_PROFILES_ACTIVE = "docker", DB_HOST = "localhost", DB_READ_HOST = "localhost", REDIS_HOST = "localhost", SERVER_PORT = "8082" }
+# CHAT_ADMIN_TOKEN은 docker 프로파일에서 필수값(@NotBlank)이므로 로컬 dev용 기본값을 여기서 주입한다.
+env = { SPRING_PROFILES_ACTIVE = "docker", DB_HOST = "localhost", DB_READ_HOST = "localhost", REDIS_HOST = "localhost", SERVER_PORT = "8082", CHAT_ADMIN_TOKEN = "my-secure-admin-token-change-me" }
 run = "./gradlew :chat-admin-application:bootRun"
 
 [tasks."dev:worker"]

@@ -4,7 +4,10 @@ const DEFAULT_API_TIMEOUT_MS = 30_000;
 const trimTrailingSlash = (value: string): string => value.replace(/\/+$/, '');
 
 const numberFromEnv = (value: string | undefined, fallback: number): number => {
-  const parsed = Number(value);
+  // 빈 문자열은 Number('') === 0 으로 변환되어 axios timeout을 무한대로 풀어버리므로 무효로 취급한다.
+  const trimmed = value?.trim();
+  if (!trimmed) return fallback;
+  const parsed = Number(trimmed);
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
 };
 

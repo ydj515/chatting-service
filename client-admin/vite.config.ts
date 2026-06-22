@@ -5,6 +5,8 @@ import tailwindcss from '@tailwindcss/vite';
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, '.', '');
+  // ?? 는 빈 문자열을 폴백하지 못하므로 trim 후 || 로 공백/빈 값까지 폴백한다.
+  const proxyTarget = env.VITE_DEV_PROXY_TARGET?.trim() || 'http://localhost:80';
 
   return {
     plugins: [tailwindcss(), react()],
@@ -13,7 +15,7 @@ export default defineConfig(({ mode }) => {
       port: 5174,
       proxy: {
         '/api': {
-          target: env.VITE_DEV_PROXY_TARGET ?? 'http://localhost:80',
+          target: proxyTarget,
           changeOrigin: true,
           ws: true,
         },

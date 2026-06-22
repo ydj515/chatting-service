@@ -91,13 +91,26 @@ async function requestJson<T>(url: string, adminToken: string, body?: unknown): 
     return response.data;
   } catch (error) {
     if (axios.isAxiosError(error) && error.response) {
-      const detail = typeof error.response.data === 'string'
-        ? error.response.data
-        : JSON.stringify(error.response.data ?? '');
-      throw new Error(`Admin request failed: ${error.response.status} ${detail}`);
+      throw new Error(`Admin request failed: ${error.response.status} ${extractErrorDetail(error.response.data)}`);
     }
     throw error instanceof Error ? error : new Error(String(error));
   }
+}
+
+// Spring 등 백엔드의 에러 응답({ message, error, ... })에서 사람이 읽을 메시지를 우선 추출한다.
+function extractErrorDetail(data: unknown): string {
+  if (typeof data === 'string') {
+    return data;
+  }
+  if (data && typeof data === 'object') {
+    const record = data as Record<string, unknown>;
+    const message = record.message ?? record.error;
+    if (typeof message === 'string' && message !== '') {
+      return message;
+    }
+    return JSON.stringify(data);
+  }
+  return String(data ?? '');
 }
 
 function appendOptional(

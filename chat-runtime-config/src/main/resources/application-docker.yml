@@ -132,7 +132,7 @@ chat:
       allowed-headers: ${CHAT_API_CORS_ALLOWED_HEADERS:*}
       max-age: ${CHAT_API_CORS_MAX_AGE:3600}
   admin:
-    token: ${CHAT_ADMIN_TOKEN:my-secure-admin-token-change-me}
+    token: ${CHAT_ADMIN_TOKEN}
     actor: ${CHAT_ADMIN_ACTOR:admin-local}
     default-limit: ${CHAT_ADMIN_DEFAULT_LIMIT:50}
     max-limit: ${CHAT_ADMIN_MAX_LIMIT:100}
