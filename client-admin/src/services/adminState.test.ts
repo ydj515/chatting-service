@@ -1,12 +1,17 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { loadAdminState, saveAdminState } from './adminState.mjs';
+import { loadAdminState, saveAdminState, type AdminStorage } from './adminState.ts';
 
-function memoryStorage(initial = {}) {
+interface MemoryStorage extends AdminStorage {
+  has(key: string): boolean;
+  value(key: string): string | undefined;
+}
+
+function memoryStorage(initial: Record<string, string> = {}): MemoryStorage {
   const values = new Map(Object.entries(initial));
   return {
     getItem(key) {
-      return values.has(key) ? values.get(key) : null;
+      return values.has(key) ? (values.get(key) as string) : null;
     },
     setItem(key, value) {
       values.set(key, String(value));
@@ -36,6 +41,14 @@ test('loadAdminState does not restore admin token from persistent storage', () =
   assert.equal(state.searchMode, 'CONTAINS');
 });
 
+test('loadAdminState falls back to the injected default base url', () => {
+  const state = loadAdminState(memoryStorage(), 'http://localhost/api');
+
+  assert.equal(state.baseUrl, 'http://localhost/api');
+  assert.equal(state.roomId, '1');
+  assert.equal(state.searchMode, 'FTS');
+});
+
 test('saveAdminState does not write admin token to persistent storage', () => {
   const storage = memoryStorage();
 
@@ -44,6 +57,8 @@ test('saveAdminState does not write admin token to persistent storage', () => {
     token: 'secret-token',
     roomId: '20',
     searchMode: 'FTS',
+    historyCursor: null,
+    searchCursor: null,
   });
 
   assert.equal(storage.value('client_admin_base_url'), '/admin-api');

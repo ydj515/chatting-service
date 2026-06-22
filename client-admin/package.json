@@ -1,12 +1,33 @@
 {
   "name": "client-admin",
   "version": "1.0.0",
+  "description": "분산 채팅 시스템 React 관리자 클라이언트",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "dependencies": {
+    "@tailwindcss/vite": "^4.3.0",
+    "axios": "^1.6.0",
+    "framer-motion": "^10.16.5",
+    "lucide-react": "^0.400.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "tailwindcss": "^4.3.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "@vitejs/plugin-react": "^4.5.2",
+    "typescript": "^5.8.3",
+    "vite": "^6.3.5"
+  },
   "scripts": {
-    "test": "npm run test:unit",
-    "test:unit": "node --test src/services/*.test.mjs",
-    "build": "node scripts/build.mjs",
-    "start": "npx serve dist -p 5174"
+    "start": "vite",
+    "dev": "vite",
+    "test:unit": "node --experimental-strip-types --test src/services/*.test.ts src/utils/*.test.ts",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview"
   }
 }

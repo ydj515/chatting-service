@@ -64,10 +64,9 @@ description = "dev용 nginx(:80)를 기동해 /api 요청을 호스트 백엔드
 run = "docker compose --profile dev up -d nginx-dev"
 
 [tasks."dev:client-admin"]
-description = "관리자 클라이언트를 dev 게이트웨이(http://localhost/api) 기본값으로 빌드 후 실행한다. (:5174)"
+description = "관리자 클라이언트 dev 서버를 실행한다. (/api → 게이트웨이 프록시, :5174)"
 dir = "client-admin"
-env = { ADMIN_DEFAULT_BASE_URL = "http://localhost/api" }
-run = "npm run build && npx serve dist -p 5174"
+run = "npm run dev"
 
 [tasks."dev:api"]
 description = "chat-api를 도커 인프라에 붙여 호스트(JDK 21)에서 실행한다. (:8080)"
@@ -103,9 +102,9 @@ dir = "client"
 run = "npm start"
 
 [tasks."start:client-admin"]
-description = "관리자 클라이언트 개발 서버를 실행한다."
+description = "관리자 클라이언트 개발 서버를 실행한다. (:5174)"
 dir = "client-admin"
-run = "npm run build && npx serve dist -p 5174"
+run = "npm start"
 
 # ---------- start (전체 도커 클러스터: 이미지 빌드 + nginx + 멀티 인스턴스) ----------
 
