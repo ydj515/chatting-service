@@ -260,7 +260,7 @@ Expected: PASS.
 
 Add a section:
 
-```markdown
+````markdown
 ## Takeover Smoke와 함께 실행
 
 worker owner kill smoke의 restore 직후 routing check를 함께 검증하려면 opt-in 옵션을 사용한다.
@@ -278,7 +278,7 @@ node scripts/phase6-fanout-takeover-smoke.mjs \
 ```
 
 기본값에서는 routing check가 실행되지 않는다. 이 옵션은 Phase 7 release gate용이다.
-```
+````
 
 - [x] **Step 2: Update slice index**
 

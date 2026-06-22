@@ -39,7 +39,39 @@ test('parseTakeoverSmokeArgs keeps Phase 6 production lease defaults in the smok
   assert.equal(options.verifyRoutingAfterRestore, false);
   assert.equal(options.routingCheckBaseUrl, 'http://localhost');
   assert.equal(options.routingCheckAdminToken, 'test');
-  assert.equal(options.routingCheckTimeoutMs, 3000);
+  // opt-in이 아니면 timeout은 검증하지 않고 raw 기본값을 그대로 둔다.
+  assert.equal(options.routingCheckTimeoutMs, '3000');
+});
+
+test('parseTakeoverSmokeArgs ignores invalid routing timeout env when routing check is not opted in', () => {
+  const previous = process.env.CHAT_PHASE7_ROUTE_TIMEOUT_MS;
+  process.env.CHAT_PHASE7_ROUTE_TIMEOUT_MS = 'not-a-number';
+  try {
+    assert.doesNotThrow(() => parseTakeoverSmokeArgs([]));
+  } finally {
+    if (previous === undefined) {
+      delete process.env.CHAT_PHASE7_ROUTE_TIMEOUT_MS;
+    } else {
+      process.env.CHAT_PHASE7_ROUTE_TIMEOUT_MS = previous;
+    }
+  }
+});
+
+test('parseTakeoverSmokeArgs validates routing timeout env when routing check is opted in', () => {
+  const previous = process.env.CHAT_PHASE7_ROUTE_TIMEOUT_MS;
+  process.env.CHAT_PHASE7_ROUTE_TIMEOUT_MS = 'not-a-number';
+  try {
+    assert.throws(
+      () => parseTakeoverSmokeArgs(['--verify-routing-after-restore']),
+      /CHAT_PHASE7_ROUTE_TIMEOUT_MS/,
+    );
+  } finally {
+    if (previous === undefined) {
+      delete process.env.CHAT_PHASE7_ROUTE_TIMEOUT_MS;
+    } else {
+      process.env.CHAT_PHASE7_ROUTE_TIMEOUT_MS = previous;
+    }
+  }
 });
 
 test('parseTakeoverSmokeArgs maps Phase 7 routing check opt-in options', () => {
@@ -69,8 +101,6 @@ test('buildRoutingCheckArgs maps takeover options to phase7 routing check CLI ar
     [
       '--base-url',
       'http://localhost:8088',
-      '--admin-token',
-      'secret',
       '--timeout-ms',
       '1200',
       '--json',

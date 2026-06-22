@@ -46,6 +46,7 @@ async function main() {
   ];
 
   let killedContainer = null;
+  let primaryError = null;
   const load = spawn(process.execPath, loadArgs, {
     env,
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -96,6 +97,8 @@ async function main() {
       minReceivedRatio: summary.minReceivedRatio,
       assertedRoomSeqOrder: summary.assertedRoomSeqOrder,
     }, null, 2));
+  } catch (error) {
+    primaryError = error;
   } finally {
     await fs.rm(metadataFile, { force: true });
     if (load.exitCode === null) {
@@ -108,9 +111,22 @@ async function main() {
         runOptions,
       );
       if (options.verifyRoutingAfterRestore) {
-        runRoutingCheckAfterRestore({ options, env, runOptions });
+        try {
+          runRoutingCheckAfterRestore({ options, env, runOptions });
+        } catch (routingError) {
+          // takeover/load 실패가 근본 원인이다. 이미 주 에러가 있으면 routing 실패는 로그만 남기고 덮어쓰지 않는다.
+          if (primaryError) {
+            console.error(routingError.message);
+          } else {
+            primaryError = routingError;
+          }
+        }
       }
     }
+  }
+
+  if (primaryError) {
+    throw primaryError;
   }
 }
 
@@ -120,15 +136,21 @@ function runCaptured(command, args, options) {
 
 function runRoutingCheckAfterRestore({ options, env, runOptions }) {
   const routingCheckScript = fileURLToPath(new URL('./phase7-role-routing-check.mjs', import.meta.url));
+  // admin token은 CLI 인자가 아니라 env로 넘긴다(프로세스 목록 노출 방지).
+  const checkEnv = { ...env, CHAT_ADMIN_TOKEN: options.routingCheckAdminToken };
   try {
     const output = runCaptured(
       process.execPath,
       [routingCheckScript, ...buildRoutingCheckArgs(options)],
-      { ...runOptions, env },
+      { ...runOptions, env: checkEnv },
     );
     process.stdout.write(coerceRoutingCheckOutput(output));
   } catch (error) {
-    throw new Error(`phase7 routing check after restore failed\n${error.stderr ?? error.message}`);
+    // 실패 시 phase7은 어떤 check가 깨졌는지 JSON summary를 stdout으로 출력한다(execFileSync는 error.stdout에 담는다).
+    if (error.stdout) {
+      process.stdout.write(coerceRoutingCheckOutput(error.stdout));
+    }
+    throw new Error(`phase7 routing check after restore failed\n${error.stderr || error.message}`);
   }
 }
 

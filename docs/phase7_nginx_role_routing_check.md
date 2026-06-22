@@ -119,7 +119,7 @@ node scripts/phase6-fanout-takeover-smoke.mjs \
 
 ## 8. 주의사항
 
-> - 이 check는 Compose 운영 기간의 stale upstream release gate다. Kubernetes 전환 후에는 Service/Ingress가 안정 endpoint를 제공하므로 회귀 방지용으로 축소될 수 있다.
+> - 이 check는 Compose 운영 기간의 stale upstream release gate다. Kubernetes 전환 후에는 Service/Ingress가 안정적인 endpoint를 제공하므로 회귀 방지용으로 축소될 수 있다.
 > - WebSocket check는 일반 HTTP 요청이 아니라 raw Upgrade handshake 형식으로 보낸다. 올바른 WebSocket role에서 invalid ticket이 `401`로 거부되는 것을 정상으로 본다.
 > - `POST /api/ws-tickets`는 인증 header 없이 호출하므로 ticket을 실제로 발급하지 않는다.
 > - `CHAT_ADMIN_TOKEN` 원문을 로그에 남기지 않는다. 현재 check summary에는 token 값을 출력하지 않는다.

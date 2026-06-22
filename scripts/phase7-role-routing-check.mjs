@@ -40,12 +40,16 @@ async function requestHttp(check) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), check.timeoutMs);
   try {
-    const response = await fetch(check.url, {
+    const fetchOptions = {
       method: check.method,
       headers: check.headers,
-      body: check.body,
       signal: controller.signal,
-    });
+    };
+    // GET 요청에 body(undefined/'')를 넘기면 일부 fetch 구현에서 TypeError가 나므로 정의된 경우에만 추가한다.
+    if (check.body !== undefined) {
+      fetchOptions.body = check.body;
+    }
+    const response = await fetch(check.url, fetchOptions);
     return {
       status: response.status,
       headers: Object.fromEntries(response.headers.entries()),
@@ -75,6 +79,8 @@ function requestWebSocketHandshake(check) {
     };
 
     const request = transport.request(requestOptions, (response) => {
+      // 응답 본문을 읽는 중 연결이 끊기면 response 스트림이 error를 emit한다. 처리하지 않으면 프로세스가 죽는다.
+      response.on('error', (error) => finish(reject, error));
       const chunks = [];
       response.on('data', (chunk) => chunks.push(chunk));
       response.on('end', () => {

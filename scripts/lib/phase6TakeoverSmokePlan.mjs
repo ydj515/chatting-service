@@ -13,10 +13,8 @@ export function parseTakeoverSmokeArgs(argv) {
     verifyRoutingAfterRestore: false,
     routingCheckBaseUrl: process.env.CHAT_PHASE7_BASE_URL ?? 'http://localhost',
     routingCheckAdminToken: process.env.CHAT_ADMIN_TOKEN ?? 'test',
-    routingCheckTimeoutMs: positiveInteger(
-      process.env.CHAT_PHASE7_ROUTE_TIMEOUT_MS ?? '3000',
-      'CHAT_PHASE7_ROUTE_TIMEOUT_MS',
-    ),
+    // routing check를 실제로 쓸 때만 검증한다(아래 참고). opt-in이 아닐 때 잘못된 env 값으로 Phase 6를 깨뜨리지 않기 위함이다.
+    routingCheckTimeoutMs: process.env.CHAT_PHASE7_ROUTE_TIMEOUT_MS ?? '3000',
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -63,6 +61,14 @@ export function parseTakeoverSmokeArgs(argv) {
     }
   }
 
+  // timeout 검증은 routing check를 실제로 실행하는 경우에만 수행한다.
+  if (options.verifyRoutingAfterRestore) {
+    options.routingCheckTimeoutMs = positiveInteger(
+      options.routingCheckTimeoutMs,
+      'CHAT_PHASE7_ROUTE_TIMEOUT_MS',
+    );
+  }
+
   return options;
 }
 
@@ -85,11 +91,10 @@ export function buildLoadChatArgs(options) {
 }
 
 export function buildRoutingCheckArgs(options) {
+  // admin token은 프로세스 목록에 노출되지 않도록 CLI 인자 대신 CHAT_ADMIN_TOKEN env로 전달한다.
   return [
     '--base-url',
     options.routingCheckBaseUrl,
-    '--admin-token',
-    options.routingCheckAdminToken,
     '--timeout-ms',
     String(options.routingCheckTimeoutMs),
     '--json',
