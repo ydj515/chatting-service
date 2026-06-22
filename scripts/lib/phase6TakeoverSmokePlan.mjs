@@ -10,10 +10,20 @@ export function parseTakeoverSmokeArgs(argv) {
     drainWaitSeconds: 12,
     minReceivedRatio: 0.9,
     ownerLeaseKeyPrefix: 'chat:fanout:owner:room:',
+    verifyRoutingAfterRestore: false,
+    routingCheckBaseUrl: process.env.CHAT_PHASE7_BASE_URL ?? 'http://localhost',
+    routingCheckAdminToken: process.env.CHAT_ADMIN_TOKEN ?? 'test',
+    // routing check를 실제로 쓸 때만 검증한다(아래 참고). opt-in이 아닐 때 잘못된 env 값으로 Phase 6를 깨뜨리지 않기 위함이다.
+    routingCheckTimeoutMs: process.env.CHAT_PHASE7_ROUTE_TIMEOUT_MS ?? '3000',
   };
 
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
+    if (arg === '--verify-routing-after-restore') {
+      options.verifyRoutingAfterRestore = true;
+      continue;
+    }
+
     const value = argv[index + 1];
     if (value === undefined) {
       throw new Error(`Missing value for ${arg}`);
@@ -40,9 +50,23 @@ export function parseTakeoverSmokeArgs(argv) {
       options.minReceivedRatio = ratio(value, arg);
     } else if (arg === '--owner-lease-key-prefix') {
       options.ownerLeaseKeyPrefix = value;
+    } else if (arg === '--routing-check-base-url') {
+      options.routingCheckBaseUrl = value;
+    } else if (arg === '--routing-check-admin-token') {
+      options.routingCheckAdminToken = value;
+    } else if (arg === '--routing-check-timeout-ms') {
+      options.routingCheckTimeoutMs = positiveInteger(value, arg);
     } else {
       throw new Error(`Unknown argument: ${arg}`);
     }
+  }
+
+  // timeout 검증은 routing check를 실제로 실행하는 경우에만 수행한다.
+  if (options.verifyRoutingAfterRestore) {
+    options.routingCheckTimeoutMs = positiveInteger(
+      options.routingCheckTimeoutMs,
+      'CHAT_PHASE7_ROUTE_TIMEOUT_MS',
+    );
   }
 
   return options;
@@ -64,6 +88,24 @@ export function buildLoadChatArgs(options) {
     String(options.minReceivedRatio),
     '--assert-room-seq-order',
   ];
+}
+
+export function buildRoutingCheckArgs(options) {
+  // admin token은 프로세스 목록에 노출되지 않도록 CLI 인자 대신 CHAT_ADMIN_TOKEN env로 전달한다.
+  return [
+    '--base-url',
+    options.routingCheckBaseUrl,
+    '--timeout-ms',
+    String(options.routingCheckTimeoutMs),
+    '--json',
+  ];
+}
+
+export function coerceRoutingCheckOutput(output) {
+  if (output == null) {
+    return '';
+  }
+  return Buffer.isBuffer(output) ? output.toString('utf8') : String(output);
 }
 
 export function parseWorkerContainerIds(output) {

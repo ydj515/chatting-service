@@ -2,7 +2,9 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
   buildLoadChatArgs,
+  buildRoutingCheckArgs,
   buildRunCapturedOptions,
+  coerceRoutingCheckOutput,
   findOwnerContainer,
   parseDockerInspectRows,
   parseLoadChatJson,
@@ -34,6 +36,82 @@ test('parseTakeoverSmokeArgs keeps Phase 6 production lease defaults in the smok
   assert.equal(options.killAfterSeconds, 5);
   assert.equal(options.drainWaitSeconds, 12);
   assert.equal(options.minReceivedRatio, 0.9);
+  assert.equal(options.verifyRoutingAfterRestore, false);
+  assert.equal(options.routingCheckBaseUrl, 'http://localhost');
+  assert.equal(options.routingCheckAdminToken, 'test');
+  // opt-in이 아니면 timeout은 검증하지 않고 raw 기본값을 그대로 둔다.
+  assert.equal(options.routingCheckTimeoutMs, '3000');
+});
+
+test('parseTakeoverSmokeArgs ignores invalid routing timeout env when routing check is not opted in', () => {
+  const previous = process.env.CHAT_PHASE7_ROUTE_TIMEOUT_MS;
+  process.env.CHAT_PHASE7_ROUTE_TIMEOUT_MS = 'not-a-number';
+  try {
+    assert.doesNotThrow(() => parseTakeoverSmokeArgs([]));
+  } finally {
+    if (previous === undefined) {
+      delete process.env.CHAT_PHASE7_ROUTE_TIMEOUT_MS;
+    } else {
+      process.env.CHAT_PHASE7_ROUTE_TIMEOUT_MS = previous;
+    }
+  }
+});
+
+test('parseTakeoverSmokeArgs validates routing timeout env when routing check is opted in', () => {
+  const previous = process.env.CHAT_PHASE7_ROUTE_TIMEOUT_MS;
+  process.env.CHAT_PHASE7_ROUTE_TIMEOUT_MS = 'not-a-number';
+  try {
+    assert.throws(
+      () => parseTakeoverSmokeArgs(['--verify-routing-after-restore']),
+      /CHAT_PHASE7_ROUTE_TIMEOUT_MS/,
+    );
+  } finally {
+    if (previous === undefined) {
+      delete process.env.CHAT_PHASE7_ROUTE_TIMEOUT_MS;
+    } else {
+      process.env.CHAT_PHASE7_ROUTE_TIMEOUT_MS = previous;
+    }
+  }
+});
+
+test('parseTakeoverSmokeArgs maps Phase 7 routing check opt-in options', () => {
+  const options = parseTakeoverSmokeArgs([
+    '--verify-routing-after-restore',
+    '--routing-check-base-url',
+    'http://localhost:8088',
+    '--routing-check-admin-token',
+    'secret',
+    '--routing-check-timeout-ms',
+    '1200',
+  ]);
+
+  assert.equal(options.verifyRoutingAfterRestore, true);
+  assert.equal(options.routingCheckBaseUrl, 'http://localhost:8088');
+  assert.equal(options.routingCheckAdminToken, 'secret');
+  assert.equal(options.routingCheckTimeoutMs, 1200);
+});
+
+test('buildRoutingCheckArgs maps takeover options to phase7 routing check CLI args', () => {
+  assert.deepEqual(
+    buildRoutingCheckArgs({
+      routingCheckBaseUrl: 'http://localhost:8088',
+      routingCheckAdminToken: 'secret',
+      routingCheckTimeoutMs: 1200,
+    }),
+    [
+      '--base-url',
+      'http://localhost:8088',
+      '--timeout-ms',
+      '1200',
+      '--json',
+    ],
+  );
+});
+
+test('coerceRoutingCheckOutput keeps captured routing check JSON printable', () => {
+  assert.equal(coerceRoutingCheckOutput('{"ok":true}\n'), '{"ok":true}\n');
+  assert.equal(coerceRoutingCheckOutput(Buffer.from('{"ok":true}\n')), '{"ok":true}\n');
+  assert.equal(coerceRoutingCheckOutput(null), '');
 });
 
 test('buildLoadChatArgs always verifies roomSeq order and minimum fanout receipt', () => {
