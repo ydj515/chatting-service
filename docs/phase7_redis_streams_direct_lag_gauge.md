@@ -13,8 +13,7 @@
 ### 목표
 
 - worker application이 known stream set을 주기적으로 순회한다.
-- 각 stream의 `XINFO GROUPS`에서 consumer group `lag`를 읽는다.
-- 각 stream/group의 `XPENDING` summary에서 pending count를 읽는다.
+- 각 stream의 `XINFO GROUPS`에서 consumer group `lag`와 `pending` count를 읽는다.
 - `stream_shard`, `consumer_group` 단위로 합산해 Micrometer gauge로 노출한다.
 
 ## 2. Metric Contract
@@ -22,7 +21,7 @@
 | Metric | Type | Tags | 의미 |
 | --- | --- | --- | --- |
 | `chat.redis.stream.group.lag` | Gauge | `stream_shard`, `consumer_group` | Redis `XINFO GROUPS` group lag 합계 |
-| `chat.redis.stream.group.pending` | Gauge | `stream_shard`, `consumer_group` | Redis `XPENDING` summary pending 합계 |
+| `chat.redis.stream.group.pending` | Gauge | `stream_shard`, `consumer_group` | Redis `XINFO GROUPS` group pending 합계 |
 
 `stream_shard`는 stream key에서 파싱한 bounded shard 값이다. stream key 형식이 예상과 다르면 `unknown` tag로 기록한다.
 
@@ -56,9 +55,9 @@ chat:
 ## 5. 주의사항
 
 > - `lag`는 Redis 서버의 `XINFO GROUPS` 결과에 `lag` 필드가 있을 때만 갱신된다. Redis 버전이나 group 상태에 따라 필드가 없으면 pending gauge만 갱신될 수 있다.
-> - `pending`은 `XPENDING` summary 기준이며, claim 가능한 메시지 수와 같지 않다.
+> - `pending`은 `XINFO GROUPS`에서 조회한 pending count 기준이며, claim 가능한 메시지 수와 같지 않다.
 > - room stream key와 `roomId`는 metric tag에 넣지 않는다. 상세 추적은 로그나 tracing으로 분리한다.
-> - polling interval을 너무 낮추면 Redis에 `XINFO`/`XPENDING` 부하가 생긴다.
+> - polling interval을 너무 낮추면 Redis에 `XINFO` 부하가 생긴다.
 
 ## 6. 대안
 

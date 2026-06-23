@@ -37,7 +37,7 @@ class SpringRedisStreamLagReader(
                     streamShard = streamShard,
                     consumerGroup = consumerGroup,
                     lag = groupInfo.lagOrNull(),
-                    pending = readPending(streamOperations, streamKey, consumerGroup) ?: groupInfo.pendingCount(),
+                    pending = groupInfo.pendingCount(),
                 )
             }
         }
@@ -48,18 +48,8 @@ class SpringRedisStreamLagReader(
         streamKey: String,
     ): List<StreamInfo.XInfoGroup> {
         return runCatching {
-            streamOperations.groups(streamKey)?.asSequence()?.toList() ?: emptyList()
+            streamOperations.groups(streamKey)?.toList() ?: emptyList()
         }.getOrDefault(emptyList())
-    }
-
-    private fun readPending(
-        streamOperations: org.springframework.data.redis.core.StreamOperations<String, String, String>,
-        streamKey: String,
-        consumerGroup: String,
-    ): Long? {
-        return runCatching {
-            streamOperations.pending(streamKey, consumerGroup)?.totalPendingMessages
-        }.getOrNull()
     }
 
     private fun StreamInfo.XInfoGroup.lagOrNull(): Long? {

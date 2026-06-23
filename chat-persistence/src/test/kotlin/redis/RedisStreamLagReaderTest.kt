@@ -4,11 +4,7 @@ import com.chat.persistence.config.ChatRedisProperties
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.mock
-import org.mockito.Mockito.times
-import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
-import org.springframework.data.domain.Range
-import org.springframework.data.redis.connection.stream.PendingMessagesSummary
 import org.springframework.data.redis.connection.stream.StreamInfo
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.data.redis.core.SetOperations
@@ -26,7 +22,6 @@ class RedisStreamLagReaderTest {
         `when`(redisTemplate.opsForStream<String, String>()).thenReturn(streamOperations)
         `when`(setOperations.members("chat:stream:rooms")).thenReturn(setOf(streamKey))
         `when`(streamOperations.groups(streamKey)).thenReturn(xInfoGroups("message-writer", lag = 9L, pending = 3L))
-        `when`(streamOperations.pending(streamKey, "message-writer")).thenReturn(pendingSummary("message-writer", 5L))
         val reader = SpringRedisStreamLagReader(
             redisTemplate = redisTemplate,
             keyResolver = MessageStreamKeyResolver(ChatRedisProperties()),
@@ -40,12 +35,11 @@ class RedisStreamLagReaderTest {
                     streamShard = 2,
                     consumerGroup = "message-writer",
                     lag = 9L,
-                    pending = 5L,
+                    pending = 3L,
                 ),
             ),
             snapshots,
         )
-        verify(streamOperations, times(1)).pending(streamKey, "message-writer")
     }
 
     @Suppress("UNCHECKED_CAST")
@@ -85,14 +79,5 @@ class RedisStreamLagReaderTest {
             ),
         )
         return StreamInfo.XInfoGroups.fromList(raw)
-    }
-
-    private fun pendingSummary(consumerGroup: String, pending: Long): PendingMessagesSummary {
-        return PendingMessagesSummary(
-            consumerGroup,
-            pending,
-            Range.closed("0-0", "1-0"),
-            emptyMap(),
-        )
     }
 }
