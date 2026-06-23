@@ -152,6 +152,13 @@ Phase 7 명시 task:
 | search projection lag | Gauge | `projection` | 검색 projection 지연 |
 | archive worker run duration | Timer | `result` | partition archive 안정성 |
 
+Phase 7 명시 task:
+
+- 2026-06-24 admin search latency gate 슬라이스에서 `scripts/measure-admin-search-p95.mjs`가 `--gate warm|cold|both`를 지원하도록 확장되었다.
+- warm gate는 explicit warmup 이후 `p95 <= 1000ms`와 실패 응답 0건을 요구한다.
+- cold gate는 warmup 없는 post-restart 또는 cold-cache synthetic run에서 `p99 <= 6000ms`와 실패 응답 0건을 요구한다.
+- `--gate both`는 cold 샘플을 먼저 실행한 뒤 warmup과 warm 샘플을 실행해 두 gate를 같은 JSON report의 `ok`와 `failedGates`로 분리한다.
+
 권장 alert 후보:
 
 - replica lag 3초 이상 지속
@@ -200,6 +207,7 @@ Phase 7 명시 task:
 | ticket user/IP atomicity | 실패율이 전체 `0.5%` 초과 또는 cohort p95 `1.0%` 초과로 rolling 15분 2회 이상 반복될 때 검토 |
 | nginx stale upstream | app recreate 후 오라우팅 없음 |
 | Redis Streams worker observability | append latency, consumer read/claim records, worker batch latency, dead-letter 이동이 bounded tag로 관측됨 |
+| admin search latency gate | warm p95와 cold p99가 별도 gate로 계산되고 `failedGates`에 분리 기록됨 |
 
 ## 5. Log / Trace 필수 필드
 

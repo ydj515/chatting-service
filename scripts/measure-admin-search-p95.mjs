@@ -1,13 +1,15 @@
 #!/usr/bin/env node
 import { performance } from 'node:perf_hooks';
 import { writeFile } from 'node:fs/promises';
-import { buildRequestPlans } from './lib/adminMeasurePlan.mjs';
-import { summarizeSamples } from './lib/adminLatencyStats.mjs';
+import { buildGatePhases, buildRequestPlans } from './lib/adminMeasurePlan.mjs';
+import { summarizeGateReport, summarizeGateSamples } from './lib/adminLatencyStats.mjs';
 
 const args = parseArgs(process.argv.slice(2));
 const baseUrl = args['base-url'] ?? process.env.ADMIN_API_BASE_URL ?? 'http://localhost/api';
 const token = requiredAdminToken(args.token ?? process.env.CHAT_ADMIN_TOKEN);
 const scenario = scenarioValue(args.scenario ?? 'both');
+const gate = gateValue(args.gate ?? 'warm');
+const gatePhases = buildGatePhases(gate);
 const requests = positiveInteger(args.requests ?? '100', '--requests');
 const warmup = nonNegativeInteger(args.warmup ?? '10', '--warmup');
 const concurrency = positiveInteger(args.concurrency ?? '5', '--concurrency');
@@ -15,7 +17,9 @@ const roomId = positiveInteger(args['room-id'] ?? '30001', '--room-id');
 const query = args.query ?? 'hello searchable admin keyword';
 const searchMode = searchModeValue(args['search-mode'] ?? 'FTS');
 const limit = positiveInteger(args.limit ?? '50', '--limit');
-const targetP95Ms = positiveInteger(args['target-p95-ms'] ?? '1000', '--target-p95-ms');
+const targetWarmP95OptionName = args['target-warm-p95-ms'] !== undefined ? '--target-warm-p95-ms' : '--target-p95-ms';
+const targetWarmP95Ms = positiveInteger(args['target-warm-p95-ms'] ?? args['target-p95-ms'] ?? '1000', targetWarmP95OptionName);
+const targetColdP99Ms = positiveInteger(args['target-cold-p99-ms'] ?? '6000', '--target-cold-p99-ms');
 const output = args.output;
 const from = args.from;
 const to = args.to;
@@ -23,22 +27,39 @@ const to = args.to;
 const plans = buildRequestPlans({ baseUrl, scenario, roomId, query, searchMode, limit, from, to });
 const results = [];
 for (const plan of plans) {
-  if (warmup > 0) {
-    await runSamples(plan, warmup, Math.min(concurrency, warmup), token);
+  const gateResults = [];
+  for (const gatePhase of gatePhases) {
+    if (gatePhase === 'warm' && warmup > 0) {
+      await runSamples(plan, warmup, Math.min(concurrency, warmup), token);
+    }
+    const samples = await runSamples(plan, requests, concurrency, token);
+    const targetMs = gatePhase === 'cold' ? targetColdP99Ms : targetWarmP95Ms;
+    gateResults.push({
+      gate: gatePhase,
+      summary: summarizeGateSamples(samples, { gate: gatePhase, targetMs }),
+    });
   }
-  const samples = await runSamples(plan, requests, concurrency, token);
+  const finalGateResult = gateResults[gateResults.length - 1];
   results.push({
     ...plan,
-    summary: summarizeSamples(samples, { targetP95Ms }),
+    summary: finalGateResult.summary,
+    gateResults,
   });
 }
+const gateSummary = summarizeGateReport(results);
 
 const report = {
   measuredAt: new Date().toISOString(),
-  targetP95Ms,
+  gate,
+  ok: gateSummary.ok,
+  failedGates: gateSummary.failedGates,
+  targetP95Ms: targetWarmP95Ms,
+  targetWarmP95Ms,
+  targetColdP99Ms,
   options: {
     baseUrl,
     scenario,
+    gate,
     requests,
     warmup,
     concurrency,
@@ -98,6 +119,13 @@ function scenarioValue(value) {
     return value;
   }
   throw new Error('--scenario must be one of history, search, both.');
+}
+
+function gateValue(value) {
+  if (value === 'warm' || value === 'cold' || value === 'both') {
+    return value;
+  }
+  throw new Error('--gate must be one of warm, cold, both.');
 }
 
 function searchModeValue(value) {

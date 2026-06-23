@@ -31,3 +31,34 @@ export function summarizeSamples(samples, { targetP95Ms }) {
     }, {}),
   };
 }
+
+export function summarizeGateSamples(samples, { gate, targetMs }) {
+  const summary = summarizeSamples(samples, { targetP95Ms: targetMs });
+  const targetMetric = gate === 'cold' ? 'p99Ms' : 'p95Ms';
+  const measuredMs = summary[targetMetric];
+
+  return {
+    ...summary,
+    gate,
+    targetMetric,
+    targetMs,
+    measuredMs,
+    passedTarget: measuredMs != null && measuredMs <= targetMs && summary.failures === 0,
+  };
+}
+
+export function summarizeGateReport(results) {
+  const failedGates = results.flatMap((result) =>
+    (result.gateResults ?? [])
+      .filter((gateResult) => !gateResult.summary?.passedTarget)
+      .map((gateResult) => {
+        const percentileName = gateResult.summary?.targetMetric?.replace('Ms', '') ?? 'unknown';
+        return `admin_search_${gateResult.gate ?? 'unknown'}_${percentileName}:${result.name}`;
+      }),
+  );
+
+  return {
+    ok: failedGates.length === 0,
+    failedGates,
+  };
+}
