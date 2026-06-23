@@ -13,6 +13,7 @@ data class ChatWorkerProperties(
     val fanout: StreamConsumer = StreamConsumer(
         consumerGroup = "fanout",
     ),
+    val redisStreamLag: RedisStreamLag = RedisStreamLag(),
 ) {
     fun roleEnabled(role: String): Boolean = roles.contains(role)
 
@@ -30,5 +31,10 @@ data class ChatWorkerProperties(
         val ttlMillis: Long = 10_000,
         val renewIntervalMillis: Long = 3_000,
         val keyPrefix: String = "chat:fanout:owner:room:",
+    )
+
+    data class RedisStreamLag(
+        val enabled: Boolean = true,
+        val pollDelayMillis: Long = 5_000,
     )
 }

@@ -1,18 +1,21 @@
 package com.chat.persistence.service
 
 import io.micrometer.core.instrument.Counter
+import io.micrometer.core.instrument.Gauge
 import io.micrometer.core.instrument.MeterRegistry
 import io.micrometer.core.instrument.Timer
 import org.springframework.beans.factory.ObjectProvider
 import org.springframework.stereotype.Service
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicLong
 
 @Service
 class MessageStreamMetrics(
     private val meterRegistryProvider: ObjectProvider<MeterRegistry>? = null,
 ) {
     private val appendTimers = ConcurrentHashMap<AppendTimerKey, Timer>()
+    private val streamGroupGauges = ConcurrentHashMap<StreamGroupGaugeKey, AtomicLong>()
 
     fun recordAppend(streamShard: Int, outcome: String, durationNanos: Long) {
         meterRegistryProvider?.ifAvailable { registry ->
@@ -78,6 +81,51 @@ class MessageStreamMetrics(
         }
     }
 
+    fun updateStreamGroupLag(streamShard: Int?, consumerGroup: String, lag: Long) {
+        updateStreamGroupGauge(
+            metricName = "chat.redis.stream.group.lag",
+            streamShard = streamShard,
+            consumerGroup = consumerGroup,
+            value = lag,
+        )
+    }
+
+    fun updateStreamGroupPending(streamShard: Int?, consumerGroup: String, pending: Long) {
+        updateStreamGroupGauge(
+            metricName = "chat.redis.stream.group.pending",
+            streamShard = streamShard,
+            consumerGroup = consumerGroup,
+            value = pending,
+        )
+    }
+
+    private fun updateStreamGroupGauge(
+        metricName: String,
+        streamShard: Int?,
+        consumerGroup: String,
+        value: Long,
+    ) {
+        meterRegistryProvider?.ifAvailable { registry ->
+            val tagStreamShard = streamShard?.toString() ?: TAG_VALUE_UNKNOWN
+            val holder = streamGroupGauges.computeIfAbsent(
+                StreamGroupGaugeKey(
+                    registry = registry,
+                    metricName = metricName,
+                    streamShard = tagStreamShard,
+                    consumerGroup = consumerGroup,
+                ),
+            ) {
+                AtomicLong(0).also { gaugeValue ->
+                    Gauge.builder(metricName, gaugeValue) { currentValue -> currentValue.get().toDouble() }
+                        .tag(TAG_STREAM_SHARD, tagStreamShard)
+                        .tag(TAG_CONSUMER_GROUP, consumerGroup)
+                        .register(registry)
+                }
+            }
+            holder.set(value.coerceAtLeast(0))
+        }
+    }
+
     companion object {
         val Noop = MessageStreamMetrics()
 
@@ -93,5 +141,12 @@ class MessageStreamMetrics(
         val registry: MeterRegistry,
         val streamShard: Int,
         val outcome: String,
+    )
+
+    private data class StreamGroupGaugeKey(
+        val registry: MeterRegistry,
+        val metricName: String,
+        val streamShard: String,
+        val consumerGroup: String,
     )
 }
