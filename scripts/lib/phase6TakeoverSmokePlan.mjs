@@ -91,7 +91,9 @@ export function buildLoadChatArgs(options) {
 }
 
 export function buildTakeoverSmokeSummary({ killedContainer, loadSummary }) {
-  const releaseBlocking = loadSummary.takeoverDelivery?.releaseBlocking === true;
+  const takeoverDeliverySummary = loadSummary.takeoverDeliverySummary === true;
+  const takeoverDeliveryMissing = takeoverDeliverySummary && !loadSummary.takeoverDelivery;
+  const releaseBlocking = takeoverDeliveryMissing || loadSummary.takeoverDelivery?.releaseBlocking === true;
   return {
     ok: !releaseBlocking,
     killedContainer: killedContainer.name,
@@ -101,7 +103,8 @@ export function buildTakeoverSmokeSummary({ killedContainer, loadSummary }) {
     receivedPerViewer: loadSummary.receivedPerViewer,
     minReceivedRatio: loadSummary.minReceivedRatio,
     assertedRoomSeqOrder: loadSummary.assertedRoomSeqOrder,
-    takeoverDeliverySummary: loadSummary.takeoverDeliverySummary === true,
+    takeoverDeliverySummary,
+    ...(takeoverDeliveryMissing ? { takeoverDeliveryMissing: true } : {}),
     ...(loadSummary.takeoverDelivery ? { takeoverDelivery: loadSummary.takeoverDelivery } : {}),
   };
 }

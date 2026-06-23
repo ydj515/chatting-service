@@ -175,7 +175,7 @@ function summarizeViewerTakeoverDelivery(messages, { viewerIndex, sent, minRecei
 
     if (messageId && roomSeq !== null && !duplicate) {
       seenMessages.set(messageId, message);
-      if (roomSeqOwners.has(roomSeq) && roomSeqOwners.get(roomSeq) !== messageId) {
+      if (roomSeqOwners.has(roomSeq)) {
         clientVisible.roomSeqConflictCount += 1;
       } else {
         roomSeqOwners.set(roomSeq, messageId);

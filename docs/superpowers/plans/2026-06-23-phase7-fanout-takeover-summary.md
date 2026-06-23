@@ -10,7 +10,7 @@
 
 ---
 
-### Task 1: Add failing load-chat summary contract tests
+## Task 1: Add failing load-chat summary contract tests
 
 **Files:**
 - Modify: `scripts/lib/loadChatPlan.test.mjs`
@@ -115,7 +115,7 @@ node --test scripts/lib/loadChatPlan.test.mjs
 
 Expected: FAIL because `summarizeTakeoverDelivery` is not exported and `takeoverDeliverySummary` is not parsed.
 
-### Task 2: Implement takeover delivery summary analysis
+## Task 2: Implement takeover delivery summary analysis
 
 **Files:**
 - Modify: `scripts/lib/loadChatPlan.mjs`
@@ -281,7 +281,7 @@ node --test scripts/lib/loadChatPlan.test.mjs
 
 Expected: PASS.
 
-### Task 3: Wire load-chat JSON output
+## Task 3: Wire load-chat JSON output
 
 **Files:**
 - Modify: `scripts/load-chat.mjs`
@@ -340,7 +340,7 @@ node --check scripts/load-chat.mjs
 
 Expected: PASS.
 
-### Task 4: Connect takeover smoke to the summary gate
+## Task 4: Connect takeover smoke to the summary gate
 
 **Files:**
 - Modify: `scripts/lib/phase6TakeoverSmokePlan.test.mjs`
@@ -478,7 +478,7 @@ node --test scripts/lib/phase6TakeoverSmokePlan.test.mjs
 
 Expected: PASS.
 
-### Task 5: Add operator documentation and update slice index
+## Task 5: Add operator documentation and update slice index
 
 **Files:**
 - Create: `docs/phase7_fanout_takeover_summary.md`
@@ -489,7 +489,7 @@ Expected: PASS.
 
 Create `docs/phase7_fanout_takeover_summary.md` with:
 
-```markdown
+````markdown
 # Phase 7 Fanout Takeover Delivery Summary
 
 이 문서는 owner kill takeover smoke가 raw delivery diagnostic과 client-visible release gate를 어떻게 분리하는지 설명한다.
@@ -547,7 +547,7 @@ node scripts/phase6-fanout-takeover-smoke.mjs \
 - duplicate replay 허용 한도를 어느 release gate에서 숫자로 고정할 것인가?
 - actual client gap fill synthetic test를 reconnect load test에 포함할 것인가?
 ```
-```
+````
 
 - [ ] **Step 2: Update slice index**
 
@@ -557,7 +557,7 @@ Update row 3 in `docs/phase7_slices.md`:
 | 3 | Fanout owner kill takeover summary 확장 | [설계](./superpowers/specs/2026-06-23-phase7-fanout-takeover-summary-design.md), [계획](./superpowers/plans/2026-06-23-phase7-fanout-takeover-summary.md), [운영 문서](./phase7_fanout_takeover_summary.md) | 구현 완료 |
 ```
 
-### Task 6: Verification and commit
+## Task 6: Verification and commit
 
 **Files:**
 - All modified files

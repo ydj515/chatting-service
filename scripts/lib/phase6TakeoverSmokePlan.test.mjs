@@ -170,6 +170,27 @@ test('buildTakeoverSmokeSummary carries takeover delivery and flips ok on releas
   assert.equal(summary.takeoverDelivery.releaseBlocking, true);
 });
 
+test('buildTakeoverSmokeSummary fails closed when takeover delivery summary is requested but missing', () => {
+  const summary = buildTakeoverSmokeSummary({
+    killedContainer: {
+      name: 'chatting-service-chat-worker-app-1-1',
+      id: 'abcdef1234567890',
+    },
+    loadSummary: {
+      roomId: 7,
+      sent: 10,
+      receivedPerViewer: [10, 10],
+      minReceivedRatio: 0.9,
+      assertedRoomSeqOrder: false,
+      takeoverDeliverySummary: true,
+    },
+  });
+
+  assert.equal(summary.ok, false);
+  assert.equal(summary.takeoverDeliverySummary, true);
+  assert.equal(summary.takeoverDeliveryMissing, true);
+});
+
 test('parseWorkerContainerIds requires at least two worker replicas', () => {
   assert.deepEqual(parseWorkerContainerIds('abc\n\ndef\n'), ['abc', 'def']);
   assert.throws(() => parseWorkerContainerIds('abc\n'), /at least 2/);
