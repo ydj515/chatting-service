@@ -5,10 +5,12 @@ import tls from 'node:tls';
 import { URL } from 'node:url';
 import {
   buildReconnectAttemptPlan,
+  buildWebSocketSocketOptions,
   classifyTicketIssueFailure,
   exitCodeForReconnectSummary,
   parseReconnectLoadArgs,
   summarizeReconnectAttempts,
+  validateWebSocketHandshake,
 } from './lib/phase7ReconnectLoadPlan.mjs';
 import {
   buildLoadUsername,
@@ -89,9 +91,9 @@ class RawWebSocket {
   connect() {
     return new Promise((resolve, reject) => {
       const isSecure = this.url.protocol === 'wss:';
-      const port = Number(this.url.port || (isSecure ? 443 : 80));
       const key = crypto.randomBytes(16).toString('base64');
       const socketFactory = isSecure ? tls.connect : net.createConnection;
+      const socketOptions = buildWebSocketSocketOptions(this.url);
       const path = `${this.url.pathname}${this.url.search}`;
       let handshakeBuffer = Buffer.alloc(0);
       let settled = false;
@@ -100,7 +102,7 @@ class RawWebSocket {
         this.close();
       }, this.timeoutMs);
 
-      this.socket = socketFactory({ host: this.url.hostname, port }, () => {
+      this.socket = socketFactory(socketOptions, () => {
         this.socket.write([
           `GET ${path} HTTP/1.1`,
           `Host: ${this.url.host}`,
@@ -125,8 +127,9 @@ class RawWebSocket {
         const header = handshakeBuffer.subarray(0, headerEnd).toString('utf8');
         clearTimeout(timer);
         settled = true;
-        if (!header.startsWith('HTTP/1.1 101') && !header.startsWith('HTTP/1.0 101')) {
-          reject(new Error(`WebSocket handshake failed: ${header.split('\r\n')[0]}`));
+        const validation = validateWebSocketHandshake(header, key);
+        if (!validation.ok) {
+          reject(new Error(`WebSocket handshake failed: ${validation.statusLine} (${validation.reason})`));
           this.close();
           return;
         }

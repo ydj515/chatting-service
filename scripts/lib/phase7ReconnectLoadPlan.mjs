@@ -1,7 +1,11 @@
+import crypto from 'node:crypto';
+
 const COHORTS = ['direct', 'nat_proxy', 'mobile_carrier', 'synthetic'];
 const REASONS = ['network_flap', 'gateway_restart', 'gateway_kill', 'deploy', 'unknown'];
+const WEB_SOCKET_GUID = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
 
 export function parseReconnectLoadArgs(argv, env = process.env) {
+  let timeoutMsName = 'CHAT_PHASE7_RECONNECT_TIMEOUT_MS';
   const options = {
     scenario: 'baseline-reconnect',
     clients: 3,
@@ -14,7 +18,7 @@ export function parseReconnectLoadArgs(argv, env = process.env) {
     minHandshakeSuccessRatio: 0.999,
     maxRateLimitFailureRatio: 0.001,
     maxCohortFailureRatio: 0.003,
-    timeoutMs: positiveInteger(env.CHAT_PHASE7_RECONNECT_TIMEOUT_MS ?? '15000', 'CHAT_PHASE7_RECONNECT_TIMEOUT_MS'),
+    timeoutMs: env.CHAT_PHASE7_RECONNECT_TIMEOUT_MS ?? '15000',
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -48,13 +52,17 @@ export function parseReconnectLoadArgs(argv, env = process.env) {
     } else if (arg === '--max-cohort-failure-ratio') {
       options.maxCohortFailureRatio = ratio(value, arg);
     } else if (arg === '--timeout-ms') {
-      options.timeoutMs = positiveInteger(value, arg);
+      options.timeoutMs = value;
+      timeoutMsName = arg;
     } else {
       throw new Error(`Unknown argument: ${arg}`);
     }
   }
 
-  return options;
+  return {
+    ...options,
+    timeoutMs: positiveInteger(options.timeoutMs, timeoutMsName),
+  };
 }
 
 export function buildReconnectAttemptPlan({
@@ -101,16 +109,18 @@ export function summarizeReconnectAttempts(events, gates) {
       aggregate.normalReconnectRateLimited,
       aggregate.normalReconnectAttempts,
     ),
-    handshakeSuccessRate: ratioOrZero(
-      aggregate.normalReconnectHandshakeSucceeded,
-      aggregate.normalReconnectTicketIssued,
-    ),
+    handshakeSuccessRate: aggregate.normalReconnectTicketIssued > 0
+      ? aggregate.normalReconnectHandshakeSucceeded / aggregate.normalReconnectTicketIssued
+      : null,
   };
   const failedGates = [];
   if (rates.ticketIssueSuccessRate < gates.minTicketIssueSuccessRatio) {
     failedGates.push('ticket_issue_success_ratio');
   }
-  if (rates.handshakeSuccessRate < gates.minHandshakeSuccessRatio) {
+  if (
+    rates.handshakeSuccessRate !== null
+    && rates.handshakeSuccessRate < gates.minHandshakeSuccessRatio
+  ) {
     failedGates.push('handshake_success_ratio');
   }
   if (rates.rateLimitFailureRate > gates.maxRateLimitFailureRatio) {
@@ -133,7 +143,8 @@ export function summarizeReconnectAttempts(events, gates) {
   };
 }
 
-export function classifyTicketIssueFailure({ status, body }) {
+export function classifyTicketIssueFailure(error) {
+  const { status, body } = error || {};
   if (status === 429) {
     const normalized = String(body ?? '').toLowerCase();
     if (normalized.includes('ip')) {
@@ -152,6 +163,41 @@ export function classifyTicketIssueFailure({ status, body }) {
 
 export function exitCodeForReconnectSummary(summary) {
   return summary.ok ? 0 : 1;
+}
+
+export function buildWebSocketSocketOptions(url) {
+  const parsedUrl = url instanceof URL ? url : new URL(url);
+  const isSecure = parsedUrl.protocol === 'wss:';
+  return {
+    host: parsedUrl.hostname,
+    port: Number(parsedUrl.port || (isSecure ? 443 : 80)),
+    ...(isSecure ? { servername: parsedUrl.hostname } : {}),
+  };
+}
+
+export function validateWebSocketHandshake(header, key) {
+  const lines = String(header).split('\r\n');
+  const statusLine = lines[0] ?? '';
+  if (!statusLine.startsWith('HTTP/1.1 101') && !statusLine.startsWith('HTTP/1.0 101')) {
+    return { ok: false, reason: 'unexpected_status', statusLine };
+  }
+
+  const headers = parseHeaders(lines.slice(1));
+  if (String(headers.upgrade ?? '').toLowerCase() !== 'websocket') {
+    return { ok: false, reason: 'missing_upgrade_header', statusLine };
+  }
+  const connectionTokens = String(headers.connection ?? '')
+    .toLowerCase()
+    .split(',')
+    .map((value) => value.trim());
+  if (!connectionTokens.includes('upgrade')) {
+    return { ok: false, reason: 'missing_connection_upgrade', statusLine };
+  }
+  if (headers['sec-websocket-accept'] !== expectedWebSocketAccept(key)) {
+    return { ok: false, reason: 'invalid_sec_websocket_accept', statusLine };
+  }
+
+  return { ok: true, statusLine };
 }
 
 function summarizeCohorts(events) {
@@ -224,4 +270,25 @@ function oneOf(value, allowed, name) {
 
 function ratioOrZero(count, total) {
   return total > 0 ? count / total : 0;
+}
+
+function parseHeaders(lines) {
+  const headers = {};
+  for (const line of lines) {
+    const separator = line.indexOf(':');
+    if (separator === -1) {
+      continue;
+    }
+    const name = line.slice(0, separator).trim().toLowerCase();
+    const value = line.slice(separator + 1).trim();
+    headers[name] = value;
+  }
+  return headers;
+}
+
+function expectedWebSocketAccept(key) {
+  return crypto
+    .createHash('sha1')
+    .update(`${key}${WEB_SOCKET_GUID}`)
+    .digest('base64');
 }

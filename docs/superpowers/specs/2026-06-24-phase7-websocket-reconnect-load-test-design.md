@@ -18,7 +18,7 @@
 
 - 정상 reconnect synthetic runner를 추가한다.
 - 각 reconnect 시도마다 새 WebSocket one-time ticket을 발급하고 raw WebSocket handshake를 수행한다.
-- ticket issue success, rate limited failure, handshake success/failure를 같은 denominator로 집계한다.
+- ticket issue success와 rate limited failure는 전체 정상 reconnect attempt를 denominator로 집계하고, handshake success/failure는 ticket이 발급된 attempt만 denominator로 집계한다.
 - cohort tag를 bounded enum으로 유지한다.
 - release gate 실패 원인을 `failedGates`로 분리한다.
 - Phase 7 슬라이스 인덱스와 reconnect 운영 문서를 갱신한다.
@@ -67,7 +67,7 @@ Runner 흐름:
 | Gate | 기본값 | 실패 조건 |
 | --- | --- | --- |
 | `ticket_issue_success_ratio` | `0.999` | `normalReconnectTicketIssued / normalReconnectAttempts`가 기준 미만 |
-| `handshake_success_ratio` | `0.999` | `normalReconnectHandshakeSucceeded / normalReconnectTicketIssued`가 기준 미만 |
+| `handshake_success_ratio` | `0.999` | ticket이 발급된 attempt가 있을 때 `normalReconnectHandshakeSucceeded / normalReconnectTicketIssued`가 기준 미만 |
 | `rate_limit_failure_ratio` | `0.001` | `normalReconnectRateLimited / normalReconnectAttempts`가 기준 초과 |
 | `cohort_failure_ratio:<cohort>` | `0.003` | cohort별 `(attempts - handshakeSucceeded) / attempts`가 기준 초과 |
 

@@ -1,11 +1,14 @@
 import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
 import { test } from 'node:test';
 import {
   buildReconnectAttemptPlan,
+  buildWebSocketSocketOptions,
   classifyTicketIssueFailure,
   exitCodeForReconnectSummary,
   parseReconnectLoadArgs,
   summarizeReconnectAttempts,
+  validateWebSocketHandshake,
 } from './phase7ReconnectLoadPlan.mjs';
 
 test('parseReconnectLoadArgs maps CLI values over defaults', () => {
@@ -60,6 +63,21 @@ test('parseReconnectLoadArgs rejects unknown cohort and invalid ratios', () => {
   assert.throws(
     () => parseReconnectLoadArgs(['--min-ticket-issue-success-ratio', '1.5'], {}),
     /--min-ticket-issue-success-ratio must be a number between 0 and 1/,
+  );
+});
+
+test('parseReconnectLoadArgs lets CLI timeout override an invalid env timeout', () => {
+  const options = parseReconnectLoadArgs(['--timeout-ms', '1200'], {
+    CHAT_PHASE7_RECONNECT_TIMEOUT_MS: 'not-a-number',
+  });
+
+  assert.equal(options.timeoutMs, 1200);
+});
+
+test('parseReconnectLoadArgs validates env timeout only when CLI does not override it', () => {
+  assert.throws(
+    () => parseReconnectLoadArgs([], { CHAT_PHASE7_RECONNECT_TIMEOUT_MS: 'not-a-number' }),
+    /CHAT_PHASE7_RECONNECT_TIMEOUT_MS must be a positive integer/,
   );
 });
 
@@ -131,6 +149,28 @@ test('summarizeReconnectAttempts fails release gate on normal reconnect rate lim
   assert.equal(exitCodeForReconnectSummary(summary), 1);
 });
 
+test('summarizeReconnectAttempts does not add handshake gate when no tickets were issued', () => {
+  const summary = summarizeReconnectAttempts([
+    rateLimitedAttempt('nat_proxy', 'rate_limited'),
+    rateLimitedAttempt('nat_proxy', 'rate_limited'),
+  ], {
+    scenario: 'nat-proxy-cohort',
+    durationSeconds: 15,
+    minTicketIssueSuccessRatio: 0.999,
+    minHandshakeSuccessRatio: 0.999,
+    maxRateLimitFailureRatio: 0.001,
+    maxCohortFailureRatio: 0.003,
+  });
+
+  assert.equal(summary.normalReconnectTicketIssued, 0);
+  assert.equal(summary.rates.handshakeSuccessRate, null);
+  assert.deepEqual(summary.failedGates, [
+    'ticket_issue_success_ratio',
+    'rate_limit_failure_ratio',
+    'cohort_failure_ratio:nat_proxy',
+  ]);
+});
+
 test('summarizeReconnectAttempts fails release gate on handshake failures after ticket issue', () => {
   const summary = summarizeReconnectAttempts([
     successAttempt('mobile_carrier'),
@@ -155,6 +195,8 @@ test('summarizeReconnectAttempts fails release gate on handshake failures after 
 });
 
 test('classifyTicketIssueFailure maps HTTP status and body into bounded outcomes', () => {
+  assert.equal(classifyTicketIssueFailure(null), 'failure');
+  assert.equal(classifyTicketIssueFailure(undefined), 'failure');
   assert.equal(
     classifyTicketIssueFailure({ status: 429, body: '{"message":"user rate limit exceeded"}' }),
     'rate_limited_user',
@@ -175,6 +217,54 @@ test('classifyTicketIssueFailure maps HTTP status and body into bounded outcomes
     classifyTicketIssueFailure({ status: 503, body: 'unavailable' }),
     'failure',
   );
+});
+
+test('buildWebSocketSocketOptions includes SNI servername for secure WebSocket URLs', () => {
+  assert.deepEqual(buildWebSocketSocketOptions(new URL('wss://chat.example.com/ws')), {
+    host: 'chat.example.com',
+    port: 443,
+    servername: 'chat.example.com',
+  });
+  assert.deepEqual(buildWebSocketSocketOptions(new URL('ws://localhost:18080/ws')), {
+    host: 'localhost',
+    port: 18080,
+  });
+});
+
+test('validateWebSocketHandshake requires status, upgrade headers, and Sec-WebSocket-Accept', () => {
+  const key = 'phase7-reconnect-key';
+  const accept = crypto
+    .createHash('sha1')
+    .update(`${key}258EAFA5-E914-47DA-95CA-C5AB0DC85B11`)
+    .digest('base64');
+
+  assert.equal(validateWebSocketHandshake([
+    'HTTP/1.1 101 Switching Protocols',
+    'Upgrade: websocket',
+    'Connection: keep-alive, Upgrade',
+    `Sec-WebSocket-Accept: ${accept}`,
+  ].join('\r\n'), key).ok, true);
+
+  assert.deepEqual(validateWebSocketHandshake([
+    'HTTP/1.1 101 Switching Protocols',
+    'Connection: Upgrade',
+    `Sec-WebSocket-Accept: ${accept}`,
+  ].join('\r\n'), key), {
+    ok: false,
+    reason: 'missing_upgrade_header',
+    statusLine: 'HTTP/1.1 101 Switching Protocols',
+  });
+
+  assert.deepEqual(validateWebSocketHandshake([
+    'HTTP/1.1 101 Switching Protocols',
+    'Upgrade: websocket',
+    'Connection: Upgrade',
+    'Sec-WebSocket-Accept: wrong',
+  ].join('\r\n'), key), {
+    ok: false,
+    reason: 'invalid_sec_websocket_accept',
+    statusLine: 'HTTP/1.1 101 Switching Protocols',
+  });
 });
 
 function successAttempt(cohort) {
