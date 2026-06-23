@@ -2,6 +2,44 @@
 
 이 문서는 Phase 7에서 WebSocket one-time ticket, reconnect storm, user/IP rate limit 원자성 기준을 검증하기 위한 synthetic reconnect/load test 시나리오를 정의한다.
 
+## 0. 실행 가능한 Synthetic Runner
+
+이번 슬라이스는 정상 reconnect baseline을 검증하는 runner를 제공한다.
+
+```bash
+node scripts/phase7-reconnect-load.mjs \
+  --scenario baseline-reconnect \
+  --clients 3 \
+  --reconnects-per-client 2 \
+  --cohort synthetic \
+  --reason network_flap
+```
+
+환경 변수:
+
+```text
+CHAT_HTTP_URL=http://localhost/api
+CHAT_WS_URL=ws://localhost/api/ws/chat
+CHAT_PHASE7_RECONNECT_TIMEOUT_MS=15000
+```
+
+주요 옵션:
+
+| 옵션 | 기본값 | 의미 |
+| --- | --- | --- |
+| `--clients` | `3` | synthetic client 수 |
+| `--reconnects-per-client` | `2` | client당 reconnect 시도 수 |
+| `--cohort` | `synthetic` | `direct`, `nat_proxy`, `mobile_carrier`, `synthetic` 중 하나 |
+| `--reason` | `network_flap` | `network_flap`, `gateway_restart`, `gateway_kill`, `deploy`, `unknown` 중 하나 |
+| `--min-ticket-issue-success-ratio` | `0.999` | ticket 발급 성공률 gate |
+| `--min-handshake-success-ratio` | `0.999` | ticket 발급 후 handshake 성공률 gate |
+| `--max-rate-limit-failure-ratio` | `0.001` | 정상 reconnect rate limit 실패율 gate |
+| `--max-cohort-failure-ratio` | `0.003` | cohort별 실패율 gate |
+
+Runner는 source IP를 직접 조작하지 않는다. `cohort`는 summary 분류용 bounded label이며, 실제 NAT/proxy/mobile carrier 재현은 별도 네트워크 구성에서 실행해야 한다.
+
+`POST /ws-tickets`의 `429` 응답이 원인 body를 제공하지 않으면 runner는 세부 원인을 `rate_limited_user`나 `rate_limited_ip`로 나누지 않고 generic `rate_limited`로 분류한다. user/IP 세부 원인은 같은 시간대의 `chat.websocket.ticket.events` 서버 metric을 함께 확인한다.
+
 ## 1. 목표
 
 - 정상 reconnect ticket 발급 성공률을 rolling 15분 기준으로 측정한다.
@@ -280,24 +318,44 @@ Tags:
 
 ```json
 {
-  "scenario": "gateway-hard-kill",
-  "durationSeconds": 900,
-  "normalReconnectAttempts": 10000,
-  "normalReconnectTicketIssued": 9995,
-  "normalReconnectRateLimited": 3,
-  "normalReconnectHandshakeSucceeded": 9990,
-  "normalReconnectHandshakeFailed": 5,
+  "ok": true,
+  "scenario": "baseline-reconnect",
+  "durationSeconds": 12,
+  "normalReconnectAttempts": 6,
+  "normalReconnectTicketIssued": 6,
+  "normalReconnectRateLimited": 0,
+  "normalReconnectHandshakeSucceeded": 6,
+  "normalReconnectHandshakeFailed": 0,
+  "rates": {
+    "ticketIssueSuccessRate": 1,
+    "rateLimitFailureRate": 0,
+    "handshakeSuccessRate": 1
+  },
   "cohorts": {
-    "nat_proxy": {
-      "attempts": 1000,
-      "rateLimited": 2,
-      "failureRate": 0.002
+    "synthetic": {
+      "attempts": 6,
+      "ticketIssued": 6,
+      "rateLimited": 0,
+      "handshakeSucceeded": 6,
+      "handshakeFailed": 0,
+      "failureRate": 0,
+      "rateLimitFailureRate": 0
     }
-  }
+  },
+  "failedGates": []
 }
 ```
 
 이 summary는 Phase 7 release gate 계산의 기준 데이터로 사용한다. 서버 Micrometer metric은 같은 시간대의 backend health와 원인 분석에 사용한다.
+
+`ok=false`일 때 `failedGates`는 다음 이름을 포함할 수 있다.
+
+| Gate | 의미 |
+| --- | --- |
+| `ticket_issue_success_ratio` | 정상 reconnect ticket 발급 성공률이 기준 미만 |
+| `handshake_success_ratio` | ticket 발급 후 WebSocket handshake 성공률이 기준 미만 |
+| `rate_limit_failure_ratio` | 정상 reconnect rate limit 실패율이 기준 초과 |
+| `cohort_failure_ratio:<cohort>` | cohort별 실패율이 기준 초과 |
 
 ## 8. 복잡도
 
