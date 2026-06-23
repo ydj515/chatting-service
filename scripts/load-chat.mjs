@@ -11,6 +11,7 @@ import {
   flattenChatMessages,
   parseLoadChatArgs,
   readJsonResponse,
+  summarizeTakeoverDelivery,
 } from './lib/loadChatPlan.mjs';
 import { RawWebSocketFrameDecoder } from './lib/rawWebSocketFrameDecoder.mjs';
 
@@ -273,7 +274,13 @@ async function main() {
 
   senderWs.close();
   viewers.forEach((viewer) => viewer.close());
-  console.log(JSON.stringify({
+  const takeoverDelivery = options.takeoverDeliverySummary
+    ? summarizeTakeoverDelivery(receivedSamples, {
+      sent,
+      minReceivedRatio: options.minReceivedRatio,
+    })
+    : null;
+  const summary = {
     ok: true,
     roomId: room.id,
     sent,
@@ -281,7 +288,10 @@ async function main() {
     receivedPerViewer: receivedSamples.map((messages) => messages.length),
     minReceivedRatio: options.minReceivedRatio,
     assertedRoomSeqOrder: options.assertRoomSeqOrder,
-  }, null, 2));
+    takeoverDeliverySummary: options.takeoverDeliverySummary,
+    ...(takeoverDelivery ? { takeoverDelivery } : {}),
+  };
+  console.log(JSON.stringify(summary, null, 2));
 }
 
 main().catch((error) => {
