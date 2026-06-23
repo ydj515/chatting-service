@@ -4,6 +4,7 @@ import com.chat.persistence.config.ChatWorkerProperties
 import com.chat.persistence.service.AdminMessageExportWorker
 import com.chat.persistence.service.HotRoomFanoutWorker
 import com.chat.persistence.service.MessageWriterWorker
+import com.chat.persistence.service.RedisStreamLagMonitor
 import com.chat.persistence.service.RoomPolicyWorker
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.mock
@@ -18,12 +19,14 @@ class MessageWorkerSchedulerTest {
         val fanoutWorker = mock(HotRoomFanoutWorker::class.java)
         val exportWorker = mock(AdminMessageExportWorker::class.java)
         val roomPolicyWorker = mock(RoomPolicyWorker::class.java)
+        val redisStreamLagMonitor = mock(RedisStreamLagMonitor::class.java)
         val scheduler = MessageWorkerScheduler(
             workerProperties = ChatWorkerProperties(roles = setOf("message-writer")),
             messageWriterWorker = writerWorker,
             hotRoomFanoutWorker = fanoutWorker,
             adminMessageExportWorker = exportWorker,
             roomPolicyWorker = roomPolicyWorker,
+            redisStreamLagMonitor = redisStreamLagMonitor,
         )
 
         scheduler.pollWriter()
@@ -37,12 +40,14 @@ class MessageWorkerSchedulerTest {
         val fanoutWorker = mock(HotRoomFanoutWorker::class.java)
         val exportWorker = mock(AdminMessageExportWorker::class.java)
         val roomPolicyWorker = mock(RoomPolicyWorker::class.java)
+        val redisStreamLagMonitor = mock(RedisStreamLagMonitor::class.java)
         val scheduler = MessageWorkerScheduler(
             workerProperties = ChatWorkerProperties(roles = setOf("fanout")),
             messageWriterWorker = writerWorker,
             hotRoomFanoutWorker = fanoutWorker,
             adminMessageExportWorker = exportWorker,
             roomPolicyWorker = roomPolicyWorker,
+            redisStreamLagMonitor = redisStreamLagMonitor,
         )
 
         scheduler.pollWriter()
@@ -56,12 +61,14 @@ class MessageWorkerSchedulerTest {
         val fanoutWorker = mock(HotRoomFanoutWorker::class.java)
         val exportWorker = mock(AdminMessageExportWorker::class.java)
         val roomPolicyWorker = mock(RoomPolicyWorker::class.java)
+        val redisStreamLagMonitor = mock(RedisStreamLagMonitor::class.java)
         val scheduler = MessageWorkerScheduler(
             workerProperties = ChatWorkerProperties(roles = setOf("fanout")),
             messageWriterWorker = writerWorker,
             hotRoomFanoutWorker = fanoutWorker,
             adminMessageExportWorker = exportWorker,
             roomPolicyWorker = roomPolicyWorker,
+            redisStreamLagMonitor = redisStreamLagMonitor,
         )
 
         scheduler.pollFanout()
@@ -75,12 +82,14 @@ class MessageWorkerSchedulerTest {
         val fanoutWorker = mock(HotRoomFanoutWorker::class.java)
         val exportWorker = mock(AdminMessageExportWorker::class.java)
         val roomPolicyWorker = mock(RoomPolicyWorker::class.java)
+        val redisStreamLagMonitor = mock(RedisStreamLagMonitor::class.java)
         val scheduler = MessageWorkerScheduler(
             workerProperties = ChatWorkerProperties(roles = setOf("admin-export")),
             messageWriterWorker = writerWorker,
             hotRoomFanoutWorker = fanoutWorker,
             adminMessageExportWorker = exportWorker,
             roomPolicyWorker = roomPolicyWorker,
+            redisStreamLagMonitor = redisStreamLagMonitor,
         )
 
         scheduler.pollAdminExport()
@@ -94,12 +103,14 @@ class MessageWorkerSchedulerTest {
         val fanoutWorker = mock(HotRoomFanoutWorker::class.java)
         val exportWorker = mock(AdminMessageExportWorker::class.java)
         val roomPolicyWorker = mock(RoomPolicyWorker::class.java)
+        val redisStreamLagMonitor = mock(RedisStreamLagMonitor::class.java)
         val scheduler = MessageWorkerScheduler(
             workerProperties = ChatWorkerProperties(roles = setOf("room-policy")),
             messageWriterWorker = writerWorker,
             hotRoomFanoutWorker = fanoutWorker,
             adminMessageExportWorker = exportWorker,
             roomPolicyWorker = roomPolicyWorker,
+            redisStreamLagMonitor = redisStreamLagMonitor,
         )
 
         scheduler.pollRoomPolicy()
@@ -113,16 +124,62 @@ class MessageWorkerSchedulerTest {
         val fanoutWorker = mock(HotRoomFanoutWorker::class.java)
         val exportWorker = mock(AdminMessageExportWorker::class.java)
         val roomPolicyWorker = mock(RoomPolicyWorker::class.java)
+        val redisStreamLagMonitor = mock(RedisStreamLagMonitor::class.java)
         val scheduler = MessageWorkerScheduler(
             workerProperties = ChatWorkerProperties(roles = setOf("fanout")),
             messageWriterWorker = writerWorker,
             hotRoomFanoutWorker = fanoutWorker,
             adminMessageExportWorker = exportWorker,
             roomPolicyWorker = roomPolicyWorker,
+            redisStreamLagMonitor = redisStreamLagMonitor,
         )
 
         scheduler.pollRoomPolicy()
 
         verify(roomPolicyWorker, never()).pollAndApply()
+    }
+
+    @Test
+    fun `redis stream lag monitor가 켜져 있으면 direct lag gauge를 poll한다`() {
+        val writerWorker = mock(MessageWriterWorker::class.java)
+        val fanoutWorker = mock(HotRoomFanoutWorker::class.java)
+        val exportWorker = mock(AdminMessageExportWorker::class.java)
+        val roomPolicyWorker = mock(RoomPolicyWorker::class.java)
+        val redisStreamLagMonitor = mock(RedisStreamLagMonitor::class.java)
+        val scheduler = MessageWorkerScheduler(
+            workerProperties = ChatWorkerProperties(),
+            messageWriterWorker = writerWorker,
+            hotRoomFanoutWorker = fanoutWorker,
+            adminMessageExportWorker = exportWorker,
+            roomPolicyWorker = roomPolicyWorker,
+            redisStreamLagMonitor = redisStreamLagMonitor,
+        )
+
+        scheduler.pollRedisStreamLag()
+
+        verify(redisStreamLagMonitor).poll()
+    }
+
+    @Test
+    fun `redis stream lag monitor가 꺼져 있으면 direct lag gauge를 poll하지 않는다`() {
+        val writerWorker = mock(MessageWriterWorker::class.java)
+        val fanoutWorker = mock(HotRoomFanoutWorker::class.java)
+        val exportWorker = mock(AdminMessageExportWorker::class.java)
+        val roomPolicyWorker = mock(RoomPolicyWorker::class.java)
+        val redisStreamLagMonitor = mock(RedisStreamLagMonitor::class.java)
+        val scheduler = MessageWorkerScheduler(
+            workerProperties = ChatWorkerProperties(
+                redisStreamLag = ChatWorkerProperties.RedisStreamLag(enabled = false),
+            ),
+            messageWriterWorker = writerWorker,
+            hotRoomFanoutWorker = fanoutWorker,
+            adminMessageExportWorker = exportWorker,
+            roomPolicyWorker = roomPolicyWorker,
+            redisStreamLagMonitor = redisStreamLagMonitor,
+        )
+
+        scheduler.pollRedisStreamLag()
+
+        verify(redisStreamLagMonitor, never()).poll()
     }
 }
