@@ -90,19 +90,14 @@ class RedisMessageStreamConsumer(
         return streamKeys.flatMap { streamKey ->
             val pendingMessages = redisTemplate.opsForStream<String, String>()
                 .pending(streamKey, consumerGroup, Range.unbounded<String>(), count)
-            val pendingList = pendingMessages
-                .asSequence()
-                .toList()
+            val pendingList = pendingMessages?.toList() ?: emptyList()
             messageStreamMetrics.recordConsumerRecords(
                 consumerGroup = consumerGroup,
                 source = SOURCE_PENDING_SCANNED,
                 streamShard = keyResolver.parseRoomStreamKey(streamKey)?.streamShard,
                 count = pendingList.size,
             )
-            val claimable = pendingList
-                .asSequence()
-                .filter { it.elapsedTimeSinceLastDelivery.toMillis() >= minIdleMillis }
-                .toList()
+            val claimable = pendingList.filter { it.elapsedTimeSinceLastDelivery.toMillis() >= minIdleMillis }
 
             if (claimable.isEmpty()) {
                 return@flatMap emptyList()

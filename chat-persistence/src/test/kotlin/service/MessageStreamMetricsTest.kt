@@ -15,13 +15,18 @@ class MessageStreamMetricsTest {
         val metrics = MessageStreamMetrics(meterRegistryProvider(meterRegistry))
 
         metrics.recordAppend(streamShard = 3, outcome = "success", durationNanos = 1_000)
+        metrics.recordAppend(streamShard = 3, outcome = "success", durationNanos = 2_000)
 
         val timer = meterRegistry.find("chat.redis.stream.append.latency")
             .tag("stream_shard", "3")
             .tag("outcome", "success")
             .timer()
 
-        assertEquals(1, timer?.count())
+        assertEquals(2, timer?.count())
+        assertEquals(
+            1,
+            meterRegistry.meters.count { meter -> meter.id.name == "chat.redis.stream.append.latency" },
+        )
     }
 
     @Test

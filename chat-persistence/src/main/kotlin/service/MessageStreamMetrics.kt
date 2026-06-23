@@ -5,19 +5,24 @@ import io.micrometer.core.instrument.MeterRegistry
 import io.micrometer.core.instrument.Timer
 import org.springframework.beans.factory.ObjectProvider
 import org.springframework.stereotype.Service
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 
 @Service
 class MessageStreamMetrics(
     private val meterRegistryProvider: ObjectProvider<MeterRegistry>? = null,
 ) {
+    private val appendTimers = ConcurrentHashMap<AppendTimerKey, Timer>()
+
     fun recordAppend(streamShard: Int, outcome: String, durationNanos: Long) {
         meterRegistryProvider?.ifAvailable { registry ->
-            Timer.builder("chat.redis.stream.append.latency")
-                .tag(TAG_STREAM_SHARD, streamShard.toString())
-                .tag(TAG_OUTCOME, outcome)
-                .register(registry)
-                .record(maxOf(durationNanos, 0L), TimeUnit.NANOSECONDS)
+            val timer = appendTimers.computeIfAbsent(AppendTimerKey(registry, streamShard, outcome)) {
+                Timer.builder("chat.redis.stream.append.latency")
+                    .tag(TAG_STREAM_SHARD, streamShard.toString())
+                    .tag(TAG_OUTCOME, outcome)
+                    .register(registry)
+            }
+            timer.record(maxOf(durationNanos, 0L), TimeUnit.NANOSECONDS)
         }
     }
 
@@ -83,4 +88,10 @@ class MessageStreamMetrics(
         private const val TAG_VALUE_UNKNOWN = "unknown"
         private const val TAG_WORKER_ROLE = "worker_role"
     }
+
+    private data class AppendTimerKey(
+        val registry: MeterRegistry,
+        val streamShard: Int,
+        val outcome: String,
+    )
 }
