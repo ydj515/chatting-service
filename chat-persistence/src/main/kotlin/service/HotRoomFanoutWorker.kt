@@ -19,6 +19,7 @@ class HotRoomFanoutWorker(
     private val workerProperties: ChatWorkerProperties,
     private val messageStreamKeyResolver: MessageStreamKeyResolver = MessageStreamKeyResolver(ChatRedisProperties()),
     private val fanoutOwnerLeaseService: FanoutOwnerLeaseService = FanoutOwnerLeaseService.Noop,
+    private val messageStreamMetrics: MessageStreamMetrics = MessageStreamMetrics.Noop,
 ) {
     private val logger = LoggerFactory.getLogger(HotRoomFanoutWorker::class.java)
     private var lastPendingClaimAtMillis = 0L
@@ -49,8 +50,10 @@ class HotRoomFanoutWorker(
 
         var broadcastCount = 0
         records.groupBy { it.streamKey }.forEach { (streamKey, streamRecords) ->
+            val startedAtNanos = System.nanoTime()
             val lease = leasesByStreamKey[streamKey] ?: return@forEach
             if (!fanoutOwnerLeaseService.validate(lease, FanoutOwnerLeaseValidationStage.BEFORE_PUBLISH)) {
+                recordFanoutBatch(streamRecords, OUTCOME_LEASE_LOST, startedAtNanos)
                 logger.warn("Skipped fanout publish for $streamKey because owner lease is no longer valid")
                 return@forEach
             }
@@ -72,6 +75,7 @@ class HotRoomFanoutWorker(
                 broadcastCount += 1
 
                 if (!fanoutOwnerLeaseService.validate(lease, FanoutOwnerLeaseValidationStage.BEFORE_ACK)) {
+                    recordFanoutBatch(streamRecords, OUTCOME_LEASE_LOST, startedAtNanos)
                     logger.warn("Skipped fanout ack for $streamKey because owner lease is no longer valid")
                     return@forEach
                 }
@@ -83,14 +87,17 @@ class HotRoomFanoutWorker(
                         recordId = record.recordId,
                     )
                 }
+                recordFanoutBatch(streamRecords, OUTCOME_SUCCESS, startedAtNanos)
             } catch (e: Exception) {
                 if (!fanoutOwnerLeaseService.validate(lease, FanoutOwnerLeaseValidationStage.BEFORE_ACK)) {
+                    recordFanoutBatch(streamRecords, OUTCOME_LEASE_LOST, startedAtNanos)
                     logger.warn("Skipped fanout failure handling for $streamKey because owner lease is no longer valid")
                     return@forEach
                 }
                 streamRecords.forEach { record ->
                     handleFailure(record, consumerGroup, e)
                 }
+                recordFanoutBatch(streamRecords, OUTCOME_FAILURE, startedAtNanos)
             }
         }
 
@@ -142,6 +149,7 @@ class HotRoomFanoutWorker(
         val reason = throwable.message ?: throwable.javaClass.simpleName
         if (record.deliveryCount >= workerProperties.fanout.maxDeliveryCount) {
             messageStreamConsumer.sendToDeadLetter(record, consumerGroup, reason)
+            messageStreamMetrics.recordDeadLetter(consumerGroup, record.envelope.streamShard)
             messageStreamConsumer.acknowledge(
                 streamKey = record.streamKey,
                 consumerGroup = consumerGroup,
@@ -152,6 +160,19 @@ class HotRoomFanoutWorker(
         }
 
         logger.warn("Fanout failed for ${record.recordId}; record remains pending: $reason")
+    }
+
+    private fun recordFanoutBatch(
+        streamRecords: List<MessageStreamRecord>,
+        outcome: String,
+        startedAtNanos: Long,
+    ) {
+        messageStreamMetrics.recordWorkerBatch(
+            workerRole = ROLE_FANOUT,
+            outcome = outcome,
+            recordCount = streamRecords.size,
+            durationNanos = System.nanoTime() - startedAtNanos,
+        )
     }
 
     private fun MessageStreamEnvelope.toChatMessage(): ChatMessage {
@@ -171,5 +192,12 @@ class HotRoomFanoutWorker(
             chatRoomId = chatRoomId,
             timestamp = createdAt,
         )
+    }
+
+    private companion object {
+        const val OUTCOME_FAILURE = "failure"
+        const val OUTCOME_LEASE_LOST = "lease_lost"
+        const val OUTCOME_SUCCESS = "success"
+        const val ROLE_FANOUT = "fanout"
     }
 }

@@ -13,6 +13,7 @@ class MessageWriterWorker(
     private val messageStreamConsumer: MessageStreamConsumer,
     private val messageWritePort: MessageWritePort,
     private val workerProperties: ChatWorkerProperties,
+    private val messageStreamMetrics: MessageStreamMetrics = MessageStreamMetrics.Noop,
 ) {
     private val logger = LoggerFactory.getLogger(MessageWriterWorker::class.java)
     private var lastPendingClaimAtMillis = 0L
@@ -71,6 +72,7 @@ class MessageWriterWorker(
         val reason = throwable.message ?: throwable.javaClass.simpleName
         if (record.deliveryCount >= workerProperties.writer.maxDeliveryCount) {
             messageStreamConsumer.sendToDeadLetter(record, consumerGroup, reason)
+            messageStreamMetrics.recordDeadLetter(consumerGroup, record.envelope.streamShard)
             messageStreamConsumer.acknowledge(
                 streamKey = record.streamKey,
                 consumerGroup = consumerGroup,
@@ -88,6 +90,7 @@ class MessageWriterWorker(
             return 0
         }
 
+        val startedAtNanos = System.nanoTime()
         return try {
             val result = messageWritePort.write(records.map { it.envelope.toWriteRequest() })
             if (result.outcomes.size != records.size) {
@@ -101,13 +104,26 @@ class MessageWriterWorker(
                 )
             }
             records.forEach { record -> acknowledge(record, consumerGroup) }
+            messageStreamMetrics.recordWorkerBatch(
+                workerRole = ROLE_MESSAGE_WRITER,
+                outcome = OUTCOME_SUCCESS,
+                recordCount = records.size,
+                durationNanos = System.nanoTime() - startedAtNanos,
+            )
             result.writtenCount
         } catch (e: Exception) {
             logger.warn(
                 "Message writer batch failed for ${records.size} records; retrying records individually",
                 e,
             )
-            writeIndividually(records, consumerGroup, e)
+            val writtenCount = writeIndividually(records, consumerGroup, e)
+            messageStreamMetrics.recordWorkerBatch(
+                workerRole = ROLE_MESSAGE_WRITER,
+                outcome = if (writtenCount > 0) OUTCOME_PARTIAL else OUTCOME_FAILURE,
+                recordCount = records.size,
+                durationNanos = System.nanoTime() - startedAtNanos,
+            )
+            writtenCount
         }
     }
 
@@ -162,5 +178,12 @@ class MessageWriterWorker(
             fanoutShard = fanoutShard,
             createdAt = createdAt,
         )
+    }
+
+    private companion object {
+        const val OUTCOME_FAILURE = "failure"
+        const val OUTCOME_PARTIAL = "partial"
+        const val OUTCOME_SUCCESS = "success"
+        const val ROLE_MESSAGE_WRITER = "message-writer"
     }
 }

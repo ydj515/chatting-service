@@ -1,6 +1,7 @@
 package com.chat.persistence.redis
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.chat.persistence.service.MessageStreamMetrics
 import io.lettuce.core.RedisBusyException
 import org.springframework.data.domain.Range
 import org.springframework.data.redis.connection.stream.Consumer
@@ -18,6 +19,7 @@ class RedisMessageStreamConsumer(
     private val redisTemplate: RedisTemplate<String, String>,
     private val objectMapper: ObjectMapper,
     private val keyResolver: MessageStreamKeyResolver,
+    private val messageStreamMetrics: MessageStreamMetrics = MessageStreamMetrics.Noop,
 ) : MessageStreamConsumer {
     private val ensuredConsumerGroups = ConcurrentHashMap.newKeySet<String>()
 
@@ -62,7 +64,7 @@ class RedisMessageStreamConsumer(
             *offsets,
         ) ?: emptyList()
 
-        return records.mapNotNull { record ->
+        val mappedRecords = records.mapNotNull { record ->
             val payload = record.value[FIELD_PAYLOAD] ?: return@mapNotNull null
             MessageStreamRecord(
                 streamKey = record.requiredStream,
@@ -70,6 +72,8 @@ class RedisMessageStreamConsumer(
                 envelope = objectMapper.readValue(payload, MessageStreamEnvelope::class.java),
             )
         }
+        recordConsumerRecords(consumerGroup, SOURCE_NEW, mappedRecords)
+        return mappedRecords
     }
 
     override fun claimPending(
@@ -86,7 +90,16 @@ class RedisMessageStreamConsumer(
         return streamKeys.flatMap { streamKey ->
             val pendingMessages = redisTemplate.opsForStream<String, String>()
                 .pending(streamKey, consumerGroup, Range.unbounded<String>(), count)
-            val claimable = pendingMessages
+            val pendingList = pendingMessages
+                .asSequence()
+                .toList()
+            messageStreamMetrics.recordConsumerRecords(
+                consumerGroup = consumerGroup,
+                source = SOURCE_PENDING_SCANNED,
+                streamShard = keyResolver.parseRoomStreamKey(streamKey)?.streamShard,
+                count = pendingList.size,
+            )
+            val claimable = pendingList
                 .asSequence()
                 .filter { it.elapsedTimeSinceLastDelivery.toMillis() >= minIdleMillis }
                 .toList()
@@ -105,7 +118,7 @@ class RedisMessageStreamConsumer(
                 *ids,
             )
 
-            claimedRecords.mapNotNull { record ->
+            val mappedRecords = claimedRecords.mapNotNull { record ->
                 val payload = record.value[FIELD_PAYLOAD] ?: return@mapNotNull null
                 MessageStreamRecord(
                     streamKey = record.requiredStream,
@@ -114,6 +127,8 @@ class RedisMessageStreamConsumer(
                     deliveryCount = deliveryCountsById[record.id.value] ?: 1,
                 )
             }
+            recordConsumerRecords(consumerGroup, SOURCE_PENDING_CLAIMED, mappedRecords)
+            mappedRecords
         }
     }
 
@@ -140,6 +155,24 @@ class RedisMessageStreamConsumer(
         )
     }
 
+    private fun recordConsumerRecords(
+        consumerGroup: String,
+        source: String,
+        records: List<MessageStreamRecord>,
+    ) {
+        records
+            .groupingBy { it.envelope.streamShard }
+            .eachCount()
+            .forEach { (streamShard, count) ->
+                messageStreamMetrics.recordConsumerRecords(
+                    consumerGroup = consumerGroup,
+                    source = source,
+                    streamShard = streamShard,
+                    count = count,
+                )
+            }
+    }
+
     private companion object {
         const val FIELD_PAYLOAD = "payload"
         const val FIELD_SOURCE_STREAM_KEY = "sourceStreamKey"
@@ -147,6 +180,9 @@ class RedisMessageStreamConsumer(
         const val FIELD_CONSUMER_GROUP = "consumerGroup"
         const val FIELD_DELIVERY_COUNT = "deliveryCount"
         const val FIELD_REASON = "reason"
+        const val SOURCE_NEW = "new"
+        const val SOURCE_PENDING_CLAIMED = "pending_claimed"
+        const val SOURCE_PENDING_SCANNED = "pending_scanned"
 
         fun isBusyGroup(throwable: Throwable): Boolean {
             var current: Throwable? = throwable

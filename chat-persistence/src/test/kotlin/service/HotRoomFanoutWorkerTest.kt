@@ -7,13 +7,17 @@ import com.chat.persistence.redis.MessageStreamConsumer
 import com.chat.persistence.redis.MessageStreamEnvelope
 import com.chat.persistence.redis.MessageStreamRecord
 import com.chat.persistence.redis.RedisMessageBroker
+import io.micrometer.core.instrument.MeterRegistry
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentCaptor
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.verifyNoInteractions
+import org.springframework.beans.factory.ObjectProvider
 import java.time.LocalDateTime
+import java.util.stream.Stream
 
 class HotRoomFanoutWorkerTest {
 
@@ -209,6 +213,41 @@ class HotRoomFanoutWorkerTest {
         )
     }
 
+    @Test
+    fun `fanout worker는 처리 latency와 record outcome metric을 기록한다`() {
+        val meterRegistry = SimpleMeterRegistry()
+        val consumer = FakeMessageStreamConsumer(
+            records = listOf(streamRecord(recordId = "1749790000000-0", roomSeq = 12L)),
+        )
+        val redisMessageBroker = mock(RedisMessageBroker::class.java)
+        val worker = HotRoomFanoutWorker(
+            messageStreamConsumer = consumer,
+            redisMessageBroker = redisMessageBroker,
+            workerProperties = ChatWorkerProperties(
+                consumerName = "worker-1",
+                fanout = ChatWorkerProperties.StreamConsumer(
+                    consumerGroup = "fanout",
+                    readCount = 10,
+                ),
+            ),
+            messageStreamMetrics = MessageStreamMetrics(meterRegistryProvider(meterRegistry)),
+        )
+
+        worker.pollAndFanout()
+
+        val timer = meterRegistry.find("chat.redis.stream.worker.batch.latency")
+            .tag("worker_role", "fanout")
+            .tag("outcome", "success")
+            .timer()
+        val counter = meterRegistry.find("chat.redis.stream.worker.records")
+            .tag("worker_role", "fanout")
+            .tag("outcome", "success")
+            .counter()
+
+        assertEquals(1, timer?.count())
+        assertEquals(1.0, counter?.count())
+    }
+
     private fun streamRecord(recordId: String, roomSeq: Long): MessageStreamRecord {
         return MessageStreamRecord(
             streamKey = "chat:stream:room:10:shard:0",
@@ -317,4 +356,16 @@ class HotRoomFanoutWorkerTest {
 
     @Suppress("UNCHECKED_CAST")
     private fun <T> uninitialized(): T = null as T
+
+    private fun meterRegistryProvider(meterRegistry: MeterRegistry): ObjectProvider<MeterRegistry> {
+        return object : ObjectProvider<MeterRegistry> {
+            override fun getObject(): MeterRegistry = meterRegistry
+            override fun getObject(vararg args: Any?): MeterRegistry = meterRegistry
+            override fun getIfAvailable(): MeterRegistry = meterRegistry
+            override fun getIfUnique(): MeterRegistry = meterRegistry
+            override fun iterator(): MutableIterator<MeterRegistry> = mutableListOf(meterRegistry).iterator()
+            override fun stream(): Stream<MeterRegistry> = Stream.of(meterRegistry)
+            override fun orderedStream(): Stream<MeterRegistry> = Stream.of(meterRegistry)
+        }
+    }
 }
