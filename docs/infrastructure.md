@@ -140,4 +140,5 @@ mise run verify:chat
 | [redis_cluster_key_naming.md](./redis_cluster_key_naming.md) | Redis Cluster key naming, hash slot, hash tag 정책 |
 | [observability_metrics.md](./observability_metrics.md) | Phase 7 dashboard metric, alert, cardinality 정책 |
 | [phase7_reconnect_load_test_scenarios.md](./phase7_reconnect_load_test_scenarios.md) | 정상 reconnect 실패율과 ticket rate limit 원자성 판단용 synthetic load test 시나리오 |
+| [phase7_admin_search_latency_gate.md](./phase7_admin_search_latency_gate.md) | 관리자 검색 warm p95와 cold p99 release gate 측정 절차 |
 | [architecture_overview.md](./architecture_overview.md) | 분산 웹소켓 서버 아키텍처 및 실시간 채팅 데이터 흐름 (Mermaid 다이어그램) |

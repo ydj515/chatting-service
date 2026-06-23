@@ -29,3 +29,16 @@ export function buildRequestPlans({ baseUrl, scenario, roomId, query, searchMode
 
   return plans;
 }
+
+export function buildGatePhases(gate) {
+  if (gate === 'warm') {
+    return ['warm'];
+  }
+  if (gate === 'cold') {
+    return ['cold'];
+  }
+  if (gate === 'both') {
+    return ['cold', 'warm'];
+  }
+  throw new Error('gate must be one of warm, cold, both.');
+}
