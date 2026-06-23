@@ -20,7 +20,13 @@ test('parseChaosArgs defaults to dry-run with env-backed endpoints', () => {
   assert.equal(options.restore, true);
   assert.equal(options.baseUrl, 'http://localhost:8088');
   assert.equal(options.metricsUrl, 'http://localhost:8088/actuator/prometheus');
+  // worker-kill 시나리오 기본 required check
   assert.deepEqual(options.checks, ['health', 'functional', 'lag']);
+});
+
+test('parseChaosArgs falls back to the scenario default checks (lag excluded for gateway)', () => {
+  const options = parseChaosArgs(['--scenario', 'gateway-kill'], {});
+  assert.deepEqual(options.checks, ['health', 'functional']);
 });
 
 test('parseChaosArgs maps CLI flags over defaults', () => {
@@ -68,6 +74,12 @@ test('buildChaosScenario maps each known scenario to a default target and inject
   assert.equal(buildChaosScenario({ scenario: 'redis-restart' }).target, 'redis');
   assert.equal(buildChaosScenario({ scenario: 'redis-restart' }).injectAction, 'restart');
   assert.equal(buildChaosScenario({ scenario: 'replica-kill' }).target, 'postgres-replica');
+});
+
+test('buildChaosScenario exposes required checks per scenario', () => {
+  assert.deepEqual(buildChaosScenario({ scenario: 'worker-kill' }).requiredChecks, ['health', 'functional', 'lag']);
+  assert.deepEqual(buildChaosScenario({ scenario: 'gateway-kill' }).requiredChecks, ['health', 'functional']);
+  assert.deepEqual(buildChaosScenario({ scenario: 'replica-kill' }).requiredChecks, ['health', 'functional']);
 });
 
 test('buildChaosScenario honors target and slo overrides', () => {

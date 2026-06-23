@@ -36,7 +36,7 @@ CHAT_PHASE7_CHAOS_POLL_INTERVAL_MS=1000
 | `--no-restore` | (off) | kill 시나리오에서 컨테이너 자동 복구(`docker start`)를 건너뜀 |
 | `--recovery-timeout-ms` | `30000` | 복구 폴링 최대 시간 |
 | `--scenario-slo-ms` | 시나리오 기본 SLO | 복구 시간 SLO 오버라이드 |
-| `--checks` | `health,functional,lag` | 실행할 복구 체크 목록 |
+| `--checks` | 시나리오별 기본 required check | 실행할 복구 체크 목록. 미지정 시 시나리오 기본값을 쓴다 |
 | `--lag-threshold` | `0` | lag gauge 복구 판정 임계값 |
 | `--pending-threshold` | `0` | pending gauge 복구 판정 임계값 |
 | `--json` | (off) | summary를 한 줄 JSON으로 출력 |
@@ -53,6 +53,15 @@ CHAT_PHASE7_CHAOS_POLL_INTERVAL_MS=1000
 | `replica-kill` | `postgres-replica` | `docker kill` | read 경로 degrade 후 복귀한다 |
 
 `kill` 시나리오는 `--no-restore`가 아니면 주입 후 `docker start`로 컨테이너를 복귀시킨다. `restart`는 컨테이너를 그대로 되살리므로 별도 복구가 필요 없다.
+
+시나리오별 기본 required check는 다음과 같다. lag/pending은 Redis Streams 전용 metric이므로 Redis 경로를 다루는 시나리오에만 required로 둔다. `--checks`로 추가한 비관련 체크는 optional로 실행되어 release gate를 블로킹하지 않는다.
+
+| 시나리오 | 기본 required check |
+| --- | --- |
+| `gateway-kill` | `health`, `functional` |
+| `worker-kill` | `health`, `functional`, `lag` |
+| `redis-restart` | `health`, `functional`, `lag` |
+| `replica-kill` | `health`, `functional` |
 
 ## 2. 수동 절차 (runner 없이)
 

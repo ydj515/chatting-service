@@ -18,7 +18,15 @@ const POLL_INTERVAL_MS = Number(process.env.CHAT_PHASE7_CHAOS_POLL_INTERVAL_MS ?
 const DOCKER_TIMEOUT_MS = Number(process.env.CHAT_PHASE7_CHAOS_DOCKER_TIMEOUT_MS ?? 30000);
 
 async function main() {
-  const options = parseChaosArgs(process.argv.slice(2));
+  let options;
+  try {
+    options = parseChaosArgs(process.argv.slice(2));
+  } catch (error) {
+    // 사용법/인자 오류는 exit code 2로 구분한다(런타임 실패는 1).
+    console.error(error.message);
+    process.exitCode = 2;
+    return;
+  }
   const scenario = buildChaosScenario(options);
 
   if (!options.execute) {
@@ -70,23 +78,32 @@ async function main() {
 }
 
 async function pollRecovery({ options, scenario, startedAt }) {
-  const pending = new Map(options.checks.map((check) => [check, { check, required: true, recovered: false, lastValue: undefined }]));
+  // required 여부는 시나리오 정의를 따른다. 사용자가 --checks로 추가한 비관련 체크는
+  // optional로 두어 release gate를 블로킹하지 않는다.
+  const pending = new Map(
+    options.checks.map((check) => [
+      check,
+      { check, required: scenario.requiredChecks.includes(check), recovered: false, lastValue: undefined },
+    ]),
+  );
   const deadline = startedAt + options.recoveryTimeoutMs;
 
   while (Date.now() < deadline && [...pending.values()].some((entry) => !entry.recovered)) {
-    for (const entry of pending.values()) {
-      if (entry.recovered) {
-        continue;
-      }
-      const observation = await probeCheck(entry.check, options, scenario);
-      if (observation.lastValue !== undefined) {
-        entry.lastValue = observation.lastValue;
-      }
-      if (observation.recovered) {
-        entry.recovered = true;
-        entry.elapsedMs = Date.now() - startedAt;
-      }
-    }
+    // 느린 probe가 다른 probe와 poll 주기를 막지 않도록 병렬로 실행한다.
+    await Promise.all(
+      [...pending.values()]
+        .filter((entry) => !entry.recovered)
+        .map(async (entry) => {
+          const observation = await probeCheck(entry.check, options, scenario);
+          if (observation.lastValue !== undefined) {
+            entry.lastValue = observation.lastValue;
+          }
+          if (observation.recovered) {
+            entry.recovered = true;
+            entry.elapsedMs = Date.now() - startedAt;
+          }
+        }),
+    );
     if ([...pending.values()].every((entry) => entry.recovered)) {
       break;
     }
@@ -127,8 +144,15 @@ async function probeHealth(options) {
 async function probeLag(options) {
   const url = options.metricsUrl ?? `${options.baseUrl}/api/actuator/prometheus`;
   const text = await fetchText(url, options.recoveryTimeoutMs);
+  if (!text) {
+    return { recovered: false };
+  }
   const lag = maxMetricValue(text, 'chat_redis_stream_group_lag');
   const pending = maxMetricValue(text, 'chat_redis_stream_group_pending');
+  // metric 자체가 없으면(컨테이너 다운, 502 HTML 등) 0으로 오판하지 않고 복구 실패로 본다.
+  if (lag === null || pending === null) {
+    return { recovered: false };
+  }
   const lagOk = lag <= options.lagThreshold;
   const pendingOk = pending <= options.pendingThreshold;
   return { recovered: lagOk && pendingOk, lastValue: Math.max(lag, pending) };
@@ -137,25 +161,33 @@ async function probeLag(options) {
 async function probeFunctional(options) {
   // 기존 verify-chat.mjs를 synthetic 메시지 송신→수신 probe로 재사용한다.
   const script = fileURLToPath(new URL('./verify-chat.mjs', import.meta.url));
-  const status = await runScriptStatus(process.execPath, [script], {
-    ...process.env,
-    CHAT_HTTP_URL: process.env.CHAT_HTTP_URL ?? `${options.baseUrl}/api`,
-  });
+  const status = await runScriptStatus(
+    process.execPath,
+    [script],
+    {
+      ...process.env,
+      CHAT_HTTP_URL: process.env.CHAT_HTTP_URL ?? `${options.baseUrl}/api`,
+    },
+    options.recoveryTimeoutMs,
+  );
   return { recovered: status === 0 };
 }
 
 function maxMetricValue(prometheusText, metricName) {
   let max = 0;
+  let found = false;
   for (const line of prometheusText.split(/\r?\n/)) {
     if (!line.startsWith(metricName)) {
       continue;
     }
     const value = Number(line.slice(line.lastIndexOf(' ') + 1));
     if (Number.isFinite(value)) {
-      max = Math.max(max, value);
+      max = found ? Math.max(max, value) : value;
+      found = true;
     }
   }
-  return max;
+  // metric line이 하나도 없으면 0이 아니라 null을 반환해 복구 오탐을 막는다.
+  return found ? max : null;
 }
 
 function resolveContainerId(service) {
@@ -174,12 +206,21 @@ function runDocker(args) {
   execFileSync('docker', args, { stdio: ['ignore', 'inherit', 'inherit'], timeout: DOCKER_TIMEOUT_MS });
 }
 
-function runScriptStatus(command, args, env) {
-  // verify-chat는 자체 timeout(CHAT_VERIFY_TIMEOUT_MS)을 가지므로 여기서는 종료 코드만 기다린다.
+function runScriptStatus(command, args, env, timeoutMs) {
+  // verify-chat는 자체 timeout(CHAT_VERIFY_TIMEOUT_MS)을 갖지만, 자식이 끝나지 않아도
+  // poll 주기를 넘기지 않도록 여기서도 상한 timeout으로 강제 종료한다.
+  // stderr는 inherit해 functional 실패 원인을 로그로 확인할 수 있게 한다.
   return new Promise((resolve) => {
-    const child = spawn(command, args, { env, stdio: ['ignore', 'ignore', 'ignore'] });
-    child.on('exit', (code) => resolve(code ?? 1));
-    child.on('error', () => resolve(1));
+    const child = spawn(command, args, { env, stdio: ['ignore', 'ignore', 'inherit'] });
+    const timer = setTimeout(() => child.kill('SIGTERM'), timeoutMs);
+    child.on('exit', (code) => {
+      clearTimeout(timer);
+      resolve(code ?? 1);
+    });
+    child.on('error', () => {
+      clearTimeout(timer);
+      resolve(1);
+    });
   });
 }
 
@@ -215,6 +256,7 @@ function printSummary(summary, options) {
 }
 
 main().catch((error) => {
+  // 인자 파싱 이후의 런타임 실패(docker/probe 등)는 exit code 1로 본다.
   console.error(error.message);
-  process.exitCode = 2;
+  process.exitCode = 1;
 });

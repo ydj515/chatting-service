@@ -73,6 +73,8 @@ node scripts/phase7-chaos-runner.mjs --scenario worker-kill --execute \
 | `lag` | `actuator/prometheus`에서 `chat.redis.stream.group.lag`/`.pending` scrape | threshold 이하로 회복 |
 | `recovery-slo` | required 체크 전부 pass까지의 wall-clock | scenario SLO 이내 |
 
+required 체크는 시나리오별로 정의한다. lag/pending은 Redis Streams 전용 metric이므로 Redis 경로를 다루는 `worker-kill`/`redis-restart`에만 required로 두고, `gateway-kill`/`replica-kill`에서는 `health`/`functional`만 required로 둔다. `--checks`로 추가한 비관련 체크는 optional로 실행되어 gate를 블로킹하지 않는다.
+
 aggregate `releaseBlocking = true` ⟺ required 체크 중 하나라도 fail 또는 SLO 초과. 각 체크 결과는 summary에 개별 표기하여 부분 복구(예: health만 복구, lag 미복구)를 구분한다.
 
 ### Summary JSON / exit code

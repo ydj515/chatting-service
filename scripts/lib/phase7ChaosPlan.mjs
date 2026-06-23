@@ -4,11 +4,14 @@
 
 const KNOWN_CHECKS = ['health', 'functional', 'lag'];
 
+// 시나리오별 required check를 정의한다. lag/pending은 Redis Streams 전용 metric이므로
+// Redis 경로를 다루는 시나리오에만 required로 둔다. gateway/replica 시나리오에서 lag를
+// required로 두면 무관한 metric으로 release gate가 오탐될 수 있다.
 const SCENARIOS = {
-  'gateway-kill': { target: 'chat-websocket-app-1', injectAction: 'kill', sloMs: 30000 },
-  'worker-kill': { target: 'chat-worker-app-1', injectAction: 'kill', sloMs: 30000 },
-  'redis-restart': { target: 'redis', injectAction: 'restart', sloMs: 20000 },
-  'replica-kill': { target: 'postgres-replica', injectAction: 'kill', sloMs: 30000 },
+  'gateway-kill': { target: 'chat-websocket-app-1', injectAction: 'kill', sloMs: 30000, checks: ['health', 'functional'] },
+  'worker-kill': { target: 'chat-worker-app-1', injectAction: 'kill', sloMs: 30000, checks: ['health', 'functional', 'lag'] },
+  'redis-restart': { target: 'redis', injectAction: 'restart', sloMs: 20000, checks: ['health', 'functional', 'lag'] },
+  'replica-kill': { target: 'postgres-replica', injectAction: 'kill', sloMs: 30000, checks: ['health', 'functional'] },
 };
 
 export function parseChaosArgs(argv, env = process.env) {
@@ -19,7 +22,7 @@ export function parseChaosArgs(argv, env = process.env) {
     restore: true,
     recoveryTimeoutMs: positiveInteger(env.CHAT_PHASE7_CHAOS_RECOVERY_TIMEOUT_MS ?? '30000', 'recovery-timeout-ms'),
     scenarioSloMs: null,
-    checks: [...KNOWN_CHECKS],
+    checks: null,
     lagThreshold: 0,
     pendingThreshold: 0,
     baseUrl: normalizeBaseUrl(env.CHAT_PHASE7_BASE_URL ?? 'http://localhost'),
@@ -78,6 +81,11 @@ export function parseChaosArgs(argv, env = process.env) {
     throw new Error(`Unknown scenario: ${options.scenario}`);
   }
 
+  // --checks 미지정 시 시나리오별 required check를 기본값으로 쓴다.
+  if (options.checks === null) {
+    options.checks = [...SCENARIOS[options.scenario].checks];
+  }
+
   return options;
 }
 
@@ -91,6 +99,7 @@ export function buildChaosScenario({ scenario, target, scenarioSloMs }) {
     target: target ?? definition.target,
     injectAction: definition.injectAction,
     sloMs: scenarioSloMs ?? definition.sloMs,
+    requiredChecks: [...definition.checks],
   };
 }
 
