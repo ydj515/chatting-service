@@ -5,9 +5,13 @@ import com.chat.persistence.config.ChatRedisProperties
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
 import com.fasterxml.jackson.module.kotlin.KotlinModule
+import com.chat.persistence.service.MessageStreamMetrics
+import io.micrometer.core.instrument.MeterRegistry
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import org.springframework.beans.factory.ObjectProvider
 import org.mockito.ArgumentCaptor
 import org.mockito.ArgumentMatchers.eq
 import org.mockito.Mockito.mock
@@ -19,6 +23,7 @@ import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.data.redis.core.SetOperations
 import org.springframework.data.redis.core.StreamOperations
 import java.time.LocalDateTime
+import java.util.stream.Stream
 
 class RedisMessageStreamProducerTest {
 
@@ -116,6 +121,35 @@ class RedisMessageStreamProducerTest {
         verify(streamOperations, times(2)).add(eq("chat:stream:room:42:shard:3"), anyStringMap())
     }
 
+    @Test
+    fun `stream append latency metric은 shard와 outcome만 tag로 기록한다`() {
+        val redisTemplate = redisTemplate()
+        val streamOperations = streamOperations()
+        val setOperations = setOperations()
+        val meterRegistry = SimpleMeterRegistry()
+        `when`(redisTemplate.opsForStream<String, String>()).thenReturn(streamOperations)
+        `when`(redisTemplate.opsForSet()).thenReturn(setOperations)
+        `when`(streamOperations.add(eq("chat:stream:room:42:shard:3"), anyStringMap()))
+            .thenReturn(RecordId.of("1749790000000-0"))
+
+        val producer = RedisMessageStreamProducer(
+            redisTemplate = redisTemplate,
+            objectMapper = objectMapper(),
+            redisProperties = ChatRedisProperties(),
+            keyResolver = MessageStreamKeyResolver(ChatRedisProperties()),
+            messageStreamMetrics = MessageStreamMetrics(meterRegistryProvider(meterRegistry)),
+        )
+
+        producer.append(envelope())
+
+        val timer = meterRegistry.find("chat.redis.stream.append.latency")
+            .tag("stream_shard", "3")
+            .tag("outcome", "success")
+            .timer()
+
+        assertEquals(1, timer?.count())
+    }
+
     @Suppress("UNCHECKED_CAST")
     private fun redisTemplate(): RedisTemplate<String, String> {
         return mock(RedisTemplate::class.java) as RedisTemplate<String, String>
@@ -148,4 +182,40 @@ class RedisMessageStreamProducerTest {
 
     @Suppress("UNCHECKED_CAST")
     private fun <T> uninitialized(): T = null as T
+
+    private fun objectMapper(): ObjectMapper {
+        return ObjectMapper()
+            .registerModule(JavaTimeModule())
+            .registerModule(KotlinModule.Builder().build())
+    }
+
+    private fun envelope(): MessageStreamEnvelope {
+        return MessageStreamEnvelope(
+            messageId = "msg-1",
+            clientMessageId = "client-1",
+            chatRoomId = 42L,
+            senderId = 7L,
+            senderName = "User 7",
+            messageType = MessageType.TEXT,
+            content = "hello",
+            sequenceNumber = 11L,
+            roomSeq = 11L,
+            streamShard = 3,
+            writeShard = 4,
+            fanoutShard = 5,
+            createdAt = LocalDateTime.parse("2026-06-13T12:00:00"),
+        )
+    }
+
+    private fun meterRegistryProvider(meterRegistry: MeterRegistry): ObjectProvider<MeterRegistry> {
+        return object : ObjectProvider<MeterRegistry> {
+            override fun getObject(): MeterRegistry = meterRegistry
+            override fun getObject(vararg args: Any?): MeterRegistry = meterRegistry
+            override fun getIfAvailable(): MeterRegistry = meterRegistry
+            override fun getIfUnique(): MeterRegistry = meterRegistry
+            override fun iterator(): MutableIterator<MeterRegistry> = mutableListOf(meterRegistry).iterator()
+            override fun stream(): Stream<MeterRegistry> = Stream.of(meterRegistry)
+            override fun orderedStream(): Stream<MeterRegistry> = Stream.of(meterRegistry)
+        }
+    }
 }
