@@ -87,3 +87,22 @@ test('summarizeGateReport returns ok false with stable failed gate names', () =>
   assert.equal(report.ok, false);
   assert.deepEqual(report.failedGates, ['admin_search_cold_p99:search']);
 });
+
+test('summarizeGateReport handles missing gate result fields defensively', () => {
+  const report = summarizeGateReport([
+    {
+      name: 'history',
+    },
+    {
+      name: 'search',
+      gateResults: [
+        {
+          gate: 'cold',
+        },
+      ],
+    },
+  ]);
+
+  assert.equal(report.ok, false);
+  assert.deepEqual(report.failedGates, ['admin_search_cold_unknown:search']);
+});

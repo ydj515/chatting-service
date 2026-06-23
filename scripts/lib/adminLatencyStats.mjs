@@ -49,11 +49,11 @@ export function summarizeGateSamples(samples, { gate, targetMs }) {
 
 export function summarizeGateReport(results) {
   const failedGates = results.flatMap((result) =>
-    result.gateResults
-      .filter((gateResult) => !gateResult.summary.passedTarget)
+    (result.gateResults ?? [])
+      .filter((gateResult) => !gateResult.summary?.passedTarget)
       .map((gateResult) => {
-        const percentileName = gateResult.summary.targetMetric.replace('Ms', '');
-        return `admin_search_${gateResult.gate}_${percentileName}:${result.name}`;
+        const percentileName = gateResult.summary?.targetMetric?.replace('Ms', '') ?? 'unknown';
+        return `admin_search_${gateResult.gate ?? 'unknown'}_${percentileName}:${result.name}`;
       }),
   );
 
