@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import crypto from 'node:crypto';
+import fs from 'node:fs/promises';
 import net from 'node:net';
 import tls from 'node:tls';
 import { URL } from 'node:url';
@@ -171,6 +172,15 @@ async function main() {
     const user = await registerUser(`reconn_${index}`, options.timeoutMs);
     const login = await loginUser(user, options.timeoutMs);
     clients.push({ user, login });
+  }
+
+  if (options.readyFile) {
+    // chaos orchestrator가 storm 시작 시점에 맞춰 gateway 장애를 주입할 수 있도록,
+    // 등록을 끝내고 attempt phase를 시작하기 직전에 ready 신호를 남긴다.
+    await fs.writeFile(
+      options.readyFile,
+      JSON.stringify({ startedAt: Date.now(), clients: options.clients }),
+    );
   }
 
   const attemptPlan = buildReconnectAttemptPlan(options);

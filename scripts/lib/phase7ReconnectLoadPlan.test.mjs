@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import { test } from 'node:test';
 import {
+  RECONNECT_COHORTS,
+  RECONNECT_REASONS,
   buildReconnectAttemptPlan,
   buildWebSocketSocketOptions,
   classifyTicketIssueFailure,
@@ -52,7 +54,21 @@ test('parseReconnectLoadArgs maps CLI values over defaults', () => {
     maxRateLimitFailureRatio: 0.02,
     maxCohortFailureRatio: 0.03,
     timeoutMs: 4000,
+    readyFile: null,
   });
+});
+
+test('parseReconnectLoadArgs parses --ready-file and defaults it to null', () => {
+  const withReadyFile = parseReconnectLoadArgs(['--ready-file', '/tmp/storm-ready.json'], {});
+  assert.equal(withReadyFile.readyFile, '/tmp/storm-ready.json');
+
+  const withoutReadyFile = parseReconnectLoadArgs([], {});
+  assert.equal(withoutReadyFile.readyFile, null);
+});
+
+test('RECONNECT_COHORTS and RECONNECT_REASONS expose the bounded enums', () => {
+  assert.deepEqual(RECONNECT_COHORTS, ['direct', 'nat_proxy', 'mobile_carrier', 'synthetic']);
+  assert.deepEqual(RECONNECT_REASONS, ['network_flap', 'gateway_restart', 'gateway_kill', 'deploy', 'unknown']);
 });
 
 test('parseReconnectLoadArgs rejects unknown cohort and invalid ratios', () => {

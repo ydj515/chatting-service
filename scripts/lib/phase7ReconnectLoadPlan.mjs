@@ -4,6 +4,10 @@ const COHORTS = ['direct', 'nat_proxy', 'mobile_carrier', 'synthetic'];
 const REASONS = ['network_flap', 'gateway_restart', 'gateway_kill', 'deploy', 'unknown'];
 const WEB_SOCKET_GUID = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
 
+// chaos orchestrator가 같은 bounded enum으로 cohort/reason을 검증할 수 있도록 노출한다.
+export const RECONNECT_COHORTS = COHORTS;
+export const RECONNECT_REASONS = REASONS;
+
 export function parseReconnectLoadArgs(argv, env = process.env) {
   let timeoutMsName = 'CHAT_PHASE7_RECONNECT_TIMEOUT_MS';
   const options = {
@@ -19,6 +23,8 @@ export function parseReconnectLoadArgs(argv, env = process.env) {
     maxRateLimitFailureRatio: 0.001,
     maxCohortFailureRatio: 0.003,
     timeoutMs: env.CHAT_PHASE7_RECONNECT_TIMEOUT_MS ?? '15000',
+    // chaos orchestrator가 storm 시작 시점을 감지하도록, 등록 완료 후 이 파일에 신호를 쓴다.
+    readyFile: null,
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -54,6 +60,8 @@ export function parseReconnectLoadArgs(argv, env = process.env) {
     } else if (arg === '--timeout-ms') {
       options.timeoutMs = value;
       timeoutMsName = arg;
+    } else if (arg === '--ready-file') {
+      options.readyFile = value;
     } else {
       throw new Error(`Unknown argument: ${arg}`);
     }
