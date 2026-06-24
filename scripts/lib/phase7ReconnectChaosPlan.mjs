@@ -182,7 +182,10 @@ export function summarizeReconnectChaos({
 }) {
   const reconnect = reconnectSummary ?? null;
   const recoveryElapsed = dryRun ? null : (recoveryElapsedMs ?? null);
-  const recoverySloMet = dryRun || recoveryElapsed === null || maxRecoverySloMs == null
+  const recoverySloMet = dryRun
+    || recoveryElapsed === null
+    || maxRecoverySloMs === null
+    || maxRecoverySloMs === undefined
     ? true
     : recoveryElapsed <= maxRecoverySloMs;
   const failedGates = [
