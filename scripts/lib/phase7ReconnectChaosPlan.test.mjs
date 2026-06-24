@@ -28,6 +28,7 @@ test('parseReconnectChaosArgs defaults rolling-restart to both replicas and gate
   assert.equal(options.rollingStepDelayMs, 2000);
   assert.equal(options.injectAfterMs, 0);
   assert.equal(options.readyTimeoutMs, 60000);
+  assert.equal(options.maxRecoverySloMs, 30000);
   assert.equal(options.json, false);
   // reconnect pass-through chaos defaults
   assert.equal(options.clients, 5);
@@ -59,6 +60,7 @@ test('parseReconnectChaosArgs maps orchestration and pass-through overrides', ()
     '--rolling-step-delay-ms', '500',
     '--inject-after-ms', '750',
     '--ready-timeout-ms', '30000',
+    '--max-recovery-slo-ms', '12000',
     '--clients', '8',
     '--reconnects-per-client', '10',
     '--attempt-spacing-ms', '300',
@@ -79,6 +81,7 @@ test('parseReconnectChaosArgs maps orchestration and pass-through overrides', ()
   assert.equal(options.rollingStepDelayMs, 500);
   assert.equal(options.injectAfterMs, 750);
   assert.equal(options.readyTimeoutMs, 30000);
+  assert.equal(options.maxRecoverySloMs, 12000);
   assert.equal(options.clients, 8);
   assert.equal(options.reconnectsPerClient, 10);
   assert.equal(options.attemptSpacingMs, 300);
@@ -100,6 +103,7 @@ test('parseReconnectChaosArgs rejects empty gateways, bad cohort/reason, and unk
   assert.throws(() => parseReconnectChaosArgs(['--fault', 'gateway-hard-kill', '--oops', 'x']), /Unknown argument/);
   assert.throws(() => parseReconnectChaosArgs(['--fault', 'gateway-hard-kill', '--clients', '0']), /--clients must be a positive integer/);
   assert.throws(() => parseReconnectChaosArgs(['--fault', 'gateway-hard-kill', '--inject-after-ms', '-1']), /--inject-after-ms must be a non-negative integer/);
+  assert.throws(() => parseReconnectChaosArgs(['--fault', 'gateway-hard-kill', '--max-recovery-slo-ms', '0']), /--max-recovery-slo-ms must be a positive integer/);
   assert.throws(() => parseReconnectChaosArgs(['--fault', 'gateway-hard-kill', '--max-cohort-failure-ratio', '1.5']), /--max-cohort-failure-ratio must be a number between 0 and 1/);
 });
 
@@ -170,6 +174,8 @@ test('summarizeReconnectChaos is non-blocking when the storm gate passes', () =>
     faultMode: 'gateway-rolling-restart',
     injectedContainers: ['chat-websocket-app-1', 'chat-websocket-app-2'],
     injectionOffsetMs: 120,
+    recoveryElapsedMs: 8200,
+    maxRecoverySloMs: 30000,
     dryRun: false,
     reconnectSummary: { ok: true, scenario: 'gateway-rolling-restart', failedGates: [] },
   });
@@ -178,6 +184,9 @@ test('summarizeReconnectChaos is non-blocking when the storm gate passes', () =>
   assert.equal(summary.dryRun, false);
   assert.deepEqual(summary.injectedContainers, ['chat-websocket-app-1', 'chat-websocket-app-2']);
   assert.equal(summary.injectionOffsetMs, 120);
+  assert.equal(summary.recoveryElapsedMs, 8200);
+  assert.equal(summary.maxRecoverySloMs, 30000);
+  assert.equal(summary.recoverySloMet, true);
   assert.equal(summary.reconnect.ok, true);
   assert.deepEqual(summary.failedGates, []);
   assert.equal(summary.releaseBlocking, false);
@@ -188,6 +197,8 @@ test('summarizeReconnectChaos is release blocking when the storm gate fails', ()
     faultMode: 'gateway-hard-kill',
     injectedContainers: ['chat-websocket-app-1'],
     injectionOffsetMs: 80,
+    recoveryElapsedMs: 6100,
+    maxRecoverySloMs: 30000,
     dryRun: false,
     reconnectSummary: {
       ok: false,
@@ -198,6 +209,23 @@ test('summarizeReconnectChaos is release blocking when the storm gate fails', ()
 
   assert.equal(summary.releaseBlocking, true);
   assert.deepEqual(summary.failedGates, ['handshake_success_ratio']);
+  assert.equal(summary.recoverySloMet, true);
+});
+
+test('summarizeReconnectChaos is release blocking when recovery SLO is exceeded', () => {
+  const summary = summarizeReconnectChaos({
+    faultMode: 'gateway-rolling-restart',
+    injectedContainers: ['chat-websocket-app-1', 'chat-websocket-app-2'],
+    injectionOffsetMs: 90,
+    recoveryElapsedMs: 32000,
+    maxRecoverySloMs: 30000,
+    dryRun: false,
+    reconnectSummary: { ok: true, scenario: 'gateway-rolling-restart', failedGates: [] },
+  });
+
+  assert.equal(summary.recoverySloMet, false);
+  assert.equal(summary.releaseBlocking, true);
+  assert.deepEqual(summary.failedGates, ['recovery_slo_ms']);
 });
 
 test('summarizeReconnectChaos dry-run is never blocking and carries no reconnect summary', () => {
@@ -205,6 +233,8 @@ test('summarizeReconnectChaos dry-run is never blocking and carries no reconnect
     faultMode: 'gateway-rolling-restart',
     injectedContainers: ['chat-websocket-app-1', 'chat-websocket-app-2'],
     injectionOffsetMs: null,
+    recoveryElapsedMs: null,
+    maxRecoverySloMs: 30000,
     dryRun: true,
     reconnectSummary: null,
   });
@@ -212,6 +242,8 @@ test('summarizeReconnectChaos dry-run is never blocking and carries no reconnect
   assert.equal(summary.dryRun, true);
   assert.equal(summary.reconnect, null);
   assert.equal(summary.injectionOffsetMs, null);
+  assert.equal(summary.recoveryElapsedMs, null);
+  assert.equal(summary.recoverySloMet, true);
   assert.deepEqual(summary.failedGates, []);
   assert.equal(summary.releaseBlocking, false);
 });
