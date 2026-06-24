@@ -48,6 +48,24 @@ test('redis streams lag alert rules keep metric labels bounded', () => {
   assert.doesNotMatch(rendered, /roomId|room_id|stream_key|room_stream|chat:stream:/);
 });
 
+test('redis streams lag alert renderer skips empty optional label blocks', () => {
+  const rendered = renderRedisStreamsLagAlertRules({
+    rules: [
+      {
+        alert: 'RedisStreamsGroupLagNoMetadata',
+        expr: 'chat_redis_stream_group_lag > 0',
+        for: '1m',
+        labels: {},
+        annotations: null,
+      },
+    ],
+  });
+
+  assert.match(rendered, /alert: RedisStreamsGroupLagNoMetadata/);
+  assert.doesNotMatch(rendered, /\n        labels:\n/);
+  assert.doesNotMatch(rendered, /\n        annotations:\n/);
+});
+
 test('redis streams lag prometheus rule file stays in sync with renderer', () => {
   const file = readFileSync(
     new URL('../../infra/prometheus/rules/phase7-redis-streams-lag.rules.yml', import.meta.url),

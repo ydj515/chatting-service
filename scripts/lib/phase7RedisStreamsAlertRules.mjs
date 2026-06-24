@@ -63,26 +63,39 @@ export const REDIS_STREAMS_LAG_ALERT_RULES = [
   },
 ];
 
-export function renderRedisStreamsLagAlertRules() {
+export function renderRedisStreamsLagAlertRules({
+  groupName = REDIS_STREAMS_LAG_ALERT_GROUP,
+  rules = REDIS_STREAMS_LAG_ALERT_RULES,
+} = {}) {
   return [
     'groups:',
-    `  - name: ${REDIS_STREAMS_LAG_ALERT_GROUP}`,
+    `  - name: ${groupName}`,
     '    rules:',
-    ...REDIS_STREAMS_LAG_ALERT_RULES.flatMap(renderRule),
+    ...rules.flatMap(renderRule),
     '',
   ].join('\n');
 }
 
 function renderRule(rule) {
-  return [
+  const lines = [
     `      - alert: ${rule.alert}`,
     `        expr: ${rule.expr}`,
     `        for: ${rule.for}`,
-    '        labels:',
-    ...Object.entries(rule.labels).map(([key, value]) => `          ${key}: ${quoteYaml(value)}`),
-    '        annotations:',
-    ...Object.entries(rule.annotations).map(([key, value]) => `          ${key}: ${quoteYaml(value)}`),
   ];
+
+  appendMapping(lines, 'labels', rule.labels);
+  appendMapping(lines, 'annotations', rule.annotations);
+
+  return lines;
+}
+
+function appendMapping(lines, name, values) {
+  const entries = Object.entries(values ?? {});
+  if (entries.length === 0) {
+    return;
+  }
+  lines.push(`        ${name}:`);
+  lines.push(...entries.map(([key, value]) => `          ${key}: ${quoteYaml(value)}`));
 }
 
 function quoteYaml(value) {
