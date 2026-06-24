@@ -10,11 +10,13 @@ const FAULT_MODES = {
     gateways: ['chat-websocket-app-1', 'chat-websocket-app-2'],
     injectAction: 'restart',
     reason: 'gateway_restart',
+    maxRecoverySloMs: 30000,
   },
   'gateway-hard-kill': {
     gateways: ['chat-websocket-app-1'],
     injectAction: 'kill',
     reason: 'gateway_kill',
+    maxRecoverySloMs: 30000,
   },
 };
 
@@ -35,6 +37,7 @@ export function parseReconnectChaosArgs(argv) {
     rollingStepDelayMs: 2000,
     injectAfterMs: 0,
     readyTimeoutMs: 60000,
+    maxRecoverySloMs: null,
     // reconnect-load pass-through. storm이 fault window보다 길도록 chaos 기본값을 키운다.
     clients: 5,
     reconnectsPerClient: 6,
@@ -81,6 +84,8 @@ export function parseReconnectChaosArgs(argv) {
       options.injectAfterMs = nonNegativeInteger(value, arg);
     } else if (arg === '--ready-timeout-ms') {
       options.readyTimeoutMs = positiveInteger(value, arg);
+    } else if (arg === '--max-recovery-slo-ms') {
+      options.maxRecoverySloMs = positiveInteger(value, arg);
     } else if (arg === '--clients') {
       options.clients = positiveInteger(value, arg);
     } else if (arg === '--reconnects-per-client') {
@@ -126,6 +131,9 @@ export function parseReconnectChaosArgs(argv) {
   if (options.scenario === null) {
     options.scenario = options.faultMode;
   }
+  if (options.maxRecoverySloMs === null) {
+    options.maxRecoverySloMs = mode.maxRecoverySloMs;
+  }
 
   return options;
 }
@@ -167,18 +175,34 @@ export function summarizeReconnectChaos({
   faultMode,
   injectedContainers,
   injectionOffsetMs,
+  recoveryElapsedMs,
+  maxRecoverySloMs,
   reconnectSummary,
   dryRun,
 }) {
   const reconnect = reconnectSummary ?? null;
-  const releaseBlocking = dryRun ? false : !(reconnect?.ok === true);
+  const recoveryElapsed = dryRun ? null : (recoveryElapsedMs ?? null);
+  const recoverySloMet = dryRun
+    || recoveryElapsed === null
+    || maxRecoverySloMs === null
+    || maxRecoverySloMs === undefined
+    ? true
+    : recoveryElapsed <= maxRecoverySloMs;
+  const failedGates = [
+    ...(reconnect?.failedGates ?? []),
+    ...(recoverySloMet ? [] : ['recovery_slo_ms']),
+  ];
+  const releaseBlocking = dryRun ? false : !(reconnect?.ok === true) || !recoverySloMet;
   return {
     faultMode,
     dryRun: dryRun === true,
     injectedContainers,
     injectionOffsetMs: dryRun ? null : (injectionOffsetMs ?? null),
+    recoveryElapsedMs: recoveryElapsed,
+    maxRecoverySloMs: maxRecoverySloMs ?? null,
+    recoverySloMet,
     reconnect,
-    failedGates: reconnect?.failedGates ?? [],
+    failedGates,
     releaseBlocking,
   };
 }

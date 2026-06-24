@@ -40,6 +40,8 @@ async function main() {
       faultMode: options.faultMode,
       injectedContainers: options.gateways,
       injectionOffsetMs: null,
+      recoveryElapsedMs: null,
+      maxRecoverySloMs: options.maxRecoverySloMs,
       reconnectSummary: null,
       dryRun: true,
     });
@@ -56,6 +58,7 @@ async function main() {
   const killedContainers = [];
   let primaryError = null;
   let stdout = '';
+  let recoveryElapsedMs = null;
 
   const child = spawn(process.execPath, [loadScript, ...reconnectArgs, '--ready-file', readyFile], {
     env: process.env,
@@ -90,6 +93,7 @@ async function main() {
     }
 
     const exitCode = await childExit;
+    recoveryElapsedMs = Date.now() - injectionStart;
     const reconnectSummary = parseLastJson(stdout);
     if (reconnectSummary === null) {
       throw new Error(`reconnect-load produced no JSON summary (exit ${exitCode})`);
@@ -99,6 +103,8 @@ async function main() {
       faultMode: options.faultMode,
       injectedContainers: faultPlan.map((step) => step.service),
       injectionOffsetMs,
+      recoveryElapsedMs,
+      maxRecoverySloMs: options.maxRecoverySloMs,
       reconnectSummary,
       dryRun: false,
     });
