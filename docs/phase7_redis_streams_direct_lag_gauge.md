@@ -44,7 +44,26 @@ chat:
 | `CHAT_WORKER_REDIS_STREAM_LAG_ENABLED` | `true` | direct lag gauge polling 활성화 |
 | `CHAT_WORKER_REDIS_STREAM_LAG_POLL_DELAY_MILLIS` | `5000` | polling fixed delay |
 
-## 4. 복잡도
+## 4. Alert 연결
+
+Redis Streams lag/pending alert rule은 [Phase 7 Redis Streams Lag Alert Rule](./phase7_redis_streams_lag_alert_rule.md)을 따른다.
+
+Prometheus rule artifact:
+
+```text
+infra/prometheus/rules/phase7-redis-streams-lag.rules.yml
+```
+
+기본 alert 기준:
+
+| Alert | 기준 | Window |
+| --- | --- | --- |
+| `RedisStreamsGroupLagSustained` | `chat_redis_stream_group_lag > 0` | `3m` |
+| `RedisStreamsGroupLagCritical` | `chat_redis_stream_group_lag > 1000` | `5m` |
+| `RedisStreamsGroupPendingSustained` | `chat_redis_stream_group_pending > 0` | `5m` |
+| `RedisStreamsGroupPendingCritical` | `chat_redis_stream_group_pending > 100` | `10m` |
+
+## 5. 복잡도
 
 - polling 시간 복잡도: `O(S * G)`
 - gauge 갱신 시간 복잡도: `O(S * G)`
@@ -52,14 +71,14 @@ chat:
 
 여기서 `S`는 known stream 수, `G`는 관측 consumer group 수, `H`는 stream shard 수다.
 
-## 5. 주의사항
+## 6. 주의사항
 
 > - `lag`는 Redis 서버의 `XINFO GROUPS` 결과에 `lag` 필드가 있을 때만 갱신된다. Redis 버전이나 group 상태에 따라 필드가 없으면 pending gauge만 갱신될 수 있다.
 > - `pending`은 `XINFO GROUPS`에서 조회한 pending count 기준이며, claim 가능한 메시지 수와 같지 않다.
 > - room stream key와 `roomId`는 metric tag에 넣지 않는다. 상세 추적은 로그나 tracing으로 분리한다.
 > - polling interval을 너무 낮추면 Redis에 `XINFO` 부하가 생긴다.
 
-## 6. 대안
+## 7. 대안
 
 | 대안 | 장점 | 단점 | 판단 |
 | --- | --- | --- | --- |
@@ -67,8 +86,8 @@ chat:
 | Redis exporter/Prometheus query | 애플리케이션 코드가 단순하다 | worker consumer group 설정과 release gate 의미를 코드에서 보장하기 어렵다 | 보조 |
 | 기존 event metric만 사용 | Redis 추가 polling이 없다 | 실제 backlog gauge가 없어 release gate 판단이 간접적이다 | 제외 |
 
-## 7. 후속 질문
+## 8. 후속 질문
 
-- `lag`와 `pending` alert threshold를 각각 어떤 evaluation window로 둘 것인가?
 - worker가 아닌 별도 observer role로 polling을 분리할 것인가?
 - Redis Cluster 환경에서 known stream set shard scan 비용을 별도 synthetic check로 검증할 것인가?
+- staging 부하 테스트 후 alert threshold를 조정할 것인가?
