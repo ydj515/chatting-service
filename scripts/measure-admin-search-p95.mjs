@@ -3,6 +3,11 @@ import { performance } from 'node:perf_hooks';
 import { writeFile } from 'node:fs/promises';
 import { buildGatePhases, buildRequestPlans } from './lib/adminMeasurePlan.mjs';
 import { summarizeGateReport, summarizeGateSamples } from './lib/adminLatencyStats.mjs';
+import {
+  buildSlowQueryCaptureRequests,
+  captureSlowQueryPlans,
+  slowQueryPlanCaptureModeValue,
+} from './lib/adminSearchPlanCapture.mjs';
 
 const args = parseArgs(process.argv.slice(2));
 const baseUrl = args['base-url'] ?? process.env.ADMIN_API_BASE_URL ?? 'http://localhost/api';
@@ -23,6 +28,17 @@ const targetColdP99Ms = positiveInteger(args['target-cold-p99-ms'] ?? '6000', '-
 const output = args.output;
 const from = args.from;
 const to = args.to;
+const slowQueryPlanMode = slowQueryPlanCaptureModeValue(args['slow-query-plan']);
+const slowQueryPlanOutputDir = args['slow-query-plan-output-dir'] ?? 'docs/performance/admin-search-slow-query-plans';
+const psqlMode = psqlModeValue(args['psql-mode'] ?? 'local');
+const psqlService = args['psql-service'] ?? 'postgres-replica';
+const db = {
+  host: args.host ?? process.env.DB_READ_HOST ?? process.env.DB_HOST ?? 'localhost',
+  port: args.port ?? process.env.DB_READ_PORT ?? process.env.DB_PORT ?? '5432',
+  name: args.database ?? process.env.DB_NAME ?? 'chatdb',
+  user: args.username ?? process.env.DB_USERNAME ?? 'chatuser',
+  password: args.password ?? process.env.DB_PASSWORD ?? 'chatpass',
+};
 
 const plans = buildRequestPlans({ baseUrl, scenario, roomId, query, searchMode, limit, from, to });
 const results = [];
@@ -47,9 +63,26 @@ for (const plan of plans) {
   });
 }
 const gateSummary = summarizeGateReport(results);
+const measuredAt = new Date().toISOString();
+const slowQueryPlanCaptureRequests = buildSlowQueryCaptureRequests(results, { mode: slowQueryPlanMode });
+const slowQueryPlanCaptures = await captureSlowQueryPlans(slowQueryPlanCaptureRequests, {
+  db,
+  psqlMode,
+  psqlService,
+  outputDir: slowQueryPlanOutputDir,
+  measuredAt,
+  planOptions: {
+    query,
+    searchMode,
+    roomId,
+    from,
+    to,
+    limit,
+  },
+});
 
 const report = {
-  measuredAt: new Date().toISOString(),
+  measuredAt,
   gate,
   ok: gateSummary.ok,
   failedGates: gateSummary.failedGates,
@@ -69,7 +102,20 @@ const report = {
     limit,
     from: from ?? null,
     to: to ?? null,
+    slowQueryPlan: slowQueryPlanMode,
+    slowQueryPlanOutputDir: slowQueryPlanMode === 'off' ? null : slowQueryPlanOutputDir,
+    psql: slowQueryPlanMode === 'off'
+      ? null
+      : {
+          mode: psqlMode,
+          service: psqlMode === 'docker-compose' ? psqlService : null,
+          host: db.host,
+          port: db.port,
+          database: db.name,
+          username: db.user,
+        },
   },
+  slowQueryPlans: slowQueryPlanCaptures,
   results,
 };
 
@@ -134,6 +180,13 @@ function searchModeValue(value) {
     return normalized;
   }
   throw new Error('--search-mode must be one of FTS, CONTAINS.');
+}
+
+function psqlModeValue(value) {
+  if (value === 'local' || value === 'docker-compose') {
+    return value;
+  }
+  throw new Error('--psql-mode must be one of local, docker-compose.');
 }
 
 function requiredAdminToken(value) {

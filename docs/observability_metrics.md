@@ -160,6 +160,7 @@ Phase 7 명시 task:
 - warm gate는 explicit warmup 이후 `p95 <= 1000ms`와 실패 응답 0건을 요구한다.
 - cold gate는 warmup 없는 post-restart 또는 cold-cache synthetic run에서 `p99 <= 6000ms`와 실패 응답 0건을 요구한다.
 - `--gate both`는 cold 샘플을 먼저 실행한 뒤 warmup과 warm 샘플을 실행해 두 gate를 같은 JSON report의 `ok`와 `failedGates`로 분리한다.
+- 2026-06-24 admin search slow query plan capture 슬라이스에서 `--slow-query-plan on-cold-failure` 옵션을 추가했다. cold p99 실패 endpoint는 `EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)` artifact를 `slowQueryPlans` report field로 남길 수 있다.
 
 권장 alert 후보:
 
@@ -210,6 +211,7 @@ Phase 7 명시 task:
 | nginx stale upstream | app recreate 후 오라우팅 없음 |
 | Redis Streams worker observability | append latency, consumer read/claim records, worker batch latency, dead-letter 이동이 bounded tag로 관측됨 |
 | admin search latency gate | warm p95와 cold p99가 별도 gate로 계산되고 `failedGates`에 분리 기록됨 |
+| admin search slow plan capture | cold p99 실패 시 선택적으로 PostgreSQL JSON plan artifact가 남음 |
 | Redis Streams direct lag gauge | `chat.redis.stream.group.lag`와 `chat.redis.stream.group.pending`이 bounded tag로 관측됨 |
 
 ## 5. Log / Trace 필수 필드

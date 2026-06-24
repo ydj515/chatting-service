@@ -58,6 +58,31 @@ node scripts/measure-admin-search-p95.mjs \
 
 `--gate cold`에서는 `--warmup` 값이 있어도 measurement 전 warmup request를 실행하지 않는다.
 
+### Cold Gate With Slow Query Plan Capture
+
+Cold p99가 threshold를 넘는 경우 같은 room, query, time window, search mode, limit 조건으로 PostgreSQL 실행 계획을 남기려면 plan capture를 명시적으로 켠다.
+
+```bash
+node scripts/measure-admin-search-p95.mjs \
+  --scenario both \
+  --gate cold \
+  --room-id 30001 \
+  --query "hello searchable admin keyword" \
+  --from 2026-06-13T11:46:50 \
+  --to 2026-06-14T15:33:25 \
+  --search-mode FTS \
+  --requests 100 \
+  --concurrency 5 \
+  --target-cold-p99-ms 6000 \
+  --slow-query-plan on-cold-failure \
+  --slow-query-plan-output-dir docs/performance/admin-search-slow-query-plans \
+  --psql-mode docker-compose \
+  --psql-service postgres-replica \
+  --output docs/performance/phase7_admin_search_cold.json
+```
+
+`--slow-query-plan on-cold-failure`는 cold gate가 실패한 endpoint에 대해서만 `EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)`을 실행한다. psql 접속 기본값은 `DB_READ_HOST`, `DB_READ_PORT`, `DB_NAME`, `DB_USERNAME`, `DB_PASSWORD`를 우선 사용한다.
+
 ### Combined Gate
 
 ```bash
@@ -90,6 +115,7 @@ Top-level fields:
 | `failedGates` | 실패 gate 이름. 예: `admin_search_cold_p99:search` |
 | `targetWarmP95Ms` | warm p95 threshold |
 | `targetColdP99Ms` | cold p99 threshold |
+| `slowQueryPlans` | slow query plan capture 대상별 상태와 artifact 경로 |
 | `results[].gateResults[]` | endpoint별 gate summary |
 
 Gate summary fields:
@@ -102,14 +128,25 @@ Gate summary fields:
 | `measuredMs` | 판정에 사용한 percentile 값 |
 | `passedTarget` | 실패 응답이 없고 measured latency가 threshold 이하이면 `true` |
 
+Slow query plan fields:
+
+| Field | 의미 |
+| --- | --- |
+| `endpointName` | `history` 또는 `search` |
+| `gate` | capture를 유발한 gate. 현재는 `cold` |
+| `status` | `captured` 또는 `failed` |
+| `artifactPath` | plan artifact JSON 경로 |
+| `error` | capture 실패 시 오류 메시지 |
+
 ## 4. 복잡도
 
 - request plan 생성 시간 복잡도: `O(S)`
 - sample 실행 네트워크 복잡도: `O(S * G * N)`
 - percentile 계산 시간 복잡도: `O(N log N)`
-- report 공간 복잡도: `O(S * G * N)`
+- plan capture 대상 선정 시간 복잡도: `O(S * G)`
+- report 공간 복잡도: `O(S * G * N + C)`
 
-여기서 `S`는 endpoint scenario 수, `G`는 gate phase 수, `N`은 gate별 request 수다.
+여기서 `S`는 endpoint scenario 수, `G`는 gate phase 수, `N`은 gate별 request 수, `C`는 slow query plan capture 대상 수다.
 
 ## 5. 주의사항
 
@@ -117,6 +154,7 @@ Gate summary fields:
 > - `--gate both`의 warm 측정은 같은 process의 cold 측정 이후 실행되므로, 순수 cold-only 증거가 필요하면 `--gate cold`를 별도 실행한다.
 > - warm p95 통과는 cold p99 통과를 의미하지 않는다.
 > - `CONTAINS` mode는 operator fallback이며 기본 release gate는 `FTS` 기준이다.
+> - `EXPLAIN (ANALYZE)`는 실제 쿼리를 실행한다. `--slow-query-plan on-cold-failure`는 기본값이 아니며, 운영 부하와 artifact 민감도를 확인한 뒤 사용한다.
 
 ## 6. 대안
 
@@ -125,9 +163,10 @@ Gate summary fields:
 | 기존 측정 스크립트 확장 | 기존 seed/measure workflow와 호환되고 변경 범위가 작다 | 파일명에 `p95`가 남아 cold p99 역할이 덜 드러난다 | 선택 |
 | 새 Phase 7 전용 스크립트 추가 | release gate 책임이 명확하다 | HTTP 측정 로직이 중복된다 | 보류 |
 | 서버 metric만 사용 | dashboard와 alert에 바로 연결된다 | post-restart/cold synthetic denominator를 분리하기 어렵다 | 보조 |
+| auto_explain 기반 plan 수집 | DB가 slow query를 자동 기록한다 | 환경 설정과 log pipeline 의존성이 커진다 | 후속 |
 
 ## 7. 후속 질문
 
-- cold p99 실패 시 `EXPLAIN (ANALYZE, BUFFERS)` 자동 수집을 붙일 것인가?
 - `CONTAINS` fallback에도 별도 operator-only threshold를 둘 것인가?
 - CI에서 작은 synthetic fixture로 JSON contract만 검증할 것인가?
+- slow query plan artifact를 CI artifact나 PR comment로 업로드할 것인가?
