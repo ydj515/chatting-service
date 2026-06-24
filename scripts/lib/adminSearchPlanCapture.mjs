@@ -86,7 +86,7 @@ LIMIT ${sqlPositiveInteger(limit, 'limit')};
 
 export function buildSlowQueryPlanArtifactPath({
   outputDir = DEFAULT_SLOW_QUERY_PLAN_OUTPUT_DIR,
-  measuredAt,
+  measuredAt = new Date().toISOString(),
   endpointName,
   gate,
   targetMetric,
@@ -108,6 +108,7 @@ export async function captureSlowQueryPlans(
     psqlService,
     outputDir = DEFAULT_SLOW_QUERY_PLAN_OUTPUT_DIR,
     measuredAt,
+    slowQueryPlanTimeoutMs = 30_000,
     planOptions,
     executeSql = runPsqlExplain,
   },
@@ -126,7 +127,15 @@ export async function captureSlowQueryPlans(
         ...planOptions,
         name: request.endpointName,
       });
-      const rawExplain = await executeSql(db, { mode: psqlMode, service: psqlService }, sql);
+      const rawExplain = await executeSql(
+        db,
+        {
+          mode: psqlMode,
+          service: psqlService,
+          timeoutMs: slowQueryPlanTimeoutMs,
+        },
+        sql,
+      );
       await mkdir(dirname(artifactPath), { recursive: true });
       await writeFile(
         artifactPath,
@@ -157,6 +166,7 @@ export async function captureSlowQueryPlans(
 
 function runPsqlExplain(db, options, sql) {
   return new Promise((resolve, reject) => {
+    let settled = false;
     const command = buildPsqlCommand(db, {
       mode: options.mode,
       service: options.service,
@@ -169,9 +179,17 @@ function runPsqlExplain(db, options, sql) {
         stdio: ['pipe', 'pipe', 'pipe'],
       },
     );
+    const timeoutMs = Number.isSafeInteger(options.timeoutMs) && options.timeoutMs > 0
+      ? options.timeoutMs
+      : 30_000;
+    const timer = setTimeout(() => {
+      child.kill('SIGTERM');
+      settle(reject, new Error(`psql explain timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
 
     let stdout = '';
     let stderr = '';
+    child.stdin.on('error', () => {});
     child.stdout.setEncoding('utf8');
     child.stderr.setEncoding('utf8');
     child.stdout.on('data', (chunk) => {
@@ -180,15 +198,30 @@ function runPsqlExplain(db, options, sql) {
     child.stderr.on('data', (chunk) => {
       stderr += chunk;
     });
-    child.stdin.end(`${sql}\n`);
-    child.on('error', reject);
-    child.on('exit', (code) => {
+    child.on('error', (error) => {
+      settle(reject, error);
+    });
+    child.on('close', (code) => {
       if (code === 0) {
-        resolve(stdout);
+        settle(resolve, stdout);
       } else {
-        reject(new Error(`psql explain exited with code ${code}: ${stderr.trim()}`));
+        settle(reject, new Error(`psql explain exited with code ${code}: ${stderr.trim()}`));
       }
     });
+    try {
+      child.stdin.end(`${sql}\n`);
+    } catch (error) {
+      settle(reject, error);
+    }
+
+    function settle(callback, value) {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      clearTimeout(timer);
+      callback(value);
+    }
   });
 }
 

@@ -34,6 +34,7 @@ node scripts/measure-admin-search-p95.mjs \
   --target-cold-p99-ms 6000 \
   --slow-query-plan on-cold-failure \
   --slow-query-plan-output-dir docs/performance/admin-search-slow-query-plans \
+  --slow-query-plan-timeout-ms 30000 \
   --psql-mode docker-compose \
   --psql-service postgres-replica \
   --output docs/performance/phase7_admin_search_cold.json
@@ -50,6 +51,7 @@ node scripts/measure-admin-search-p95.mjs \
 | `--password` | `DB_PASSWORD`, 없으면 `chatpass` |
 | `--psql-mode` | `local` |
 | `--psql-service` | `postgres-replica` |
+| `--slow-query-plan-timeout-ms` | `30000` |
 
 ## 3. JSON Summary
 
@@ -59,6 +61,7 @@ Top-level report에 다음 필드가 추가된다.
 | --- | --- |
 | `options.slowQueryPlan` | `off` 또는 `on-cold-failure` |
 | `options.slowQueryPlanOutputDir` | artifact 저장 디렉터리 |
+| `options.slowQueryPlanTimeoutMs` | psql capture subprocess timeout |
 | `options.psql` | capture가 켜졌을 때 psql 접속 정보. password는 제외 |
 | `slowQueryPlans[]` | capture 대상별 상태 |
 
@@ -100,6 +103,7 @@ artifact는 JSON 파일이며 다음 정보를 포함한다.
 > - artifact에는 query text와 SQL이 들어가므로 민감한 검색어를 외부에 공유하기 전에 검토한다.
 > - script는 cold cache를 만들지 않는다. cold run 조건은 app restart, DB restart, 또는 별도 synthetic window로 준비해야 한다.
 > - plan capture 실패는 latency report 생성을 막지 않고 `slowQueryPlans[].status = failed`로 남긴다.
+> - psql process가 `--slow-query-plan-timeout-ms`를 넘기면 capture는 실패로 기록되고 measurement report 생성은 계속된다.
 
 ## 7. 대안
 

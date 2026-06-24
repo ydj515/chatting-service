@@ -76,6 +76,7 @@ node scripts/measure-admin-search-p95.mjs \
   --target-cold-p99-ms 6000 \
   --slow-query-plan on-cold-failure \
   --slow-query-plan-output-dir docs/performance/admin-search-slow-query-plans \
+  --slow-query-plan-timeout-ms 30000 \
   --psql-mode docker-compose \
   --psql-service postgres-replica \
   --output docs/performance/phase7_admin_search_cold.json
@@ -155,6 +156,7 @@ Slow query plan fields:
 > - warm p95 통과는 cold p99 통과를 의미하지 않는다.
 > - `CONTAINS` mode는 operator fallback이며 기본 release gate는 `FTS` 기준이다.
 > - `EXPLAIN (ANALYZE)`는 실제 쿼리를 실행한다. `--slow-query-plan on-cold-failure`는 기본값이 아니며, 운영 부하와 artifact 민감도를 확인한 뒤 사용한다.
+> - psql process가 `--slow-query-plan-timeout-ms`를 넘기면 plan capture는 실패로 기록되고 latency report 생성은 계속된다.
 
 ## 6. 대안
 

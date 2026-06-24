@@ -51,7 +51,7 @@ Generate app-equivalent history and search SQL with bounded filters, ordering, l
 
 - [x] **Step 4: Add artifact writer**
 
-Run psql, parse JSON output when possible, and write metadata plus raw plan output.
+Run psql with a bounded timeout, parse JSON output when possible, and write metadata plus raw plan output.
 
 ### Task 3: Runner Wiring
 
@@ -61,11 +61,11 @@ Run psql, parse JSON output when possible, and write metadata plus raw plan outp
 
 - [x] **Step 1: Add CLI options**
 
-Add `--slow-query-plan`, `--slow-query-plan-output-dir`, `--psql-mode`, `--psql-service`, and DB connection overrides.
+Add `--slow-query-plan`, `--slow-query-plan-output-dir`, `--slow-query-plan-timeout-ms`, `--psql-mode`, `--psql-service`, and DB connection overrides.
 
 - [x] **Step 2: Attach capture results to report**
 
-Add `options.slowQueryPlan`, `options.psql`, and top-level `slowQueryPlans`.
+Add `options.slowQueryPlan`, `options.slowQueryPlanOutputDir`, `options.slowQueryPlanTimeoutMs`, `options.psql`, and top-level `slowQueryPlans`.
 
 ### Task 4: Documentation
 

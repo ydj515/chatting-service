@@ -29,16 +29,24 @@ const output = args.output;
 const from = args.from;
 const to = args.to;
 const slowQueryPlanMode = slowQueryPlanCaptureModeValue(args['slow-query-plan']);
-const slowQueryPlanOutputDir = args['slow-query-plan-output-dir'] ?? 'docs/performance/admin-search-slow-query-plans';
-const psqlMode = psqlModeValue(args['psql-mode'] ?? 'local');
-const psqlService = args['psql-service'] ?? 'postgres-replica';
-const db = {
-  host: args.host ?? process.env.DB_READ_HOST ?? process.env.DB_HOST ?? 'localhost',
-  port: args.port ?? process.env.DB_READ_PORT ?? process.env.DB_PORT ?? '5432',
-  name: args.database ?? process.env.DB_NAME ?? 'chatdb',
-  user: args.username ?? process.env.DB_USERNAME ?? 'chatuser',
-  password: args.password ?? process.env.DB_PASSWORD ?? 'chatpass',
-};
+const slowQueryPlanEnabled = slowQueryPlanMode !== 'off';
+const slowQueryPlanOutputDir = slowQueryPlanEnabled
+  ? args['slow-query-plan-output-dir'] ?? 'docs/performance/admin-search-slow-query-plans'
+  : null;
+const slowQueryPlanTimeoutMs = slowQueryPlanEnabled
+  ? positiveInteger(args['slow-query-plan-timeout-ms'] ?? '30000', '--slow-query-plan-timeout-ms')
+  : null;
+const psqlMode = slowQueryPlanEnabled ? psqlModeValue(args['psql-mode'] ?? 'local') : null;
+const psqlService = slowQueryPlanEnabled ? args['psql-service'] ?? 'postgres-replica' : null;
+const db = slowQueryPlanEnabled
+  ? {
+      host: args.host ?? process.env.DB_READ_HOST ?? process.env.DB_HOST ?? 'localhost',
+      port: args.port ?? process.env.DB_READ_PORT ?? process.env.DB_PORT ?? '5432',
+      name: args.database ?? process.env.DB_NAME ?? 'chatdb',
+      user: args.username ?? process.env.DB_USERNAME ?? 'chatuser',
+      password: args.password ?? process.env.DB_PASSWORD ?? 'chatpass',
+    }
+  : null;
 
 const plans = buildRequestPlans({ baseUrl, scenario, roomId, query, searchMode, limit, from, to });
 const results = [];
@@ -65,21 +73,24 @@ for (const plan of plans) {
 const gateSummary = summarizeGateReport(results);
 const measuredAt = new Date().toISOString();
 const slowQueryPlanCaptureRequests = buildSlowQueryCaptureRequests(results, { mode: slowQueryPlanMode });
-const slowQueryPlanCaptures = await captureSlowQueryPlans(slowQueryPlanCaptureRequests, {
-  db,
-  psqlMode,
-  psqlService,
-  outputDir: slowQueryPlanOutputDir,
-  measuredAt,
-  planOptions: {
-    query,
-    searchMode,
-    roomId,
-    from,
-    to,
-    limit,
-  },
-});
+const slowQueryPlanCaptures = slowQueryPlanCaptureRequests.length
+  ? await captureSlowQueryPlans(slowQueryPlanCaptureRequests, {
+      db,
+      psqlMode,
+      psqlService,
+      outputDir: slowQueryPlanOutputDir,
+      measuredAt,
+      slowQueryPlanTimeoutMs,
+      planOptions: {
+        query,
+        searchMode,
+        roomId,
+        from,
+        to,
+        limit,
+      },
+    })
+  : [];
 
 const report = {
   measuredAt,
@@ -103,8 +114,9 @@ const report = {
     from: from ?? null,
     to: to ?? null,
     slowQueryPlan: slowQueryPlanMode,
-    slowQueryPlanOutputDir: slowQueryPlanMode === 'off' ? null : slowQueryPlanOutputDir,
-    psql: slowQueryPlanMode === 'off'
+    slowQueryPlanOutputDir,
+    slowQueryPlanTimeoutMs,
+    psql: !slowQueryPlanEnabled
       ? null
       : {
           mode: psqlMode,

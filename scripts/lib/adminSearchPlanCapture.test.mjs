@@ -1,7 +1,12 @@
 import assert from 'node:assert/strict';
+import { chmod, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { test } from 'node:test';
 import {
   buildAdminSearchExplainSql,
+  buildSlowQueryPlanArtifactPath,
+  captureSlowQueryPlans,
   buildSlowQueryCaptureRequests,
   slowQueryPlanCaptureModeValue,
 } from './adminSearchPlanCapture.mjs';
@@ -84,4 +89,60 @@ test('slowQueryPlanCaptureModeValue accepts explicit modes only', () => {
     () => slowQueryPlanCaptureModeValue('always'),
     /--slow-query-plan must be one of off, on-cold-failure/,
   );
+});
+
+test('buildSlowQueryPlanArtifactPath defaults measuredAt to a timestamp', () => {
+  const artifactPath = buildSlowQueryPlanArtifactPath({
+    outputDir: 'docs/performance/admin-search-slow-query-plans',
+    endpointName: 'search',
+    gate: 'cold',
+    targetMetric: 'p99Ms',
+  });
+
+  assert.doesNotMatch(artifactPath, /undefined/);
+  assert.match(artifactPath, /search_cold_p99_explain\.json$/);
+});
+
+test('captureSlowQueryPlans fails a hanging psql process with a timeout', async () => {
+  const tempDir = await mkdtemp(join(tmpdir(), 'admin-search-plan-capture-'));
+  const originalPath = process.env.PATH;
+  try {
+    const fakePsql = join(tempDir, 'psql');
+    await writeFile(fakePsql, '#!/bin/sh\nsleep 1\n', 'utf8');
+    await chmod(fakePsql, 0o755);
+    process.env.PATH = `${tempDir}:${originalPath ?? ''}`;
+
+    const captures = await captureSlowQueryPlans(
+      [
+        {
+          endpointName: 'search',
+          gate: 'cold',
+          targetMetric: 'p99Ms',
+          measuredMs: 7000,
+          targetMs: 6000,
+        },
+      ],
+      {
+        db: { host: 'localhost', port: '5432', user: 'chatuser', password: 'chatpass', name: 'chatdb' },
+        psqlMode: 'local',
+        psqlService: 'postgres-replica',
+        outputDir: join(tempDir, 'plans'),
+        measuredAt: '2026-06-24T00:00:00.000Z',
+        slowQueryPlanTimeoutMs: 10,
+        planOptions: {
+          query: 'hello',
+          searchMode: 'FTS',
+          roomId: 30001,
+          limit: 50,
+        },
+      },
+    );
+
+    assert.equal(captures.length, 1);
+    assert.equal(captures[0].status, 'failed');
+    assert.match(captures[0].error, /timed out after 10ms/);
+  } finally {
+    process.env.PATH = originalPath;
+    await rm(tempDir, { recursive: true, force: true });
+  }
 });

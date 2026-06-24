@@ -53,6 +53,8 @@ Runner 흐름:
 | Field | 의미 |
 | --- | --- |
 | `options.slowQueryPlan` | `off` 또는 `on-cold-failure` |
+| `options.slowQueryPlanOutputDir` | artifact 저장 디렉터리 |
+| `options.slowQueryPlanTimeoutMs` | psql capture subprocess timeout |
 | `options.psql` | password를 제외한 psql 접속 정보 |
 | `slowQueryPlans[]` | endpoint별 capture 결과 |
 | `slowQueryPlans[].status` | `captured` 또는 `failed` |
@@ -65,6 +67,8 @@ Runner 흐름:
 - query literal의 single quote escaping을 검증한다.
 - history endpoint EXPLAIN SQL이 room/time bounded query와 history ordering을 유지하는지 검증한다.
 - CLI의 invalid `--slow-query-plan` 값이 명확한 option error를 내는지 검증한다.
+- capture off 상태에서는 잘못된 psql 옵션이 일반 측정을 막지 않는지 검증한다.
+- hanging psql process가 timeout으로 실패 처리되는지 검증한다.
 
 ## 5. 복잡도
 
@@ -81,6 +85,7 @@ Runner 흐름:
 > - artifact에는 query와 SQL text가 포함된다. 민감 검색어가 들어갈 수 있으므로 공유 전 검토가 필요하다.
 > - `--gate both`에서는 cold phase가 먼저 실행되며, slow query plan capture도 cold 실패 항목에만 붙는다.
 > - psql 접속 실패는 report 생성 실패가 아니라 capture 실패로 기록한다.
+> - psql process가 timeout을 넘기면 capture는 실패로 남기고 measurement report 생성을 계속한다.
 
 ## 7. 대안
 
