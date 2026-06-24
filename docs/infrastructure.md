@@ -143,4 +143,5 @@ mise run verify:chat
 | [phase7_admin_search_latency_gate.md](./phase7_admin_search_latency_gate.md) | 관리자 검색 warm p95와 cold p99 release gate 측정 절차 |
 | [phase7_admin_search_slow_query_plan_capture.md](./phase7_admin_search_slow_query_plan_capture.md) | 관리자 검색 cold p99 실패 시 PostgreSQL 실행 계획 수집 절차 |
 | [phase7_redis_streams_direct_lag_gauge.md](./phase7_redis_streams_direct_lag_gauge.md) | Redis Streams group lag/pending direct gauge 운영 기준 |
+| [phase7_redis_streams_lag_alert_rule.md](./phase7_redis_streams_lag_alert_rule.md) | Redis Streams lag/pending Prometheus alert rule 기준 |
 | [architecture_overview.md](./architecture_overview.md) | 분산 웹소켓 서버 아키텍처 및 실시간 채팅 데이터 흐름 (Mermaid 다이어그램) |

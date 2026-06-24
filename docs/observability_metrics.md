@@ -124,6 +124,7 @@ Phase 7 명시 task:
 - `chat.fanout.owner.takeovers`의 production 의미를 코드와 문서에서 정합하게 확정한다. 현재 Phase 6 구현은 owner lease 기능, fencing, owner kill smoke를 갖추었지만, metric semantics는 release gate 전에 별도로 검증해야 한다.
 - 2026-06-24 Redis Streams worker metric 슬라이스에서 append latency, consumer read/claim records, worker batch latency, worker processed records, dead-letter counters를 추가했다. 이 metric들은 애플리케이션 처리 경로의 event/timer 신호이며, Redis 서버의 전체 backlog를 직접 재는 gauge는 별도 후속 슬라이스로 남긴다.
 - 2026-06-24 Redis Streams direct lag gauge 슬라이스에서 `XINFO GROUPS`와 `XPENDING` summary 기반 `chat.redis.stream.group.lag`, `chat.redis.stream.group.pending` gauge를 추가했다. tag는 `stream_shard`, `consumer_group`으로 제한하고 room stream key와 `roomId`는 tag로 쓰지 않는다.
+- 2026-06-24 Redis Streams lag alert rule 슬라이스에서 `infra/prometheus/rules/phase7-redis-streams-lag.rules.yml`를 추가했다. rule은 `consumer_group`, `stream_shard` aggregation만 사용하며 warning/critical threshold를 분리한다.
 - 일반적인 worker death takeover, 즉 worker A 사망 후 TTL 만료와 worker B 신규 acquire가 발생한 경우를 `takeovers` counter가 직접 세는지 확인한다.
 - 직접 계측이 어렵다면 `lease.lost`, `pending claim`, smoke runner summary를 조합한 derived signal로 정의하고, 문서의 reason tag를 실제 구현 가능한 값으로 낮춘다.
 - 2026-06-20 사전 점검에서 `roomSeq order violated: 77 came after 600` flake가 1회 관측되었으므로, owner kill takeover smoke summary는 raw delivery order와 client-visible render result를 분리해서 기록한다.
@@ -133,8 +134,10 @@ Phase 7 명시 task:
 
 권장 alert 후보:
 
-- Redis Streams lag가 3초 이상 지속
-- pending count가 계속 증가
+- `RedisStreamsGroupLagSustained`: `chat_redis_stream_group_lag > 0` for `3m`
+- `RedisStreamsGroupLagCritical`: `chat_redis_stream_group_lag > 1000` for `5m`
+- `RedisStreamsGroupPendingSustained`: `chat_redis_stream_group_pending > 0` for `5m`
+- `RedisStreamsGroupPendingCritical`: `chat_redis_stream_group_pending > 100` for `10m`
 - writer failure rate 증가
 - `chat.message.admission.rejected{reason="redis_error"}`가 5분 동안 1건 이상 발생
 - `room_rate_limited`, `user_rate_limited`, `slow_mode_active`가 배포 직후 기준선보다 급증
@@ -213,6 +216,7 @@ Phase 7 명시 task:
 | admin search latency gate | warm p95와 cold p99가 별도 gate로 계산되고 `failedGates`에 분리 기록됨 |
 | admin search slow plan capture | cold p99 실패 시 선택적으로 PostgreSQL JSON plan artifact가 남음 |
 | Redis Streams direct lag gauge | `chat.redis.stream.group.lag`와 `chat.redis.stream.group.pending`이 bounded tag로 관측됨 |
+| Redis Streams lag alert rule | lag/pending warning과 critical Prometheus rule이 bounded label로 정의됨 |
 
 ## 5. Log / Trace 필수 필드
 
