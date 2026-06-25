@@ -122,6 +122,20 @@ Redis Cluster host port는 `127.0.0.1`에만 bind한다. `infra/redis/redis-clus
 
 `redis-cluster-init`은 `REDIS_CLUSTER_NODES`와 `REDIS_CLUSTER_BOOTSTRAP_TIMEOUT_SECONDS`를 사용한다. node 준비나 cluster convergence가 timeout 안에 끝나지 않으면 cluster diagnostics를 출력하고 실패한다.
 
+### Phase 8.4 Hot Room Shard 분산
+
+Phase 8.4부터 메시지 수락 경로는 `room_storage_configs`의 `current_shard_count`와 `fanout_shard_count`를 읽어 새 메시지의 `writeShard`, `streamShard`, `fanoutShard`를 계산한다. `writeShard`는 `messageId` hash 기반이고, `streamShard`와 `fanoutShard`는 `roomSeq` round-robin 기반이다.
+
+`room-policy` worker는 `HOT=16`, `VERY_HOT=64`를 기본 shard count로 upsert한다. 자동 downgrade는 live feed window와 rate/slow-mode 정책은 갱신하지만 shard count를 줄이지 않는다. 이미 확장된 hot room이 다시 트래픽을 받을 때 단일 stream shard로 되돌아가 fanout owner 병목을 만들지 않기 위함이다.
+
+10k release gate는 다음 명령으로 실행한다.
+
+```bash
+node scripts/phase8-hot-room-release-gate.mjs
+```
+
+이 명령은 `scripts/load-chat.mjs`로 10,000 msg/sec 60초 부하를 생성하고, Prometheus에서 fanout p95, stream shard 관측 수, Redis Streams group lag를 조회해 threshold를 넘으면 실패한다.
+
 ## 로드 밸런싱
 
 Nginx는 역할별 upstream으로 트래픽을 분리합니다.
