@@ -86,7 +86,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics,caches
+        include: health,info,metrics,caches,prometheus
       cors:
         allowed-origins: ${MANAGEMENT_CORS_ALLOWED_ORIGINS:*}
         allowed-methods: ${MANAGEMENT_CORS_ALLOWED_METHODS:GET,POST,PUT,DELETE,OPTIONS}
@@ -95,6 +95,9 @@ management:
   endpoint:
     health:
       show-details: always
+  metrics:
+    tags:
+      application: ${spring.application.name:chat}
 
 chat:
   datasource:

@@ -29,6 +29,7 @@ dependencies {
     implementation(libs.jackson.module.kotlin)
     implementation(libs.jackson.datatype.jsr310)
     implementation(libs.micrometer.core)
+    implementation(libs.micrometer.registry.prometheus)
 
     // 데이터베이스 드라이버 (런타임)
     runtimeOnly(libs.h2)
