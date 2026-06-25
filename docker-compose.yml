@@ -7,7 +7,7 @@ x-chat-app-build: &chat-app-build
 x-chat-app-environment: &chat-app-environment
   TZ: ${TZ:-Asia/Seoul}
   APP_TIME_ZONE: ${APP_TIME_ZONE:-Asia/Seoul}
-  SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-docker}
+  SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-docker,redis-cluster}
   SERVER_PORT: ${SERVER_PORT:-8080}
   SERVER_CONTEXT_PATH: ${SERVER_CONTEXT_PATH:-/api}
   DB_HOST: postgres
@@ -20,6 +20,8 @@ x-chat-app-environment: &chat-app-environment
   REDIS_HOST: redis
   REDIS_PORT: ${REDIS_PORT:-6379}
   REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+  REDIS_CLUSTER_NODES: ${REDIS_CLUSTER_NODES:-redis-cluster-node-1:6379,redis-cluster-node-2:6379,redis-cluster-node-3:6379,redis-cluster-node-4:6379,redis-cluster-node-5:6379,redis-cluster-node-6:6379}
+  REDIS_CLUSTER_MAX_REDIRECTS: ${REDIS_CLUSTER_MAX_REDIRECTS:-5}
   CHAT_REDIS_ADMISSION_KEY_PREFIX: ${CHAT_REDIS_ADMISSION_KEY_PREFIX:-chat:admission:room:}
   CHAT_REDIS_ADMISSION_RATE_LIMIT_WINDOW_TTL: ${CHAT_REDIS_ADMISSION_RATE_LIMIT_WINDOW_TTL:-2s}
   CHAT_CACHE_ROOM_ADMISSION_POLICIES_TTL: ${CHAT_CACHE_ROOM_ADMISSION_POLICIES_TTL:-10s}
@@ -174,10 +176,11 @@ services:
     networks:
       - chat-network
 
-  # Redis 메시지 브로커 (공유)
+  # Redis 메시지 브로커 (호스트 Gradle 개발 모드 전용 standalone)
   redis:
     image: ${REDIS_IMAGE:-redis:7.2-alpine}
     container_name: chat-redis
+    profiles: [ "dev" ]
     command: redis-server /usr/local/etc/redis/redis.conf
     environment:
       TZ: ${TZ:-Asia/Seoul}
@@ -194,8 +197,200 @@ services:
     networks:
       - chat-network
 
+  # Redis Cluster HA (전체 Docker 백엔드 기본값)
+  redis-cluster-node-1:
+    image: ${REDIS_IMAGE:-redis:7.2-alpine}
+    container_name: chat-redis-cluster-node-1
+    hostname: redis-cluster-node-1
+    profiles: [ "cluster" ]
+    command:
+      [
+        "redis-server",
+        "/usr/local/etc/redis/redis-cluster.conf",
+        "--cluster-announce-hostname", "redis-cluster-node-1",
+        "--cluster-announce-port", "6379",
+        "--cluster-announce-bus-port", "16379"
+      ]
+    environment:
+      TZ: ${TZ:-Asia/Seoul}
+    volumes:
+      - redis_cluster_node_1_data:/data
+      - ./infra/redis/redis-cluster.conf:/usr/local/etc/redis/redis-cluster.conf:ro
+    ports:
+      - "127.0.0.1:${REDIS_CLUSTER_NODE_1_HOST_PORT:-6379}:6379"
+    healthcheck:
+      test: [ "CMD", "redis-cli", "-p", "6379", "ping" ]
+      interval: ${REDIS_HEALTHCHECK_INTERVAL:-10s}
+      timeout: ${REDIS_HEALTHCHECK_TIMEOUT:-3s}
+      retries: ${REDIS_HEALTHCHECK_RETRIES:-5}
+    networks:
+      - chat-network
+
+  redis-cluster-node-2:
+    image: ${REDIS_IMAGE:-redis:7.2-alpine}
+    container_name: chat-redis-cluster-node-2
+    hostname: redis-cluster-node-2
+    profiles: [ "cluster" ]
+    command:
+      [
+        "redis-server",
+        "/usr/local/etc/redis/redis-cluster.conf",
+        "--cluster-announce-hostname", "redis-cluster-node-2",
+        "--cluster-announce-port", "6379",
+        "--cluster-announce-bus-port", "16379"
+      ]
+    environment:
+      TZ: ${TZ:-Asia/Seoul}
+    volumes:
+      - redis_cluster_node_2_data:/data
+      - ./infra/redis/redis-cluster.conf:/usr/local/etc/redis/redis-cluster.conf:ro
+    ports:
+      - "127.0.0.1:${REDIS_CLUSTER_NODE_2_HOST_PORT:-6380}:6379"
+    healthcheck:
+      test: [ "CMD", "redis-cli", "-p", "6379", "ping" ]
+      interval: ${REDIS_HEALTHCHECK_INTERVAL:-10s}
+      timeout: ${REDIS_HEALTHCHECK_TIMEOUT:-3s}
+      retries: ${REDIS_HEALTHCHECK_RETRIES:-5}
+    networks:
+      - chat-network
+
+  redis-cluster-node-3:
+    image: ${REDIS_IMAGE:-redis:7.2-alpine}
+    container_name: chat-redis-cluster-node-3
+    hostname: redis-cluster-node-3
+    profiles: [ "cluster" ]
+    command:
+      [
+        "redis-server",
+        "/usr/local/etc/redis/redis-cluster.conf",
+        "--cluster-announce-hostname", "redis-cluster-node-3",
+        "--cluster-announce-port", "6379",
+        "--cluster-announce-bus-port", "16379"
+      ]
+    environment:
+      TZ: ${TZ:-Asia/Seoul}
+    volumes:
+      - redis_cluster_node_3_data:/data
+      - ./infra/redis/redis-cluster.conf:/usr/local/etc/redis/redis-cluster.conf:ro
+    ports:
+      - "127.0.0.1:${REDIS_CLUSTER_NODE_3_HOST_PORT:-6381}:6379"
+    healthcheck:
+      test: [ "CMD", "redis-cli", "-p", "6379", "ping" ]
+      interval: ${REDIS_HEALTHCHECK_INTERVAL:-10s}
+      timeout: ${REDIS_HEALTHCHECK_TIMEOUT:-3s}
+      retries: ${REDIS_HEALTHCHECK_RETRIES:-5}
+    networks:
+      - chat-network
+
+  redis-cluster-node-4:
+    image: ${REDIS_IMAGE:-redis:7.2-alpine}
+    container_name: chat-redis-cluster-node-4
+    hostname: redis-cluster-node-4
+    profiles: [ "cluster" ]
+    command:
+      [
+        "redis-server",
+        "/usr/local/etc/redis/redis-cluster.conf",
+        "--cluster-announce-hostname", "redis-cluster-node-4",
+        "--cluster-announce-port", "6379",
+        "--cluster-announce-bus-port", "16379"
+      ]
+    environment:
+      TZ: ${TZ:-Asia/Seoul}
+    volumes:
+      - redis_cluster_node_4_data:/data
+      - ./infra/redis/redis-cluster.conf:/usr/local/etc/redis/redis-cluster.conf:ro
+    ports:
+      - "127.0.0.1:${REDIS_CLUSTER_NODE_4_HOST_PORT:-6382}:6379"
+    healthcheck:
+      test: [ "CMD", "redis-cli", "-p", "6379", "ping" ]
+      interval: ${REDIS_HEALTHCHECK_INTERVAL:-10s}
+      timeout: ${REDIS_HEALTHCHECK_TIMEOUT:-3s}
+      retries: ${REDIS_HEALTHCHECK_RETRIES:-5}
+    networks:
+      - chat-network
+
+  redis-cluster-node-5:
+    image: ${REDIS_IMAGE:-redis:7.2-alpine}
+    container_name: chat-redis-cluster-node-5
+    hostname: redis-cluster-node-5
+    profiles: [ "cluster" ]
+    command:
+      [
+        "redis-server",
+        "/usr/local/etc/redis/redis-cluster.conf",
+        "--cluster-announce-hostname", "redis-cluster-node-5",
+        "--cluster-announce-port", "6379",
+        "--cluster-announce-bus-port", "16379"
+      ]
+    environment:
+      TZ: ${TZ:-Asia/Seoul}
+    volumes:
+      - redis_cluster_node_5_data:/data
+      - ./infra/redis/redis-cluster.conf:/usr/local/etc/redis/redis-cluster.conf:ro
+    ports:
+      - "127.0.0.1:${REDIS_CLUSTER_NODE_5_HOST_PORT:-6383}:6379"
+    healthcheck:
+      test: [ "CMD", "redis-cli", "-p", "6379", "ping" ]
+      interval: ${REDIS_HEALTHCHECK_INTERVAL:-10s}
+      timeout: ${REDIS_HEALTHCHECK_TIMEOUT:-3s}
+      retries: ${REDIS_HEALTHCHECK_RETRIES:-5}
+    networks:
+      - chat-network
+
+  redis-cluster-node-6:
+    image: ${REDIS_IMAGE:-redis:7.2-alpine}
+    container_name: chat-redis-cluster-node-6
+    hostname: redis-cluster-node-6
+    profiles: [ "cluster" ]
+    command:
+      [
+        "redis-server",
+        "/usr/local/etc/redis/redis-cluster.conf",
+        "--cluster-announce-hostname", "redis-cluster-node-6",
+        "--cluster-announce-port", "6379",
+        "--cluster-announce-bus-port", "16379"
+      ]
+    environment:
+      TZ: ${TZ:-Asia/Seoul}
+    volumes:
+      - redis_cluster_node_6_data:/data
+      - ./infra/redis/redis-cluster.conf:/usr/local/etc/redis/redis-cluster.conf:ro
+    ports:
+      - "127.0.0.1:${REDIS_CLUSTER_NODE_6_HOST_PORT:-6384}:6379"
+    healthcheck:
+      test: [ "CMD", "redis-cli", "-p", "6379", "ping" ]
+      interval: ${REDIS_HEALTHCHECK_INTERVAL:-10s}
+      timeout: ${REDIS_HEALTHCHECK_TIMEOUT:-3s}
+      retries: ${REDIS_HEALTHCHECK_RETRIES:-5}
+    networks:
+      - chat-network
+
+  # redis-cluster-init runs redis-cli --cluster create via infra/redis/create-cluster.sh.
+  redis-cluster-init:
+    image: ${REDIS_IMAGE:-redis:7.2-alpine}
+    container_name: chat-redis-cluster-init
+    profiles: [ "cluster" ]
+    entrypoint: [ "/bin/sh", "/usr/local/bin/create-cluster.sh" ]
+    environment:
+      TZ: ${TZ:-Asia/Seoul}
+      REDIS_CLUSTER_NODES: ${REDIS_CLUSTER_NODES:-redis-cluster-node-1:6379,redis-cluster-node-2:6379,redis-cluster-node-3:6379,redis-cluster-node-4:6379,redis-cluster-node-5:6379,redis-cluster-node-6:6379}
+      REDIS_CLUSTER_BOOTSTRAP_TIMEOUT_SECONDS: ${REDIS_CLUSTER_BOOTSTRAP_TIMEOUT_SECONDS:-90}
+    volumes:
+      - ./infra/redis/create-cluster.sh:/usr/local/bin/create-cluster.sh:ro
+    depends_on:
+      redis-cluster-node-1: { condition: service_healthy }
+      redis-cluster-node-2: { condition: service_healthy }
+      redis-cluster-node-3: { condition: service_healthy }
+      redis-cluster-node-4: { condition: service_healthy }
+      redis-cluster-node-5: { condition: service_healthy }
+      redis-cluster-node-6: { condition: service_healthy }
+    networks:
+      - chat-network
+
   chat-api-app-1:
     image: ${CHAT_API_IMAGE:-chatting-service-chat-api-application:local}
+    profiles: [ "cluster" ]
     build:
       context: .
       args:
@@ -209,13 +404,14 @@ services:
       APP_ROLE: api
     depends_on:
       postgres-primary-setup: { condition: service_completed_successfully }
-      redis: { condition: service_healthy }
+      redis-cluster-init: { condition: service_completed_successfully }
     healthcheck: *chat-app-healthcheck
     networks:
       - chat-network
 
   chat-api-app-2:
     image: ${CHAT_API_IMAGE:-chatting-service-chat-api-application:local}
+    profiles: [ "cluster" ]
     container_name: chat-api-app-2
     hostname: chat-api-app-2
     environment:
@@ -224,13 +420,14 @@ services:
       APP_ROLE: api
     depends_on:
       postgres-primary-setup: { condition: service_completed_successfully }
-      redis: { condition: service_healthy }
+      redis-cluster-init: { condition: service_completed_successfully }
     healthcheck: *chat-app-healthcheck
     networks:
       - chat-network
 
   chat-websocket-app-1:
     image: ${CHAT_WEBSOCKET_IMAGE:-chatting-service-chat-websocket-application:local}
+    profiles: [ "cluster" ]
     build:
       context: .
       args:
@@ -244,13 +441,14 @@ services:
       APP_ROLE: websocket
     depends_on:
       postgres-primary-setup: { condition: service_completed_successfully }
-      redis: { condition: service_healthy }
+      redis-cluster-init: { condition: service_completed_successfully }
     healthcheck: *chat-app-healthcheck
     networks:
       - chat-network
 
   chat-websocket-app-2:
     image: ${CHAT_WEBSOCKET_IMAGE:-chatting-service-chat-websocket-application:local}
+    profiles: [ "cluster" ]
     container_name: chat-websocket-app-2
     hostname: chat-websocket-app-2
     environment:
@@ -259,13 +457,14 @@ services:
       APP_ROLE: websocket
     depends_on:
       postgres-primary-setup: { condition: service_completed_successfully }
-      redis: { condition: service_healthy }
+      redis-cluster-init: { condition: service_completed_successfully }
     healthcheck: *chat-app-healthcheck
     networks:
       - chat-network
 
   chat-worker-app-1:
     image: ${CHAT_WORKER_IMAGE:-chatting-service-chat-worker-application:local}
+    profiles: [ "cluster" ]
     build:
       context: .
       args:
@@ -282,13 +481,14 @@ services:
       CHAT_WORKER_FANOUT_OWNER_LEASE_KEY_PREFIX: ${CHAT_WORKER_FANOUT_OWNER_LEASE_KEY_PREFIX:-chat:fanout:owner:room:}
     depends_on:
       postgres-primary-setup: { condition: service_completed_successfully }
-      redis: { condition: service_healthy }
+      redis-cluster-init: { condition: service_completed_successfully }
     healthcheck: *chat-app-healthcheck
     networks:
       - chat-network
 
   chat-admin-app-1:
     image: ${CHAT_ADMIN_IMAGE:-chatting-service-chat-admin-application:local}
+    profiles: [ "cluster" ]
     build:
       context: .
       args:
@@ -303,7 +503,7 @@ services:
     depends_on:
       postgres-primary-setup: { condition: service_completed_successfully }
       postgres-replica: { condition: service_healthy }
-      redis: { condition: service_healthy }
+      redis-cluster-init: { condition: service_completed_successfully }
     healthcheck: *chat-app-healthcheck
     networks:
       - chat-network
@@ -311,6 +511,7 @@ services:
   # Prometheus (metric 수집)
   prometheus:
     image: ${PROMETHEUS_IMAGE:-prom/prometheus:v2.53.0}
+    profiles: [ "cluster" ]
     container_name: chat-prometheus
     volumes:
       - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
@@ -324,7 +525,8 @@ services:
 
   # Grafana (dashboard)
   grafana:
-    image: ${GRAFANA_IMAGE:-grafana/grafana:11.1.0}
+    image: ${GRAFANA_IMAGE:-grafana/grafana:11.5.2}
+    profiles: [ "cluster" ]
     container_name: chat-grafana
     environment:
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
@@ -344,6 +546,7 @@ services:
   # Nginx
   nginx:
     image: ${NGINX_IMAGE:-nginx:1.27-alpine}
+    profiles: [ "cluster" ]
     container_name: chat-nginx
     environment:
       TZ: ${TZ:-Asia/Seoul}
@@ -397,6 +600,18 @@ volumes:
   postgres_partition_archive:
     driver: local
   redis_data:
+    driver: local
+  redis_cluster_node_1_data:
+    driver: local
+  redis_cluster_node_2_data:
+    driver: local
+  redis_cluster_node_3_data:
+    driver: local
+  redis_cluster_node_4_data:
+    driver: local
+  redis_cluster_node_5_data:
+    driver: local
+  redis_cluster_node_6_data:
     driver: local
   prometheus_data:
     driver: local

@@ -5,17 +5,38 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.SerializationFeature
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
 import com.fasterxml.jackson.module.kotlin.KotlinModule
+import io.lettuce.core.cluster.ClusterClientOptions
+import io.lettuce.core.cluster.ClusterTopologyRefreshOptions
+import org.springframework.boot.autoconfigure.data.redis.LettuceClientConfigurationBuilderCustomizer
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.context.annotation.Profile
 import org.springframework.data.redis.connection.RedisConnectionFactory
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.data.redis.listener.RedisMessageListenerContainer
 import org.springframework.data.redis.serializer.StringRedisSerializer
+import java.time.Duration
 import java.util.concurrent.Executors
 
 
 @Configuration
 class RedisConfig {
+
+    @Bean
+    @Profile("redis-cluster")
+    fun redisClusterTopologyRefreshCustomizer(): LettuceClientConfigurationBuilderCustomizer {
+        return LettuceClientConfigurationBuilderCustomizer { builder ->
+            val topologyRefreshOptions = ClusterTopologyRefreshOptions.builder()
+                .enableAllAdaptiveRefreshTriggers()
+                .enablePeriodicRefresh(Duration.ofSeconds(30))
+                .build()
+            val clusterClientOptions = ClusterClientOptions.builder()
+                .topologyRefreshOptions(topologyRefreshOptions)
+                .build()
+
+            builder.clientOptions(clusterClientOptions)
+        }
+    }
 
     @Bean("distributedObjectMapper")
     fun distributedObjectMapper() : ObjectMapper {

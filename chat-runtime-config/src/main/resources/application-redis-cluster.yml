@@ -1,0 +1,6 @@
+spring:
+  data:
+    redis:
+      cluster:
+        nodes: ${REDIS_CLUSTER_NODES:redis-cluster-node-1:6379,redis-cluster-node-2:6379,redis-cluster-node-3:6379,redis-cluster-node-4:6379,redis-cluster-node-5:6379,redis-cluster-node-6:6379}
+        max-redirects: ${REDIS_CLUSTER_MAX_REDIRECTS:5}

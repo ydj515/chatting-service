@@ -1920,6 +1920,7 @@ node scripts/load-chat.mjs --room hot --viewers 10000 --messages-per-sec 10000 -
 - client를 Lettuce/Redisson cluster mode로 전환한다. 애플리케이션 코드는 이미 `{roomId}` hash tag로 같은 slot 보장을 준비했으므로 연결 설정 분기 중심으로 변경한다.
 - 단일 key Lua script(ticket rate limit, admission)가 cross-slot 문제 없이 동작하는지 Cluster에서 재검증한다.
 - `appendfsync everysec`로 인한 장애 시 최대 1초 ingest 유실 가능성을 운영 기준으로 명문화하고, 8.7 gap audit로 감지 경로를 만든다.
+- 2026-06-25 구현 기준: 전체 Docker backend는 `redis-cluster-node-1..6` + `redis-cluster-init`으로 3 master + 3 replica Redis Cluster를 구성하고, 앱 컨테이너는 `docker,redis-cluster` profile로 Lettuce cluster mode를 사용한다. 호스트 Gradle 개발 모드는 standalone `redis` dev profile을 유지한다.
 
 8.3 Object Storage + cold archive (B-2)
 

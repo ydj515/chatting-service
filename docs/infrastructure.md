@@ -6,7 +6,7 @@
 mise run setup                     # 도구(JDK 21 등) 설치 및 클라이언트 의존성 설치
 mise run                           # (기본) 로컬 개발: 인프라(도커)+백엔드(gradle)+클라이언트 = mise run dev
 mise run dev:api                   # 단일 앱만 기동(인프라 자동). websocket/admin/worker 동일
-mise run start:infra               # PostgreSQL primary/read-replica, archive worker, Redis만 기동
+mise run start:infra               # PostgreSQL primary/read-replica, archive worker, dev profile standalone Redis만 기동
 mise run start                     # 전체 도커 클러스터(이미지 빌드+nginx+멀티 인스턴스)+클라이언트 기동
 mise run build                     # 백엔드와 클라이언트 산출물 빌드
 mise run clean:infra               # 인프라 볼륨 정리 (깨끗하게 재시작할 때)
@@ -17,7 +17,7 @@ mise run stop                      # 전체 클러스터 종료
 
 ### 두 가지 실행 모드
 
-- **로컬 개발(기본)**: 인프라와 nginx 게이트웨이(`:80`)만 Docker, 백엔드는 호스트 Gradle `bootRun`. 이미지 빌드가 없어 코드 변경이 바로 반영된다. dev용 nginx는 `nginx.dev.conf`로 upstream을 `host.docker.internal:8080~8082`(호스트 백엔드)로 라우팅한다. 멀티 인스턴스는 포함하지 않는다.
+- **로컬 개발(기본)**: 인프라와 nginx 게이트웨이(`:80`)만 Docker, 백엔드는 호스트 Gradle `bootRun`. 이미지 빌드가 없어 코드 변경이 바로 반영된다. dev용 nginx는 `nginx.dev.conf`로 upstream을 `host.docker.internal:8080~8082`(호스트 백엔드)로 라우팅한다. 멀티 인스턴스는 포함하지 않는다. 이 모드는 호스트 Gradle 앱이 Redis Cluster redirect를 처리하기 어렵지 않도록 dev profile의 standalone Redis를 사용한다.
 
   ```bash
   mise run            # = mise run dev
@@ -25,7 +25,7 @@ mise run stop                      # 전체 클러스터 종료
                       #   호스트 백엔드 api:8080 / websocket:8081 / admin:8082 / worker:8083
   ```
 
-- **전체 도커 클러스터**: 이미지를 빌드해 nginx 게이트웨이와 다중 인스턴스를 포함한 전체 클러스터를 기동한다. 통합/최종 검증용.
+- **전체 도커 클러스터**: 이미지를 빌드해 nginx 게이트웨이, 다중 앱 인스턴스, 3 master + 3 replica Redis Cluster를 포함한 전체 클러스터를 기동한다. 통합/최종 검증용이며 Compose `cluster` profile을 사용한다.
 
   ```bash
   mise run clean:infra   # (선택) 볼륨 정리
@@ -66,6 +66,44 @@ docker compose run --rm \
 
 ---
 
+## Redis Cluster HA
+
+Phase 8.2부터 전체 Docker backend의 기본 Redis topology는 `redis-cluster-node-1..6`과 `redis-cluster-init`으로 구성된 Redis Cluster다.
+
+구성:
+
+- `redis-cluster-node-1..3`: master 후보
+- `redis-cluster-node-4..6`: replica 후보
+- `redis-cluster-init`: 6개 node가 healthy가 된 뒤 `redis-cli --cluster create ... --cluster-replicas 1`을 idempotent하게 실행하는 one-shot gate
+- Spring Boot 앱 컨테이너: `SPRING_PROFILES_ACTIVE=docker,redis-cluster`와 `REDIS_CLUSTER_NODES`로 Lettuce cluster mode를 사용
+
+수동 기동:
+
+```bash
+docker compose --profile cluster up -d \
+  redis-cluster-node-1 redis-cluster-node-2 redis-cluster-node-3 \
+  redis-cluster-node-4 redis-cluster-node-5 redis-cluster-node-6 \
+  redis-cluster-init
+```
+
+상태 확인:
+
+```bash
+docker compose exec -T redis-cluster-node-1 \
+  redis-cli -p 6379 cluster info
+
+docker compose exec -T redis-cluster-node-1 \
+  redis-cli -p 6379 cluster nodes
+```
+
+로컬 호스트 Gradle 개발 모드(`mise run dev:*`)는 `mise run start:infra`가 명시적으로 시작하는 dev profile의 standalone `redis` 서비스를 사용한다. Redis Cluster 서비스와 전체 backend 앱/nginx/Prometheus/Grafana는 `cluster` profile에 격리되어 있어 `docker compose --profile dev up` 경로에서 함께 뜨지 않는다.
+
+Redis Cluster host port는 `127.0.0.1`에만 bind한다. `infra/redis/redis-cluster.conf`는 `protected-mode no`가 필요하므로, Compose port binding으로 외부 인터페이스 노출을 막는다.
+
+`infra/redis/redis-cluster.conf`는 `appendonly yes`, `appendfsync everysec`, `cluster-preferred-endpoint-type hostname`을 사용한다. 따라서 Redis node 장애나 host crash 시 마지막 fsync 이후 최대 1초의 Redis ingest가 손실될 수 있다. 이 위험은 Phase 8.7의 gap audit/heartbeat 경로에서 감지하고 운영 runbook으로 보정한다.
+
+`redis-cluster-init`은 `REDIS_CLUSTER_NODES`와 `REDIS_CLUSTER_BOOTSTRAP_TIMEOUT_SECONDS`를 사용한다. node 준비나 cluster convergence가 timeout 안에 끝나지 않으면 cluster diagnostics를 출력하고 실패한다.
+
 ## 로드 밸런싱
 
 Nginx는 역할별 upstream으로 트래픽을 분리합니다.
@@ -86,7 +124,7 @@ Nginx는 역할별 upstream으로 트래픽을 분리합니다.
 
 이전 API 컨테이너 IP가 WebSocket 컨테이너 같은 다른 role에 재사용되면 `/api/users/register` 같은 REST 요청이 잘못된 role로 전달되어 `404`가 발생할 수 있습니다. 이는 controller mapping 문제가 아니라 nginx upstream endpoint가 stale 상태가 된 것입니다.
 
-현재 Compose runbook은 app rebuild 후 app health를 기다리고, nginx를 재시작한 뒤 nginx health까지 다시 기다리는 방식입니다. `mise run start`(내부적으로 `start:backend`)는 `docker compose up -d --build --wait` 이후 `docker compose restart nginx`를 실행합니다.
+현재 Compose runbook은 app rebuild 후 app health를 기다리고, nginx를 재시작한 뒤 nginx health까지 다시 기다리는 방식입니다. `mise run start`(내부적으로 `start:backend`)는 `docker compose --profile cluster up -d --build --wait` 이후 `docker compose restart nginx`를 실행합니다.
 
 ```bash
 mise run start
@@ -126,7 +164,9 @@ mise run verify:chat
 | `infra/postgres/replica/` | PostgreSQL replica 설정 |
 | `infra/postgres/message-partitions.sql` | 메시지 파티션 DDL |
 | `infra/postgres/archive/` | 파티션 archive worker |
-| `infra/redis/redis.conf` | Redis 설정 |
+| `infra/redis/redis.conf` | host Gradle 개발 모드용 standalone Redis 설정 |
+| `infra/redis/redis-cluster.conf` | 전체 Docker backend용 Redis Cluster node 설정 |
+| `infra/redis/create-cluster.sh` | 3 master + 3 replica Redis Cluster bootstrap one-shot 스크립트 |
 | `infra/nginx/nginx.conf` | Nginx 템플릿 설정(전체 클러스터용). Compose에서 `SERVER_PORT`를 `CHAT_BACKEND_PORT`로 전달해 upstream 포트를 생성 |
 | `infra/nginx/nginx.dev.conf` | 로컬 개발용 Nginx 설정. upstream을 `host.docker.internal:8080~8082`(호스트 gradle 백엔드)로 라우팅. compose `nginx-dev`(profile `dev`) 서비스가 사용 |
 | `start-cluster.sh` | 클러스터 실행 스크립트 |
