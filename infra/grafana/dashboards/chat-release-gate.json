@@ -10,6 +10,48 @@
       "targets": [
         { "expr": "chat_redis_stream_group_lag", "legendFormat": "{{stream_shard}}/{{consumer_group}}" }
       ]
+    },
+    {
+      "type": "timeseries",
+      "title": "WebSocket write latency p95",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        { "expr": "histogram_quantile(0.95, sum(rate(chat_websocket_gateway_write_latency_seconds_bucket[1m])) by (le, gatewayGroup))", "legendFormat": "{{gatewayGroup}}" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Active connections / send queue depth",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "targets": [
+        { "expr": "chat_websocket_gateway_connections", "legendFormat": "connections {{gatewayGroup}}" },
+        { "expr": "chat_websocket_gateway_send_queue_depth", "legendFormat": "queue {{gatewayGroup}}" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Local delivery / outbound bytes rate",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "targets": [
+        { "expr": "sum(rate(chat_websocket_gateway_local_deliveries_total[1m])) by (gatewayGroup)", "legendFormat": "deliveries/s {{gatewayGroup}}" },
+        { "expr": "sum(rate(chat_websocket_gateway_outbound_bytes_total[1m])) by (gatewayGroup)", "legendFormat": "bytes/s {{gatewayGroup}}" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Slow client disconnects rate",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "targets": [
+        { "expr": "sum(rate(chat_websocket_gateway_slow_client_disconnects_total[5m])) by (gatewayGroup)", "legendFormat": "{{gatewayGroup}}" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Postgres replica lag (ms)",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "targets": [
+        { "expr": "chat_postgres_replica_lag", "legendFormat": "{{replica}}" }
+      ]
     }
   ]
 }
