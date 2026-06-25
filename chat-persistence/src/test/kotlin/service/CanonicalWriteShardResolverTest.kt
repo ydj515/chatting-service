@@ -33,5 +33,9 @@ class CanonicalWriteShardResolverTest {
         override fun currentShardCount(roomId: Long): Int {
             return shardCounts.getValue(roomId)
         }
+
+        override fun shardConfig(roomId: Long): RoomShardConfig {
+            return RoomShardConfig(writeShardCount = currentShardCount(roomId), fanoutShardCount = 1)
+        }
     }
 }

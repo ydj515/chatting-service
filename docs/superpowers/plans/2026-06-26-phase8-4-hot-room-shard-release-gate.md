@@ -17,6 +17,8 @@
 - Modify `chat-persistence/src/main/kotlin/config/ChatRoomPolicyProperties.kt`: `hotShardCount=16`, `veryHotShardCount=64` 설정 추가.
 - Modify `chat-persistence/src/main/kotlin/service/RoomStorageConfigReader.kt`: `RoomShardConfig` DTO와 `shardConfig(roomId)` reader 추가.
 - Modify `chat-persistence/src/main/kotlin/repository/RoomStorageConfigJdbcRepository.kt`: write/fanout shard count 동시 조회.
+- Modify `chat-persistence/src/test/kotlin/service/CanonicalWriteShardResolverTest.kt`: `RoomStorageConfigReader` 확장에 따른 fake 보정.
+- Modify `chat-persistence/src/test/kotlin/service/PartitionedMessageWriteAdapterTest.kt`: `RoomStorageConfigReader` 확장에 따른 fake 보정.
 - Modify `chat-persistence/src/main/kotlin/service/RoomHeatClassifier.kt`: heat level별 shard count 포함.
 - Modify `chat-persistence/src/main/kotlin/repository/RoomPolicyJdbcRepository.kt`: automatic policy upsert가 shard count를 monotonic expansion으로 반영.
 - Modify `chat-persistence/src/main/kotlin/service/ChatServiceImpl.kt`: 메시지 수락 시 동적 shard count 사용.
@@ -46,6 +48,8 @@
 - Modify: `chat-persistence/src/main/kotlin/service/RoomStorageConfigReader.kt`
 - Modify: `chat-persistence/src/main/kotlin/repository/RoomStorageConfigJdbcRepository.kt`
 - Test: `chat-persistence/src/test/kotlin/repository/RoomStorageConfigJdbcRepositoryTest.kt`
+- Test: `chat-persistence/src/test/kotlin/service/CanonicalWriteShardResolverTest.kt`
+- Test: `chat-persistence/src/test/kotlin/service/PartitionedMessageWriteAdapterTest.kt`
 
 - [ ] **Step 1: Write the failing repository tests**
 
@@ -229,14 +233,49 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 8: Commit Task 1**
+- [ ] **Step 8: Update existing RoomStorageConfigReader fake implementations**
+
+Modify `chat-persistence/src/test/kotlin/service/CanonicalWriteShardResolverTest.kt` fake:
+
+```kotlin
+        override fun shardConfig(roomId: Long): RoomShardConfig {
+            return RoomShardConfig(writeShardCount = currentShardCount(roomId), fanoutShardCount = 1)
+        }
+```
+
+Modify `chat-persistence/src/test/kotlin/service/PartitionedMessageWriteAdapterTest.kt` fake:
+
+```kotlin
+        override fun shardConfig(roomId: Long): RoomShardConfig {
+            return RoomShardConfig(writeShardCount = shardCount, fanoutShardCount = 1)
+        }
+```
+
+- [ ] **Step 9: Run reader and affected fake tests**
+
+Run:
+
+```bash
+./gradlew :chat-persistence:test \
+  --tests com.chat.persistence.repository.RoomStorageConfigJdbcRepositoryTest \
+  --tests com.chat.persistence.service.CanonicalWriteShardResolverTest \
+  --tests com.chat.persistence.service.PartitionedMessageWriteAdapterTest \
+  --no-daemon
+```
+
+Expected: PASS.
+
+- [ ] **Step 10: Commit Task 1**
 
 ```bash
 git add chat-persistence/src/main/kotlin/config/ChatCacheProperties.kt \
   chat-persistence/src/main/kotlin/config/CacheConfig.kt \
   chat-persistence/src/main/kotlin/service/RoomStorageConfigReader.kt \
   chat-persistence/src/main/kotlin/repository/RoomStorageConfigJdbcRepository.kt \
-  chat-persistence/src/test/kotlin/repository/RoomStorageConfigJdbcRepositoryTest.kt
+  chat-persistence/src/test/kotlin/repository/RoomStorageConfigJdbcRepositoryTest.kt \
+  chat-persistence/src/test/kotlin/service/CanonicalWriteShardResolverTest.kt \
+  chat-persistence/src/test/kotlin/service/PartitionedMessageWriteAdapterTest.kt \
+  docs/superpowers/plans/2026-06-26-phase8-4-hot-room-shard-release-gate.md
 git commit -m "feat: add room shard config reader"
 ```
 

@@ -120,5 +120,9 @@ class PartitionedMessageWriteAdapterTest {
         private val shardCount: Int,
     ) : RoomStorageConfigReader {
         override fun currentShardCount(roomId: Long): Int = shardCount
+
+        override fun shardConfig(roomId: Long): RoomShardConfig {
+            return RoomShardConfig(writeShardCount = shardCount, fanoutShardCount = 1)
+        }
     }
 }
