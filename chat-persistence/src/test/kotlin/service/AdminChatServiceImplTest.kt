@@ -33,6 +33,7 @@ import org.mockito.ArgumentMatchers.contains
 import org.mockito.ArgumentMatchers.eq
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
+import org.mockito.Mockito.verifyNoInteractions
 import org.mockito.Mockito.`when`
 import org.springframework.transaction.annotation.Transactional
 import java.time.Duration
@@ -328,6 +329,58 @@ class AdminChatServiceImplTest {
     }
 
     @Test
+    fun `export status 조회는 object storage 비활성 시 download url 없이 status를 반환한다`() {
+        val fixture = fixture(ChatObjectStorageProperties(enabled = false))
+        `when`(fixture.exportJobRepository.findById("export-1")).thenReturn(
+            AdminExportJobStatusRecord(
+                jobId = "export-1",
+                actor = "admin-local",
+                status = "COMPLETED",
+                outputUri = "s3://chat-archives/admin-exports/export-1.csv",
+                exportedRows = 2,
+                errorMessage = null,
+                createdAt = LocalDateTime.parse("2026-06-26T00:00:00"),
+                startedAt = LocalDateTime.parse("2026-06-26T00:00:01"),
+                completedAt = LocalDateTime.parse("2026-06-26T00:00:02"),
+            ),
+        )
+
+        val result = fixture.service.getMessageExport("admin-local", "export-1")
+
+        // 비활성 상태에서는 presign을 시도하지 않고 status만 반환한다(500 방지).
+        assertEquals("COMPLETED", result?.status)
+        assertEquals("s3://chat-archives/admin-exports/export-1.csv", result?.outputUri)
+        assertEquals(null, result?.downloadUrl)
+        assertEquals(null, result?.downloadUrlExpiresAt)
+        assertEquals(null, fixture.objectStoragePort.presignedObjectUri)
+    }
+
+    @Test
+    fun `export status 조회는 미완료 job의 로컬 staging output uri를 노출하지 않는다`() {
+        val fixture = fixture()
+        `when`(fixture.exportJobRepository.findById("export-1")).thenReturn(
+            AdminExportJobStatusRecord(
+                jobId = "export-1",
+                actor = "admin-local",
+                status = "RUNNING",
+                outputUri = "file:///tmp/chat-admin-exports/export-1.csv",
+                exportedRows = 1,
+                errorMessage = null,
+                createdAt = LocalDateTime.parse("2026-06-26T00:00:00"),
+                startedAt = LocalDateTime.parse("2026-06-26T00:00:01"),
+                completedAt = null,
+            ),
+        )
+
+        val result = fixture.service.getMessageExport("admin-local", "export-1")
+
+        assertEquals("RUNNING", result?.status)
+        assertEquals(null, result?.outputUri)
+        assertEquals(null, result?.downloadUrl)
+        assertEquals(null, fixture.objectStoragePort.presignedObjectUri)
+    }
+
+    @Test
     fun `export status 조회는 없는 job이면 null을 반환하고 audit log를 남기지 않는다`() {
         val fixture = fixture()
         `when`(fixture.exportJobRepository.findById("missing")).thenReturn(null)
@@ -336,6 +389,7 @@ class AdminChatServiceImplTest {
 
         assertEquals(null, result)
         verify(fixture.exportJobRepository).findById(eqString("missing"))
+        verifyNoInteractions(fixture.auditRepository)
     }
 
     @Test
@@ -383,7 +437,9 @@ class AdminChatServiceImplTest {
         )
     }
 
-    private fun fixture(): Fixture {
+    private fun fixture(
+        objectStorageProperties: ChatObjectStorageProperties = ChatObjectStorageProperties(enabled = true),
+    ): Fixture {
         val messageRepository = mock(AdminMessageRepository::class.java)
         val auditRepository = mock(AdminAuditLogRepository::class.java)
         val exportJobRepository = mock(AdminExportJobRepository::class.java)
@@ -398,7 +454,7 @@ class AdminChatServiceImplTest {
                 auditLogRepository = auditRepository,
                 exportJobRepository = exportJobRepository,
                 objectStoragePort = objectStoragePort,
-                objectStorageProperties = ChatObjectStorageProperties(),
+                objectStorageProperties = objectStorageProperties,
                 objectMapper = jacksonObjectMapper().registerModule(JavaTimeModule()),
             ),
         )

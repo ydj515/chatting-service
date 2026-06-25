@@ -153,6 +153,11 @@ class AdminExportJobRepositoryTest {
 
         assertEquals("COMPLETED", record?.status)
         assertEquals("s3://chat-archives/admin-exports/export-1.csv", record?.outputUri)
+        assertEquals(2, record?.exportedRows)
+        // timestamp 매핑이 깨져도 통과하지 않도록 createdAt/startedAt/completedAt도 함께 검증한다.
+        assertEquals(LocalDateTime.parse("2026-06-26T00:00:00"), record?.createdAt)
+        assertEquals(LocalDateTime.parse("2026-06-26T00:00:01"), record?.startedAt)
+        assertEquals(LocalDateTime.parse("2026-06-26T00:00:02"), record?.completedAt)
         val sqlCaptor = ArgumentCaptor.forClass(String::class.java)
         verify(jdbcTemplate).queryForObject(
             sqlCaptor.capture(),

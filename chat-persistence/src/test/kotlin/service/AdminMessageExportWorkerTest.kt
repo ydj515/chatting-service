@@ -70,9 +70,9 @@ class AdminMessageExportWorkerTest {
         assertEquals("s3://chat-archives/admin-exports/export-1.csv", outputCaptor.value)
         assertEquals("admin-exports/export-1.csv", storage.uploadedObjectKey)
         assertEquals("text/csv; charset=utf-8", storage.uploadedContentType)
-        val uploadedFile = requireNotNull(storage.uploadedFile)
-        assertTrue(Files.exists(uploadedFile))
-        val csv = Files.readString(uploadedFile, Charsets.UTF_8)
+        // 업로드 후 로컬 staging 파일은 삭제되어야 한다.
+        assertTrue(Files.notExists(requireNotNull(storage.uploadedFile)))
+        val csv = requireNotNull(storage.uploadedContent)
         assertTrue(csv.contains("messageId,clientMessageId,roomId"))
         assertTrue(csv.contains("msg-1,client-100,10,100"))
     }
@@ -117,7 +117,7 @@ class AdminMessageExportWorkerTest {
             captureString(outputCaptor),
         )
         assertEquals("s3://chat-archives/admin-exports/export-1.csv", outputCaptor.value)
-        val csv = Files.readString(requireNotNull(storage.uploadedFile), Charsets.UTF_8)
+        val csv = requireNotNull(storage.uploadedContent)
         assertTrue(csv.contains("'\u0040admin"))
         assertTrue(csv.contains("\"'=IMPORTXML(\"\"https://example.test\"\")\""))
     }
@@ -251,7 +251,8 @@ class AdminMessageExportWorkerTest {
     ) {
         val exportJobRepository = mock(AdminExportJobRepository::class.java)
         val messageRepository = mock(AdminMessageRepository::class.java)
-        val worker = worker(exportJobRepository, messageRepository, tempDir)
+        val storage = RecordingObjectStoragePort()
+        val worker = worker(exportJobRepository, messageRepository, tempDir, objectStoragePort = storage)
         val output = tempDir.resolve("export-1.csv")
         Files.writeString(
             output,
@@ -297,7 +298,9 @@ class AdminMessageExportWorkerTest {
         val exportedRows = worker.pollAndExport()
 
         assertEquals(3, exportedRows)
-        val csv = Files.readString(output, Charsets.UTF_8)
+        // 완료 후 로컬 staging 파일은 삭제되므로 업로드된 내용으로 누적 append 결과를 검증한다.
+        assertTrue(Files.notExists(output))
+        val csv = requireNotNull(storage.uploadedContent)
         assertEquals(1, Regex("messageId,clientMessageId,roomId").findAll(csv).count())
         assertTrue(csv.contains("msg-98,client-98,10,98"))
         verify(messageRepository).findRoomMessages(10L, null, null, checkpointCursor, 2)
@@ -360,6 +363,7 @@ class AdminMessageExportWorkerTest {
 
     private class RecordingObjectStoragePort : ObjectStoragePort {
         var uploadedFile: Path? = null
+        var uploadedContent: String? = null
         var uploadedObjectKey: String? = null
         var uploadedContentType: String? = null
         var failUpload: Boolean = false
@@ -369,6 +373,9 @@ class AdminMessageExportWorkerTest {
                 error("upload failed")
             }
             uploadedFile = request.file
+            // 실제 업로드처럼 파일 바이트를 읽어 둔다. worker가 업로드 후 로컬 파일을 삭제하므로
+            // 테스트는 원본 경로가 아닌 캡처한 내용으로 CSV를 검증한다.
+            uploadedContent = Files.readString(request.file, Charsets.UTF_8)
             uploadedObjectKey = request.objectKey
             uploadedContentType = request.contentType
             return ObjectUploadResult("s3://chat-archives/${request.objectKey}")

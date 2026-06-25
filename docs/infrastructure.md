@@ -66,7 +66,7 @@ docker compose run --rm \
 
 ### Object Storage / MinIO
 
-Phase 8.3부터 Docker Compose는 S3 호환 Object Storage로 MinIO를 함께 띄웁니다. `minio-init`은 앱과 archive worker가 시작되기 전에 `${CHAT_OBJECT_STORAGE_BUCKET:-chat-archives}` bucket을 idempotent하게 생성합니다.
+Phase 8.3부터 Docker Compose는 S3 호환 Object Storage로 MinIO를 함께 띄웁니다. `minio-init`은 `${CHAT_OBJECT_STORAGE_BUCKET:-chat-archives}` bucket을 idempotent하게 생성하며, Object Storage를 실제로 사용하는 `chat-worker-app-1`, `chat-admin-app-1`, `postgres-partition-archive`만 `minio-init` 완료를 기다린 뒤 시작합니다. (API/WebSocket 앱은 bucket 초기화에 의존하지 않습니다.)
 
 | 항목 | 기본값 |
 | --- | --- |

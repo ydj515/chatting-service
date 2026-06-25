@@ -67,14 +67,24 @@ upload_archive_to_object_storage() {
   if ! is_true "$object_storage_enabled"; then
     return 0
   fi
-  if [ -z "$object_storage_endpoint" ] || [ -z "$object_storage_bucket" ]; then
-    echo "Object Storage endpoint and bucket are required when archive upload is enabled." >&2
+  if [ -z "$object_storage_bucket" ]; then
+    echo "Object Storage bucket is required when archive upload is enabled." >&2
     exit 1
   fi
+  # endpoint가 비어 있으면 표준 AWS S3 엔드포인트를 그대로 사용한다(운영 S3 환경 지원).
+  # MinIO 등 커스텀 엔드포인트는 값이 있을 때만 --endpoint-url로 전달한다.
   echo "Uploading ${archive_file} to ${archive_object_uri}..."
-  aws --endpoint-url "$object_storage_endpoint" s3 cp "$archive_file" "s3://${object_storage_bucket}/${archive_object_key}"
+  if [ -n "$object_storage_endpoint" ]; then
+    aws --endpoint-url "$object_storage_endpoint" s3 cp "$archive_file" "s3://${object_storage_bucket}/${archive_object_key}"
+  else
+    aws s3 cp "$archive_file" "s3://${object_storage_bucket}/${archive_object_key}"
+  fi
   echo "Uploading ${metadata_file} to ${metadata_object_uri}..."
-  aws --endpoint-url "$object_storage_endpoint" s3 cp "$metadata_file" "s3://${object_storage_bucket}/${metadata_object_key}"
+  if [ -n "$object_storage_endpoint" ]; then
+    aws --endpoint-url "$object_storage_endpoint" s3 cp "$metadata_file" "s3://${object_storage_bucket}/${metadata_object_key}"
+  else
+    aws s3 cp "$metadata_file" "s3://${object_storage_bucket}/${metadata_object_key}"
+  fi
 }
 
 require_object_storage_for_drop

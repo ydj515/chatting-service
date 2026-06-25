@@ -81,6 +81,11 @@ function App() {
   const [searchHasNext, setSearchHasNext] = useState(false);
   const [searchCursor, setSearchCursor] = useState<string | null>(null);
   const [lastExportJob, setLastExportJob] = useState<AdminExportJob | null>(null);
+  // export job을 생성한 API 컨텍스트(baseUrl/token)를 함께 보관한다.
+  // 사용자가 환경/토큰을 바꿔도 Refresh Export가 원래 백엔드를 폴링하도록 고정한다.
+  const [exportJobContext, setExportJobContext] = useState<{ baseUrl: string; token: string } | null>(
+    null,
+  );
 
   const [notice, setNotice] = useState('Ready');
   const [noticeError, setNoticeError] = useState(false);
@@ -257,16 +262,18 @@ function App() {
       async () => {
         const job = await createAdminExport(effectiveBaseUrl, token, buildFilters());
         setLastExportJob(job);
+        setExportJobContext({ baseUrl: effectiveBaseUrl, token });
         successMessage = `Export ${job.jobId} ${job.status}`;
       },
     );
   };
 
   const handleExportStatusRefresh = async () => {
-    if (!lastExportJob) return;
-    const { baseUrl: effectiveBaseUrl } = persistState();
+    if (!lastExportJob || !exportJobContext) return;
+    // 현재 입력값이 아닌, job을 생성한 시점의 baseUrl/token으로 조회한다.
+    const { baseUrl: jobBaseUrl, token: jobToken } = exportJobContext;
     await run('Export status loaded', async () => {
-      const job = await fetchAdminExportStatus(effectiveBaseUrl, token, lastExportJob.jobId);
+      const job = await fetchAdminExportStatus(jobBaseUrl, jobToken, lastExportJob.jobId);
       setLastExportJob(job);
     });
   };

@@ -51,6 +51,10 @@ class AdminMessageExportWorker(
                 ),
             )
             exportJobRepository.markCompleted(job.jobId, upload.objectUri)
+            // 업로드가 끝난 로컬 staging CSV는 디스크 점유/민감 데이터 잔존을 막기 위해 정리한다.
+            // 정리 실패가 완료된 job을 되돌릴 이유는 없으므로 예외는 삼킨다.
+            runCatching { Files.deleteIfExists(exportResult.outputPath) }
+                .onFailure { logger.warn("Failed to delete staging export file ${exportResult.outputPath}: ${it.message}") }
             logger.info("Completed admin message export job ${job.jobId} with ${exportResult.exportedRows} rows")
             exportResult.exportedRows
         } catch (e: Exception) {

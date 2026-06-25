@@ -149,9 +149,19 @@ class AdminChatServiceImpl(
         jobId: String,
     ): AdminExportJobStatusDto? {
         val record = exportJobRepository.findById(jobId) ?: return null
-        val presigned = record.outputUri
+        // RUNNING 중에는 outputUri가 worker 로컬 staging(file://) 경로로 checkpoint된다.
+        // 외부에 노출하는 outputUri는 완료된 s3:// 객체 URI로만 한정한다.
+        val completedObjectUri = record.outputUri
             ?.takeIf { record.status == "COMPLETED" && it.startsWith("s3://") }
-            ?.let { objectStoragePort.createDownloadUrl(it, objectStorageProperties.presignedUrlTtl) }
+        // Object Storage가 비활성이거나 presign이 실패하더라도 status 조회 자체는 500이 되지 않도록
+        // enabled 게이트 + runCatching으로 downloadUrl을 graceful하게 생략한다.
+        val presigned = completedObjectUri
+            ?.takeIf { objectStorageProperties.enabled }
+            ?.let {
+                runCatching {
+                    objectStoragePort.createDownloadUrl(it, objectStorageProperties.presignedUrlTtl)
+                }.getOrNull()
+            }
 
         auditLogRepository.record(
             actor = actor,
@@ -173,7 +183,7 @@ class AdminChatServiceImpl(
             startedAt = record.startedAt,
             completedAt = record.completedAt,
             exportedRows = record.exportedRows,
-            outputUri = record.outputUri,
+            outputUri = completedObjectUri,
             downloadUrl = presigned?.url,
             downloadUrlExpiresAt = presigned?.expiresAt,
             errorMessage = record.errorMessage,
