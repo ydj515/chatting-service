@@ -1885,6 +1885,229 @@ mise run verify:chat
 node scripts/load-chat.mjs --room hot --viewers 10000 --messages-per-sec 10000 --duration 60
 ```
 
+### Phase 8. Production 준비 — 운영/보안/처리량 토대 (Compose 기준)
+
+의존성:
+
+- Phase 7 완료. 계측 코드(Redis Streams metric, fanout owner metric, admission/ticket metric)와 검증 스크립트(`scripts/phase7-*.mjs`), Prometheus alert rule(`infra/prometheus/rules/phase7-redis-streams-lag.rules.yml`)이 존재한다.
+- 2026-06-25 production readiness 평가(`docs/phase7_production_readiness_assessment.md` + `production-readiness-assessment-2026-06-25.html`)에서 확인된 Blocker(B-1~B-4)와 핵심 High(H-1, H-2), 설계 고민 미구현분(MAXLEN, gap audit, heartbeat)이 입력이다.
+
+목표:
+
+- 배포 오케스트레이션(Kubernetes)을 제외한, 공개 트래픽을 받기 위한 가용성/관측/보안/처리량 토대를 Docker Compose에서 확보한다.
+- 모든 토대는 Phase 9 K8s 전환에서 버려지지 않도록 K8s 재사용 가능한 형태로 만든다. 즉 Object Storage는 S3 호환 추상화로, Redis는 Cluster 전제로, TLS는 엣지 종단으로 둔다.
+- Phase 7이 "측정 수단"을 만들었다면, Phase 8은 그 measurement를 실제 수집/경보 파이프라인에 연결하고, 측정 대상이 되는 인프라 토대 자체를 채운다.
+- hot room 10,000 msg/sec 60초 유지를 형식 통과가 아니라 실제 release gate로 충족한다.
+
+초기 작업 순서:
+
+작업은 release gate 의존도 순으로 진행한다. 관측 파이프라인이 없으면 이후 모든 gate를 판정할 수 없으므로 8.1을 가장 먼저 한다.
+
+구현 작업:
+
+8.1 관측 파이프라인 + Gateway/Fan-out 실측 metric (B-3)
+
+- `micrometer-registry-prometheus` 의존성을 추가하고, actuator management exposure에 `prometheus`를 포함한다. 현재 노출은 `health,info,metrics,caches`뿐이라 scrape 포맷(`/actuator/prometheus`)이 생성되지 않는다.
+- `docker-compose.yml`에 Prometheus와 Grafana 컨테이너를 추가하고, role별(`chat-api`, `chat-websocket`, `chat-worker`, `chat-admin`) scrape target과 기존 alert rule을 연결한다.
+- Gateway/Fan-out 실측 metric을 신규 계측한다: active WebSocket connections, room subscription count, outbound payload bytes/sec, batch frames/sec, local delivery count/sec, send queue depth, WebSocket write latency p95/p99, slow client disconnect count, reconnect rate.
+- `RoomPolicyWorker`의 `gatewaySendQueueDepth`, writer lag, fanout lag 입력을 실제 계측 provider(`RoomPolicySignalProvider`)로 연결한다. 현재 기본 provider는 0을 반환해 `OVERLOAD` 자동 판정이 시스템 lag를 반영하지 못한다.
+- admin 응답의 `replicaLagMs`/`searchP95LatencyMs` placeholder(`0::bigint`/`NULL`)를 실제 측정값 또는 metric 기반으로 채운다.
+- `observability_metrics.md`가 정의한 dashboard 섹션(WebSocket Ticket, Gateway/Fan-out, Ingest/Worker, PostgreSQL/Search, Infra/Routing)을 Grafana dashboard로 구성한다.
+
+8.2 Redis Cluster HA (B-1)
+
+- 단일 `redis:7.2-alpine`을 Redis Cluster(최소 3 master + 3 replica)로 전환한다. 노드 장애 시 자동 failover로 sequence 발급/Streams ingest/admission/presence/fanout owner lease/pub-sub 경로가 유지되어야 한다.
+- client를 Lettuce/Redisson cluster mode로 전환한다. 애플리케이션 코드는 이미 `{roomId}` hash tag로 같은 slot 보장을 준비했으므로 연결 설정 분기 중심으로 변경한다.
+- 단일 key Lua script(ticket rate limit, admission)가 cross-slot 문제 없이 동작하는지 Cluster에서 재검증한다.
+- `appendfsync everysec`로 인한 장애 시 최대 1초 ingest 유실 가능성을 운영 기준으로 명문화하고, 8.7 gap audit로 감지 경로를 만든다.
+
+8.3 Object Storage + cold archive (B-2)
+
+- `docker-compose.yml`에 MinIO를 추가하고, S3 호환 `ObjectStoragePort` 추상화 1벌을 둔다. K8s 전환 시 인클러스터 MinIO 또는 매니지드 S3로 endpoint/credential만 교체한다.
+- `AdminMessageExportWorker`의 로컬 파일(`java.nio.file.Files`) 출력을 Object Storage 업로드 + 만료 시간이 있는 download URL 제공으로 바꾼다.
+- `infra/postgres/archive/archive-partitions.sh`의 retention 초과 파티션 DROP 전에 Object Storage cold archive 단계를 추가한다. 현재는 로컬 `/archive` 디렉토리 COPY 후 DROP뿐이라 retention 초과분이 사실상 삭제된다.
+
+8.4 hot room shard 분산 + 10k msg/sec release gate (B-4)
+
+- shard count 기본값 1 고정(`ChatRedisProperties.shardCount`, `RoomStorageConfigJdbcRepository.DEFAULT_SHARD_COUNT`, `ChatServiceImpl.SHARD_COUNT`)을 방별 동적 확장 가능 구조로 정비한다.
+- hot room 승격 시 stream/fanout shard count를 늘리고, 방별 owner를 여러 worker에 분산해 단일 owner가 10,000 msg/sec를 직렬 처리하지 않게 한다. forward-only sharding 원칙(과거 bucket shard count 유지, 새 bucket부터 적용)을 지킨다.
+- 10,000 msg/sec를 60초 이상 유지하는 부하 검증을 release gate로 강제한다. shard 분산 효과(owner 분산, writer lag, fanout p95)를 8.1 metric으로 확인한다.
+
+8.5 전송 보안 토대 (H-1)
+
+- nginx에 TLS termination을 추가하고 WebSocket을 `wss://`로 전환한다. 인증서는 마운트하고, Phase 9에서 Ingress + cert-manager로 자리만 이동할 수 있게 엣지 종단으로 둔다.
+- Redis `requirepass`(AUTH)와 DB/Redis 연결 암호화를 적용한다.
+- `.env` 평문 시크릿을 외부 주입 구조(Compose env_file/secret, K8s Secret으로 이행 가능)로 분리한다. HMAC session token 서명 키 회전 절차를 문서화한다.
+
+8.6 인증 토큰 revocation/회전 (H-2)
+
+- `HmacSessionTokenService`는 현재 TTL 만료만 검증한다. 로그아웃/제재/유출 시 즉시 무효화하는 revocation 경로(Redis 기반 denylist 또는 token version)를 추가한다.
+- 강제 로그아웃, 서명 키 롤오버, refresh 정책을 추가한다. WebSocket one-time ticket의 기반이 되는 session token 수명 관리를 강화한다.
+
+8.7 생존성 보강 (설계 고민 미구현분)
+
+- Redis Streams append에 `MAXLEN`(approximate trim)을 적용해 HPA 지연이나 worker 정체 시 Redis OOM을 방지한다. 유실을 감수하는 대신 8.1의 `Evicted`/lag metric으로 경보한다.
+- `roomSeq` gap audit job을 추가한다. canonical store의 `(roomId, roomSeq)`를 스캔해 비어 있는 sequence를 찾아 유실 구간을 식별하고 metric/alert로 노출한다. MAXLEN trim이나 장애로 유실이 생겨도 감지 수단이 있어야 한다.
+- WebSocket heartbeat(ping-pong)를 명시적으로 구현한다. 일정 시간 내 pong/메시지가 없는 zombie connection을 강제 종료해 File Descriptor와 메모리를 회수한다.
+
+이번 Phase에서 하지 않을 것:
+
+- Kubernetes manifest/Helm, HPA, Service/Ingress 전환은 만들지 않는다. Phase 9에서 다룬다.
+- 금칙어/스팸/도배 필터와 ban/mute 같은 moderation 도메인은 만들지 않는다. Phase 8.5에서 다룬다.
+- hot room 전용 Gateway pool과 room-aware routing은 만들지 않는다. Service/affinity가 깔끔한 Phase 9 K8s에서 다룬다.
+- OpenSearch, ScyllaDB/Cassandra는 도입하지 않는다. 기존 기준대로 장기 대안으로 둔다.
+- nginx static upstream stale 동적 resolver 같은 Compose 한정 과투자는 하지 않는다. Phase 7 restart 절차를 유지하고 근본 해결은 Phase 9 K8s Service/Ingress에 맡긴다.
+
+주요 파일:
+
+- `*/build.gradle.kts`, `chat-runtime-config/src/main/resources/application-docker.yml`
+- `docker-compose.yml`
+- `infra/prometheus/prometheus.yml`, `infra/grafana/`
+- `chat-persistence/src/main/kotlin/service/WebSocketSessionManager.kt`, 신규 Gateway metrics 컴포넌트
+- `chat-persistence/src/main/kotlin/service/RoomPolicyWorker.kt`, `RoomPolicySignalProvider` 구현체
+- `infra/redis/redis.conf`, Redis client cluster config
+- 신규 `ObjectStoragePort` + S3 adapter, `chat-persistence/src/main/kotlin/service/AdminMessageExportWorker.kt`, `infra/postgres/archive/archive-partitions.sh`
+- `chat-persistence/src/main/kotlin/repository/RoomStorageConfigJdbcRepository.kt`, `chat-persistence/src/main/kotlin/config/ChatRedisProperties.kt`
+- `infra/nginx/nginx.conf`
+- `chat-persistence/src/main/kotlin/service/HmacSessionTokenService.kt`, 신규 token revocation 컴포넌트
+- `chat-persistence/src/main/kotlin/redis/RedisMessageStreamProducer.kt`, 신규 `roomSeq` gap audit worker, WebSocket heartbeat 설정
+
+완료 기준:
+
+- `/actuator/prometheus`가 노출되고, Prometheus가 모든 role을 scrape하며, Grafana dashboard에서 Phase 7 release gate metric을 시계열로 확인할 수 있다.
+- Gateway/Fan-out 실측 metric(active connections, send queue depth, write latency p95/p99 등)이 관측되고, `OVERLOAD` 자동 판정이 실제 lag/queue 신호를 입력으로 받는다.
+- Redis 노드 하나를 죽여도 자동 failover로 메시지 수락과 실시간 경로가 유지된다.
+- export 파일이 Object Storage에 저장되고 만료 download URL이 제공되며, retention 초과 파티션이 cold archive 후 DROP된다.
+- hot room shard 분산이 적용되어 10,000 msg/sec를 60초 이상 유지하고, 단일 owner 병목 없이 fanout p95가 기준을 만족한다.
+- WebSocket이 `wss://`로 동작하고, Redis AUTH와 시크릿 외부화가 적용된다.
+- 로그아웃/제재 시 토큰이 즉시 무효화되고 키 롤오버가 가능하다.
+- Streams `MAXLEN`이 적용되고, `roomSeq` gap audit가 유실 구간을 감지하며, heartbeat가 zombie connection을 회수한다.
+
+검증:
+
+```bash
+./gradlew test --no-daemon
+docker compose up -d
+curl -s http://localhost/api/actuator/prometheus | grep -c '^chat_'
+# Redis Cluster failover
+docker compose kill redis-node-1 && mise run verify:chat
+# Object storage export
+mise run verify:admin-export
+# 10k release gate
+node scripts/load-chat.mjs --room hot --viewers 10000 --messages-per-sec 10000 --duration 60 --assert-room-seq-order
+# 생존성
+node scripts/verify-stream-maxlen.mjs
+node scripts/verify-roomseq-gap-audit.mjs
+```
+
+> 주의사항
+> - 관측 파이프라인 없이 토대만 채우면 release gate를 형식 통과시키는 Phase 7의 함정을 그대로 반복한다. 8.1을 반드시 먼저 끝낸다.
+> - Redis Cluster는 가용성을 주지만, 단일 key Lua script 제약과 hot room slot skew를 함께 본다. very hot room 하나가 특정 slot을 압박할 수 있다.
+> - `MAXLEN` trim은 유실을 감수하는 backpressure다. gap audit와 alert가 없으면 유실을 감지하지 못하므로 8.7은 묶어서 완료한다.
+> - 모든 토대는 Compose 한정 자산이 아니라 K8s 재사용 가능한 형태(S3 추상화, Cluster 전제, 엣지 TLS)로 만든다. 그래야 Phase 9에서 재작성이 아니라 배포 계층 교체로 끝난다.
+
+### Phase 8.5. Moderation과 사용자 제재
+
+의존성:
+
+- Phase 8 완료. message admission 경로(rate limit/slow mode)와 audit log가 안정화되어 있다.
+
+목표:
+
+- 설계 6.2/9.5가 요구하는 콘텐츠/abuse 통제를 추가한다. 현재 admission은 rate limit과 slow mode만 처리한다.
+
+구현 작업:
+
+- 금칙어/스팸/도배(중복 메시지) 필터를 admission 경로와 분리된 moderation 단계로 추가한다.
+- 신규/비인증 계정 차등 제한을 적용한다.
+- `ban`, `mute`, `suspend` 사용자 제재 도메인을 추가하고, 제재 시 8.6의 토큰 revocation과 연계한다.
+- 모든 moderation/제재 액션을 admin audit log에 남긴다.
+- `subscriber_only` 정책 컬럼(Phase 6에서 스키마만 준비)의 강제 로직 도입 여부를 구독 도메인 유무와 함께 판단한다.
+
+이번 Phase에서 하지 않을 것:
+
+- 자동 AI 기반 콘텐츠 분류는 1차 범위로 두지 않는다. 규칙 기반 필터를 먼저 둔다.
+
+주요 파일:
+
+- 신규 moderation 서비스/도메인, `chat-domain`, `chat-persistence`
+- `chat-admin` 제재/감사 controller
+
+완료 기준:
+
+- 금칙어/도배 메시지가 수락 전 거부되고 사유가 metric/audit으로 남는다.
+- ban/mute/suspend가 적용되고 토큰 무효화와 연계된다.
+- 모든 제재가 audit log에 기록된다.
+
+검증:
+
+```bash
+./gradlew test --no-daemon
+mise run verify:moderation
+```
+
+### Phase 9. Kubernetes 전환과 DR/백업
+
+의존성:
+
+- Phase 8 완료. 모든 운영 토대(S3 추상화, Redis Cluster 전제, 엣지 TLS, 전면 계측)가 K8s 재사용 가능한 형태로 준비되어 있다.
+
+목표:
+
+- Docker Compose 운영을 Kubernetes로 전환한다. 애플리케이션 도메인 코드는 대부분 공통이고, 교체되는 것은 배포 계층(라우팅/스케일/HA/시크릿)이다.
+- nginx static upstream stale 문제를 Service/Ingress의 stable virtual endpoint로 소멸시킨다.
+- 자동 확장과 데이터 복구 절차를 갖춰 단일 VM 한계(노드 장애 = 전체 정지)를 제거한다.
+
+구현 작업:
+
+- 모듈별 Deployment(`chat-api`, `chat-websocket`, `chat-worker`, `chat-admin`)와 개별 HPA를 작성한다. HPA는 CPU만이 아니라 active connections, Redis Streams lag, send queue depth를 입력으로 본다. Phase 8 metric을 Prometheus Adapter(또는 custom metrics API)로 노출해 HPA 입력으로 연결한다.
+- Service/Ingress(또는 Gateway API)로 전환해 stale upstream 문제와 Phase 7 nginx restart 절차/synthetic check를 회귀 방지용으로 축소한다.
+- Ingress + cert-manager로 TLS를 이전한다. Phase 8 엣지 TLS는 자리만 이동한다.
+- Redis Operator / Redis Cluster를 PV 기반으로 배포한다. Phase 8 hash tag 전제를 그대로 사용한다.
+- hot room 전용 Gateway pool과 room-aware routing(M-1)을 전용 Deployment + label/affinity + Service 분리로 구현한다.
+- DR/백업: PostgreSQL 정기 백업과 PITR, Redis 백업(AOF/RDB) 보관과 복구 리허설, PV snapshot, multi-AZ/노드 분산, RTO/RPO를 정의한다.
+- export atomic manifest(M-3), ws-ticket user/IP 완전 원자성(지표 초과 시)을 hardening 후보에서 승격 여부 판단한다.
+
+이번 Phase에서 하지 않을 것:
+
+- 애플리케이션 도메인 로직 재작성은 하지 않는다. 코드는 공통이고 배포 계층만 교체한다.
+- ScyllaDB/Cassandra, OpenSearch는 여전히 기준(검색 SLA/규모 한계)에 도달하기 전까지 도입하지 않는다.
+
+주요 파일:
+
+- 신규 `k8s/` 또는 `helm/` (Deployment, Service, Ingress, HPA, Secret, ConfigMap)
+- cert-manager, Redis Operator, Prometheus Adapter 매니페스트
+- DR/백업 runbook 문서
+
+완료 기준:
+
+- 모듈별 Deployment가 개별 HPA로 자동 확장되고, hot room 급증 시 Gateway/Worker가 metric 기반으로 스케일된다.
+- Service/Ingress 전환 후 app rollout/recreate에서 stale upstream 오라우팅이 발생하지 않는다.
+- Ingress + cert-manager로 TLS가 자동 갱신된다.
+- Redis Cluster가 Operator로 관리되고 노드 장애 시 자동 복구된다.
+- hot room이 전용 Gateway pool로 격리되어 일반 방 UX에 영향을 주지 않는다.
+- PITR 복구, Redis 백업 복원 리허설이 성공하고 RTO/RPO가 정의되어 있다.
+
+검증:
+
+```bash
+# 클러스터 배포 후
+kubectl apply -k k8s/overlays/staging
+kubectl get hpa
+# rollout 중 오라우팅 없음
+node scripts/phase7-role-routing-check.mjs --base-url https://staging.example.com
+# 부하/스케일
+node scripts/load-chat.mjs --room hot --viewers 10000 --messages-per-sec 10000 --duration 60
+# DR 리허설
+mise run verify:pitr-restore
+```
+
+> 주의사항
+> - Phase 9의 가치는 Phase 8 토대가 K8s 재사용 가능하게 만들어졌을 때만 "배포 계층 교체"로 끝난다. 토대가 Compose 종속이면 재작성 비용이 발생한다.
+> - HPA는 Phase 8 metric이 외부(Prometheus Adapter 등)로 노출되어야 동작한다. metric 노출 없이는 자동 확장이 불가능하다.
+> - chaos test(견디는가)와 DR/백업(복구하는가)은 다른 영역이다. 둘을 혼동하지 않는다.
+> - hot room 전용 Gateway pool의 라우팅 정책(어떤 방을 어느 pool로)은 앱/설정 공통으로 설계해 Compose/K8s 양쪽에 유효하게 둔다.
+
 ## 20. 현재 코드 기준 변경 포인트
 
 완료된 기반 작업:
@@ -1925,6 +2148,9 @@ node scripts/load-chat.mjs --room hot --viewers 10000 --messages-per-sec 10000 -
 | Phase 5 | admin history/search/export, audit log, 1천만건 seed | `chat-admin`, `chat-admin-application`, `chat-persistence`, `admin-web 또는 client` |
 | Phase 6 | Redis TTL fanout owner lease, hot room heat classifier, bounded live feed override, rate limit/slow mode | `chat-domain`, `chat-persistence`, `chat-admin`, `chat-websocket`, `client` |
 | Phase 7 | load/chaos/observability/release gate, fanout owner takeover metric semantics 정합성 검증 | `scripts`, `docs`, observability config |
+| Phase 8 | 관측 파이프라인+Gateway metric, Redis Cluster HA, Object Storage/cold archive, shard 분산+10k gate, TLS/wss, 토큰 revocation, MAXLEN/gap audit/heartbeat | `build.gradle.kts`, `docker-compose.yml`, `infra/prometheus`, `infra/grafana`, `infra/redis`, `infra/nginx`, `chat-persistence` |
+| Phase 8.5 | moderation 필터, ban/mute/suspend 제재, audit 연계 | `chat-domain`, `chat-persistence`, `chat-admin` |
+| Phase 9 | Kubernetes 전환(Deployment/HPA/Ingress), Redis Operator, cert-manager, hot room 전용 Gateway pool, DR/백업(PITR/RTO/RPO) | 신규 `k8s` 또는 `helm`, DR runbook |
 
 ## 21. 성공 기준
 
