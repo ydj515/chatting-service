@@ -41,6 +41,20 @@ class RoomHeatClassifierTest {
     }
 
     @Test
+    fun `HOT 방은 shard count를 16으로 확장한다`() {
+        val policy = classifier().classify(
+            RoomTrafficSnapshot(
+                roomId = 10L,
+                roomMessagesPerSecond = 1000,
+                roomMessagesP95PerSecond = 1000,
+            ),
+        )
+
+        assertEquals(16, policy.writeShardCount)
+        assertEquals(16, policy.fanoutShardCount)
+    }
+
+    @Test
     fun `VERY_HOT 방은 live feed를 500개 30초로 downgrade하고 room limit을 적용한다`() {
         val policy = classifier().classify(
             RoomTrafficSnapshot(
@@ -55,6 +69,20 @@ class RoomHeatClassifierTest {
         assertEquals(30, policy.liveFeedMaxAgeSeconds)
         assertEquals(5000, policy.roomRateLimitPerSecond)
         assertEquals(1, policy.slowModeSeconds)
+    }
+
+    @Test
+    fun `VERY_HOT 방은 shard count를 64로 확장한다`() {
+        val policy = classifier().classify(
+            RoomTrafficSnapshot(
+                roomId = 10L,
+                roomMessagesPerSecond = 5000,
+                roomMessagesP95PerSecond = 3000,
+            ),
+        )
+
+        assertEquals(64, policy.writeShardCount)
+        assertEquals(64, policy.fanoutShardCount)
     }
 
     @Test
@@ -86,6 +114,21 @@ class RoomHeatClassifierTest {
         assertEquals(15, policy.liveFeedMaxAgeSeconds)
         assertEquals(1000, policy.roomRateLimitPerSecond)
         assertEquals(3, policy.slowModeSeconds)
+    }
+
+    @Test
+    fun `OVERLOAD 방은 VERY_HOT과 같은 shard count를 유지한다`() {
+        val policy = classifier().classify(
+            RoomTrafficSnapshot(
+                roomId = 10L,
+                roomMessagesPerSecond = 100,
+                roomMessagesP95PerSecond = 100,
+                fanoutLagMillis = 3001,
+            ),
+        )
+
+        assertEquals(64, policy.writeShardCount)
+        assertEquals(64, policy.fanoutShardCount)
     }
 
     private fun classifier(): RoomHeatClassifier {

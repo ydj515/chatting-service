@@ -6,6 +6,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties
 data class ChatRoomPolicyProperties(
     val hotMessagesPerSecond: Long = 1_000,
     val veryHotMessagesPerSecond: Long = 5_000,
+    val hotShardCount: Int = 16,
+    val veryHotShardCount: Int = 64,
     val overloadWriterLagMillis: Long = 3_000,
     val overloadFanoutLagMillis: Long = 3_000,
     val overloadGatewayQueueDepth: Int = 128,

@@ -26,6 +26,8 @@ data class RoomHeatPolicy(
     val liveFeedMaxAgeSeconds: Int,
     val roomRateLimitPerSecond: Int?,
     val slowModeSeconds: Int?,
+    val writeShardCount: Int,
+    val fanoutShardCount: Int,
 )
 
 @Service
@@ -41,6 +43,7 @@ class RoomHeatClassifier(
                 liveFeedMaxAgeSeconds = properties.overloadLiveFeedMaxAgeSeconds,
                 roomRateLimitPerSecond = properties.overloadRoomRateLimitPerSecond,
                 slowModeSeconds = properties.overloadSlowModeSeconds,
+                shardCount = properties.veryHotShardCount,
             )
 
             snapshot.isVeryHot() -> snapshot.policy(
@@ -49,6 +52,7 @@ class RoomHeatClassifier(
                 liveFeedMaxAgeSeconds = properties.veryHotLiveFeedMaxAgeSeconds,
                 roomRateLimitPerSecond = properties.veryHotRoomRateLimitPerSecond,
                 slowModeSeconds = properties.veryHotSlowModeSeconds,
+                shardCount = properties.veryHotShardCount,
             )
 
             snapshot.roomMessagesPerSecond >= properties.hotMessagesPerSecond -> snapshot.policy(
@@ -57,6 +61,7 @@ class RoomHeatClassifier(
                 liveFeedMaxAgeSeconds = properties.normalLiveFeedMaxAgeSeconds,
                 roomRateLimitPerSecond = null,
                 slowModeSeconds = properties.hotSlowModeSeconds,
+                shardCount = properties.hotShardCount,
             )
 
             else -> snapshot.policy(
@@ -65,6 +70,7 @@ class RoomHeatClassifier(
                 liveFeedMaxAgeSeconds = properties.normalLiveFeedMaxAgeSeconds,
                 roomRateLimitPerSecond = null,
                 slowModeSeconds = null,
+                shardCount = MIN_SHARD_COUNT,
             )
         }
     }
@@ -86,7 +92,9 @@ class RoomHeatClassifier(
         liveFeedMaxAgeSeconds: Int,
         roomRateLimitPerSecond: Int?,
         slowModeSeconds: Int?,
+        shardCount: Int,
     ): RoomHeatPolicy {
+        val sanitizedShardCount = shardCount.coerceAtLeast(MIN_SHARD_COUNT)
         return RoomHeatPolicy(
             roomId = roomId,
             heatLevel = heatLevel,
@@ -94,6 +102,12 @@ class RoomHeatClassifier(
             liveFeedMaxAgeSeconds = liveFeedMaxAgeSeconds,
             roomRateLimitPerSecond = roomRateLimitPerSecond,
             slowModeSeconds = slowModeSeconds,
+            writeShardCount = sanitizedShardCount,
+            fanoutShardCount = sanitizedShardCount,
         )
+    }
+
+    private companion object {
+        const val MIN_SHARD_COUNT = 1
     }
 }

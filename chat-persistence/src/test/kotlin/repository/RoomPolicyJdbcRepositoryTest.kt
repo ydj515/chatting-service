@@ -25,6 +25,8 @@ class RoomPolicyJdbcRepositoryTest {
                 liveFeedMaxAgeSeconds = 30,
                 roomRateLimitPerSecond = 5000,
                 slowModeSeconds = 1,
+                writeShardCount = 64,
+                fanoutShardCount = 64,
             ),
         )
 
@@ -37,11 +39,17 @@ class RoomPolicyJdbcRepositoryTest {
             eq(30),
             eq(5000),
             eq(1),
+            eq(64),
+            eq(64),
         )
         assertTrue(sqlCaptor.value.contains("INSERT INTO room_storage_configs"))
         assertTrue(sqlCaptor.value.contains("ON CONFLICT (room_id) DO UPDATE"))
         assertTrue(sqlCaptor.value.contains("hot_room_policy = EXCLUDED.hot_room_policy"))
         assertTrue(sqlCaptor.value.contains("live_feed_max_messages = EXCLUDED.live_feed_max_messages"))
+        assertTrue(sqlCaptor.value.contains("current_shard_count"))
+        assertTrue(sqlCaptor.value.contains("fanout_shard_count"))
+        assertTrue(sqlCaptor.value.contains("GREATEST(room_storage_configs.current_shard_count, EXCLUDED.current_shard_count)"))
+        assertTrue(sqlCaptor.value.contains("GREATEST(room_storage_configs.fanout_shard_count, EXCLUDED.fanout_shard_count)"))
         assertTrue(sqlCaptor.value.contains("auto_policy_enabled"))
         assertTrue(sqlCaptor.value.contains("WHERE room_storage_configs.auto_policy_enabled = true"))
     }
