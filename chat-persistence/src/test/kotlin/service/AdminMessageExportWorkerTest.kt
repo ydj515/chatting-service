@@ -5,10 +5,15 @@ import com.chat.domain.dto.AdminMessageCursor
 import com.chat.domain.dto.AdminMessageCursorCodec
 import com.chat.domain.model.MessageType
 import com.chat.domain.dto.AdminMessageSearchMode
+import com.chat.persistence.config.ChatObjectStorageProperties
 import com.chat.persistence.config.ChatWorkerProperties
 import com.chat.persistence.repository.AdminExportJobRecord
 import com.chat.persistence.repository.AdminExportJobRepository
 import com.chat.persistence.repository.AdminMessageRepository
+import com.chat.persistence.storage.ObjectStoragePort
+import com.chat.persistence.storage.ObjectUploadRequest
+import com.chat.persistence.storage.ObjectUploadResult
+import com.chat.persistence.storage.PresignedObjectUrl
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
@@ -24,6 +29,7 @@ import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
 import java.nio.file.Files
 import java.nio.file.Path
+import java.time.Duration
 import java.time.Instant
 
 class AdminMessageExportWorkerTest {
@@ -34,15 +40,8 @@ class AdminMessageExportWorkerTest {
     ) {
         val exportJobRepository = mock(AdminExportJobRepository::class.java)
         val messageRepository = mock(AdminMessageRepository::class.java)
-        val objectMapper = testObjectMapper()
-        val worker = AdminMessageExportWorker(
-            exportJobRepository = exportJobRepository,
-            messageRepository = messageRepository,
-            workerProperties = ChatWorkerProperties(consumerName = "worker-1"),
-            objectMapper = objectMapper,
-            exportDirectory = tempDir.toString(),
-            exportChunkSize = 2,
-        )
+        val storage = RecordingObjectStoragePort()
+        val worker = worker(exportJobRepository, messageRepository, tempDir, objectStoragePort = storage)
         `when`(exportJobRepository.claimNextPending("worker-1")).thenReturn(
             AdminExportJobRecord(
                 jobId = "export-1",
@@ -68,10 +67,12 @@ class AdminMessageExportWorkerTest {
             eqString("export-1"),
             captureString(outputCaptor),
         )
-        assertTrue(outputCaptor.value.startsWith("file://"))
-        val csvPath = Path.of(java.net.URI.create(outputCaptor.value))
-        assertTrue(Files.exists(csvPath))
-        val csv = Files.readString(csvPath, Charsets.UTF_8)
+        assertEquals("s3://chat-archives/admin-exports/export-1.csv", outputCaptor.value)
+        assertEquals("admin-exports/export-1.csv", storage.uploadedObjectKey)
+        assertEquals("text/csv; charset=utf-8", storage.uploadedContentType)
+        val uploadedFile = requireNotNull(storage.uploadedFile)
+        assertTrue(Files.exists(uploadedFile))
+        val csv = Files.readString(uploadedFile, Charsets.UTF_8)
         assertTrue(csv.contains("messageId,clientMessageId,roomId"))
         assertTrue(csv.contains("msg-1,client-100,10,100"))
     }
@@ -82,14 +83,8 @@ class AdminMessageExportWorkerTest {
     ) {
         val exportJobRepository = mock(AdminExportJobRepository::class.java)
         val messageRepository = mock(AdminMessageRepository::class.java)
-        val worker = AdminMessageExportWorker(
-            exportJobRepository = exportJobRepository,
-            messageRepository = messageRepository,
-            workerProperties = ChatWorkerProperties(consumerName = "worker-1"),
-            objectMapper = testObjectMapper(),
-            exportDirectory = tempDir.toString(),
-            exportChunkSize = 2,
-        )
+        val storage = RecordingObjectStoragePort()
+        val worker = worker(exportJobRepository, messageRepository, tempDir, objectStoragePort = storage)
         `when`(exportJobRepository.claimNextPending("worker-1")).thenReturn(
             AdminExportJobRecord(
                 jobId = "export-1",
@@ -121,8 +116,8 @@ class AdminMessageExportWorkerTest {
             eqString("export-1"),
             captureString(outputCaptor),
         )
-        val csvPath = Path.of(java.net.URI.create(outputCaptor.value))
-        val csv = Files.readString(csvPath, Charsets.UTF_8)
+        assertEquals("s3://chat-archives/admin-exports/export-1.csv", outputCaptor.value)
+        val csv = Files.readString(requireNotNull(storage.uploadedFile), Charsets.UTF_8)
         assertTrue(csv.contains("'\u0040admin"))
         assertTrue(csv.contains("\"'=IMPORTXML(\"\"https://example.test\"\")\""))
     }
@@ -133,14 +128,7 @@ class AdminMessageExportWorkerTest {
     ) {
         val exportJobRepository = mock(AdminExportJobRepository::class.java)
         val messageRepository = mock(AdminMessageRepository::class.java)
-        val worker = AdminMessageExportWorker(
-            exportJobRepository = exportJobRepository,
-            messageRepository = messageRepository,
-            workerProperties = ChatWorkerProperties(consumerName = "worker-1"),
-            objectMapper = testObjectMapper(),
-            exportDirectory = tempDir.toString(),
-            exportChunkSize = 2,
-        )
+        val worker = worker(exportJobRepository, messageRepository, tempDir)
         val firstChunkCursor = AdminMessageCursor(
             createdAt = Instant.parse("2026-06-14T00:00:01Z"),
             roomSeq = 99L,
@@ -200,14 +188,7 @@ class AdminMessageExportWorkerTest {
     ) {
         val exportJobRepository = mock(AdminExportJobRepository::class.java)
         val messageRepository = mock(AdminMessageRepository::class.java)
-        val worker = AdminMessageExportWorker(
-            exportJobRepository = exportJobRepository,
-            messageRepository = messageRepository,
-            workerProperties = ChatWorkerProperties(consumerName = "worker-1"),
-            objectMapper = testObjectMapper(),
-            exportDirectory = tempDir.toString(),
-            exportChunkSize = 2,
-        )
+        val worker = worker(exportJobRepository, messageRepository, tempDir)
         val firstChunkCursor = AdminMessageCursor(
             createdAt = Instant.parse("2026-06-14T00:00:01Z"),
             roomSeq = 99L,
@@ -270,14 +251,7 @@ class AdminMessageExportWorkerTest {
     ) {
         val exportJobRepository = mock(AdminExportJobRepository::class.java)
         val messageRepository = mock(AdminMessageRepository::class.java)
-        val worker = AdminMessageExportWorker(
-            exportJobRepository = exportJobRepository,
-            messageRepository = messageRepository,
-            workerProperties = ChatWorkerProperties(consumerName = "worker-1"),
-            objectMapper = testObjectMapper(),
-            exportDirectory = tempDir.toString(),
-            exportChunkSize = 2,
-        )
+        val worker = worker(exportJobRepository, messageRepository, tempDir)
         val output = tempDir.resolve("export-1.csv")
         Files.writeString(
             output,
@@ -333,6 +307,82 @@ class AdminMessageExportWorkerTest {
             eq(3),
             eqString(output.toUri().toString()),
         )
+    }
+
+    @Test
+    fun `export worker는 object storage upload 실패 시 job을 failed로 전이한다`(
+        @TempDir tempDir: Path,
+    ) {
+        val exportJobRepository = mock(AdminExportJobRepository::class.java)
+        val messageRepository = mock(AdminMessageRepository::class.java)
+        val storage = RecordingObjectStoragePort().apply { failUpload = true }
+        val worker = worker(exportJobRepository, messageRepository, tempDir, objectStoragePort = storage)
+        `when`(exportJobRepository.claimNextPending("worker-1")).thenReturn(
+            AdminExportJobRecord(
+                jobId = "export-1",
+                actor = "admin-local",
+                requestJson = """{"roomId":10,"from":null,"to":null,"query":null,"senderId":null}""",
+            ),
+        )
+        `when`(
+            messageRepository.findRoomMessages(
+                roomId = 10L,
+                from = null,
+                to = null,
+                cursor = null,
+                limit = 2,
+            ),
+        ).thenReturn(listOf(message()))
+
+        val exportedRows = worker.pollAndExport()
+
+        assertEquals(0, exportedRows)
+        verify(exportJobRepository).markFailed(eqString("export-1"), eqString("upload failed"))
+    }
+
+    private fun worker(
+        exportJobRepository: AdminExportJobRepository,
+        messageRepository: AdminMessageRepository,
+        tempDir: Path,
+        objectStoragePort: ObjectStoragePort = RecordingObjectStoragePort(),
+    ): AdminMessageExportWorker {
+        return AdminMessageExportWorker(
+            exportJobRepository = exportJobRepository,
+            messageRepository = messageRepository,
+            workerProperties = ChatWorkerProperties(consumerName = "worker-1"),
+            objectMapper = testObjectMapper(),
+            exportDirectory = tempDir.toString(),
+            exportChunkSize = 2,
+            objectStoragePort = objectStoragePort,
+            objectStorageProperties = ChatObjectStorageProperties(),
+        )
+    }
+
+    private class RecordingObjectStoragePort : ObjectStoragePort {
+        var uploadedFile: Path? = null
+        var uploadedObjectKey: String? = null
+        var uploadedContentType: String? = null
+        var failUpload: Boolean = false
+
+        override fun uploadFile(request: ObjectUploadRequest): ObjectUploadResult {
+            if (failUpload) {
+                error("upload failed")
+            }
+            uploadedFile = request.file
+            uploadedObjectKey = request.objectKey
+            uploadedContentType = request.contentType
+            return ObjectUploadResult("s3://chat-archives/${request.objectKey}")
+        }
+
+        override fun createDownloadUrl(
+            objectUri: String,
+            ttl: Duration,
+        ): PresignedObjectUrl {
+            return PresignedObjectUrl(
+                url = "http://localhost/download",
+                expiresAt = Instant.parse("2026-06-26T00:15:00Z"),
+            )
+        }
     }
 
     private fun message(

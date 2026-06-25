@@ -5,10 +5,13 @@ import com.chat.domain.dto.AdminMessageCursor
 import com.chat.domain.dto.AdminMessageCursorCodec
 import com.chat.domain.dto.AdminMessageDto
 import com.chat.domain.dto.AdminMessageSearchMode
+import com.chat.persistence.config.ChatObjectStorageProperties
 import com.chat.persistence.config.ChatWorkerProperties
 import com.chat.persistence.repository.AdminExportJobRecord
 import com.chat.persistence.repository.AdminExportJobRepository
 import com.chat.persistence.repository.AdminMessageRepository
+import com.chat.persistence.storage.ObjectStoragePort
+import com.chat.persistence.storage.ObjectUploadRequest
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import org.slf4j.LoggerFactory
@@ -26,6 +29,8 @@ class AdminMessageExportWorker(
     private val messageRepository: AdminMessageRepository,
     private val workerProperties: ChatWorkerProperties,
     private val objectMapper: ObjectMapper,
+    private val objectStoragePort: ObjectStoragePort,
+    private val objectStorageProperties: ChatObjectStorageProperties,
     @Value("\${chat.admin.export.directory:build/admin-exports}")
     private val exportDirectory: String,
     @Value("\${chat.admin.export.chunk-size:1000}")
@@ -38,8 +43,14 @@ class AdminMessageExportWorker(
         return try {
             val request = objectMapper.readValue<AdminExportMessagesRequest>(job.requestJson)
             val exportResult = writeCsv(job, request)
-            val outputUri = exportResult.outputUri
-            exportJobRepository.markCompleted(job.jobId, outputUri)
+            val upload = objectStoragePort.uploadFile(
+                ObjectUploadRequest(
+                    objectKey = adminExportObjectKey(job.jobId),
+                    file = exportResult.outputPath,
+                    contentType = EXPORT_CONTENT_TYPE,
+                ),
+            )
+            exportJobRepository.markCompleted(job.jobId, upload.objectUri)
             logger.info("Completed admin message export job ${job.jobId} with ${exportResult.exportedRows} rows")
             exportResult.exportedRows
         } catch (e: Exception) {
@@ -129,9 +140,16 @@ class AdminMessageExportWorker(
         }
 
         return ExportResult(
+            outputPath = output,
             outputUri = outputUri,
             exportedRows = exportedRows,
         )
+    }
+
+    private fun adminExportObjectKey(jobId: String): String {
+        val safeJobId = jobId.replace(Regex("[^A-Za-z0-9._-]"), "_")
+        val prefix = objectStorageProperties.adminExportPrefix.trim().trim('/')
+        return if (prefix.isBlank()) "$safeJobId.csv" else "$prefix/$safeJobId.csv"
     }
 
     private fun resolveOutputPath(job: AdminExportJobRecord, directory: Path): Path {
@@ -199,9 +217,11 @@ class AdminMessageExportWorker(
     private companion object {
         const val DEFAULT_EXPORT_CHUNK_SIZE = 1_000
         const val EXPORT_MAX_ROWS = 10_000
+        const val EXPORT_CONTENT_TYPE = "text/csv; charset=utf-8"
     }
 
     private data class ExportResult(
+        val outputPath: Path,
         val outputUri: String,
         val exportedRows: Int,
     )
