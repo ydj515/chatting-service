@@ -1,0 +1,15 @@
+{
+  "title": "Chat Release Gate",
+  "uid": "chat-release-gate",
+  "schemaVersion": 39,
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Redis Streams group lag",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        { "expr": "chat_redis_stream_group_lag", "legendFormat": "{{stream_shard}}/{{consumer_group}}" }
+      ]
+    }
+  ]
+}
