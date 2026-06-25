@@ -94,8 +94,8 @@ env = { SPRING_PROFILES_ACTIVE = "docker", DB_HOST = "localhost", DB_READ_HOST =
 run = "./gradlew :chat-worker-application:bootRun"
 
 [tasks."start:infra"]
-description = "로컬 개발용 PostgreSQL primary/read-replica, partition archive worker, Redis를 기동한다."
-run = "docker compose --profile dev up -d postgres postgres-primary-setup postgres-replica postgres-partition-archive redis"
+description = "로컬 개발용 PostgreSQL primary/read-replica, partition archive worker, Redis, MinIO를 기동한다."
+run = "docker compose --profile dev up -d postgres postgres-primary-setup postgres-replica postgres-partition-archive redis minio minio-init"
 
 [tasks."start:client"]
 description = "일반 사용자 클라이언트 개발 서버를 실행한다."

@@ -147,6 +147,16 @@ chat:
       allowed-methods: ${CHAT_ADMIN_CORS_ALLOWED_METHODS:GET,POST,PUT,DELETE,PATCH,OPTIONS}
       allowed-headers: ${CHAT_ADMIN_CORS_ALLOWED_HEADERS:*}
       max-age: ${CHAT_ADMIN_CORS_MAX_AGE:3600}
+  object-storage:
+    enabled: ${CHAT_OBJECT_STORAGE_ENABLED:true}
+    endpoint: ${CHAT_OBJECT_STORAGE_ENDPOINT:http://localhost:9000}
+    region: ${CHAT_OBJECT_STORAGE_REGION:us-east-1}
+    bucket: ${CHAT_OBJECT_STORAGE_BUCKET:chat-archives}
+    access-key: ${CHAT_OBJECT_STORAGE_ACCESS_KEY:chatminio}
+    secret-key: ${CHAT_OBJECT_STORAGE_SECRET_KEY:chatminiosecret}
+    path-style-access: ${CHAT_OBJECT_STORAGE_PATH_STYLE_ACCESS:true}
+    admin-export-prefix: ${CHAT_OBJECT_STORAGE_ADMIN_EXPORT_PREFIX:admin-exports}
+    presigned-url-ttl: ${CHAT_OBJECT_STORAGE_PRESIGNED_URL_TTL:15m}
   websocket:
     endpoint: ${CHAT_WEBSOCKET_ENDPOINT:/ws/chat}
     allowed-origins: ${CHAT_WEBSOCKET_ALLOWED_ORIGINS:*}
