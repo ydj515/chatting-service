@@ -48,6 +48,17 @@ x-chat-app-environment: &chat-app-environment
   CHAT_ROOM_POLICY_TRAFFIC_COUNTER_TTL_SECONDS: ${CHAT_ROOM_POLICY_TRAFFIC_COUNTER_TTL_SECONDS:-120}
   CHAT_ADMIN_TOKEN: ${CHAT_ADMIN_TOKEN:?CHAT_ADMIN_TOKEN is required}
   CHAT_ADMIN_EXPORT_DIRECTORY: ${CHAT_ADMIN_EXPORT_DIRECTORY:-/tmp/chat-admin-exports}
+  CHAT_OBJECT_STORAGE_ENABLED: ${CHAT_OBJECT_STORAGE_ENABLED:-true}
+  CHAT_OBJECT_STORAGE_ENDPOINT: ${CHAT_OBJECT_STORAGE_ENDPOINT:-http://minio:9000}
+  # presigned download URL은 호스트 브라우저가 직접 접근하므로 loopback 노출 주소로 서명한다.
+  CHAT_OBJECT_STORAGE_PUBLIC_ENDPOINT: ${CHAT_OBJECT_STORAGE_PUBLIC_ENDPOINT:-http://127.0.0.1:${MINIO_API_PORT:-9000}}
+  CHAT_OBJECT_STORAGE_REGION: ${CHAT_OBJECT_STORAGE_REGION:-us-east-1}
+  CHAT_OBJECT_STORAGE_BUCKET: ${CHAT_OBJECT_STORAGE_BUCKET:-chat-archives}
+  CHAT_OBJECT_STORAGE_ACCESS_KEY: ${CHAT_OBJECT_STORAGE_ACCESS_KEY:-chatminio}
+  CHAT_OBJECT_STORAGE_SECRET_KEY: ${CHAT_OBJECT_STORAGE_SECRET_KEY:-chatminiosecret}
+  CHAT_OBJECT_STORAGE_PATH_STYLE_ACCESS: ${CHAT_OBJECT_STORAGE_PATH_STYLE_ACCESS:-true}
+  CHAT_OBJECT_STORAGE_ADMIN_EXPORT_PREFIX: ${CHAT_OBJECT_STORAGE_ADMIN_EXPORT_PREFIX:-admin-exports}
+  CHAT_OBJECT_STORAGE_PRESIGNED_URL_TTL: ${CHAT_OBJECT_STORAGE_PRESIGNED_URL_TTL:-15m}
 
 x-chat-app-healthcheck: &chat-app-healthcheck
   test: [ "CMD-SHELL", "curl -f http://localhost:$${SERVER_PORT:-8080}$${SERVER_CONTEXT_PATH:-/api}/actuator/health" ]
@@ -150,9 +161,50 @@ services:
     networks:
       - chat-network
 
+  # S3 호환 Object Storage (admin export / cold archive)
+  minio:
+    image: ${MINIO_IMAGE:-minio/minio:RELEASE.2025-04-22T22-12-26Z}
+    container_name: chat-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-chatminio}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-chatminiosecret}
+    volumes:
+      - minio_data:/data
+    ports:
+      - "127.0.0.1:${MINIO_API_PORT:-9000}:9000"
+      - "127.0.0.1:${MINIO_CONSOLE_PORT:-9001}:9001"
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -f http://localhost:9000/minio/health/ready" ]
+      interval: ${MINIO_HEALTHCHECK_INTERVAL:-10s}
+      timeout: ${MINIO_HEALTHCHECK_TIMEOUT:-5s}
+      retries: ${MINIO_HEALTHCHECK_RETRIES:-5}
+    networks:
+      - chat-network
+
+  minio-init:
+    image: ${MINIO_MC_IMAGE:-minio/mc:RELEASE.2025-04-16T18-13-26Z}
+    container_name: chat-minio-init
+    entrypoint: [ "/bin/sh", "-c" ]
+    command:
+      - >
+        mc alias set chat-minio http://minio:9000 "$${MINIO_ROOT_USER}" "$${MINIO_ROOT_PASSWORD}" &&
+        mc mb --ignore-existing "chat-minio/$${CHAT_OBJECT_STORAGE_BUCKET}"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-chatminio}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-chatminiosecret}
+      CHAT_OBJECT_STORAGE_BUCKET: ${CHAT_OBJECT_STORAGE_BUCKET:-chat-archives}
+    depends_on:
+      minio: { condition: service_healthy }
+    networks:
+      - chat-network
+
   # 오래된 메시지 파티션 아카이브 워커 (기본 보관 기간: 100일)
   postgres-partition-archive:
-    image: ${POSTGRES_IMAGE:-postgres:17.9-alpine}
+    image: ${POSTGRES_ARCHIVE_IMAGE:-chat-postgres-partition-archive:local}
+    build:
+      context: .
+      dockerfile: infra/postgres/archive/Dockerfile
     container_name: chat-postgres-partition-archive
     entrypoint: [ "/bin/sh", "/usr/local/bin/archive-partitions.sh" ]
     environment:
@@ -168,11 +220,21 @@ services:
       CHAT_PARTITION_ARCHIVE_DROP_AFTER_COPY: ${CHAT_PARTITION_ARCHIVE_DROP_AFTER_COPY:-false}
       CHAT_PARTITION_ARCHIVE_RUN_ONCE: ${CHAT_PARTITION_ARCHIVE_RUN_ONCE:-false}
       CHAT_PARTITION_ARCHIVE_INTERVAL_SECONDS: ${CHAT_PARTITION_ARCHIVE_INTERVAL_SECONDS:-86400}
+      CHAT_PARTITION_ARCHIVE_OBJECT_STORAGE_ENABLED: ${CHAT_PARTITION_ARCHIVE_OBJECT_STORAGE_ENABLED:-true}
+      CHAT_PARTITION_ARCHIVE_OBJECT_PREFIX: ${CHAT_PARTITION_ARCHIVE_OBJECT_PREFIX:-postgres/archive/chat_messages}
+      CHAT_OBJECT_STORAGE_ENDPOINT: ${CHAT_OBJECT_STORAGE_ENDPOINT:-http://minio:9000}
+      CHAT_OBJECT_STORAGE_BUCKET: ${CHAT_OBJECT_STORAGE_BUCKET:-chat-archives}
+      CHAT_OBJECT_STORAGE_REGION: ${CHAT_OBJECT_STORAGE_REGION:-us-east-1}
+      AWS_ACCESS_KEY_ID: ${CHAT_OBJECT_STORAGE_ACCESS_KEY:-chatminio}
+      AWS_SECRET_ACCESS_KEY: ${CHAT_OBJECT_STORAGE_SECRET_KEY:-chatminiosecret}
+      AWS_DEFAULT_REGION: ${CHAT_OBJECT_STORAGE_REGION:-us-east-1}
+      AWS_EC2_METADATA_DISABLED: "true"
     volumes:
       - postgres_partition_archive:/archive
       - ./infra/postgres/archive/archive-partitions.sh:/usr/local/bin/archive-partitions.sh:ro
     depends_on:
       postgres: { condition: service_healthy }
+      minio-init: { condition: service_completed_successfully }
     networks:
       - chat-network
 
@@ -482,6 +544,7 @@ services:
     depends_on:
       postgres-primary-setup: { condition: service_completed_successfully }
       redis-cluster-init: { condition: service_completed_successfully }
+      minio-init: { condition: service_completed_successfully }
     healthcheck: *chat-app-healthcheck
     networks:
       - chat-network
@@ -504,6 +567,7 @@ services:
       postgres-primary-setup: { condition: service_completed_successfully }
       postgres-replica: { condition: service_healthy }
       redis-cluster-init: { condition: service_completed_successfully }
+      minio-init: { condition: service_completed_successfully }
     healthcheck: *chat-app-healthcheck
     networks:
       - chat-network
@@ -598,6 +662,8 @@ volumes:
   postgres_replica_data:
     driver: local
   postgres_partition_archive:
+    driver: local
+  minio_data:
     driver: local
   redis_data:
     driver: local

@@ -54,6 +54,7 @@ OpenAPI 스펙은 [`openapi.yaml`](openapi.yaml)을 참고하세요.
 | `GET` | `/api/admin/rooms/{roomId}/status` | room heat, bounded live feed, rate limit, replica/search latency 상태 조회 |
 | `PATCH` | `/api/admin/rooms/{roomId}/policy` | bounded live feed, room/user rate limit, slow mode, moderator priority 정책 override. 기본적으로 `autoPolicyEnabled=false`가 되어 room-policy worker가 해당 방의 수동 정책을 덮어쓰지 않음. `rateLimitPerSecond`, `userRateLimitPerSecond`, `slowModeSeconds`의 누락/null은 기존 값 유지이며, 제한 해제는 `clearRateLimit=true`, `clearUserRateLimit=true`, `clearSlowMode=true`로 명시 |
 | `POST` | `/api/admin/exports/messages` | 메시지 export job 생성. `admin-export` worker가 pending job을 claim해 CSV 산출물을 생성 |
+| `GET` | `/api/admin/exports/{jobId}` | export job 상태 조회. 완료된 job은 안정적인 `s3://` `outputUri`와 짧은 TTL의 `downloadUrl`/`downloadUrlExpiresAt`을 반환 |
 
 관리자 프론트는 일반 사용자용 `client`와 분리된 `client-admin` 모듈입니다.
 

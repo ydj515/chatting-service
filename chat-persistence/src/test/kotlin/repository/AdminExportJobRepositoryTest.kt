@@ -16,6 +16,7 @@ import org.springframework.jdbc.core.RowMapper
 import org.springframework.jdbc.core.JdbcTemplate
 import java.time.Clock
 import java.time.Instant
+import java.time.LocalDateTime
 import java.time.ZoneOffset
 
 class AdminExportJobRepositoryTest {
@@ -125,6 +126,49 @@ class AdminExportJobRepositoryTest {
     }
 
     @Test
+    fun `export job status lookup returns output uri and timestamps`() {
+        val jdbcTemplate = mock(JdbcTemplate::class.java)
+        val repository = AdminExportJobRepository(jdbcTemplate = jdbcTemplate)
+        `when`(
+            jdbcTemplate.queryForObject(
+                anyString(),
+                anyExportJobStatusRowMapper(),
+                eq("export-1"),
+            ),
+        ).thenReturn(
+            AdminExportJobStatusRecord(
+                jobId = "export-1",
+                actor = "admin-local",
+                status = "COMPLETED",
+                outputUri = "s3://chat-archives/admin-exports/export-1.csv",
+                exportedRows = 2,
+                errorMessage = null,
+                createdAt = LocalDateTime.parse("2026-06-26T00:00:00"),
+                startedAt = LocalDateTime.parse("2026-06-26T00:00:01"),
+                completedAt = LocalDateTime.parse("2026-06-26T00:00:02"),
+            ),
+        )
+
+        val record = repository.findById("export-1")
+
+        assertEquals("COMPLETED", record?.status)
+        assertEquals("s3://chat-archives/admin-exports/export-1.csv", record?.outputUri)
+        assertEquals(2, record?.exportedRows)
+        // timestamp 매핑이 깨져도 통과하지 않도록 createdAt/startedAt/completedAt도 함께 검증한다.
+        assertEquals(LocalDateTime.parse("2026-06-26T00:00:00"), record?.createdAt)
+        assertEquals(LocalDateTime.parse("2026-06-26T00:00:01"), record?.startedAt)
+        assertEquals(LocalDateTime.parse("2026-06-26T00:00:02"), record?.completedAt)
+        val sqlCaptor = ArgumentCaptor.forClass(String::class.java)
+        verify(jdbcTemplate).queryForObject(
+            sqlCaptor.capture(),
+            anyExportJobStatusRowMapper(),
+            eq("export-1"),
+        )
+        assertTrue(sqlCaptor.value.contains("FROM admin_message_export_jobs"))
+        assertTrue(sqlCaptor.value.contains("WHERE job_id = ?"))
+    }
+
+    @Test
     fun `failed export job은 running 상태에서만 실패로 전이한다`() {
         val jdbcTemplate = RecordingJdbcTemplate(updatedRows = 1)
         val repository = AdminExportJobRepository(jdbcTemplate = jdbcTemplate)
@@ -150,6 +194,11 @@ class AdminExportJobRepositoryTest {
     }
 
     private fun anyExportJobRecordRowMapper(): RowMapper<AdminExportJobRecord> {
+        any(RowMapper::class.java)
+        return uninitialized()
+    }
+
+    private fun anyExportJobStatusRowMapper(): RowMapper<AdminExportJobStatusRecord> {
         any(RowMapper::class.java)
         return uninitialized()
     }

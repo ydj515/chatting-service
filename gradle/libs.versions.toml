@@ -2,6 +2,7 @@
 kotlin = "2.0.21"
 springBoot = "3.3.4"
 springDependencyManagement = "1.1.6"
+awsSdk = "2.25.70"
 
 [libraries]
 # Spring Boot BOM
@@ -34,6 +35,7 @@ jackson-module-kotlin = { group = "com.fasterxml.jackson.module", name = "jackso
 jackson-datatype-jsr310 = { group = "com.fasterxml.jackson.datatype", name = "jackson-datatype-jsr310" }
 
 # Others
+aws-sdk-s3 = { group = "software.amazon.awssdk", name = "s3", version.ref = "awsSdk" }
 micrometer-core = { group = "io.micrometer", name = "micrometer-core" }
 micrometer-registry-prometheus = { group = "io.micrometer", name = "micrometer-registry-prometheus" }
 junit-platform-launcher = { group = "org.junit.platform", name = "junit-platform-launcher" }

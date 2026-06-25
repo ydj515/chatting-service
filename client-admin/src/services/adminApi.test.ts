@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
+  buildAdminExportStatusUrl,
   buildAdminHistoryUrl,
   buildAdminSearchUrl,
   createAdminHeaders,
@@ -38,4 +39,10 @@ test('admin headers include X-Admin-Token', () => {
     'Content-Type': 'application/json',
     'X-Admin-Token': 'secret-token',
   });
+});
+
+test('admin export status URL encodes job id', () => {
+  const url = buildAdminExportStatusUrl('/api/', 'export/with symbols');
+
+  assert.equal(url, '/api/admin/exports/export%2Fwith%20symbols');
 });

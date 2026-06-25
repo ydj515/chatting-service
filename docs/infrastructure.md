@@ -39,7 +39,7 @@ mise run stop                      # 전체 클러스터 종료
 ### 구성 검증
 
 ```bash
-docker compose up -d postgres postgres-primary-setup postgres-replica postgres-partition-archive
+docker compose up -d postgres postgres-primary-setup postgres-replica minio minio-init postgres-partition-archive
 
 # replication 상태 확인
 docker compose exec -T postgres \
@@ -62,7 +62,25 @@ docker compose run --rm \
 - replication 상태: `chat_replicator|streaming|async`
 - replica recovery 상태: `true`
 - 오래된 파티션이 없으면 archive worker는 `No partitions are older than retention window.`를 출력합니다.
-- archive 대상 파티션이 있으면 `${partition}.csv`와 `${partition}.csv.metadata.json`이 함께 생성됩니다. metadata에는 `sha256`, `bytes`, `rowCount`, `archivedAt`이 포함됩니다.
+- archive 대상 파티션이 있으면 `${partition}.csv`와 `${partition}.csv.metadata.json`이 함께 생성되고 Object Storage로 업로드됩니다. metadata에는 `sha256`, `bytes`, `rowCount`, `archivedAt`, `objectUri`, `metadataObjectUri`, `uploadedAt`이 포함됩니다.
+
+### Object Storage / MinIO
+
+Phase 8.3부터 Docker Compose는 S3 호환 Object Storage로 MinIO를 함께 띄웁니다. `minio-init`은 `${CHAT_OBJECT_STORAGE_BUCKET:-chat-archives}` bucket을 idempotent하게 생성하며, Object Storage를 실제로 사용하는 `chat-worker-app-1`, `chat-admin-app-1`, `postgres-partition-archive`만 `minio-init` 완료를 기다린 뒤 시작합니다. (API/WebSocket 앱은 bucket 초기화에 의존하지 않습니다.)
+
+| 항목 | 기본값 |
+| --- | --- |
+| MinIO S3 API | `http://127.0.0.1:${MINIO_API_PORT:-9000}` |
+| MinIO Console | `http://127.0.0.1:${MINIO_CONSOLE_PORT:-9001}` |
+| Bucket | `chat-archives` |
+| Admin export prefix | `admin-exports/` |
+| Partition archive prefix | `postgres/archive/chat_messages/` |
+
+admin export worker는 실행 중 checkpoint/resume에는 로컬 staging CSV를 사용하고, 완료 시 최종 CSV를 `s3://chat-archives/admin-exports/{jobId}.csv`에 업로드합니다. 관리자는 `GET /api/admin/exports/{jobId}`로 안정적인 `outputUri`와 만료 시간이 있는 `downloadUrl`을 조회합니다.
+
+앱 컨테이너는 내부 endpoint(`CHAT_OBJECT_STORAGE_ENDPOINT=http://minio:9000`)로 업로드/조회하지만, presigned `downloadUrl`은 호스트 브라우저가 직접 접근해야 하므로 공개 endpoint(`CHAT_OBJECT_STORAGE_PUBLIC_ENDPOINT=http://127.0.0.1:${MINIO_API_PORT:-9000}`)로 서명됩니다. SigV4는 Host를 서명에 포함하므로 두 endpoint를 분리해야 컨테이너 내부 업로드와 호스트 브라우저 다운로드가 모두 동작합니다. 실제 AWS S3 환경에서는 공개 endpoint를 비워 두면 내부 endpoint로 폴백합니다.
+
+partition archive worker는 detach/drop 전에 CSV와 metadata JSON을 `s3://chat-archives/postgres/archive/chat_messages/...` 아래로 업로드합니다. `CHAT_PARTITION_ARCHIVE_DROP_AFTER_COPY=true`인데 Object Storage 업로드가 비활성화되었거나 실패하면 partition detach/drop은 수행하지 않습니다.
 
 ---
 

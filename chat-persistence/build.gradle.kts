@@ -28,6 +28,7 @@ dependencies {
     // Jackson (Redis 직렬화 및 WebSocket 메시지 처리용)
     implementation(libs.jackson.module.kotlin)
     implementation(libs.jackson.datatype.jsr310)
+    implementation(libs.aws.sdk.s3)
     implementation(libs.micrometer.core)
     implementation(libs.micrometer.registry.prometheus)
 

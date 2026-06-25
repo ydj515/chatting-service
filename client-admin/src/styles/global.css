@@ -390,6 +390,35 @@ label {
   gap: 8px;
 }
 
+.export-status {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+  min-height: 40px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line-subtle);
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.export-status b {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.export-status a {
+  color: var(--accent);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.export-status a:hover {
+  color: var(--accent-strong);
+  text-decoration: underline;
+}
+
 .content {
   display: grid;
   gap: 16px;

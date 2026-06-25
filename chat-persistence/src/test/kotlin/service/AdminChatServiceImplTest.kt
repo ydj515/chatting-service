@@ -13,9 +13,15 @@ import com.chat.domain.dto.AdminMessageSearchMode
 import com.chat.domain.dto.AdminRoomPolicyUpdateRequest
 import com.chat.domain.dto.AdminRoomStatusDto
 import com.chat.domain.model.MessageType
+import com.chat.persistence.config.ChatObjectStorageProperties
 import com.chat.persistence.repository.AdminAuditLogRepository
+import com.chat.persistence.repository.AdminExportJobStatusRecord
 import com.chat.persistence.repository.AdminExportJobRepository
 import com.chat.persistence.repository.AdminMessageRepository
+import com.chat.persistence.storage.ObjectStoragePort
+import com.chat.persistence.storage.ObjectUploadRequest
+import com.chat.persistence.storage.ObjectUploadResult
+import com.chat.persistence.storage.PresignedObjectUrl
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -27,8 +33,10 @@ import org.mockito.ArgumentMatchers.contains
 import org.mockito.ArgumentMatchers.eq
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
+import org.mockito.Mockito.verifyNoInteractions
 import org.mockito.Mockito.`when`
 import org.springframework.transaction.annotation.Transactional
+import java.time.Duration
 import java.time.Instant
 import java.time.LocalDateTime
 
@@ -284,6 +292,107 @@ class AdminChatServiceImplTest {
     }
 
     @Test
+    fun `export status 조회는 completed s3 output에 presigned download url을 붙인다`() {
+        val fixture = fixture()
+        `when`(fixture.exportJobRepository.findById("export-1")).thenReturn(
+            AdminExportJobStatusRecord(
+                jobId = "export-1",
+                actor = "admin-local",
+                status = "COMPLETED",
+                outputUri = "s3://chat-archives/admin-exports/export-1.csv",
+                exportedRows = 2,
+                errorMessage = null,
+                createdAt = LocalDateTime.parse("2026-06-26T00:00:00"),
+                startedAt = LocalDateTime.parse("2026-06-26T00:00:01"),
+                completedAt = LocalDateTime.parse("2026-06-26T00:00:02"),
+            ),
+        )
+        fixture.objectStoragePort.nextDownloadUrl = PresignedObjectUrl(
+            url = "http://localhost:9000/chat-archives/admin-exports/export-1.csv?signature=abc",
+            expiresAt = Instant.parse("2026-06-26T00:15:00Z"),
+        )
+
+        val result = fixture.service.getMessageExport("admin-local", "export-1")
+
+        assertEquals("COMPLETED", result?.status)
+        assertEquals("s3://chat-archives/admin-exports/export-1.csv", result?.outputUri)
+        assertEquals("http://localhost:9000/chat-archives/admin-exports/export-1.csv?signature=abc", result?.downloadUrl)
+        assertEquals(Instant.parse("2026-06-26T00:15:00Z"), result?.downloadUrlExpiresAt)
+        assertEquals("s3://chat-archives/admin-exports/export-1.csv", fixture.objectStoragePort.presignedObjectUri)
+        verify(fixture.auditRepository).record(
+            eqString("admin-local"),
+            eqString("ADMIN_MESSAGE_EXPORT_VIEWED"),
+            eqString("EXPORT_JOB"),
+            eqString("export-1"),
+            containsString(""""status":"COMPLETED""""),
+        )
+    }
+
+    @Test
+    fun `export status 조회는 object storage 비활성 시 download url 없이 status를 반환한다`() {
+        val fixture = fixture(ChatObjectStorageProperties(enabled = false))
+        `when`(fixture.exportJobRepository.findById("export-1")).thenReturn(
+            AdminExportJobStatusRecord(
+                jobId = "export-1",
+                actor = "admin-local",
+                status = "COMPLETED",
+                outputUri = "s3://chat-archives/admin-exports/export-1.csv",
+                exportedRows = 2,
+                errorMessage = null,
+                createdAt = LocalDateTime.parse("2026-06-26T00:00:00"),
+                startedAt = LocalDateTime.parse("2026-06-26T00:00:01"),
+                completedAt = LocalDateTime.parse("2026-06-26T00:00:02"),
+            ),
+        )
+
+        val result = fixture.service.getMessageExport("admin-local", "export-1")
+
+        // 비활성 상태에서는 presign을 시도하지 않고 status만 반환한다(500 방지).
+        assertEquals("COMPLETED", result?.status)
+        assertEquals("s3://chat-archives/admin-exports/export-1.csv", result?.outputUri)
+        assertEquals(null, result?.downloadUrl)
+        assertEquals(null, result?.downloadUrlExpiresAt)
+        assertEquals(null, fixture.objectStoragePort.presignedObjectUri)
+    }
+
+    @Test
+    fun `export status 조회는 미완료 job의 로컬 staging output uri를 노출하지 않는다`() {
+        val fixture = fixture()
+        `when`(fixture.exportJobRepository.findById("export-1")).thenReturn(
+            AdminExportJobStatusRecord(
+                jobId = "export-1",
+                actor = "admin-local",
+                status = "RUNNING",
+                outputUri = "file:///tmp/chat-admin-exports/export-1.csv",
+                exportedRows = 1,
+                errorMessage = null,
+                createdAt = LocalDateTime.parse("2026-06-26T00:00:00"),
+                startedAt = LocalDateTime.parse("2026-06-26T00:00:01"),
+                completedAt = null,
+            ),
+        )
+
+        val result = fixture.service.getMessageExport("admin-local", "export-1")
+
+        assertEquals("RUNNING", result?.status)
+        assertEquals(null, result?.outputUri)
+        assertEquals(null, result?.downloadUrl)
+        assertEquals(null, fixture.objectStoragePort.presignedObjectUri)
+    }
+
+    @Test
+    fun `export status 조회는 없는 job이면 null을 반환하고 audit log를 남기지 않는다`() {
+        val fixture = fixture()
+        `when`(fixture.exportJobRepository.findById("missing")).thenReturn(null)
+
+        val result = fixture.service.getMessageExport("admin-local", "missing")
+
+        assertEquals(null, result)
+        verify(fixture.exportJobRepository).findById(eqString("missing"))
+        verifyNoInteractions(fixture.auditRepository)
+    }
+
+    @Test
     fun `room policy override는 repository를 갱신하고 audit log를 남긴다`() {
         val fixture = fixture()
         val request = AdminRoomPolicyUpdateRequest(
@@ -328,18 +437,24 @@ class AdminChatServiceImplTest {
         )
     }
 
-    private fun fixture(): Fixture {
+    private fun fixture(
+        objectStorageProperties: ChatObjectStorageProperties = ChatObjectStorageProperties(enabled = true),
+    ): Fixture {
         val messageRepository = mock(AdminMessageRepository::class.java)
         val auditRepository = mock(AdminAuditLogRepository::class.java)
         val exportJobRepository = mock(AdminExportJobRepository::class.java)
+        val objectStoragePort = RecordingObjectStoragePort()
         return Fixture(
             messageRepository = messageRepository,
             auditRepository = auditRepository,
             exportJobRepository = exportJobRepository,
+            objectStoragePort = objectStoragePort,
             service = AdminChatServiceImpl(
                 messageRepository = messageRepository,
                 auditLogRepository = auditRepository,
                 exportJobRepository = exportJobRepository,
+                objectStoragePort = objectStoragePort,
+                objectStorageProperties = objectStorageProperties,
                 objectMapper = jacksonObjectMapper().registerModule(JavaTimeModule()),
             ),
         )
@@ -389,10 +504,31 @@ class AdminChatServiceImplTest {
     @Suppress("UNCHECKED_CAST")
     private fun <T> uninitialized(): T = null as T
 
+    private class RecordingObjectStoragePort : ObjectStoragePort {
+        var nextDownloadUrl: PresignedObjectUrl? = null
+        var presignedObjectUri: String? = null
+
+        override fun uploadFile(request: ObjectUploadRequest): ObjectUploadResult {
+            return ObjectUploadResult("s3://chat-archives/${request.objectKey}")
+        }
+
+        override fun createDownloadUrl(
+            objectUri: String,
+            ttl: Duration,
+        ): PresignedObjectUrl {
+            presignedObjectUri = objectUri
+            return nextDownloadUrl ?: PresignedObjectUrl(
+                url = "http://localhost/download",
+                expiresAt = Instant.parse("2026-06-26T00:15:00Z"),
+            )
+        }
+    }
+
     private data class Fixture(
         val messageRepository: AdminMessageRepository,
         val auditRepository: AdminAuditLogRepository,
         val exportJobRepository: AdminExportJobRepository,
+        val objectStoragePort: RecordingObjectStoragePort,
         val service: AdminChatServiceImpl,
     )
 }

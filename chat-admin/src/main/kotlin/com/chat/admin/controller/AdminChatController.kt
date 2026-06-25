@@ -3,6 +3,7 @@ package com.chat.admin.controller
 import com.chat.admin.config.AdminProperties
 import com.chat.admin.security.AdminTokenVerifier
 import com.chat.domain.dto.AdminExportJobDto
+import com.chat.domain.dto.AdminExportJobStatusDto
 import com.chat.domain.dto.AdminExportMessagesRequest
 import com.chat.domain.dto.AdminMessageHistoryRequest
 import com.chat.domain.dto.AdminMessageCursorCodec
@@ -127,6 +128,16 @@ class AdminChatController(
             ),
         )
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(job)
+    }
+
+    @GetMapping("/exports/{jobId}")
+    fun getMessageExport(
+        @RequestHeader(ADMIN_TOKEN_HEADER, required = false) adminToken: String?,
+        @PathVariable jobId: String,
+    ): AdminExportJobStatusDto {
+        val actor = adminTokenVerifier.requireActor(adminToken)
+        return adminChatService.getMessageExport(actor = actor, jobId = jobId)
+            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "export job not found")
     }
 
     private fun validateExportRequest(request: AdminExportMessagesHttpRequest) {

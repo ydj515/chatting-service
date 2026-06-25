@@ -57,4 +57,12 @@ export interface AdminRoomStatus {
 export interface AdminExportJob {
   jobId: string;
   status: string;
+  createdAt?: string;
+  startedAt?: string | null;
+  completedAt?: string | null;
+  exportedRows?: number;
+  outputUri?: string | null;
+  downloadUrl?: string | null;
+  downloadUrlExpiresAt?: string | null;
+  errorMessage?: string | null;
 }
