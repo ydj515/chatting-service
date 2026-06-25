@@ -60,6 +60,9 @@ class WebSocketSessionManager(
         )
     }
 
+    // RoomPolicy OVERLOAD 판정 입력으로 노출하는 현재 Gateway pending depth 합계.
+    fun currentSendQueueDepth(): Int = totalPendingSize()
+
     private fun totalPendingSize(): Int =
         sessionsById.values.sumOf { it.outboundQueue.pendingSize() }
 
