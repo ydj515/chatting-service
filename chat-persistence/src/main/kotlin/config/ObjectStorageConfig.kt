@@ -38,7 +38,8 @@ class ObjectStorageConfig {
             .region(Region.of(properties.region))
             .credentialsProvider(credentials(properties))
             .serviceConfiguration(s3Configuration(properties))
-        properties.endpoint.takeIf { it.isNotBlank() }?.let { builder.endpointOverride(URI.create(it)) }
+        // 업로드용 s3Client는 내부 endpoint를 쓰지만, presigner는 브라우저가 접근할 공개 endpoint로 서명한다.
+        properties.resolvePresignEndpoint().takeIf { it.isNotBlank() }?.let { builder.endpointOverride(URI.create(it)) }
         return builder.build()
     }
 

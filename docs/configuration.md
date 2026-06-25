@@ -41,7 +41,8 @@
 | `CHAT_ADMIN_MAX_LIMIT` | `100` | 관리자 history/search 최대 page size |
 | `CHAT_ADMIN_EXPORT_DIRECTORY` | `/tmp/chat-admin-exports` | admin export worker가 checkpoint/resume용 staging CSV를 기록할 로컬 디렉터리. 완료 산출물은 Object Storage에 업로드 |
 | `CHAT_OBJECT_STORAGE_ENABLED` | `true` | S3 호환 Object Storage adapter 활성화 여부 |
-| `CHAT_OBJECT_STORAGE_ENDPOINT` | `http://minio:9000` | Compose 앱 컨테이너가 사용하는 Object Storage endpoint. 호스트 Gradle docker profile 기본값은 `http://localhost:9000` |
+| `CHAT_OBJECT_STORAGE_ENDPOINT` | `http://minio:9000` | Compose 앱 컨테이너가 업로드/조회에 사용하는 내부 Object Storage endpoint. 호스트 Gradle docker profile 기본값은 `http://localhost:9000` |
+| `CHAT_OBJECT_STORAGE_PUBLIC_ENDPOINT` | `http://127.0.0.1:${MINIO_API_PORT}` | presigned download URL 서명에 사용하는 공개 endpoint(브라우저 접근 주소). 비우면 `ENDPOINT`로 폴백. 실제 AWS S3는 보통 비워 둠 |
 | `CHAT_OBJECT_STORAGE_REGION` | `us-east-1` | S3 client/presigner region |
 | `CHAT_OBJECT_STORAGE_BUCKET` | `chat-archives` | admin export와 cold archive object를 저장할 bucket |
 | `CHAT_OBJECT_STORAGE_ACCESS_KEY` | `chatminio` | 개발용 MinIO access key. 운영에서는 교체 필요 |

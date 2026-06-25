@@ -44,11 +44,14 @@ test('Compose includes loopback-bound MinIO and bucket init gate', () => {
 test('Docker profile exposes object storage properties to Spring apps', () => {
   assert.match(compose, /CHAT_OBJECT_STORAGE_ENABLED:/);
   assert.match(compose, /CHAT_OBJECT_STORAGE_ENDPOINT: \$\{CHAT_OBJECT_STORAGE_ENDPOINT:-http:\/\/minio:9000\}/);
+  // presign용 공개 endpoint는 호스트 loopback 노출 주소로 분리되어야 한다.
+  assert.match(compose, /CHAT_OBJECT_STORAGE_PUBLIC_ENDPOINT: \$\{CHAT_OBJECT_STORAGE_PUBLIC_ENDPOINT:-http:\/\/127\.0\.0\.1:\$\{MINIO_API_PORT:-9000\}\}/);
   assert.match(compose, /CHAT_OBJECT_STORAGE_BUCKET:/);
   assert.match(compose, /CHAT_OBJECT_STORAGE_PRESIGNED_URL_TTL:/);
   assert.match(dockerConfig, /object-storage:/);
   assert.match(dockerConfig, /enabled: \$\{CHAT_OBJECT_STORAGE_ENABLED:true\}/);
   assert.match(dockerConfig, /endpoint: \$\{CHAT_OBJECT_STORAGE_ENDPOINT:http:\/\/localhost:9000\}/);
+  assert.match(dockerConfig, /public-endpoint: \$\{CHAT_OBJECT_STORAGE_PUBLIC_ENDPOINT:\}/);
 });
 
 test('worker and admin app wait for the MinIO init gate', () => {
@@ -62,6 +65,7 @@ test('local infra starts MinIO and env example documents object storage variable
   assert.match(mise, /minio minio-init/);
   assert.match(envExample, /CHAT_OBJECT_STORAGE_ENABLED=true/);
   assert.match(envExample, /CHAT_OBJECT_STORAGE_ENDPOINT=http:\/\/minio:9000/);
+  assert.match(envExample, /CHAT_OBJECT_STORAGE_PUBLIC_ENDPOINT=http:\/\/127\.0\.0\.1:9000/);
   assert.match(envExample, /CHAT_OBJECT_STORAGE_BUCKET=chat-archives/);
   assert.match(envExample, /MINIO_ROOT_USER=/);
   assert.match(envExample, /MINIO_ROOT_PASSWORD=/);

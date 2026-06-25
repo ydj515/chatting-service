@@ -150,6 +150,7 @@ chat:
   object-storage:
     enabled: ${CHAT_OBJECT_STORAGE_ENABLED:true}
     endpoint: ${CHAT_OBJECT_STORAGE_ENDPOINT:http://localhost:9000}
+    public-endpoint: ${CHAT_OBJECT_STORAGE_PUBLIC_ENDPOINT:}
     region: ${CHAT_OBJECT_STORAGE_REGION:us-east-1}
     bucket: ${CHAT_OBJECT_STORAGE_BUCKET:chat-archives}
     access-key: ${CHAT_OBJECT_STORAGE_ACCESS_KEY:chatminio}
