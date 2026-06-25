@@ -4,7 +4,7 @@
 
 **Goal:** Move the full Docker Compose backend from a single Redis instance to a 3-master/3-replica Redis Cluster while keeping standalone Redis available for host-based local development.
 
-**Architecture:** Keep `redis` as a dev-profile standalone service for `mise run dev:*`, and make the default full Docker backend depend on `redis-cluster-node-1..6` plus a one-shot `redis-cluster-init` service. Spring Boot uses the existing standalone Redis settings in the `docker` profile, and enables Lettuce cluster mode only when the additional `redis-cluster` profile is active.
+**Architecture:** Keep `redis` as a dev-profile standalone service for `mise run dev:*`, and make the full Docker backend run under the Compose `cluster` profile with `redis-cluster-node-1..6` plus a one-shot `redis-cluster-init` service. Spring Boot uses the existing standalone Redis settings in the `docker` profile, and enables Lettuce cluster mode only when the additional `redis-cluster` profile is active.
 
 **Tech Stack:** Docker Compose, Redis 7.2 Cluster, Spring Boot 3.3 Redis auto-configuration with Lettuce, Node.js `node:test`, Markdown runbooks.
 ---

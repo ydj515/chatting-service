@@ -16,10 +16,11 @@
 - Message admission은 room/user/slow-mode multi-key Lua script를 쓰며, 같은 room hash tag로 같은 slot을 보장해야 한다.
 - WebSocket ticket rate limit, fanout owner lease, sequence, stream append는 기본적으로 단일 key 또는 shard별 key 경로로 유지한다.
 - Docker Desktop/host Gradle 개발 모드는 Redis Cluster redirect endpoint가 container hostname을 반환할 수 있어 standalone Redis를 유지할 필요가 있다.
+- Compose dev profile과 cluster profile이 동시에 뜨면 standalone Redis와 Redis Cluster node 1의 `6379` host port가 충돌할 수 있으므로 profile 격리가 필요하다.
 
 ### 목표
 
-- 전체 Docker backend 기본 Redis topology를 3 master + 3 replica Redis Cluster로 전환한다.
+- 전체 Docker backend Redis topology를 Compose `cluster` profile의 3 master + 3 replica Redis Cluster로 전환한다.
 - Redis Cluster bootstrap은 Compose에서 재현 가능하고 idempotent해야 한다.
 - 앱 컨테이너는 Spring `redis-cluster` profile과 Lettuce cluster mode를 사용한다.
 - host Gradle 개발 모드는 standalone Redis를 유지한다.
@@ -37,7 +38,7 @@
 
 ### 선택한 접근
 
-Compose 기본 backend에는 `redis-cluster-node-1..6`을 추가하고, `redis-cluster-init` one-shot service가 `redis-cli --cluster create ... --cluster-replicas 1`을 실행한다. 앱 컨테이너는 `SPRING_PROFILES_ACTIVE=docker,redis-cluster`를 기본값으로 사용하고, `application-redis-cluster.yml`에서 `spring.data.redis.cluster.nodes`를 설정한다.
+Compose `cluster` profile에는 `redis-cluster-node-1..6`을 추가하고, `redis-cluster-init` one-shot service가 `redis-cli --cluster create ... --cluster-replicas 1`을 실행한다. 앱 컨테이너는 `SPRING_PROFILES_ACTIVE=docker,redis-cluster`를 기본값으로 사용하고, `application-redis-cluster.yml`에서 `spring.data.redis.cluster.nodes`를 설정한다.
 
 기존 `redis` service는 `profiles: ["dev"]`로 격리해 host Gradle 개발 모드에서만 사용한다.
 
@@ -46,6 +47,7 @@ Compose 기본 backend에는 `redis-cluster-node-1..6`을 추가하고, `redis-c
 - 6노드 Redis Cluster는 최소 3 master + 3 replica HA 구성을 Compose에서 재현한다.
 - one-shot init gate는 앱이 cluster 생성 전 Redis에 접근하는 race를 줄인다.
 - Spring Boot/Lettuce cluster mode를 profile로 분리하면 full Docker와 host dev topology를 동시에 지원할 수 있다.
+- Lettuce adaptive topology refresh와 periodic refresh를 활성화하면 master failover 후 클라이언트가 갱신된 cluster topology를 다시 읽을 수 있다.
 - standalone Redis를 dev profile로 유지하면 Docker Desktop hostname redirect 문제를 피하면서 기존 `mise run dev:*` 경험을 보존한다.
 
 ## 3. 설계 상세
@@ -55,16 +57,19 @@ Compose 기본 backend에는 `redis-cluster-node-1..6`을 추가하고, `redis-c
 - `redis-cluster-node-1..6`: 동일한 `infra/redis/redis-cluster.conf`를 사용한다.
 - 각 node는 별도 named volume을 사용한다.
 - 각 node는 `cluster-announce-hostname`을 자신의 Compose service name으로 설정한다.
-- host port는 `6379`, `6380`, `6381`, `6382`, `6383`, `6384`로 노출한다.
+- 각 node는 `profiles: ["cluster"]`로 격리한다.
+- host port는 `127.0.0.1`의 `6379`, `6380`, `6381`, `6382`, `6383`, `6384`로만 노출한다.
+- Redis config는 `cluster-preferred-endpoint-type hostname`을 사용해 nodes.conf와 client redirect에서 hostname endpoint를 우선한다.
 
 ### Cluster bootstrap
 
 `infra/redis/create-cluster.sh`는 다음 순서로 동작한다.
 
-1. 6개 node의 `PING` 준비를 기다린다.
-2. node 1의 `cluster info`가 이미 `cluster_state:ok`이면 성공 종료한다.
-3. `redis-cli --cluster create ... --cluster-replicas 1 --cluster-yes`를 실행한다.
-4. `cluster_state:ok`가 될 때까지 대기한다.
+1. `REDIS_CLUSTER_NODES`의 endpoint 목록을 읽는다.
+2. 모든 node의 `PING` 준비를 timeout 안에서 기다린다.
+3. 첫 번째 seed node의 `cluster info`가 이미 `cluster_state:ok`이면 성공 종료한다.
+4. `redis-cli --cluster create ... --cluster-replicas 1 --cluster-yes`를 실행한다.
+5. `cluster_state:ok`가 될 때까지 timeout 안에서 대기한다.
 
 ### Spring profile
 
@@ -72,6 +77,7 @@ Compose 기본 backend에는 `redis-cluster-node-1..6`을 추가하고, `redis-c
 
 - `spring.data.redis.cluster.nodes`
 - `spring.data.redis.cluster.max-redirects`
+- Lettuce `ClusterTopologyRefreshOptions`: adaptive refresh trigger와 30초 periodic refresh
 
 `application-docker.yml`에는 cluster nodes를 직접 넣지 않는다. 따라서 `docker` profile만 사용하는 host Gradle 앱은 standalone Redis에 연결한다.
 
@@ -99,6 +105,9 @@ Redis Cluster node는 다음 persistence 정책을 사용한다.
 - `docker-compose.yml`에 6개 Redis Cluster node와 init gate 추가
 - full Docker app dependency를 `redis-cluster-init`으로 전환
 - standalone `redis`를 dev profile로 격리
+- Redis Cluster, full backend 앱, nginx, Prometheus, Grafana를 cluster profile로 격리
+- Redis Cluster host ports를 loopback으로 제한
+- Lettuce topology refresh customizer 추가
 - `docs/infrastructure.md`, `docs/configuration.md`, `docs/redis_cluster_key_naming.md` runbook 보강
 - `start-cluster.sh`를 Redis Cluster 기준으로 갱신
 - `scripts/lib/phase8RedisClusterCompose.test.mjs` contract test 추가
@@ -132,6 +141,7 @@ Redis Cluster node는 다음 persistence 정책을 사용한다.
 > - Redis Cluster에서 multi-key Lua script는 모든 key가 같은 slot이어야 한다.
 > - message admission key는 room hash tag로 같은 slot을 보장하지만, very hot room에서는 해당 slot이 병목이 될 수 있다.
 > - host Gradle 앱은 기본적으로 standalone Redis를 사용한다. cluster profile을 host에서 켜면 redirect endpoint 접근 문제가 생길 수 있다.
+> - `cluster-preferred-active-endpoint-type`은 Redis 7.2에서 유효하지 않다. 실제 설정명은 `cluster-preferred-endpoint-type`이다.
 > - `appendfsync everysec`는 최대 1초 Redis ingest 유실 가능성을 남긴다. 운영상 gap audit/heartbeat가 필요하다.
 > - Compose smoke가 Redis Cluster 생성 성공을 보장해도 app e2e와 failover recovery를 대체하지는 않는다.
 

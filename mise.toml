@@ -95,7 +95,7 @@ run = "./gradlew :chat-worker-application:bootRun"
 
 [tasks."start:infra"]
 description = "로컬 개발용 PostgreSQL primary/read-replica, partition archive worker, Redis를 기동한다."
-run = "docker compose up -d postgres postgres-primary-setup postgres-replica postgres-partition-archive redis"
+run = "docker compose --profile dev up -d postgres postgres-primary-setup postgres-replica postgres-partition-archive redis"
 
 [tasks."start:client"]
 description = "일반 사용자 클라이언트 개발 서버를 실행한다."
@@ -122,9 +122,9 @@ run = '''
 #!/usr/bin/env bash
 set -euo pipefail
 
-docker compose up -d --build --wait --wait-timeout 180
+docker compose --profile cluster up -d --build --wait --wait-timeout 180
 docker compose restart nginx
-docker compose up -d --wait --wait-timeout 60 nginx
+docker compose --profile cluster up -d --wait --wait-timeout 60 nginx
 '''
 
 [tasks."restart:nginx"]
@@ -183,7 +183,7 @@ run = [
 
 [tasks."verify:compose"]
 description = "Docker Compose 설정 파일을 검증한다."
-run = "docker compose config --quiet"
+run = "docker compose --profile cluster --profile dev config --quiet"
 
 [tasks."verify:postgres-replica"]
 description = "PostgreSQL primary/read-replica와 partition archive worker 구성을 검증한다."

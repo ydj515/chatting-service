@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-compose=(docker compose)
+compose=(docker compose --profile cluster)
 db_name="${DB_NAME:-chatdb}"
 db_username="${DB_USERNAME:-chatuser}"
 

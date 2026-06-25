@@ -19,16 +19,47 @@ const createClusterScript = readFileSync(
   new URL('../../infra/redis/create-cluster.sh', import.meta.url),
   'utf8',
 );
+const redisConfig = readFileSync(
+  new URL('../../chat-persistence/src/main/kotlin/config/RedisConfig.kt', import.meta.url),
+  'utf8',
+);
 
-test('default Docker backend uses six Redis Cluster nodes and a cluster init gate', () => {
+function serviceBlock(name) {
+  const match = compose.match(
+    new RegExp(`\\n  ${name}:\\n([\\s\\S]*?)(?=\\n  [a-zA-Z0-9_-]+:\\n|\\n# 볼륨 정의|\\nvolumes:)`),
+  );
+  assert.ok(match, `service ${name} should exist`);
+  return match[1];
+}
+
+test('cluster profile backend uses six Redis Cluster nodes and an init gate', () => {
   for (let index = 1; index <= 6; index += 1) {
-    assert.match(compose, new RegExp(`redis-cluster-node-${index}:`));
+    const block = serviceBlock(`redis-cluster-node-${index}`);
+    assert.match(block, /profiles: \[ "cluster" \]/);
+    assert.match(block, /127\.0\.0\.1:\$\{REDIS_CLUSTER_NODE_\d_HOST_PORT:-\d+\}:6379/);
     assert.match(compose, new RegExp(`redis_cluster_node_${index}_data:`));
   }
 
-  assert.match(compose, /redis-cluster-init:/);
-  assert.match(compose, /redis-cli --cluster create/);
-  assert.match(compose, /redis-cluster-init: \{ condition: service_completed_successfully \}/);
+  const initBlock = serviceBlock('redis-cluster-init');
+  assert.match(initBlock, /profiles: \[ "cluster" \]/);
+  assert.match(initBlock, /REDIS_CLUSTER_NODES:/);
+  assert.match(initBlock, /REDIS_CLUSTER_BOOTSTRAP_TIMEOUT_SECONDS:/);
+  assert.match(createClusterScript, /redis-cli --cluster create/);
+});
+
+test('every app service waits for redis-cluster-init gate', () => {
+  for (const service of [
+    'chat-api-app-1',
+    'chat-api-app-2',
+    'chat-websocket-app-1',
+    'chat-websocket-app-2',
+    'chat-worker-app-1',
+    'chat-admin-app-1',
+  ]) {
+    const block = serviceBlock(service);
+    assert.match(block, /profiles: \[ "cluster" \]/);
+    assert.match(block, /redis-cluster-init: \{ condition: service_completed_successfully \}/);
+  }
 });
 
 test('standalone Redis is isolated to the dev profile', () => {
@@ -46,12 +77,25 @@ test('Docker app profile activates Lettuce cluster mode without changing local d
 test('Redis Cluster config enables cluster mode and keeps everysec append fsync policy', () => {
   assert.match(redisClusterConfig, /cluster-enabled yes/);
   assert.match(redisClusterConfig, /cluster-require-full-coverage yes/);
+  assert.match(redisClusterConfig, /cluster-preferred-endpoint-type hostname/);
   assert.match(redisClusterConfig, /appendonly yes/);
   assert.match(redisClusterConfig, /appendfsync everysec/);
 });
 
 test('cluster bootstrap script is idempotent and creates 3 masters with 3 replicas', () => {
+  assert.match(createClusterScript, /REDIS_CLUSTER_NODES/);
+  assert.match(createClusterScript, /REDIS_CLUSTER_BOOTSTRAP_TIMEOUT_SECONDS/);
+  assert.match(createClusterScript, /Timed out waiting for Redis Cluster node/);
+  assert.match(createClusterScript, /Timed out waiting for Redis Cluster state ok/);
   assert.match(createClusterScript, /cluster_state:ok/);
   assert.match(createClusterScript, /--cluster-replicas 1/);
   assert.match(createClusterScript, /redis-cluster-node-6:6379/);
+});
+
+test('Lettuce cluster topology refresh is enabled for the redis-cluster profile', () => {
+  assert.match(redisConfig, /@Profile\("redis-cluster"\)/);
+  assert.match(redisConfig, /LettuceClientConfigurationBuilderCustomizer/);
+  assert.match(redisConfig, /ClusterTopologyRefreshOptions/);
+  assert.match(redisConfig, /enableAllAdaptiveRefreshTriggers/);
+  assert.match(redisConfig, /enablePeriodicRefresh\(Duration\.ofSeconds\(30\)\)/);
 });

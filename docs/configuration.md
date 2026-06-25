@@ -55,6 +55,7 @@
 | `REDIS_PORT` | `6379` | standalone Redis 내부 포트. host Gradle 개발 모드에서 사용 |
 | `REDIS_CLUSTER_NODES` | `redis-cluster-node-1:6379,...,redis-cluster-node-6:6379` | `redis-cluster` Spring profile에서 사용하는 Lettuce cluster seed node 목록 |
 | `REDIS_CLUSTER_MAX_REDIRECTS` | `5` | Redis Cluster MOVED/ASK redirect 최대 추적 횟수 |
+| `REDIS_CLUSTER_BOOTSTRAP_TIMEOUT_SECONDS` | `90` | `redis-cluster-init`이 node PING과 `cluster_state:ok`를 기다리는 최대 시간 |
 | `REDIS_CLUSTER_NODE_1_HOST_PORT` | `6379` | Redis Cluster node 1의 호스트 노출 포트 |
 | `REDIS_CLUSTER_NODE_2_HOST_PORT` | `6380` | Redis Cluster node 2의 호스트 노출 포트 |
 | `REDIS_CLUSTER_NODE_3_HOST_PORT` | `6381` | Redis Cluster node 3의 호스트 노출 포트 |
@@ -84,9 +85,11 @@ Redis cache value serializer는 Kotlin/JavaTime module과 함께 `GenericJackson
 
 ### Redis Topology
 
-전체 Docker backend는 `SPRING_PROFILES_ACTIVE=docker,redis-cluster`를 기본값으로 사용해 Lettuce Redis Cluster mode를 활성화한다. `docker-compose.yml`의 앱 컨테이너들은 `redis-cluster-init` 완료 후 시작되며, seed node는 `REDIS_CLUSTER_NODES`로 주입된다.
+전체 Docker backend는 Compose `cluster` profile과 `SPRING_PROFILES_ACTIVE=docker,redis-cluster`를 기본값으로 사용해 Lettuce Redis Cluster mode를 활성화한다. `docker-compose.yml`의 앱 컨테이너들은 `redis-cluster-init` 완료 후 시작되며, seed node는 `REDIS_CLUSTER_NODES`로 주입된다. Lettuce client는 adaptive topology refresh와 30초 periodic refresh를 켜서 Redis Cluster failover 이후 topology 변화를 다시 읽는다.
 
 호스트 Gradle 개발 모드(`mise run dev:*`)는 `SPRING_PROFILES_ACTIVE=docker`만 사용하고, `mise run start:infra`가 명시적으로 기동하는 standalone `redis` 서비스에 연결한다. 이 분리는 Docker Desktop 환경에서 Redis Cluster가 내부 container hostname을 redirect endpoint로 반환해 호스트 앱이 접근하지 못하는 문제를 피하기 위한 것이다.
+
+Redis Cluster node의 host port는 `127.0.0.1`에만 bind한다. Cluster discovery를 위해 container 내부 설정은 `protected-mode no`를 사용하므로, host 외부 인터페이스에는 Redis port를 공개하지 않는다.
 
 > Redis Cluster node 설정은 `appendfsync everysec`를 사용한다. Redis node 장애 또는 host crash 시 마지막 fsync 이후 최대 1초의 Redis ingest가 손실될 수 있으며, Phase 8.7 gap audit에서 감지 경로를 제공한다.
 

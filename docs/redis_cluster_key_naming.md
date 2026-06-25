@@ -2,7 +2,7 @@
 
 이 문서는 Redis Cluster 전환을 전제로 sequence, presence, ticket, rate limit, fanout owner lease key naming과 hash slot 정책을 정리한다.
 
-Phase 8.2 Compose 기준 전체 Docker backend는 3 master + 3 replica Redis Cluster를 기본 Redis topology로 사용한다. 호스트 Gradle 개발 모드는 Docker Desktop redirect endpoint 문제를 피하기 위해 standalone Redis를 유지하지만, 앱 컨테이너는 `redis-cluster` Spring profile과 Lettuce cluster mode로 동작한다.
+Phase 8.2 Compose 기준 전체 Docker backend는 `cluster` profile의 3 master + 3 replica Redis Cluster를 기본 Redis topology로 사용한다. 호스트 Gradle 개발 모드는 Docker Desktop redirect endpoint 문제를 피하기 위해 `dev` profile의 standalone Redis를 유지하지만, 앱 컨테이너는 `redis-cluster` Spring profile과 Lettuce cluster mode로 동작한다.
 
 ## 1. 원칙
 
