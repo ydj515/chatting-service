@@ -1,5 +1,6 @@
 package com.chat.persistence.service
 
+import com.chat.domain.dto.ChatMessageBatch
 import com.chat.domain.dto.WebSocketMessage
 import com.chat.persistence.config.ChatRedisProperties
 import com.chat.persistence.config.ChatWebSocketGatewayProperties
@@ -28,6 +29,7 @@ class WebSocketSessionManager(
     private val gatewayProperties: ChatWebSocketGatewayProperties,
     @Qualifier("webSocketOutboundExecutor")
     private val outboundExecutor: Executor,
+    private val gatewayMetrics: WebSocketGatewayMetrics = WebSocketGatewayMetrics.Noop,
 ) {
     private val logger = LoggerFactory.getLogger(WebSocketSessionManager::class.java)
 
@@ -50,7 +52,20 @@ class WebSocketSessionManager(
                 RedisMessageBroker.MembershipAction.LEAVE -> leaveRoom(event.userId, event.roomId)
             }
         }
+
+        gatewayMetrics.registerGauges(
+            connectionCount = { sessionsById.size },
+            // 방 개수가 아니라 (room, session) 구독 쌍 합계로 실제 구독 부하를 센다.
+            roomSubscriptionCount = { sessionIdsByRoomId.values.sumOf { ids -> ids.size } },
+            sendQueueDepth = { totalPendingSize() },
+        )
     }
+
+    // RoomPolicy OVERLOAD 판정 입력으로 노출하는 현재 Gateway pending depth 합계.
+    fun currentSendQueueDepth(): Int = totalPendingSize()
+
+    private fun totalPendingSize(): Int =
+        sessionsById.values.sumOf { it.outboundQueue.pendingSize() }
 
     fun addSession(userId: Long, session: WebSocketSession) {
         logger.info("Adding session $userId to server")
@@ -70,9 +85,19 @@ class WebSocketSessionManager(
             outboundQueue = BoundedOutboundSessionQueue(
                 maxPendingMessages = gatewayProperties.outboundQueueMaxPendingMessages,
                 executor = outboundExecutor,
-                sender = { payload -> outboundSession.sendMessage(TextMessage(payload)) },
+                sender = { payload ->
+                    val startNanos = System.nanoTime()
+                    try {
+                        outboundSession.sendMessage(TextMessage(payload))
+                        gatewayMetrics.recordWriteLatency(System.nanoTime() - startNanos, "success")
+                    } catch (t: Throwable) {
+                        gatewayMetrics.recordWriteLatency(System.nanoTime() - startNanos, "failure")
+                        throw t
+                    }
+                },
                 onOverflow = {
                     logger.warn("Closing session ${session.id} because outbound queue is full")
+                    gatewayMetrics.recordSlowClientDisconnect()
                     closeSession(session, OUTBOUND_QUEUE_FULL_STATUS)
                     removeSession(userId, session)
                 },
@@ -126,6 +151,8 @@ class WebSocketSessionManager(
     fun sendMessageToLocalRoom(roomId: Long, message: WebSocketMessage, excludeUserId: Long? = null) {
         val json = objectMapper.writerFor(com.chat.domain.dto.WebSocketMessage::class.java).writeValueAsString(message)
         val sessionIds = sessionIdsByRoomId[roomId]?.toList() ?: return
+        // payload 크기는 루프 내내 동일하므로 1회만 계산해 세션 수만큼의 byte array 할당을 피한다.
+        val outboundBytes = json.toByteArray(Charsets.UTF_8).size.toLong()
 
         sessionIds.forEach { sessionId ->
             val sessionRef = sessionsById[sessionId] ?: return@forEach
@@ -140,8 +167,12 @@ class WebSocketSessionManager(
             }
 
             if (sessionRef.outboundQueue.enqueue(json)) {
-                logger.info("Sending message to local room $roomId")
+                gatewayMetrics.recordLocalDelivery(1)
+                gatewayMetrics.recordOutboundBytes(outboundBytes)
             }
+        }
+        if (message is ChatMessageBatch) {
+            gatewayMetrics.recordBatchFrame()
         }
     }
 

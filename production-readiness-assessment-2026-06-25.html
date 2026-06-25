@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>고트래픽 채팅 서비스 Production Readiness 평가 (2026-06-25, 실제 코드 기준)</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #171a21;
+    --panel2: #1d212b;
+    --border: #2a2f3a;
+    --text: #e6e8ec;
+    --muted: #9aa3b2;
+    --accent: #6ea8fe;
+    --blocker: #ff5d5d;
+    --high: #ff9f43;
+    --medium: #ffd23f;
+    --low: #4fd18b;
+    --ok: #4fd18b;
+    --partial: #ffd23f;
+    --no: #ff5d5d;
+    --code-bg: #11141a;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Apple SD Gothic Neo", "Segoe UI", "Malgun Gothic", sans-serif;
+    line-height: 1.7;
+    font-size: 15px;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 48px 24px 96px; }
+  header.page {
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 28px;
+    margin-bottom: 40px;
+  }
+  header.page .eyebrow { color: var(--accent); font-weight: 600; letter-spacing: .04em; font-size: 13px; text-transform: uppercase; }
+  h1 { font-size: 30px; line-height: 1.3; margin: 12px 0 8px; letter-spacing: -.01em; }
+  h2 { font-size: 22px; margin: 56px 0 16px; padding-top: 8px; letter-spacing: -.01em; }
+  h3 { font-size: 17px; margin: 32px 0 10px; color: #f0f2f5; }
+  .meta { color: var(--muted); font-size: 13.5px; }
+  p { margin: 10px 0; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code { background: var(--code-bg); border: 1px solid var(--border); border-radius: 5px; padding: 1px 6px; font-family: "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace; font-size: 12.5px; color: #cfe2ff; }
+  .verdict {
+    background: linear-gradient(135deg, #1b1f29, #15181f);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--high);
+    border-radius: 12px;
+    padding: 22px 24px;
+    margin: 24px 0;
+  }
+  .verdict .label { font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+  .verdict .big { font-size: 21px; font-weight: 700; margin: 6px 0 4px; color: #fff; }
+  .grid { display: grid; gap: 14px; }
+  .cards { grid-template-columns: repeat(4, 1fr); margin: 18px 0; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
+  .card .n { font-size: 26px; font-weight: 800; }
+  .card .t { color: var(--muted); font-size: 13px; margin-top: 2px; }
+  .card.blocker .n { color: var(--blocker); }
+  .card.high .n { color: var(--high); }
+  .card.medium .n { color: var(--medium); }
+  .card.ok .n { color: var(--ok); }
+  table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 13.5px; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: 12.5px; text-transform: uppercase; letter-spacing: .03em; background: var(--panel2); }
+  tr:hover td { background: rgba(255,255,255,.015); }
+  .badge { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 700; white-space: nowrap; }
+  .b-blocker { background: rgba(255,93,93,.15); color: var(--blocker); border: 1px solid rgba(255,93,93,.35); }
+  .b-high { background: rgba(255,159,67,.15); color: var(--high); border: 1px solid rgba(255,159,67,.35); }
+  .b-medium { background: rgba(255,210,63,.13); color: var(--medium); border: 1px solid rgba(255,210,63,.3); }
+  .b-low { background: rgba(79,209,139,.13); color: var(--low); border: 1px solid rgba(79,209,139,.3); }
+  .s-ok { background: rgba(79,209,139,.15); color: var(--ok); border: 1px solid rgba(79,209,139,.35); }
+  .s-partial { background: rgba(255,210,63,.13); color: var(--partial); border: 1px solid rgba(255,210,63,.3); }
+  .s-no { background: rgba(255,93,93,.15); color: var(--no); border: 1px solid rgba(255,93,93,.35); }
+  .note { background: var(--panel); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 8px; padding: 14px 18px; margin: 18px 0; color: #d7dce4; }
+  blockquote { margin: 18px 0; padding: 14px 18px; background: var(--panel); border-left: 3px solid var(--high); border-radius: 8px; color: #d7dce4; }
+  blockquote p { margin: 6px 0; }
+  .finding { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; margin: 16px 0; }
+  .finding h3 { margin-top: 0; display: flex; align-items: center; gap: 10px; }
+  .finding .ev { font-size: 12.5px; color: var(--muted); }
+  .finding .ev code { font-size: 11.5px; }
+  ul, ol { margin: 8px 0; padding-left: 22px; }
+  li { margin: 4px 0; }
+  .toc { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 16px 22px; columns: 2; column-gap: 32px; }
+  .toc a { display: block; padding: 3px 0; font-size: 13.5px; }
+  hr { border: none; border-top: 1px solid var(--border); margin: 40px 0; }
+  .legend { font-size: 12.5px; color: var(--muted); margin: 6px 0 0; }
+  .pill-row { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0; }
+  footer { margin-top: 64px; padding-top: 20px; border-top: 1px solid var(--border); color: var(--muted); font-size: 12.5px; }
+  @media (max-width: 720px) { .cards { grid-template-columns: repeat(2,1fr); } .toc { columns: 1; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="page">
+  <div class="eyebrow">Production Readiness Assessment</div>
+  <h1>고트래픽 클러스터 채팅 서비스 — 실서비스 투입 가능성 평가</h1>
+  <p class="meta">
+    평가일: 2026-06-25 · 평가 기준: <strong>현재 저장소 코드 실측</strong>(문서상 "가정"이 아님) ·
+    대상 브랜치: <code>main</code> (HEAD <code>bd81458</code>) ·
+    비교 기준 문서: <code>docs/phase7_production_readiness_assessment.md</code> (2026-06-21, 가정 기반)
+  </p>
+</header>
+
+<div class="verdict">
+  <div class="label">종합 판정</div>
+  <div class="big">기능적으로는 완성, 그러나 공개 고트래픽 production에는 아직 부적합 (조건부 No-Go)</div>
+  <p style="margin:8px 0 0; color:var(--muted)">
+    Phase 0~7의 <strong>기능과 검증 도구</strong>는 대부분 구현되어 있다(2026-06-21 평가 대비 계측 코드가 크게 채워짐).
+    그러나 release gate를 실제로 "측정·유지·판정"할 <strong>관측 파이프라인이 런타임에 미배포</strong>이고,
+    Redis 단일 장애점·Object Storage 부재·shard 미분산·TLS/시크릿/토큰 폐기/moderation 부재 같은
+    <strong>인프라성 Blocker가 그대로 남아</strong> 있다. 내부 PoC·제한 베타에는 적합하다.
+  </p>
+</div>
+
+<div class="grid cards">
+  <div class="card blocker"><div class="n">4</div><div class="t">Blocker (1건은 부분 진척)</div></div>
+  <div class="card high"><div class="n">4</div><div class="t">High</div></div>
+  <div class="card medium"><div class="n">4</div><div class="t">Medium</div></div>
+  <div class="card ok"><div class="n">12+</div><div class="t">설계 고민 중 구현 확인</div></div>
+</div>
+
+<div class="toc">
+  <a href="#summary">1. 핵심 요약 (무엇이 바뀌었나)</a>
+  <a href="#phase">2. Phase별 구현 현황 (실측)</a>
+  <a href="#obs">3. 새 핵심 발견: 관측 파이프라인 미배포</a>
+  <a href="#blocker">4. Blocker</a>
+  <a href="#high">5. High</a>
+  <a href="#medium">6. Medium / Low</a>
+  <a href="#qa">7. 문서에서 고민한 것들의 구현 여부</a>
+  <a href="#roadmap">8. 권장 실행 순서</a>
+  <a href="#caveats">9. 주의사항</a>
+  <a href="#next">10. 후속 질문</a>
+</div>
+
+<h2 id="summary">1. 핵심 요약 — 2026-06-21 평가 대비 무엇이 바뀌었나</h2>
+<p>
+  기존 <code>phase7_production_readiness_assessment.md</code>는 "Phase 7을 정의대로 완료했다고 <em>가정</em>"한 평가였고,
+  특히 <strong>B-3(핵심 metric 대량 미구현)</strong>을 Blocker로 봤다. 그 이후(2026-06-21 ~ 06-25) Phase 7 계측·검증 슬라이스가 다수 머지되어
+  이 부분은 상당히 해소되었다. 그러나 동시에 <strong>"계측 코드는 생겼지만 그것을 수집·저장·경보할 파이프라인이 없다"</strong>는 새로운 공백이 드러났다.
+</p>
+
+<table>
+  <thead><tr><th>영역</th><th>2026-06-21 평가</th><th>2026-06-25 실측</th><th>변화</th></tr></thead>
+  <tbody>
+    <tr><td>Ingest/Worker/Streams metric</td><td>미구현(Blocker)</td><td>구현됨: append latency, consumer records, worker batch latency, dead-letter, group.lag/pending gauge</td><td><span class="badge s-ok">해소</span></td></tr>
+    <tr><td>Streams lag alert rule</td><td>없음</td><td><code>infra/prometheus/rules/phase7-redis-streams-lag.rules.yml</code> 추가</td><td><span class="badge s-ok">해소</span></td></tr>
+    <tr><td>admin search latency gate</td><td>측정 수단 없음</td><td>warm/cold 분리 gate + slow query plan capture 구현</td><td><span class="badge s-ok">해소</span></td></tr>
+    <tr><td>chaos / reconnect 검증</td><td>미구현</td><td>chaos runner, reconnect load, reconnect chaos orchestration, recovery SLO gate 스크립트 구현</td><td><span class="badge s-ok">해소</span></td></tr>
+    <tr><td>Gateway/Fan-out 실측 metric</td><td>미구현</td><td>여전히 없음 (active conn, send queue depth, outbound bytes, write latency p95/p99, slow client, reconnect rate)</td><td><span class="badge s-no">잔존</span></td></tr>
+    <tr><td>관측 파이프라인(scrape→TSDB→dashboard→alert)</td><td>(미분리)</td><td>Prometheus registry/엔드포인트/컨테이너 모두 부재 — alert rule을 평가할 서버가 없음</td><td><span class="badge s-no">신규 발견</span></td></tr>
+    <tr><td>B-1 Redis HA / B-2 Object Storage / B-4 shard / H-1~H-4</td><td>잔존</td><td>그대로 잔존</td><td><span class="badge s-no">변화 없음</span></td></tr>
+  </tbody>
+</table>
+
+<div class="note">
+  결론적으로 <strong>"Phase가 다 끝났다"는 체감은 맞다</strong>. 기능·검증 도구는 거의 다 있다. 다만 production 판정의 핵심은
+  "기능 존재"가 아니라 (1) <strong>그 기능을 실시간으로 관측·경보할 수 있는가</strong>, (2) <strong>단일 장애점·데이터 보존·전송 보안 같은 운영 토대가 있는가</strong>이며,
+  이 두 축에서 공백이 남아 있다.
+</div>
+
+<h2 id="phase">2. Phase별 구현 현황 (코드 실측)</h2>
+<table>
+  <thead><tr><th>Phase</th><th>핵심 내용</th><th>상태</th><th>실측 근거</th></tr></thead>
+  <tbody>
+    <tr><td>P1 Auth / Gateway / Local fanout</td><td>인증, WebSocket Gateway, 로컬 fan-out</td><td><span class="badge s-ok">완료</span></td><td><code>WebSocketSessionManager</code> (roomId→sessions 인덱스)</td></tr>
+    <tr><td>P2 / P2.5 Message contract · WS ticket</td><td>roomSeq/messageId, 1회용 ticket, ticket rate limit Lua</td><td><span class="badge s-ok">완료</span></td><td><code>RedisWebSocketTicketService</code>, ticket metric 3종</td></tr>
+    <tr><td>P3 Redis Streams ingest / fanout</td><td>Streams append, batch fanout</td><td><span class="badge s-ok">완료</span></td><td><code>RedisMessageStreamProducer</code>, <code>HotRoomFanoutWorker</code></td></tr>
+    <tr><td>P4 PostgreSQL canonical store</td><td>파티션 테이블, ports/adapters, batch insert</td><td><span class="badge s-ok">완료</span></td><td><code>PartitionedMessageRepository</code>, <code>MessageWritePort</code></td></tr>
+    <tr><td>P5 Admin search / opaque cursor</td><td>방별/시간/키워드 검색, opaque cursor, export</td><td><span class="badge s-ok">완료</span></td><td><code>AdminMessageRepository</code>, <code>AdminMessageExportWorker</code></td></tr>
+    <tr><td>P6 Fanout owner lease · Admission Lua</td><td>방별 TTL owner, rate limit/slow mode 원자 판정, auto downgrade</td><td><span class="badge s-ok">완료</span></td><td><code>FanoutOwnerLeaseService</code>, <code>MessageAdmissionPolicyService</code>, <code>RoomPolicyWorker</code></td></tr>
+    <tr><td>P7 계측·검증·게이트</td><td>Streams metric, lag gauge/alert, admin search gate, chaos/reconnect</td><td><span class="badge s-partial">코드 완료, 파이프라인 미배포</span></td><td><code>MessageStreamMetrics</code>, <code>scripts/phase7-*.mjs</code>, prometheus rules yml</td></tr>
+  </tbody>
+</table>
+
+<h2 id="obs">3. 새 핵심 발견 — 관측(Observability) 파이프라인이 런타임에 미배포</h2>
+<p>
+  Phase 7에서 metric 등록 코드와 Prometheus alert rule 파일은 만들었지만, <strong>그것을 수집·저장·시각화·경보할 구성요소가 전부 빠져 있다.</strong>
+  즉 release gate를 "측정 가능"하게는 만들었으나 "지속 관측·자동 판정"으로 연결하지 못했다.
+</p>
+<div class="finding">
+  <h3><span class="badge b-blocker">Blocker급</span> Prometheus 수집 경로 부재</h3>
+  <ul>
+    <li>actuator 노출 = <code>health,info,metrics,caches</code> — <strong><code>prometheus</code> 엔드포인트 미노출</strong> (<code>chat-runtime-config/.../application-docker.yml</code>).</li>
+    <li>의존성에 <code>micrometer-core</code>만 있고 <strong><code>micrometer-registry-prometheus</code> 없음</strong> — scrape 포맷(<code>/actuator/prometheus</code>) 자체가 생성되지 않음.</li>
+    <li><code>docker-compose.yml</code>에 <strong>Prometheus / Grafana / exporter 컨테이너가 전혀 없음</strong>.</li>
+  </ul>
+  <p class="ev">결과: <code>infra/prometheus/rules/phase7-redis-streams-lag.rules.yml</code>의 alert는 이를 평가할 Prometheus 서버가 없어 발화되지 않는다.
+  등록된 metric은 in-memory simple registry에만 존재하여 <code>/actuator/metrics/&lt;name&gt;</code>로 단건 조회만 가능하고, 시계열·대시보드·p95/p99 누적·경보가 불가능하다.</p>
+</div>
+<div class="finding">
+  <h3><span class="badge b-high">High</span> Gateway/Fan-out 실측 metric 전무</h3>
+  <p class="ev"><code>observability_metrics.md</code> 3.2가 release gate 입력으로 요구하는 다음 metric이 코드에 없다:
+  active WebSocket connections, room subscription count, outbound payload bytes/sec, batch frames/sec, local delivery/sec,
+  <strong>send queue depth</strong>, WebSocket write latency p95/p99(= fan-out 지연), slow client disconnect, reconnect rate.</p>
+  <p class="ev"><code>chat.websocket.gateway</code>는 metric이 아니라 <code>@ConfigurationProperties</code> prefix다(<code>ChatWebSocketGatewayProperties</code>).
+  특히 <code>RoomPolicyWorker.gatewaySendQueueDepth</code>가 <strong>default 0</strong>으로 들어가 OVERLOAD 자동 판정의 게이트웨이 신호가 실제 게이트웨이에서 측정·연결되지 않는다 → "Phase 7 release gate: hot room fan-out p95 500ms 이하" 판정 불가.</p>
+</div>
+<div class="finding">
+  <h3><span class="badge b-medium">Medium</span> PostgreSQL 관측값 placeholder 하드코딩</h3>
+  <p class="ev">admin 응답의 <code>replicaLagMs</code>/<code>searchP95LatencyMs</code>가 <code>AdminMessageRepository</code>에서 <code>0::bigint</code> / <code>NULL</code>로 고정 반환된다.
+  <code>ReadReplicaLagPolicy</code>는 fallback 판단용으로 lag를 SQL로 읽지만, partition write latency·search projection lag·archive run duration은 metric으로 등록돼 있지 않다.</p>
+</div>
+
+<h2 id="blocker">4. Blocker — 이 상태로는 공개 트래픽/SLA 수용 불가</h2>
+
+<div class="finding">
+  <h3><span class="badge b-blocker">B-1</span> Redis 단일 인스턴스 (SPOF)</h3>
+  <p><code>docker-compose.yml</code>은 <code>redis:7.2-alpine</code> 단일 노드. Sentinel/Cluster/replica 미배포. Redis는 sequence 발급·Streams ingest·admission·presence·fanout owner lease·pub/sub의 <strong>단일 의존점</strong>이라, 노드 장애 = 메시지 수락·실시간 경로 전면 중단.</p>
+  <p class="ev">코드는 <code>{roomId}</code> hash tag로 Cluster를 전제했지만 실제 Cluster 배포는 없음. <code>appendfsync everysec</code>로 장애 시 최대 1초 ingest 유실 가능.</p>
+</div>
+<div class="finding">
+  <h3><span class="badge b-blocker">B-2</span> Object Storage 부재 + Cold Archive 미구현</h3>
+  <p><code>AdminMessageExportWorker</code>는 <code>java.nio.file.Files</code>로 <strong>로컬 디스크에 CSV</strong> 작성(<code>exportDirectory</code>). S3/MinIO 클라이언트·컨테이너 모두 없음.</p>
+  <p class="ev"><code>infra/postgres/archive/archive-partitions.sh</code>는 retention 초과 파티션을 로컬 <code>/archive</code> 디렉토리로 COPY 후 옵션 DROP할 뿐 <strong>S3 cold archive 경로가 없다</strong>. 멀티 인스턴스에서 export 파일이 특정 worker 로컬에만 존재 → 만료 URL 제공·감사·법적 보관 불가.</p>
+</div>
+<div class="finding">
+  <h3><span class="badge b-blocker">B-3</span> 관측 가능성 (부분 해소 / 파이프라인 미배포)</h3>
+  <p>계측 코드는 ingest/worker/streams/fanout-owner/ticket/admission 계열로 대폭 채워졌다(상단 3장 참조). 그러나 <strong>(a) Gateway/Fan-out 실측 metric 부재, (b) Prometheus 수집·경보 파이프라인 미배포</strong>로 인해 release gate("writer lag 3초 이하", "fan-out p95 500ms 이하" 등)를 실제로 판정·유지할 수 없다.</p>
+</div>
+<div class="finding">
+  <h3><span class="badge b-blocker">B-4</span> hot room shard 실제 분산 미적용</h3>
+  <p>shard count 기본값이 모든 경로에서 <code>1</code>로 고정: <code>ChatRedisProperties.shardCount = 1</code>, <code>RoomStorageConfigJdbcRepository.DEFAULT_SHARD_COUNT = 1</code>, <code>ChatServiceImpl.SHARD_COUNT = 1</code>.</p>
+  <p class="ev">stream shard가 1이면 fanout owner도 방당 1 owner가 전 메시지를 직렬 <code>XREADGROUP</code>/publish → 순서는 지키지만 <strong>단일 owner가 10,000 msg/sec를 혼자 처리</strong>해야 한다. "10,000 msg/sec 60초 유지" gate를 통과하려면 shard 확장 + 방별 owner 분산 검증이 선행되어야 하나 그 구현·검증 공백이 남는다.</p>
+</div>
+
+<h2 id="high">5. High — 공개 직후 장애/데이터/보안 리스크</h2>
+<table>
+  <thead><tr><th>항목</th><th>실측 상태</th><th>영향</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><span class="badge b-high">H-1</span> 전송 암호화 / 시크릿</td>
+      <td><code>infra/nginx/nginx.conf</code>·<code>redis.conf</code>에 TLS/SSL/<code>requirepass</code> 없음. WebSocket은 <code>ws://</code>. <code>.env</code> 평문 시크릿. Vault/KMS 미연동. HMAC 키 회전 전략 없음.</td>
+      <td>공개 인터넷이면 wss+TLS 사실상 필수. 시크릿 평문 보관은 운영 보안 기준 미달.</td>
+    </tr>
+    <tr>
+      <td><span class="badge b-high">H-2</span> 토큰 폐기/회전(revocation)</td>
+      <td><code>revoke|logout|refresh|blacklist</code> 관련 코드 없음. <code>HmacSessionTokenService</code>는 TTL 만료만 검증.</td>
+      <td>로그아웃/제재/유출 시 즉시 무효화 경로 없음. 강제 로그아웃·키 롤오버 불가.</td>
+    </tr>
+    <tr>
+      <td><span class="badge b-high">H-3</span> K8s / HPA</td>
+      <td>K8s manifest/Helm 전무(<code>k8s</code>/<code>helm</code> 디렉토리 없음). Docker Compose만 존재.</td>
+      <td>connection/lag/queue 기반 자동 확장 불가 → 수동 스케일. nginx stale upstream 문제도 Compose에서 잔존.</td>
+    </tr>
+    <tr>
+      <td><span class="badge b-high">H-4</span> moderation / 콘텐츠 필터</td>
+      <td>금칙어·스팸·도배 필터, ban/mute/suspend 도메인 코드 없음. admission은 rate limit+slow mode만 처리.</td>
+      <td>설계 6.2/9.5의 abuse 통제 일부만 구현. 삭제는 <code>is_deleted</code> tombstone 수준.</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="medium">6. Medium / Low</h2>
+<table>
+  <thead><tr><th>항목</th><th>상태</th><th>비고</th></tr></thead>
+  <tbody>
+    <tr><td><span class="badge b-medium">M-1</span> hot room 전용 Gateway pool / room-aware routing</td><td>미구현</td><td>nginx 단순 분산. hot room이 일반 방 UX까지 저하 가능.</td></tr>
+    <tr><td><span class="badge b-medium">M-2</span> 분산 부하 발생기</td><td>부분</td><td><code>scripts/phase7-reconnect-load.mjs</code> 등 Node 단일 발생기. 10k viewers/10k msgps 신뢰 생성엔 분산 부하 인프라 필요.</td></tr>
+    <tr><td><span class="badge b-medium">M-3</span> Export atomic manifest</td><td>미적용(알려진 trade-off)</td><td>chunk append + cursor checkpoint resume까지. crash 시 마지막 chunk 중복 가능(데이터 유실 아님). <code>production_hardening_tasks.md</code> 항목 3.</td></tr>
+    <tr><td><span class="badge b-medium">M-4</span> takeover flake / metric semantics</td><td>진행 중</td><td><code>chat.fanout.owner.takeovers</code> semantics 확정, raw delivery vs client-visible 분리 검증이 release gate 전 미확정.</td></tr>
+    <tr><td><span class="badge b-low">L</span> DR / 백업</td><td>전 단계 누락</td><td>PostgreSQL PITR·Redis 백업 복구 리허설·RTO/RPO 정의 없음. chaos test와 별개 영역.</td></tr>
+    <tr><td><span class="badge b-low">L</span> OpenSearch / ScyllaDB</td><td>의도적 미도입</td><td>PostgreSQL FTS/trigram first. 장기 대안으로 명시됨.</td></tr>
+  </tbody>
+</table>
+
+<h2 id="qa">7. 문서에서 "고민한 것들"의 실제 구현 여부</h2>
+<p>요청하신 핵심 항목입니다. <code>docs/questions/chat_service_design_qa.md</code>(24개 Q&amp;A)와 설계서·hardening 문서에서 직접 고민한 결정들을 실제 코드와 대조했습니다.</p>
+<p class="legend">
+  <span class="badge s-ok">구현</span> 코드에서 확인됨 ·
+  <span class="badge s-partial">부분</span> 일부만/우회 구현 ·
+  <span class="badge s-no">미구현</span> 고민은 했으나 코드 부재
+</p>
+
+<table>
+  <thead><tr><th>문서에서의 고민</th><th>판정</th><th>실측 근거 / 비고</th></tr></thead>
+  <tbody>
+    <tr><td>Q1·Q9 sequence block 선할당 폐기, <code>roomSeq INCR 1</code>로 수락 순서 보장</td><td><span class="badge s-ok">구현</span></td><td>방 id=3 정렬 역전 회귀를 피해 block allocation 제거. INCR 1 경로 확인.</td></tr>
+    <tr><td>Q8 fan-out 시 전체 세션 순회 금지, <code>roomId→sessions</code> 인덱스</td><td><span class="badge s-ok">구현</span></td><td><code>WebSocketSessionManager.sessionIdsByRoomId</code> (ConcurrentHashMap).</td></tr>
+    <tr><td>Q8 Slow client bounded queue, 가득 차면 drop 후 gap fill</td><td><span class="badge s-ok">구현</span></td><td><code>BoundedOutboundSessionQueue</code> + <code>CloseStatus(1013, "Outbound queue full")</code>.</td></tr>
+    <tr><td>Q10 DB 저장 분리 — Streams append 성공 시 <code>MESSAGE_ACCEPTED</code></td><td><span class="badge s-ok">구현</span></td><td>수락 ACK와 영속 저장 디커플링.</td></tr>
+    <tr><td>Q12 Writer는 consumer group, Fanout은 방별 owner lease</td><td><span class="badge s-ok">구현</span></td><td><code>FanoutOwnerLeaseService</code> (SET NX PX + renew/release Lua + fencing token).</td></tr>
+    <tr><td>Q12 <code>claimPendingIfDue()</code> 자가 복구(XPENDING/XCLAIM)</td><td><span class="badge s-ok">구현</span></td><td>worker self-healing 경로 존재.</td></tr>
+    <tr><td>Q6·Q12 Poison pill → DLQ, <code>deliveryCount</code>/<code>maxDeliveryCount</code></td><td><span class="badge s-ok">구현</span></td><td><code>dead_letter</code>/deliveryCount 처리, <code>chat.redis.stream.dead_letters</code> metric.</td></tr>
+    <tr><td>Q6·Q20 멱등 저장: <code>clientMessageId</code> + <code>ON CONFLICT</code></td><td><span class="badge s-ok">구현</span></td><td><code>PartitionedMessageRepository</code> upsert, clientMessageId 중복 제거.</td></tr>
+    <tr><td>Q15 ports/adapters — <code>MessageWritePort</code> 추상화</td><td><span class="badge s-ok">구현</span></td><td>JPA→Partitioned adapter 교체 가능 구조.</td></tr>
+    <tr><td>Q16·Q17·Q21 Opaque cursor 페이지네이션</td><td><span class="badge s-ok">구현</span></td><td>admin/public cursor, numeric cursor 호환 기간 명시.</td></tr>
+    <tr><td>Q19 Pub/Sub 휘발성 → gap fill로 보정</td><td><span class="badge s-ok">구현</span></td><td><code>GET /chat-rooms/{id}/messages/gap?afterSeq=</code> 경로 존재.</td></tr>
+    <tr><td>Q23 user-level rate limit (도배 방어)</td><td><span class="badge s-ok">구현</span></td><td>admission Lua의 user rate counter. <code>MESSAGE_ADMISSION_REJECTED</code>/429.</td></tr>
+    <tr><td>Q11·Q24 Replica lag fallback → Primary 우회</td><td><span class="badge s-partial">부분</span></td><td><code>ReadReplicaLagPolicy</code>로 lag 읽어 fallback. 단, admin 응답 <code>replicaLagMs</code>는 0 하드코딩이라 운영 관측은 미연결.</td></tr>
+    <tr><td>Q2·Q4 OVERLOAD 자동 판정/강등, 다중 Pod 정책 동기화</td><td><span class="badge s-partial">부분</span></td><td><code>RoomHeatClassifier</code>/<code>RoomPolicyWorker</code> 존재하나 <code>gatewaySendQueueDepth</code> 등 게이트웨이 실측 신호가 default 0 → OVERLOAD 입력 미연결. 정책 동기화는 per-room cache evict + TTL, Pub/Sub <code>ROOM_STATE_CHANGED</code> broadcast는 "향후"로 명시.</td></tr>
+    <tr><td><strong>Q5 Redis MAXLEN으로 Streams OOM 방어</strong></td><td><span class="badge s-no">미구현</span></td><td><code>RedisMessageStreamProducer</code>의 append에 <code>MAXLEN</code>/trim 미사용. HPA 지연 시 Redis OOM 방어 장치가 코드에 없음.</td></tr>
+    <tr><td><strong>Q5·Q6 유실 감지: <code>roomSeq</code> gap audit job / Evicted 경보</strong></td><td><span class="badge s-no">미구현</span></td><td>gap scan/missing seq 감지 코드 없음. "관리자가 유실을 100% 식별"이라는 고민이 코드로는 부재.</td></tr>
+    <tr><td><strong>Q22 Zombie connection 회수 heartbeat (ping-pong)</strong></td><td><span class="badge s-no">미구현</span></td><td><code>PingMessage</code>/<code>PongMessage</code>/<code>setHeartbeat</code> 명시 코드 없음. 컨테이너/TCP 기본에 의존.</td></tr>
+    <tr><td>Q18 PgBouncer connection pooler 도입</td><td><span class="badge s-no">미구현</span></td><td>load test 단계 권고였으나 미도입. worker scale-out 시 DB connection thrashing 위험.</td></tr>
+  </tbody>
+</table>
+
+<blockquote>
+  <p><strong>고민 vs 구현 갭의 의미:</strong> 위 <span class="badge s-no">미구현</span> 4건(MAXLEN, gap audit, heartbeat, PgBouncer)은 모두 "장애·과부하 상황에서의 생존·복구"를 다루는, 문서에서 명확히 논증했던 방어 장치다. 정상 경로 기능은 충실하나, <em>스스로 고민했던 극단 상황 대비책의 일부가 코드에 반영되지 않은</em> 상태다. 특히 MAXLEN 부재 + gap audit 부재가 겹치면, OOM/장애로 ingest가 밀릴 때 (a) Redis가 무한 증식하거나 (b) 유실이 발생해도 이를 감지할 수단이 없어 위험이 복리로 커진다.</p>
+</blockquote>
+
+<h2 id="roadmap">8. 권장 실행 순서 (production까지)</h2>
+<p>설계서가 이미 제시한 하이브리드 전략(토대 선행 → 계측 → 게이트)을 현재 실측 기준으로 보정한 순서입니다.</p>
+<ol>
+  <li><strong>관측 파이프라인 배포 (최우선, 적은 비용 / 큰 효과)</strong> — <code>micrometer-registry-prometheus</code> 추가, actuator <code>prometheus</code> 노출, Compose에 Prometheus+Grafana 컨테이너 추가. 이미 등록된 metric과 alert rule이 즉시 살아난다.</li>
+  <li><strong>Gateway/Fan-out 실측 metric 계측</strong> — active conn, send queue depth, write latency p95/p99, slow client, reconnect rate. 이것이 fan-out gate 판정과 OVERLOAD 자동 강등의 실제 입력이 된다.</li>
+  <li><strong>B-1 Redis HA</strong> — Compose는 Sentinel+replica(또는 단일+AOF 한시 운영 기준 명문화). hash tag는 이미 준비됨.</li>
+  <li><strong>B-2 Object Storage + cold archive</strong> — MinIO + S3 호환 추상화 1벌. archive worker DROP 전 cold archive 경로 추가, export 만료 URL 제공.</li>
+  <li><strong>설계 고민 미구현분 보강</strong> — Streams <code>MAXLEN</code>, <code>roomSeq</code> gap audit job, WebSocket heartbeat(ping-pong). 비용 대비 생존성 효과가 큼.</li>
+  <li><strong>B-4 shard 분산 + 10k msg/sec 검증</strong> — shard count 동적 확장 구조 정비 후 부하 검증.</li>
+  <li><strong>보안/운영</strong> — H-1 TLS/wss, H-2 토큰 revocation, H-4 moderation 파이프라인.</li>
+  <li><strong>Phase 8: K8s 전환</strong> — 모듈별 Deployment + HPA, Service/Ingress(nginx stale 문제 소멸), DR/백업(PITR, RTO/RPO).</li>
+</ol>
+
+<h2 id="caveats">9. 주의사항</h2>
+<blockquote>
+  <p>- 이 평가는 <strong>현재 코드 실측</strong> 기준이다. 기능 테스트·로컬 데모 통과와 production 준비 완료는 다르다(단일 Redis·로컬 파일 export는 데모에선 정상 동작).</p>
+  <p>- "Blocker"는 공개 고트래픽 SLA 기준이다. 내부 PoC·제한 베타라면 B-1/B-2/B-4와 일부 High는 운영 합의로 완화 가능하다.</p>
+  <p>- Phase 7의 계측 코드가 늘었다는 사실이 "관측되고 있다"를 의미하지 않는다. <strong>수집·경보 파이프라인이 없으면 release gate는 형식적으로만 통과</strong>한다(3장).</p>
+  <p>- 단일 VM Compose 운영 기간에는 노드 장애 = 전체 정지이므로, 이 기간 가용성 기대치를 운영 합의로 낮춰야 한다.</p>
+  <p>- shard count는 외부 계약이 아니라 운영 설정값이지만, 과거 bucket의 shard count는 유지되므로(설계 7.2) 확장 시점·전략을 미리 정해야 조회 복잡도가 통제된다.</p>
+</blockquote>
+
+<h2 id="next">10. 후속 질문 (Next Questions)</h2>
+<ul>
+  <li>1차 공개 대상이 <strong>공개 고트래픽 서비스</strong>인가, <strong>내부 PoC/제한 베타</strong>인가? (후자면 Blocker 일부가 High로 완화되어 일정이 크게 단축된다.)</li>
+  <li>관측 파이프라인을 <strong>이번에 바로 배포</strong>할까(권장: 가장 적은 비용으로 release gate를 실제 작동시킴), 아니면 K8s 전환 시점으로 미룰까?</li>
+  <li>10,000 msg/sec 목표를 <strong>1차 공개부터 release gate로 강제</strong>할 것인가, 더 낮은 목표로 시작하고 K8s 전환 후 상향할 것인가? (낮추면 B-4가 Blocker에서 빠진다.)</li>
+  <li>Compose 운영 기간 Redis를 <strong>Sentinel+replica</strong>로 갖출까, <strong>단일+AOF 한시 운영</strong>으로 가용성 기대치를 낮출까?</li>
+  <li>설계 고민 미구현 4건(MAXLEN·gap audit·heartbeat·PgBouncer)을 <strong>production 전 필수</strong>로 둘까, 운영 안정화 task로 분리할까?</li>
+  <li>이 평가를 바탕으로 <strong>Phase 7-pre / Phase 7 본체 / Phase 8</strong> 실행 플랜 문서로 분리해 드릴까?</li>
+</ul>
+
+<footer>
+  생성: Claude Code · 평가 방식: 저장소 코드/설정/스크립트 직접 grep·열람 후 문서 대조 ·
+  주요 근거 파일: <code>docker-compose.yml</code>, <code>chat-runtime-config/.../application-docker.yml</code>,
+  <code>chat-persistence/src/main/kotlin/service/*</code>, <code>infra/*</code>, <code>scripts/phase7-*.mjs</code>,
+  <code>docs/observability_metrics.md</code>, <code>docs/production_hardening_tasks.md</code>,
+  <code>docs/questions/chat_service_design_qa.md</code>
+</footer>
+
+</div>
+</body>
+</html>

@@ -308,6 +308,39 @@ services:
     networks:
       - chat-network
 
+  # Prometheus (metric 수집)
+  prometheus:
+    image: ${PROMETHEUS_IMAGE:-prom/prometheus:v2.53.0}
+    container_name: chat-prometheus
+    volumes:
+      - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./infra/prometheus/rules:/etc/prometheus/rules:ro
+      - prometheus_data:/prometheus
+    ports:
+      # 호스트 로컬에만 바인딩한다. 외부 공개는 K8s에서 인증된 Ingress로 다룬다.
+      - "127.0.0.1:${PROMETHEUS_PORT:-9090}:9090"
+    networks:
+      - chat-network
+
+  # Grafana (dashboard)
+  grafana:
+    image: ${GRAFANA_IMAGE:-grafana/grafana:11.1.0}
+    container_name: chat-grafana
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./infra/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./infra/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    ports:
+      # 호스트 로컬에만 바인딩한다. 외부 공개는 K8s에서 인증된 Ingress로 다룬다.
+      - "127.0.0.1:${GRAFANA_PORT:-3000}:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - chat-network
+
   # Nginx
   nginx:
     image: ${NGINX_IMAGE:-nginx:1.27-alpine}
@@ -364,6 +397,10 @@ volumes:
   postgres_partition_archive:
     driver: local
   redis_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
     driver: local
 
 # 네트워크 정의
