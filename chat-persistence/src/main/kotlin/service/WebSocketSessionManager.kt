@@ -1,5 +1,6 @@
 package com.chat.persistence.service
 
+import com.chat.domain.dto.ChatMessageBatch
 import com.chat.domain.dto.WebSocketMessage
 import com.chat.persistence.config.ChatRedisProperties
 import com.chat.persistence.config.ChatWebSocketGatewayProperties
@@ -28,6 +29,7 @@ class WebSocketSessionManager(
     private val gatewayProperties: ChatWebSocketGatewayProperties,
     @Qualifier("webSocketOutboundExecutor")
     private val outboundExecutor: Executor,
+    private val gatewayMetrics: WebSocketGatewayMetrics = WebSocketGatewayMetrics.Noop,
 ) {
     private val logger = LoggerFactory.getLogger(WebSocketSessionManager::class.java)
 
@@ -50,7 +52,16 @@ class WebSocketSessionManager(
                 RedisMessageBroker.MembershipAction.LEAVE -> leaveRoom(event.userId, event.roomId)
             }
         }
+
+        gatewayMetrics.registerGauges(
+            connectionCount = { sessionsById.size },
+            roomSubscriptionCount = { sessionIdsByRoomId.size },
+            sendQueueDepth = { totalPendingSize() },
+        )
     }
+
+    private fun totalPendingSize(): Int =
+        sessionsById.values.sumOf { it.outboundQueue.pendingSize() }
 
     fun addSession(userId: Long, session: WebSocketSession) {
         logger.info("Adding session $userId to server")
@@ -70,9 +81,19 @@ class WebSocketSessionManager(
             outboundQueue = BoundedOutboundSessionQueue(
                 maxPendingMessages = gatewayProperties.outboundQueueMaxPendingMessages,
                 executor = outboundExecutor,
-                sender = { payload -> outboundSession.sendMessage(TextMessage(payload)) },
+                sender = { payload ->
+                    val startNanos = System.nanoTime()
+                    try {
+                        outboundSession.sendMessage(TextMessage(payload))
+                        gatewayMetrics.recordWriteLatency(System.nanoTime() - startNanos, "success")
+                    } catch (t: Throwable) {
+                        gatewayMetrics.recordWriteLatency(System.nanoTime() - startNanos, "failure")
+                        throw t
+                    }
+                },
                 onOverflow = {
                     logger.warn("Closing session ${session.id} because outbound queue is full")
+                    gatewayMetrics.recordSlowClientDisconnect()
                     closeSession(session, OUTBOUND_QUEUE_FULL_STATUS)
                     removeSession(userId, session)
                 },
@@ -140,8 +161,12 @@ class WebSocketSessionManager(
             }
 
             if (sessionRef.outboundQueue.enqueue(json)) {
-                logger.info("Sending message to local room $roomId")
+                gatewayMetrics.recordLocalDelivery(1)
+                gatewayMetrics.recordOutboundBytes(json.toByteArray(Charsets.UTF_8).size.toLong())
             }
+        }
+        if (message is ChatMessageBatch) {
+            gatewayMetrics.recordBatchFrame()
         }
     }
 
