@@ -509,7 +509,7 @@ services:
 
   # Grafana (dashboard)
   grafana:
-    image: ${GRAFANA_IMAGE:-grafana/grafana:11.1.0}
+    image: ${GRAFANA_IMAGE:-grafana/grafana:11.5.2}
     container_name: chat-grafana
     environment:
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
