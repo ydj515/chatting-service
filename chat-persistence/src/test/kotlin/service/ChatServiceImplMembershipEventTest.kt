@@ -113,7 +113,14 @@ class ChatServiceImplMembershipEventTest {
             messageStreamProducer = mock(MessageStreamProducer::class.java),
             messageAdmissionPolicyService = MessageAdmissionPolicyService.Noop,
             roomTrafficStatsService = RoomTrafficStatsService.Noop,
+            roomStorageConfigReader = TestRoomStorageConfigReader,
         )
+    }
+
+    private object TestRoomStorageConfigReader : RoomStorageConfigReader {
+        override fun currentShardCount(roomId: Long): Int = 1
+
+        override fun shardConfig(roomId: Long): RoomShardConfig = RoomShardConfig()
     }
 
     private fun user(id: Long): User {

@@ -41,6 +41,7 @@ class ChatServiceImpl(
     private val messageStreamProducer: MessageStreamProducer,
     private val messageAdmissionPolicyService: MessageAdmissionPolicyService,
     private val roomTrafficStatsService: RoomTrafficStatsService,
+    private val roomStorageConfigReader: RoomStorageConfigReader,
 ) : ChatService {
 
     private val logger = LoggerFactory.getLogger(ChatServiceImpl::class.java)
@@ -359,6 +360,8 @@ class ChatServiceImpl(
         val messageId = generateMessageId()
         val clientMessageId = requestedClientMessageId ?: "server:$messageId"
         val roomSeq = messageSequenceService.getNextSequence(request.chatRoomId)
+        val shardConfig = roomStorageConfigReader.shardConfig(request.chatRoomId)
+        val streamShard = streamShard(roomSeq, shardConfig.fanoutShardCount)
 
         val message = Message(
             messageId = messageId,
@@ -369,9 +372,9 @@ class ChatServiceImpl(
             sender = sender,
             sequenceNumber = roomSeq,
             roomSeq = roomSeq,
-            streamShard = streamShard(request.chatRoomId),
-            writeShard = writeShard(messageId),
-            fanoutShard = fanoutShard(request.chatRoomId),
+            streamShard = streamShard,
+            writeShard = writeShard(messageId, shardConfig.writeShardCount),
+            fanoutShard = fanoutShard(streamShard),
         )
 
         messageStreamProducer.append(messageToStreamEnvelope(message))
@@ -441,11 +444,13 @@ class ChatServiceImpl(
 
     private fun legacyMessageId(id: Long): String = "legacy:$id"
 
-    private fun streamShard(roomId: Long): Int = shard(roomId.toString(), SHARD_COUNT)
+    private fun streamShard(roomSeq: Long, shardCount: Int): Int {
+        return Math.floorMod(roomSeq - 1, shardCount.coerceAtLeast(1).toLong()).toInt()
+    }
 
-    private fun writeShard(messageId: String): Int = shard(messageId, SHARD_COUNT)
+    private fun writeShard(messageId: String, shardCount: Int): Int = shard(messageId, shardCount)
 
-    private fun fanoutShard(roomId: Long): Int = shard(roomId.toString(), SHARD_COUNT)
+    private fun fanoutShard(streamShard: Int): Int = streamShard
 
     private fun shard(value: String, shardCount: Int): Int {
         return Math.floorMod(value.hashCode(), shardCount.coerceAtLeast(1))
@@ -487,9 +492,5 @@ class ChatServiceImpl(
             roomId = roomId,
             action = action,
         )
-    }
-
-    private companion object {
-        const val SHARD_COUNT = 1
     }
 }
