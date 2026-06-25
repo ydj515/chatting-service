@@ -23,16 +23,27 @@ if [[ "$cleanup" =~ ^[Yy]$ ]]; then
     "${compose[@]}" down --volumes --remove-orphans
 fi
 
-echo "PostgreSQL primary/read-replica, archive worker, Redis를 시작합니다..."
-"${compose[@]}" up -d postgres postgres-primary-setup postgres-replica postgres-partition-archive redis
+echo "PostgreSQL primary/read-replica, archive worker, Redis Cluster를 시작합니다..."
+"${compose[@]}" up -d \
+    postgres \
+    postgres-primary-setup \
+    postgres-replica \
+    postgres-partition-archive \
+    redis-cluster-node-1 \
+    redis-cluster-node-2 \
+    redis-cluster-node-3 \
+    redis-cluster-node-4 \
+    redis-cluster-node-5 \
+    redis-cluster-node-6 \
+    redis-cluster-init
 
 echo "PostgreSQL 준비를 기다립니다..."
 until "${compose[@]}" exec -T postgres pg_isready -U "$db_username" -d "$db_name" >/dev/null 2>&1; do
     sleep 2
 done
 
-echo "Redis 준비를 기다립니다..."
-until "${compose[@]}" exec -T redis redis-cli ping >/dev/null 2>&1; do
+echo "Redis Cluster 준비를 기다립니다..."
+until "${compose[@]}" exec -T redis-cluster-node-1 redis-cli -p 6379 cluster info 2>/dev/null | grep -q 'cluster_state:ok'; do
     sleep 2
 done
 
@@ -64,8 +75,10 @@ cat <<'EOF'
   docker compose logs -f nginx
   docker stats
 
-Redis 모니터링:
-  docker exec -it chat-redis redis-cli MONITOR
+Redis Cluster 모니터링:
+  docker exec -it chat-redis-cluster-node-1 redis-cli -p 6379 cluster nodes
+  docker exec -it chat-redis-cluster-node-1 redis-cli -p 6379 cluster info
+  docker exec -it chat-redis-cluster-node-1 redis-cli -p 6379 MONITOR
 
 채팅 검증:
   mise run verify:chat

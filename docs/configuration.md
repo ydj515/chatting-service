@@ -51,7 +51,16 @@
 | `CHAT_WORKER_FANOUT_CLAIM_INTERVAL_MILLIS` | `10000` | fanout worker가 pending claim을 수행하는 최소 주기 |
 | `CHAT_WORKER_FANOUT_MAX_DELIVERY_COUNT` | `5` | fanout worker record 처리 실패 후 DLQ로 보내는 delivery count 임계값 |
 | `CHAT_WORKER_ROOM_POLICY_POLL_DELAY_MILLIS` | `1000` | active room traffic snapshot을 읽어 heat/live feed/rate/slow-mode 정책을 자동 적용하는 주기 |
-| `REDIS_PORT` | `6379` | Redis 내부 포트 |
+| `REDIS_HOST` | `redis` | standalone Redis host. host Gradle 개발 모드에서 사용 |
+| `REDIS_PORT` | `6379` | standalone Redis 내부 포트. host Gradle 개발 모드에서 사용 |
+| `REDIS_CLUSTER_NODES` | `redis-cluster-node-1:6379,...,redis-cluster-node-6:6379` | `redis-cluster` Spring profile에서 사용하는 Lettuce cluster seed node 목록 |
+| `REDIS_CLUSTER_MAX_REDIRECTS` | `5` | Redis Cluster MOVED/ASK redirect 최대 추적 횟수 |
+| `REDIS_CLUSTER_NODE_1_HOST_PORT` | `6379` | Redis Cluster node 1의 호스트 노출 포트 |
+| `REDIS_CLUSTER_NODE_2_HOST_PORT` | `6380` | Redis Cluster node 2의 호스트 노출 포트 |
+| `REDIS_CLUSTER_NODE_3_HOST_PORT` | `6381` | Redis Cluster node 3의 호스트 노출 포트 |
+| `REDIS_CLUSTER_NODE_4_HOST_PORT` | `6382` | Redis Cluster node 4의 호스트 노출 포트 |
+| `REDIS_CLUSTER_NODE_5_HOST_PORT` | `6383` | Redis Cluster node 5의 호스트 노출 포트 |
+| `REDIS_CLUSTER_NODE_6_HOST_PORT` | `6384` | Redis Cluster node 6의 호스트 노출 포트 |
 | `CHAT_REDIS_MEMBERSHIP_TOPIC` | `chat.membership` | REST create/join 결과를 WebSocket 노드에 전파하는 Redis 제어 topic |
 | `CHAT_REDIS_STREAMS_ROOM_STREAM_KEY_PREFIX` | `chat:stream:room:` | 방별 Redis Streams key prefix |
 | `CHAT_REDIS_STREAMS_KNOWN_STREAMS_KEY` | `chat:stream:rooms` | worker가 poll할 stream key index set |
@@ -72,6 +81,14 @@
 ### Redis Cache Serialization
 
 Redis cache value serializer는 Kotlin/JavaTime module과 함께 `GenericJackson2JsonRedisSerializer` default typing을 사용한다. Phase 6 runtime smoke에서 `roomAdmissionPolicies` cache의 `RoomAdmissionPolicy`가 type hint 없이 저장되어 `LinkedHashMap`으로 복원되는 문제가 확인되었고, 이 경우 WebSocket send path의 admission check가 `ClassCastException`으로 실패한다. 따라서 Redis cache를 새 serializer로 읽기 전에 과거 type hint 없는 cache value가 남아 있으면 TTL 만료를 기다리거나 해당 cache key를 삭제해야 한다.
+
+### Redis Topology
+
+전체 Docker backend는 `SPRING_PROFILES_ACTIVE=docker,redis-cluster`를 기본값으로 사용해 Lettuce Redis Cluster mode를 활성화한다. `docker-compose.yml`의 앱 컨테이너들은 `redis-cluster-init` 완료 후 시작되며, seed node는 `REDIS_CLUSTER_NODES`로 주입된다.
+
+호스트 Gradle 개발 모드(`mise run dev:*`)는 `SPRING_PROFILES_ACTIVE=docker`만 사용하고, `mise run start:infra`가 명시적으로 기동하는 standalone `redis` 서비스에 연결한다. 이 분리는 Docker Desktop 환경에서 Redis Cluster가 내부 container hostname을 redirect endpoint로 반환해 호스트 앱이 접근하지 못하는 문제를 피하기 위한 것이다.
+
+> Redis Cluster node 설정은 `appendfsync everysec`를 사용한다. Redis node 장애 또는 host crash 시 마지막 fsync 이후 최대 1초의 Redis ingest가 손실될 수 있으며, Phase 8.7 gap audit에서 감지 경로를 제공한다.
 
 | `CHAT_API_CORS_ALLOWED_ORIGINS` | `*` | REST API CORS 허용 origin |
 | `CHAT_WEBSOCKET_ALLOWED_ORIGINS` | `*` | WebSocket 허용 origin |
