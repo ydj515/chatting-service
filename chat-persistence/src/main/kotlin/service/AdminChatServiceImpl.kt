@@ -1,6 +1,7 @@
 package com.chat.persistence.service
 
 import com.chat.domain.dto.AdminExportJobDto
+import com.chat.domain.dto.AdminExportJobStatusDto
 import com.chat.domain.dto.AdminExportMessagesRequest
 import com.chat.domain.dto.AdminMessageCursor
 import com.chat.domain.dto.AdminMessageCursorCodec
@@ -14,9 +15,11 @@ import com.chat.domain.dto.AdminMessageSearchResponse
 import com.chat.domain.dto.AdminRoomPolicyUpdateRequest
 import com.chat.domain.dto.AdminRoomStatusDto
 import com.chat.domain.service.AdminChatService
+import com.chat.persistence.config.ChatObjectStorageProperties
 import com.chat.persistence.repository.AdminAuditLogRepository
 import com.chat.persistence.repository.AdminExportJobRepository
 import com.chat.persistence.repository.AdminMessageRepository
+import com.chat.persistence.storage.ObjectStoragePort
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.springframework.cache.annotation.CacheEvict
 import org.springframework.stereotype.Service
@@ -28,6 +31,8 @@ class AdminChatServiceImpl(
     private val messageRepository: AdminMessageRepository,
     private val auditLogRepository: AdminAuditLogRepository,
     private val exportJobRepository: AdminExportJobRepository,
+    private val objectStoragePort: ObjectStoragePort,
+    private val objectStorageProperties: ChatObjectStorageProperties,
     private val objectMapper: ObjectMapper,
 ) : AdminChatService {
 
@@ -137,6 +142,42 @@ class AdminChatServiceImpl(
             metadataJson = requestJson,
         )
         return job
+    }
+
+    override fun getMessageExport(
+        actor: String,
+        jobId: String,
+    ): AdminExportJobStatusDto? {
+        val record = exportJobRepository.findById(jobId) ?: return null
+        val presigned = record.outputUri
+            ?.takeIf { record.status == "COMPLETED" && it.startsWith("s3://") }
+            ?.let { objectStoragePort.createDownloadUrl(it, objectStorageProperties.presignedUrlTtl) }
+
+        auditLogRepository.record(
+            actor = actor,
+            action = "ADMIN_MESSAGE_EXPORT_VIEWED",
+            targetType = "EXPORT_JOB",
+            targetId = jobId,
+            metadataJson = objectMapper.writeValueAsString(
+                mapOf(
+                    "jobId" to jobId,
+                    "status" to record.status,
+                ),
+            ),
+        )
+
+        return AdminExportJobStatusDto(
+            jobId = record.jobId,
+            status = record.status,
+            createdAt = record.createdAt,
+            startedAt = record.startedAt,
+            completedAt = record.completedAt,
+            exportedRows = record.exportedRows,
+            outputUri = record.outputUri,
+            downloadUrl = presigned?.url,
+            downloadUrlExpiresAt = presigned?.expiresAt,
+            errorMessage = record.errorMessage,
+        )
     }
 
     private fun List<com.chat.domain.dto.AdminMessageDto>.toMessagePage(

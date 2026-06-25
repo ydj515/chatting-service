@@ -1,6 +1,7 @@
 package com.chat.domain.service
 
 import com.chat.domain.dto.AdminExportJobDto
+import com.chat.domain.dto.AdminExportJobStatusDto
 import com.chat.domain.dto.AdminExportMessagesRequest
 import com.chat.domain.dto.AdminMessageHistoryRequest
 import com.chat.domain.dto.AdminMessagePageResponse
@@ -19,4 +20,6 @@ interface AdminChatService {
     fun updateRoomPolicy(actor: String, roomId: Long, request: AdminRoomPolicyUpdateRequest): AdminRoomStatusDto
 
     fun createMessageExport(actor: String, request: AdminExportMessagesRequest): AdminExportJobDto
+
+    fun getMessageExport(actor: String, jobId: String): AdminExportJobStatusDto?
 }

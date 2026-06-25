@@ -99,3 +99,16 @@ data class AdminExportJobDto(
     val status: String,
     val createdAt: LocalDateTime,
 )
+
+data class AdminExportJobStatusDto(
+    val jobId: String,
+    val status: String,
+    val createdAt: LocalDateTime,
+    val startedAt: LocalDateTime?,
+    val completedAt: LocalDateTime?,
+    val exportedRows: Int,
+    val outputUri: String?,
+    val downloadUrl: String?,
+    val downloadUrlExpiresAt: Instant?,
+    val errorMessage: String?,
+)

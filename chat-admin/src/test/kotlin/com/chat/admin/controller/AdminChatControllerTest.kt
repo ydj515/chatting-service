@@ -3,6 +3,7 @@ package com.chat.admin.controller
 import com.chat.admin.config.AdminProperties
 import com.chat.admin.security.AdminTokenVerifier
 import com.chat.domain.dto.AdminExportJobDto
+import com.chat.domain.dto.AdminExportJobStatusDto
 import com.chat.domain.dto.AdminExportMessagesRequest
 import com.chat.domain.dto.AdminMessageCursor
 import com.chat.domain.dto.AdminMessageCursorCodec
@@ -233,6 +234,36 @@ class AdminChatControllerTest {
     }
 
     @Test
+    fun `관리자 export status 조회는 완료 job과 download url을 반환한다`() {
+        mockMvc.get("/admin/exports/export-1") {
+            header("X-Admin-Token", "local-admin-token")
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.jobId") { value("export-1") }
+                jsonPath("$.status") { value("COMPLETED") }
+                jsonPath("$.outputUri") { value("s3://chat-archives/admin-exports/export-1.csv") }
+                jsonPath("$.downloadUrl") {
+                    value("http://localhost:9000/chat-archives/admin-exports/export-1.csv?signature=abc")
+                }
+                jsonPath("$.exportedRows") { value(2) }
+            }
+
+        assertEquals("admin-local", service.exportStatusActor)
+        assertEquals("export-1", service.exportStatusJobId)
+    }
+
+    @Test
+    fun `관리자 export status 조회는 없는 job을 404로 반환한다`() {
+        mockMvc.get("/admin/exports/missing") {
+            header("X-Admin-Token", "local-admin-token")
+        }
+            .andExpect {
+                status { isNotFound() }
+            }
+    }
+
+    @Test
     fun `관리자 room status 조회는 방 상태 정보를 반환한다`() {
         mockMvc.get("/admin/rooms/10/status") {
             header("X-Admin-Token", "local-admin-token")
@@ -347,6 +378,8 @@ class AdminChatControllerTest {
         var searchRequest: AdminMessageSearchRequest? = null
         var exportActor: String? = null
         var exportRequest: AdminExportMessagesRequest? = null
+        var exportStatusActor: String? = null
+        var exportStatusJobId: String? = null
         var statusActor: String? = null
         var statusRoomId: Long? = null
         var policyActor: String? = null
@@ -428,6 +461,29 @@ class AdminChatControllerTest {
                 jobId = "export-1",
                 status = "PENDING",
                 createdAt = LocalDateTime.parse("2026-06-14T00:00:00"),
+            )
+        }
+
+        override fun getMessageExport(
+            actor: String,
+            jobId: String,
+        ): AdminExportJobStatusDto? {
+            exportStatusActor = actor
+            exportStatusJobId = jobId
+            if (jobId == "missing") {
+                return null
+            }
+            return AdminExportJobStatusDto(
+                jobId = "export-1",
+                status = "COMPLETED",
+                createdAt = LocalDateTime.parse("2026-06-26T00:00:00"),
+                startedAt = LocalDateTime.parse("2026-06-26T00:00:01"),
+                completedAt = LocalDateTime.parse("2026-06-26T00:00:02"),
+                exportedRows = 2,
+                outputUri = "s3://chat-archives/admin-exports/export-1.csv",
+                downloadUrl = "http://localhost:9000/chat-archives/admin-exports/export-1.csv?signature=abc",
+                downloadUrlExpiresAt = Instant.parse("2026-06-26T00:15:00Z"),
+                errorMessage = null,
             )
         }
 

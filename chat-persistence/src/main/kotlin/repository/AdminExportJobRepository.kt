@@ -22,6 +22,18 @@ data class AdminExportJobRecord(
     val outputUri: String? = null,
 )
 
+data class AdminExportJobStatusRecord(
+    val jobId: String,
+    val actor: String,
+    val status: String,
+    val outputUri: String?,
+    val exportedRows: Int,
+    val errorMessage: String?,
+    val createdAt: LocalDateTime,
+    val startedAt: LocalDateTime?,
+    val completedAt: LocalDateTime?,
+)
+
 @Repository
 class AdminExportJobRepository(
     @Qualifier("jdbcTemplate")
@@ -88,6 +100,31 @@ class AdminExportJobRepository(
                 """.trimIndent(),
                 exportJobRowMapper,
                 workerId,
+            )
+        } catch (e: EmptyResultDataAccessException) {
+            null
+        }
+    }
+
+    fun findById(jobId: String): AdminExportJobStatusRecord? {
+        return try {
+            jdbcTemplate.queryForObject(
+                """
+                SELECT
+                    job_id,
+                    actor,
+                    status,
+                    output_uri,
+                    exported_rows,
+                    error_message,
+                    created_at,
+                    started_at,
+                    completed_at
+                FROM admin_message_export_jobs
+                WHERE job_id = ?
+                """.trimIndent(),
+                exportJobStatusRowMapper,
+                jobId,
             )
         } catch (e: EmptyResultDataAccessException) {
             null
@@ -171,6 +208,20 @@ class AdminExportJobRepository(
                 cursorToken = rs.getString("cursor_token"),
                 exportedRows = rs.getInt("exported_rows"),
                 outputUri = rs.getString("output_uri"),
+            )
+        }
+
+        val exportJobStatusRowMapper = RowMapper { rs: ResultSet, _: Int ->
+            AdminExportJobStatusRecord(
+                jobId = rs.getString("job_id"),
+                actor = rs.getString("actor"),
+                status = rs.getString("status"),
+                outputUri = rs.getString("output_uri"),
+                exportedRows = rs.getInt("exported_rows"),
+                errorMessage = rs.getString("error_message"),
+                createdAt = rs.getTimestamp("created_at").toLocalDateTime(),
+                startedAt = rs.getTimestamp("started_at")?.toLocalDateTime(),
+                completedAt = rs.getTimestamp("completed_at")?.toLocalDateTime(),
             )
         }
     }
