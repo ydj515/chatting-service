@@ -19,6 +19,7 @@ class WebSocketGatewayMetrics(
 ) {
     private val gaugesRegistered = AtomicBoolean(false)
     private val writeTimers = ConcurrentHashMap<String, Timer>()
+    private val counters = ConcurrentHashMap<String, Counter>()
 
     // gauge supplier는 세션 매니저가 제공한다. Gauge 등록은 멱등이 아니므로 1회만 수행한다.
     fun registerGauges(
@@ -63,18 +64,19 @@ class WebSocketGatewayMetrics(
                 Timer.builder("chat.websocket.gateway.write.latency")
                     .tag(TAG_GATEWAY_GROUP, gatewayGroup)
                     .tag(TAG_OUTCOME, outcome)
+                    // Prometheus histogram_quantile로 p95/p99를 계산하려면 bucket series 발행이 필요하다.
+                    .publishPercentileHistogram()
                     .register(registry)
             }.record(maxOf(durationNanos, 0L), TimeUnit.NANOSECONDS)
         }
     }
 
     private fun counter(name: String): Counter? {
-        var result: Counter? = null
-        // Counter.builder(...).register(registry)는 동일 name/tag에 대해 멱등이라 같은 meter를 반환한다.
-        meterRegistryProvider?.ifAvailable { registry ->
-            result = Counter.builder(name).tag(TAG_GATEWAY_GROUP, gatewayGroup).register(registry)
+        // hot path에서 매번 builder를 생성/등록하지 않도록 생성된 Counter를 캐싱해 재사용한다.
+        val registry = meterRegistryProvider?.getIfAvailable() ?: return null
+        return counters.computeIfAbsent(name) {
+            Counter.builder(name).tag(TAG_GATEWAY_GROUP, gatewayGroup).register(registry)
         }
-        return result
     }
 
     companion object {

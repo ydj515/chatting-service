@@ -12,13 +12,14 @@ import java.util.stream.Stream
 class ReplicaLagGaugePublisherTest {
 
     @Test
-    fun `publishes replica lag as a gauge measured at scrape time`() {
+    fun `gauge reflects the last background measurement`() {
         val registry = SimpleMeterRegistry()
         val lagPolicy = mock(ReadReplicaLagPolicy::class.java)
         `when`(lagPolicy.currentLagMillis()).thenReturn(1500L)
         val publisher = ReplicaLagGaugePublisher(lagPolicy, provider(registry))
 
-        publisher.register()
+        publisher.registerGauge()
+        publisher.refresh()
 
         assertEquals(
             1500.0,
@@ -27,16 +28,20 @@ class ReplicaLagGaugePublisherTest {
     }
 
     @Test
-    fun `gauge falls back to zero when lag query fails`() {
+    fun `keeps last known value and does not crash when measurement fails`() {
         val registry = SimpleMeterRegistry()
         val lagPolicy = mock(ReadReplicaLagPolicy::class.java)
-        `when`(lagPolicy.currentLagMillis()).thenThrow(RuntimeException("replica down"))
+        `when`(lagPolicy.currentLagMillis())
+            .thenReturn(1200L)
+            .thenThrow(RuntimeException("replica down"))
         val publisher = ReplicaLagGaugePublisher(lagPolicy, provider(registry))
 
-        publisher.register()
+        publisher.registerGauge()
+        publisher.refresh() // 1200 측정 성공
+        publisher.refresh() // 예외 발생, 마지막 값 유지
 
         assertEquals(
-            0.0,
+            1200.0,
             registry.find("chat.postgres.replica.lag").tag("replica", "read-replica").gauge()?.value(),
         )
     }

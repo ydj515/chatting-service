@@ -55,7 +55,8 @@ class WebSocketSessionManager(
 
         gatewayMetrics.registerGauges(
             connectionCount = { sessionsById.size },
-            roomSubscriptionCount = { sessionIdsByRoomId.size },
+            // 방 개수가 아니라 (room, session) 구독 쌍 합계로 실제 구독 부하를 센다.
+            roomSubscriptionCount = { sessionIdsByRoomId.values.sumOf { ids -> ids.size } },
             sendQueueDepth = { totalPendingSize() },
         )
     }
@@ -150,6 +151,8 @@ class WebSocketSessionManager(
     fun sendMessageToLocalRoom(roomId: Long, message: WebSocketMessage, excludeUserId: Long? = null) {
         val json = objectMapper.writerFor(com.chat.domain.dto.WebSocketMessage::class.java).writeValueAsString(message)
         val sessionIds = sessionIdsByRoomId[roomId]?.toList() ?: return
+        // payload 크기는 루프 내내 동일하므로 1회만 계산해 세션 수만큼의 byte array 할당을 피한다.
+        val outboundBytes = json.toByteArray(Charsets.UTF_8).size.toLong()
 
         sessionIds.forEach { sessionId ->
             val sessionRef = sessionsById[sessionId] ?: return@forEach
@@ -165,7 +168,7 @@ class WebSocketSessionManager(
 
             if (sessionRef.outboundQueue.enqueue(json)) {
                 gatewayMetrics.recordLocalDelivery(1)
-                gatewayMetrics.recordOutboundBytes(json.toByteArray(Charsets.UTF_8).size.toLong())
+                gatewayMetrics.recordOutboundBytes(outboundBytes)
             }
         }
         if (message is ChatMessageBatch) {
