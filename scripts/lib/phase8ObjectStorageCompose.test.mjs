@@ -9,6 +9,14 @@ const dockerConfig = readFileSync(
 );
 const envExample = readFileSync(new URL('../../.env.example', import.meta.url), 'utf8');
 const mise = readFileSync(new URL('../../mise.toml', import.meta.url), 'utf8');
+const archiveScript = readFileSync(
+  new URL('../../infra/postgres/archive/archive-partitions.sh', import.meta.url),
+  'utf8',
+);
+const archiveDockerfile = readFileSync(
+  new URL('../../infra/postgres/archive/Dockerfile', import.meta.url),
+  'utf8',
+);
 
 function serviceBlock(name) {
   const match = compose.match(
@@ -57,4 +65,29 @@ test('local infra starts MinIO and env example documents object storage variable
   assert.match(envExample, /CHAT_OBJECT_STORAGE_BUCKET=chat-archives/);
   assert.match(envExample, /MINIO_ROOT_USER=/);
   assert.match(envExample, /MINIO_ROOT_PASSWORD=/);
+});
+
+test('partition archive service uses an image with AWS CLI and waits for MinIO init', () => {
+  const block = serviceBlock('postgres-partition-archive');
+  assert.match(block, /build:\n\s+context: \./);
+  assert.match(block, /dockerfile: infra\/postgres\/archive\/Dockerfile/);
+  assert.match(block, /CHAT_PARTITION_ARCHIVE_OBJECT_STORAGE_ENABLED:/);
+  assert.match(block, /CHAT_PARTITION_ARCHIVE_OBJECT_PREFIX:/);
+  assert.match(block, /AWS_ACCESS_KEY_ID:/);
+  assert.match(block, /AWS_SECRET_ACCESS_KEY:/);
+  assert.match(block, /minio-init: \{ condition: service_completed_successfully \}/);
+  assert.match(archiveDockerfile, /FROM postgres:17\.9-alpine/);
+  assert.match(archiveDockerfile, /apk add --no-cache aws-cli/);
+});
+
+test('archive script uploads csv and metadata before allowing drop', () => {
+  assert.match(archiveScript, /CHAT_PARTITION_ARCHIVE_OBJECT_STORAGE_ENABLED/);
+  assert.match(archiveScript, /CHAT_PARTITION_ARCHIVE_OBJECT_PREFIX/);
+  assert.match(archiveScript, /aws --endpoint-url/);
+  assert.match(archiveScript, /s3 cp "\$archive_file"/);
+  assert.match(archiveScript, /s3 cp "\$metadata_file"/);
+  assert.match(archiveScript, /Object Storage upload is required before detach\/drop/);
+  assert.match(archiveScript, /objectUri/);
+  assert.match(archiveScript, /metadataObjectUri/);
+  assert.match(archiveScript, /uploadedAt/);
 });

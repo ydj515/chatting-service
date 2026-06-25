@@ -11,6 +11,14 @@ drop_after_copy="${CHAT_PARTITION_ARCHIVE_DROP_AFTER_COPY:-false}"
 run_once="${CHAT_PARTITION_ARCHIVE_RUN_ONCE:-false}"
 interval_seconds="${CHAT_PARTITION_ARCHIVE_INTERVAL_SECONDS:-86400}"
 hash_partitions="${CHAT_MESSAGE_HASH_PARTITIONS:-16}"
+object_storage_enabled="${CHAT_PARTITION_ARCHIVE_OBJECT_STORAGE_ENABLED:-false}"
+object_storage_endpoint="${CHAT_OBJECT_STORAGE_ENDPOINT:-}"
+object_storage_bucket="${CHAT_OBJECT_STORAGE_BUCKET:-}"
+object_storage_prefix="${CHAT_PARTITION_ARCHIVE_OBJECT_PREFIX:-postgres/archive/chat_messages}"
+
+is_true() {
+  [ "$1" = "true" ] || [ "$1" = "1" ] || [ "$1" = "yes" ]
+}
 
 require_unsigned_integer() {
   value="$1"
@@ -37,6 +45,39 @@ require_unsigned_integer "$retention_days" "CHAT_MESSAGE_RETENTION_DAYS"
 require_positive_integer "$hash_partitions" "CHAT_MESSAGE_HASH_PARTITIONS"
 
 mkdir -p "$archive_dir"
+
+object_key_for() {
+  basename="$1"
+  prefix="$(printf "%s" "$object_storage_prefix" | sed 's#^/*##; s#/*$##')"
+  if [ -z "$prefix" ]; then
+    printf "%s" "$basename"
+  else
+    printf "%s/%s" "$prefix" "$basename"
+  fi
+}
+
+require_object_storage_for_drop() {
+  if is_true "$drop_after_copy" && ! is_true "$object_storage_enabled"; then
+    echo "Object Storage upload is required before detach/drop. Enable CHAT_PARTITION_ARCHIVE_OBJECT_STORAGE_ENABLED=true." >&2
+    exit 1
+  fi
+}
+
+upload_archive_to_object_storage() {
+  if ! is_true "$object_storage_enabled"; then
+    return 0
+  fi
+  if [ -z "$object_storage_endpoint" ] || [ -z "$object_storage_bucket" ]; then
+    echo "Object Storage endpoint and bucket are required when archive upload is enabled." >&2
+    exit 1
+  fi
+  echo "Uploading ${archive_file} to ${archive_object_uri}..."
+  aws --endpoint-url "$object_storage_endpoint" s3 cp "$archive_file" "s3://${object_storage_bucket}/${archive_object_key}"
+  echo "Uploading ${metadata_file} to ${metadata_object_uri}..."
+  aws --endpoint-url "$object_storage_endpoint" s3 cp "$metadata_file" "s3://${object_storage_bucket}/${metadata_object_key}"
+}
+
+require_object_storage_for_drop
 
 precreate_partitions() {
   echo "Ensuring chat message partitions for today and tomorrow..."
@@ -91,6 +132,14 @@ SQL
     archive_file="${archive_dir}/${partition_name}.csv"
     metadata_file="${archive_file}.metadata.json"
     tmp_file="${archive_file}.tmp"
+    archive_object_key="$(object_key_for "$(basename "$archive_file")")"
+    metadata_object_key="$(object_key_for "$(basename "$metadata_file")")"
+    archive_object_uri=""
+    metadata_object_uri=""
+    if is_true "$object_storage_enabled"; then
+      archive_object_uri="s3://${object_storage_bucket}/${archive_object_key}"
+      metadata_object_uri="s3://${object_storage_bucket}/${metadata_object_key}"
+    fi
 
     echo "Archiving ${partition_name} to ${archive_file}..."
     rm -f "$tmp_file"
@@ -101,19 +150,27 @@ SQL
     checksum="$(sha256sum "$archive_file" | awk '{print $1}')"
     bytes="$(wc -c < "$archive_file" | tr -d ' ')"
     archived_at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+    uploaded_at=""
+    if is_true "$object_storage_enabled"; then
+      uploaded_at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+    fi
     cat > "$metadata_file" <<JSON
 {
   "partitionName": "${partition_name}",
   "archiveFile": "$(basename "$archive_file")",
+  "objectUri": "${archive_object_uri}",
+  "metadataObjectUri": "${metadata_object_uri}",
   "sha256": "${checksum}",
   "bytes": ${bytes},
   "rowCount": ${row_count},
-  "archivedAt": "${archived_at}"
+  "archivedAt": "${archived_at}",
+  "uploadedAt": "${uploaded_at}"
 }
 JSON
     echo "Wrote archive metadata to ${metadata_file}."
+    upload_archive_to_object_storage
 
-    if [ "$drop_after_copy" = "true" ]; then
+    if is_true "$drop_after_copy"; then
       echo "Detaching and dropping ${partition_name} after successful archive..."
       psql -h "$db_host" -p "$db_port" -U "$db_user" -d "$db_name" \
         -v ON_ERROR_STOP=1 \
