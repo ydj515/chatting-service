@@ -567,6 +567,29 @@ paths:
               schema:
                 $ref: '#/components/schemas/AdminExportJobDto'
 
+  /admin/exports/{jobId}:
+    get:
+      summary: Get admin message export job status
+      tags:
+        - Admin
+      security:
+        - adminToken: []
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Export job status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminExportJobStatusDto'
+        '404':
+          description: Export job not found
+
 components:
   securitySchemes:
     bearerAuth:
@@ -1129,3 +1152,43 @@ components:
         createdAt:
           type: string
           format: date-time
+
+    AdminExportJobStatusDto:
+      type: object
+      properties:
+        jobId:
+          type: string
+          example: "export-1"
+        status:
+          type: string
+          example: "COMPLETED"
+        createdAt:
+          type: string
+          format: date-time
+        startedAt:
+          type: string
+          format: date-time
+          nullable: true
+        completedAt:
+          type: string
+          format: date-time
+          nullable: true
+        exportedRows:
+          type: integer
+          format: int64
+          example: 1234
+        outputUri:
+          type: string
+          nullable: true
+          example: "s3://chat-archives/admin-exports/export-1.csv"
+        downloadUrl:
+          type: string
+          nullable: true
+          example: "http://localhost:9000/chat-archives/admin-exports/export-1.csv?X-Amz-Signature=..."
+        downloadUrlExpiresAt:
+          type: string
+          format: date-time
+          nullable: true
+        errorMessage:
+          type: string
+          nullable: true

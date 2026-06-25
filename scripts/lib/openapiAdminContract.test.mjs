@@ -4,6 +4,14 @@ import { test } from 'node:test';
 
 const openapi = readFileSync(new URL('../../docs/openapi.yaml', import.meta.url), 'utf8');
 
+function schemaBlock(name) {
+  const start = openapi.indexOf(`    ${name}:`);
+  assert.notEqual(start, -1, `${name} schema must exist`);
+  const rest = openapi.slice(start + 1);
+  const next = rest.search(/\n    [A-Za-z0-9]+:/);
+  return next === -1 ? openapi.slice(start) : openapi.slice(start, start + 1 + next);
+}
+
 test('AdminExportMessagesRequest documents roomId or query requirement', () => {
   const schema = openapi.slice(
     openapi.indexOf('    AdminExportMessagesRequest:'),
@@ -60,4 +68,19 @@ test('admin room policy documents automatic policy guard and moderator priority'
   assert.match(requestSchema, /clearRateLimit:[\s\S]*type: boolean/);
   assert.match(requestSchema, /clearUserRateLimit:[\s\S]*type: boolean/);
   assert.match(requestSchema, /clearSlowMode:[\s\S]*type: boolean/);
+});
+
+test('admin export status endpoint documents stable object uri and presigned download url', () => {
+  const statusPath = openapi.slice(
+    openapi.indexOf('  /admin/exports/{jobId}:'),
+    openapi.indexOf('components:'),
+  );
+  const statusSchema = schemaBlock('AdminExportJobStatusDto');
+
+  assert.match(statusPath, /get:/);
+  assert.match(statusPath, /name: jobId[\s\S]*in: path[\s\S]*required: true/);
+  assert.match(statusPath, /AdminExportJobStatusDto/);
+  assert.match(statusSchema, /outputUri:[\s\S]*s3:\/\/chat-archives\/admin-exports\/export-1\.csv/);
+  assert.match(statusSchema, /downloadUrl:[\s\S]*nullable: true/);
+  assert.match(statusSchema, /downloadUrlExpiresAt:[\s\S]*format: date-time[\s\S]*nullable: true/);
 });

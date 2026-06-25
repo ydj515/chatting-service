@@ -33,11 +33,26 @@
 | `CHAT_MESSAGE_HASH_PARTITIONS` | `16` | 일별 `chat_messages` partition 아래 생성할 hash subpartition 수 |
 | `CHAT_PARTITION_ARCHIVE_DROP_AFTER_COPY` | `false` | archive 성공 후 partition detach/drop 여부 |
 | `CHAT_PARTITION_ARCHIVE_INTERVAL_SECONDS` | `86400` | archive worker 실행 주기 |
+| `CHAT_PARTITION_ARCHIVE_OBJECT_STORAGE_ENABLED` | `true` | partition archive worker가 CSV/metadata를 Object Storage에 업로드할지 여부. `DROP_AFTER_COPY=true`일 때는 활성화가 필요 |
+| `CHAT_PARTITION_ARCHIVE_OBJECT_PREFIX` | `postgres/archive/chat_messages` | partition archive CSV/metadata를 저장할 Object Storage key prefix |
 | `CHAT_ADMIN_TOKEN` | 필수 | `chat-admin` API의 `X-Admin-Token` 검증 값. Docker/admin 실행 시 명시하지 않으면 시작 실패 |
 | `CHAT_ADMIN_ACTOR` | `admin-local` | shared token 인증 시 audit log에 기록할 기본 관리자 actor |
 | `CHAT_ADMIN_DEFAULT_LIMIT` | `50` | 관리자 history/search 기본 page size |
 | `CHAT_ADMIN_MAX_LIMIT` | `100` | 관리자 history/search 최대 page size |
-| `CHAT_ADMIN_EXPORT_DIRECTORY` | `/tmp/chat-admin-exports` | admin export worker가 CSV 산출물을 기록할 로컬 디렉터리 |
+| `CHAT_ADMIN_EXPORT_DIRECTORY` | `/tmp/chat-admin-exports` | admin export worker가 checkpoint/resume용 staging CSV를 기록할 로컬 디렉터리. 완료 산출물은 Object Storage에 업로드 |
+| `CHAT_OBJECT_STORAGE_ENABLED` | `true` | S3 호환 Object Storage adapter 활성화 여부 |
+| `CHAT_OBJECT_STORAGE_ENDPOINT` | `http://minio:9000` | Compose 앱 컨테이너가 사용하는 Object Storage endpoint. 호스트 Gradle docker profile 기본값은 `http://localhost:9000` |
+| `CHAT_OBJECT_STORAGE_REGION` | `us-east-1` | S3 client/presigner region |
+| `CHAT_OBJECT_STORAGE_BUCKET` | `chat-archives` | admin export와 cold archive object를 저장할 bucket |
+| `CHAT_OBJECT_STORAGE_ACCESS_KEY` | `chatminio` | 개발용 MinIO access key. 운영에서는 교체 필요 |
+| `CHAT_OBJECT_STORAGE_SECRET_KEY` | `chatminiosecret` | 개발용 MinIO secret key. 운영에서는 교체 필요 |
+| `CHAT_OBJECT_STORAGE_PATH_STYLE_ACCESS` | `true` | MinIO/S3 호환 endpoint에서 path-style access를 사용할지 여부 |
+| `CHAT_OBJECT_STORAGE_ADMIN_EXPORT_PREFIX` | `admin-exports` | admin export 최종 CSV key prefix |
+| `CHAT_OBJECT_STORAGE_PRESIGNED_URL_TTL` | `15m` | `GET /admin/exports/{jobId}`가 반환하는 download URL TTL |
+| `MINIO_ROOT_USER` | `chatminio` | Compose MinIO root user |
+| `MINIO_ROOT_PASSWORD` | `chatminiosecret` | Compose MinIO root password |
+| `MINIO_API_PORT` | `9000` | 호스트 loopback에 노출할 MinIO S3 API 포트 |
+| `MINIO_CONSOLE_PORT` | `9001` | 호스트 loopback에 노출할 MinIO console 포트 |
 | `WORKER_ROLES` | `message-writer,fanout,admin-export,room-policy` | `chat-worker-application`에서 활성화할 worker role 목록 |
 | `CHAT_WORKER_POLL_DELAY_MILLIS` | `100` | worker scheduler poll 간격 |
 | `CHAT_WORKER_WRITER_CONSUMER_GROUP` | `message-writer` | Redis Streams writer consumer group 이름 |

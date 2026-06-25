@@ -46,6 +46,10 @@ export function buildAdminExportUrl(baseUrl: string): string {
   return `${normalizeBaseUrl(baseUrl)}/admin/exports/messages`;
 }
 
+export function buildAdminExportStatusUrl(baseUrl: string, jobId: string): string {
+  return `${normalizeBaseUrl(baseUrl)}/admin/exports/${encodeURIComponent(jobId)}`;
+}
+
 export async function fetchAdminHistory(
   baseUrl: string,
   adminToken: string,
@@ -77,6 +81,14 @@ export async function createAdminExport(
   payload: AdminFilters,
 ): Promise<AdminExportJob> {
   return requestJson(buildAdminExportUrl(baseUrl), adminToken, payload);
+}
+
+export async function fetchAdminExportStatus(
+  baseUrl: string,
+  adminToken: string,
+  jobId: string,
+): Promise<AdminExportJob> {
+  return requestJson(buildAdminExportStatusUrl(baseUrl, jobId), adminToken);
 }
 
 async function requestJson<T>(url: string, adminToken: string, body?: unknown): Promise<T> {

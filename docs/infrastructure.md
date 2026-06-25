@@ -39,7 +39,7 @@ mise run stop                      # 전체 클러스터 종료
 ### 구성 검증
 
 ```bash
-docker compose up -d postgres postgres-primary-setup postgres-replica postgres-partition-archive
+docker compose up -d postgres postgres-primary-setup postgres-replica minio minio-init postgres-partition-archive
 
 # replication 상태 확인
 docker compose exec -T postgres \
@@ -62,7 +62,23 @@ docker compose run --rm \
 - replication 상태: `chat_replicator|streaming|async`
 - replica recovery 상태: `true`
 - 오래된 파티션이 없으면 archive worker는 `No partitions are older than retention window.`를 출력합니다.
-- archive 대상 파티션이 있으면 `${partition}.csv`와 `${partition}.csv.metadata.json`이 함께 생성됩니다. metadata에는 `sha256`, `bytes`, `rowCount`, `archivedAt`이 포함됩니다.
+- archive 대상 파티션이 있으면 `${partition}.csv`와 `${partition}.csv.metadata.json`이 함께 생성되고 Object Storage로 업로드됩니다. metadata에는 `sha256`, `bytes`, `rowCount`, `archivedAt`, `objectUri`, `metadataObjectUri`, `uploadedAt`이 포함됩니다.
+
+### Object Storage / MinIO
+
+Phase 8.3부터 Docker Compose는 S3 호환 Object Storage로 MinIO를 함께 띄웁니다. `minio-init`은 앱과 archive worker가 시작되기 전에 `${CHAT_OBJECT_STORAGE_BUCKET:-chat-archives}` bucket을 idempotent하게 생성합니다.
+
+| 항목 | 기본값 |
+| --- | --- |
+| MinIO S3 API | `http://127.0.0.1:${MINIO_API_PORT:-9000}` |
+| MinIO Console | `http://127.0.0.1:${MINIO_CONSOLE_PORT:-9001}` |
+| Bucket | `chat-archives` |
+| Admin export prefix | `admin-exports/` |
+| Partition archive prefix | `postgres/archive/chat_messages/` |
+
+admin export worker는 실행 중 checkpoint/resume에는 로컬 staging CSV를 사용하고, 완료 시 최종 CSV를 `s3://chat-archives/admin-exports/{jobId}.csv`에 업로드합니다. 관리자는 `GET /api/admin/exports/{jobId}`로 안정적인 `outputUri`와 만료 시간이 있는 `downloadUrl`을 조회합니다.
+
+partition archive worker는 detach/drop 전에 CSV와 metadata JSON을 `s3://chat-archives/postgres/archive/chat_messages/...` 아래로 업로드합니다. `CHAT_PARTITION_ARCHIVE_DROP_AFTER_COPY=true`인데 Object Storage 업로드가 비활성화되었거나 실패하면 partition detach/drop은 수행하지 않습니다.
 
 ---
 
