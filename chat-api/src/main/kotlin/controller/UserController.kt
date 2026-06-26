@@ -6,6 +6,7 @@ import jakarta.validation.Valid
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.data.web.PageableDefault
+import org.springframework.http.HttpHeaders
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 
@@ -25,6 +26,19 @@ class UserController(
     fun login(@Valid @RequestBody request: LoginRequest): ResponseEntity<LoginResponse> {
         val response = userService.login(request)
         return ResponseEntity.ok(response)
+    }
+
+    @PostMapping("/logout")
+    fun logout(@RequestHeader(HttpHeaders.AUTHORIZATION, required = false) authorizationHeader: String?): ResponseEntity<Void> {
+        val token = authorizationHeader
+            ?.takeIf { it.startsWith(BEARER_PREFIX, ignoreCase = true) }
+            ?.substring(BEARER_PREFIX.length)
+            ?.trim()
+            ?.takeIf { it.isNotBlank() }
+            ?: throw IllegalArgumentException("인증 토큰이 필요합니다.")
+
+        userService.logout(token)
+        return ResponseEntity.noContent().build()
     }
 
     @GetMapping("/{id}")
@@ -48,4 +62,7 @@ class UserController(
         return ResponseEntity.ok(users)
     }
 
+    private companion object {
+        const val BEARER_PREFIX = "Bearer "
+    }
 }

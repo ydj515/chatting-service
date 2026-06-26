@@ -54,6 +54,10 @@ class UserServiceImpl(
         )
     }
 
+    override fun logout(sessionToken: String) {
+        sessionTokenService.revokeToken(sessionToken)
+    }
+
     override fun getUserById(userId: Long): UserDto {
         val user = userRepository.findById(userId)
             .orElseThrow { IllegalArgumentException("사용자를 찾을 수 없습니다: $userId") }

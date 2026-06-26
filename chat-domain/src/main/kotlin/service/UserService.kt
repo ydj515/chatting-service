@@ -9,6 +9,7 @@ interface UserService {
     // 사용자 관리
     fun createUser(request: CreateUserRequest): UserDto
     fun login(request: LoginRequest): LoginResponse
+    fun logout(sessionToken: String)
     fun getUserById(userId: Long): UserDto
     fun searchUsers(query: String, pageable: Pageable): Page<UserDto>
 

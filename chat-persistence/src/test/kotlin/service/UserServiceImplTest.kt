@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.mock
+import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
 import java.security.MessageDigest
 import java.time.LocalDateTime
@@ -59,6 +60,17 @@ class UserServiceImplTest {
         assertEquals("session-token-7", response.sessionToken)
         assertEquals("Bearer", response.tokenType)
         assertEquals(expiresAt, response.expiresAt)
+    }
+
+    @Test
+    fun `logout은 session token revoke를 요청한다`() {
+        val userRepository = mock(UserRepository::class.java)
+        val sessionTokenService = mock(SessionTokenService::class.java)
+        val userService = UserServiceImpl(userRepository, sessionTokenService)
+
+        userService.logout("session-token")
+
+        verify(sessionTokenService).revokeToken("session-token")
     }
 
     private fun hashPassword(password: String): String {
