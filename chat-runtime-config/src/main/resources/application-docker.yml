@@ -118,6 +118,9 @@ chat:
       secret: ${CHAT_AUTH_SESSION_SECRET:local-development-session-secret-change-me}
       ttl: ${CHAT_AUTH_SESSION_TTL:12h}
       token-query-param: ${CHAT_AUTH_SESSION_TOKEN_QUERY_PARAM:token}
+      revocation-key-prefix: ${CHAT_AUTH_SESSION_REVOCATION_KEY_PREFIX:chat:auth:session:revoked:}
+      user-revocation-grace-ttl: ${CHAT_AUTH_SESSION_USER_REVOCATION_GRACE_TTL:1h}
+      control-topic: ${CHAT_AUTH_SESSION_CONTROL_TOPIC:chat.session.control}
     web-socket-ticket:
       ttl: ${CHAT_AUTH_WEB_SOCKET_TICKET_TTL:30s}
       ticket-query-param: ${CHAT_AUTH_WEB_SOCKET_TICKET_QUERY_PARAM:ticket}
