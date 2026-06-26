@@ -35,6 +35,7 @@ class CacheConfig(
             .withCacheConfiguration("chatRoomMembers", configuration.entryTtl(cacheProperties.chatRoomMembersTtl))
             .withCacheConfiguration("messages", configuration.entryTtl(cacheProperties.messagesTtl))
             .withCacheConfiguration("roomAdmissionPolicies", configuration.entryTtl(cacheProperties.roomAdmissionPoliciesTtl))
+            .withCacheConfiguration("roomShardConfigs", configuration.entryTtl(cacheProperties.roomShardConfigsTtl))
             .build()
     }
 

@@ -33,6 +33,7 @@ import org.mockito.ArgumentMatchers.anyString
 import org.mockito.Mockito.inOrder
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.never
+import org.mockito.Mockito.times
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
 import org.springframework.dao.DataIntegrityViolationException
@@ -397,6 +398,65 @@ class ChatServiceImplMessageContractTest {
         assertEquals(MemberRole.ADMIN, admissionPolicyService.lastMemberRole)
     }
 
+    @Test
+    fun `메시지 전송은 방별 shard config로 stream과 fanout shard를 roomSeq round robin으로 계산한다`() {
+        val messageStreamProducer = mock(MessageStreamProducer::class.java)
+        `when`(messageStreamProducer.append(anyMessageStreamEnvelope()))
+            .thenReturn("1749790000000-0")
+            .thenReturn("1749790000001-0")
+        val shardReader = FixedRoomStorageConfigReader(
+            RoomShardConfig(writeShardCount = 4, fanoutShardCount = 16),
+        )
+        val fixture = chatServiceFixture(
+            messageStreamProducer = messageStreamProducer,
+            roomStorageConfigReader = shardReader,
+            sequenceValues = listOf(1L, 2L),
+        )
+        `when`(
+            fixture.messageRepository.findByChatRoomIdAndSenderIdAndClientMessageId(
+                10L,
+                7L,
+                "client-message-1",
+            )
+        ).thenReturn(Optional.empty())
+        `when`(
+            fixture.messageRepository.findByChatRoomIdAndSenderIdAndClientMessageId(
+                10L,
+                7L,
+                "client-message-2",
+            )
+        ).thenReturn(Optional.empty())
+
+        fixture.chatService.sendMessage(
+            SendMessageRequest(
+                chatRoomId = 10L,
+                type = MessageType.TEXT,
+                content = "hello-1",
+                clientMessageId = "client-message-1",
+            ),
+            senderId = 7L,
+        )
+        fixture.chatService.sendMessage(
+            SendMessageRequest(
+                chatRoomId = 10L,
+                type = MessageType.TEXT,
+                content = "hello-2",
+                clientMessageId = "client-message-2",
+            ),
+            senderId = 7L,
+        )
+
+        val envelopeCaptor = ArgumentCaptor.forClass(MessageStreamEnvelope::class.java)
+        verify(messageStreamProducer, times(2)).append(captureMessageStreamEnvelope(envelopeCaptor))
+        val envelopes = envelopeCaptor.allValues
+        assertEquals(listOf(0, 1), envelopes.map { it.streamShard })
+        assertEquals(listOf(0, 1), envelopes.map { it.fanoutShard })
+        envelopes.forEach { envelope ->
+            assertTrue(envelope.writeShard in 0..3)
+        }
+        assertEquals(listOf(10L, 10L), shardReader.shardConfigRoomIds)
+    }
+
 
     @Suppress("UNCHECKED_CAST")
     private fun chatServiceFixture(
@@ -404,11 +464,14 @@ class ChatServiceImplMessageContractTest {
         messageAdmissionPolicyService: MessageAdmissionPolicyService = MessageAdmissionPolicyService.Noop,
         roomTrafficStatsService: RoomTrafficStatsService = RoomTrafficStatsService.Noop,
         memberRole: MemberRole = MemberRole.MEMBER,
+        roomStorageConfigReader: RoomStorageConfigReader = FixedRoomStorageConfigReader(RoomShardConfig()),
+        sequenceValues: List<Long> = listOf(1L),
     ): Fixture {
         val redisTemplate = mock(RedisTemplate::class.java) as RedisTemplate<String, String>
         val valueOperations = mock(ValueOperations::class.java) as ValueOperations<String, String>
         `when`(redisTemplate.opsForValue()).thenReturn(valueOperations)
-        `when`(valueOperations.increment("chat:sequence:10", 1L)).thenReturn(1L)
+        `when`(valueOperations.increment("chat:sequence:10", 1L))
+            .thenReturn(sequenceValues.first(), *sequenceValues.drop(1).toTypedArray())
 
         val objectMapper = ObjectMapper()
             .registerModule(JavaTimeModule())
@@ -464,6 +527,7 @@ class ChatServiceImplMessageContractTest {
                 messageStreamProducer = messageStreamProducer,
                 messageAdmissionPolicyService = messageAdmissionPolicyService,
                 roomTrafficStatsService = roomTrafficStatsService,
+                roomStorageConfigReader = roomStorageConfigReader,
             ),
             messageRepository = messageRepository,
             chatRoom = chatRoom,
@@ -525,6 +589,21 @@ class ChatServiceImplMessageContractTest {
         override fun requireAllowed(roomId: Long, senderId: Long, memberRole: MemberRole) {
             callCount += 1
             lastMemberRole = memberRole
+        }
+    }
+
+    private class FixedRoomStorageConfigReader(
+        private val config: RoomShardConfig,
+    ) : RoomStorageConfigReader {
+        val shardConfigRoomIds = mutableListOf<Long>()
+
+        override fun currentShardCount(roomId: Long): Int {
+            error("sendMessage must read shardConfig(roomId), not currentShardCount(roomId)")
+        }
+
+        override fun shardConfig(roomId: Long): RoomShardConfig {
+            shardConfigRoomIds += roomId
+            return config
         }
     }
 

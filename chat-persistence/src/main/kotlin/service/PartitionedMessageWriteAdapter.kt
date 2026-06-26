@@ -13,7 +13,6 @@ import org.springframework.transaction.annotation.Transactional
 )
 class PartitionedMessageWriteAdapter(
     private val partitionedMessageRepository: PartitionedMessageRepository,
-    private val writeShardResolver: CanonicalWriteShardResolver,
 ) : MessageWritePort {
 
     @Transactional
@@ -22,23 +21,18 @@ class PartitionedMessageWriteAdapter(
             return MessageWriteResult(emptyList())
         }
 
-        val storageRequests = requests.map { request ->
-            request.copy(
-                writeShard = writeShardResolver.resolve(
-                    roomId = request.chatRoomId,
-                    messageId = request.messageId,
-                ),
-            )
-        }
-        val inserted = partitionedMessageRepository.batchInsert(storageRequests)
-        if (inserted.size != storageRequests.size) {
+        // writeShard는 메시지 수락 시점(produce time)에 계산되어 envelope에 담긴 값을 그대로 사용한다.
+        // canonical table의 PK가 write_shard를 포함하므로, 재계산하면 ack 유실 후 shard 확장 시 replay가
+        // 다른 shard로 들어가 ON CONFLICT DO NOTHING을 우회해 같은 메시지의 중복 canonical row가 생긴다.
+        val inserted = partitionedMessageRepository.batchInsert(requests)
+        if (inserted.size != requests.size) {
             throw IllegalStateException(
-                "PartitionedMessageRepository returned ${inserted.size} results for ${storageRequests.size} requests",
+                "PartitionedMessageRepository returned ${inserted.size} results for ${requests.size} requests",
             )
         }
 
         return MessageWriteResult(
-            outcomes = storageRequests.zip(inserted).map { (request, written) ->
+            outcomes = requests.zip(inserted).map { (request, written) ->
                 MessageWriteOutcome(request = request, written = written)
             },
         )

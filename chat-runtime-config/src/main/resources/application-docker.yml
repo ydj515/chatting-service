@@ -215,6 +215,8 @@ chat:
   room-policy:
     hot-messages-per-second: ${CHAT_ROOM_POLICY_HOT_MESSAGES_PER_SECOND:1000}
     very-hot-messages-per-second: ${CHAT_ROOM_POLICY_VERY_HOT_MESSAGES_PER_SECOND:5000}
+    hot-shard-count: ${CHAT_ROOM_POLICY_HOT_SHARD_COUNT:16}
+    very-hot-shard-count: ${CHAT_ROOM_POLICY_VERY_HOT_SHARD_COUNT:64}
     overload-writer-lag-millis: ${CHAT_ROOM_POLICY_OVERLOAD_WRITER_LAG_MILLIS:3000}
     overload-fanout-lag-millis: ${CHAT_ROOM_POLICY_OVERLOAD_FANOUT_LAG_MILLIS:3000}
     overload-gateway-queue-depth: ${CHAT_ROOM_POLICY_OVERLOAD_GATEWAY_QUEUE_DEPTH:128}
@@ -249,3 +251,4 @@ chat:
     chat-room-members-ttl: ${CHAT_CACHE_CHAT_ROOM_MEMBERS_TTL:10m}
     messages-ttl: ${CHAT_CACHE_MESSAGES_TTL:5m}
     room-admission-policies-ttl: ${CHAT_CACHE_ROOM_ADMISSION_POLICIES_TTL:10s}
+    room-shard-configs-ttl: ${CHAT_CACHE_ROOM_SHARD_CONFIGS_TTL:10s}

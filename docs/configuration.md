@@ -117,8 +117,11 @@ Redis Cluster node의 host port는 `127.0.0.1`에만 bind한다. Cluster discove
 | `CHAT_WEBSOCKET_GATEWAY_OUTBOUND_SEND_BUFFER_SIZE_LIMIT_BYTES` | `524288` | WebSocket session send buffer 상한 |
 | `CHAT_MESSAGE_SEQUENCE_TTL` | `24h` | Redis 메시지 시퀀스 키 TTL. `roomSeq`는 메시지마다 Redis `INCR 1`로 발급하며 block 선할당은 사용하지 않음 |
 | `CHAT_CACHE_ROOM_ADMISSION_POLICIES_TTL` | `10s` | `room_storage_configs`의 rate limit/slow mode 정책 캐시 TTL. admin 정책 변경 시 해당 방 캐시는 즉시 evict |
+| `CHAT_CACHE_ROOM_SHARD_CONFIGS_TTL` | `10s` | 메시지 수락 경로가 읽는 `room_storage_configs.current_shard_count/fanout_shard_count` cache TTL |
 | `CHAT_ROOM_POLICY_HOT_MESSAGES_PER_SECOND` | `1000` | room heat `HOT` 전환 초당 메시지 임계값 |
 | `CHAT_ROOM_POLICY_VERY_HOT_MESSAGES_PER_SECOND` | `5000` | room heat `VERY_HOT` 전환 초당 메시지 또는 1분 p95 임계값 |
+| `CHAT_ROOM_POLICY_HOT_SHARD_COUNT` | `16` | `HOT` 방으로 자동 승격될 때 적용하는 `current_shard_count`와 `fanout_shard_count` 목표값. 자동 정책은 기존 값보다 작게 줄이지 않음 |
+| `CHAT_ROOM_POLICY_VERY_HOT_SHARD_COUNT` | `64` | `VERY_HOT` 및 `OVERLOAD` 방에 적용하는 shard count 목표값. 단일 fanout owner 병목을 피하기 위한 Phase 8.4 기본값 |
 | `CHAT_ROOM_POLICY_OVERLOAD_WRITER_LAG_MILLIS` | `3000` | writer lag 기반 `OVERLOAD` 전환 임계값 |
 | `CHAT_ROOM_POLICY_OVERLOAD_FANOUT_LAG_MILLIS` | `3000` | fanout lag 기반 `OVERLOAD` 전환 임계값 |
 | `CHAT_ROOM_POLICY_OVERLOAD_GATEWAY_QUEUE_DEPTH` | `128` | Gateway send queue 기반 `OVERLOAD` 전환 임계값 |
@@ -137,8 +140,11 @@ Redis Cluster node의 host port는 `127.0.0.1`에만 bind한다. Cluster discove
 | `CHAT_ROOM_POLICY_ACTIVE_ROOMS_KEY` | `chat:room-traffic:active-rooms` | 최근 traffic이 있는 room id를 추적하는 Redis sorted set key |
 | `CHAT_ROOM_POLICY_TRAFFIC_WINDOW_SECONDS` | `60` | room traffic snapshot/p95 계산 window |
 | `CHAT_ROOM_POLICY_TRAFFIC_COUNTER_TTL_SECONDS` | `120` | room traffic second counter TTL |
+| `CHAT_PROMETHEUS_URL` | `http://localhost:9090` | `scripts/phase8-hot-room-release-gate.mjs`가 release gate metric을 조회하는 Prometheus base URL |
 
 `room_storage_configs.auto_policy_enabled`는 `room-policy` worker의 자동 heat/live feed/rate/slow-mode upsert 허용 여부다. admin policy override는 기본적으로 이 값을 `false`로 바꿔 수동 정책을 보호하며, 자동 정책을 다시 허용하려면 admin API에서 `autoPolicyEnabled=true`를 명시한다.
+
+Phase 8.4부터 `room-policy` worker는 heat/live feed/rate/slow-mode 정책과 함께 shard count를 자동 확장한다. `HOT`은 `16`, `VERY_HOT`과 `OVERLOAD`는 `64`를 기본값으로 사용한다. 자동 정책은 `GREATEST(existing, incoming)` 방식으로 shard count를 늘리기만 하며, downgrade 시 shard count를 줄이지 않는다.
 
 `room_storage_configs.moderator_priority`는 `OWNER/ADMIN` 역할이 Redis admission rate limit과 slow mode를 우회할지 결정한다. 기본값은 `true`이며, `false`로 설정된 방에서는 운영자 역할도 일반 사용자와 같은 admission 제한을 받는다.
 

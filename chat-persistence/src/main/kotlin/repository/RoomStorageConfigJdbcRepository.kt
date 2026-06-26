@@ -1,8 +1,9 @@
 package com.chat.persistence.repository
 
-import com.chat.persistence.service.RoomStorageConfigReader
 import com.chat.persistence.service.RoomAdmissionPolicy
 import com.chat.persistence.service.RoomAdmissionPolicyReader
+import com.chat.persistence.service.RoomShardConfig
+import com.chat.persistence.service.RoomStorageConfigReader
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.cache.annotation.Cacheable
 import org.springframework.dao.EmptyResultDataAccessException
@@ -27,6 +28,25 @@ class RoomStorageConfigJdbcRepository(
         }
     }
 
+    @Cacheable(value = ["roomShardConfigs"], key = "#roomId")
+    override fun shardConfig(roomId: Long): RoomShardConfig {
+        return try {
+            val config = jdbcTemplate.queryForObject(
+                SELECT_SHARD_CONFIG_SQL,
+                { rs, _ ->
+                    RoomShardConfig(
+                        writeShardCount = rs.getInt("current_shard_count"),
+                        fanoutShardCount = rs.getInt("fanout_shard_count"),
+                    )
+                },
+                roomId,
+            ) ?: RoomShardConfig()
+            config.sanitized()
+        } catch (e: EmptyResultDataAccessException) {
+            RoomShardConfig()
+        }
+    }
+
     @Cacheable(value = ["roomAdmissionPolicies"], key = "#roomId")
     override fun admissionPolicy(roomId: Long): RoomAdmissionPolicy {
         return try {
@@ -47,6 +67,13 @@ class RoomStorageConfigJdbcRepository(
         }
     }
 
+    private fun RoomShardConfig.sanitized(): RoomShardConfig {
+        return copy(
+            writeShardCount = writeShardCount.coerceAtLeast(MIN_SHARD_COUNT),
+            fanoutShardCount = fanoutShardCount.coerceAtLeast(MIN_SHARD_COUNT),
+        )
+    }
+
     private fun java.sql.ResultSet.nullableInt(column: String): Int? {
         val value = getInt(column)
         return if (wasNull()) null else value
@@ -57,6 +84,13 @@ class RoomStorageConfigJdbcRepository(
         const val MIN_SHARD_COUNT = 1
         const val SELECT_CURRENT_SHARD_COUNT_SQL = """
             SELECT current_shard_count
+            FROM room_storage_configs
+            WHERE room_id = ?
+        """
+        const val SELECT_SHARD_CONFIG_SQL = """
+            SELECT
+                current_shard_count,
+                fanout_shard_count
             FROM room_storage_configs
             WHERE room_id = ?
         """

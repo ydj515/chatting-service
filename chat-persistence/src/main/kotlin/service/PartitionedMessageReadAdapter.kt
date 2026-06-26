@@ -76,9 +76,9 @@ class PartitionedMessageReadAdapter(
             editedAt = null,
             sequenceNumber = roomSeq,
             roomSeq = roomSeq,
-            streamShard = 0,
+            streamShard = streamShard,
             writeShard = writeShard,
-            fanoutShard = 0,
+            fanoutShard = fanoutShard,
         )
     }
 }

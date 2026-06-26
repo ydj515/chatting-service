@@ -114,6 +114,8 @@ class RoomPolicyWorkerTest {
             liveFeedMaxAgeSeconds = 60,
             roomRateLimitPerSecond = null,
             slowModeSeconds = null,
+            writeShardCount = 1,
+            fanoutShardCount = 1,
         )
     }
 }

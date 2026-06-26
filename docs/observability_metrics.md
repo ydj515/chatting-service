@@ -217,6 +217,9 @@ Phase 7 명시 task:
 | admin search slow plan capture | cold p99 실패 시 선택적으로 PostgreSQL JSON plan artifact가 남음 |
 | Redis Streams direct lag gauge | `chat.redis.stream.group.lag`와 `chat.redis.stream.group.pending`이 bounded tag로 관측됨 |
 | Redis Streams lag alert rule | lag/pending warning과 critical Prometheus rule이 bounded label로 정의됨 |
+| Phase 8.4 hot room shard 분산 | `count(count by (stream_shard) (chat_redis_stream_group_lag{consumer_group="fanout",stream_shard!="unknown"}))` 16 이상 |
+| Phase 8.4 fanout p95 | `histogram_quantile(0.95, sum(rate(chat_redis_stream_worker_batch_latency_seconds_bucket{worker_role="fanout",outcome="success"}[1m])) by (le))` 0.5초 이하 |
+| Phase 8.4 stream lag | `max(chat_redis_stream_group_lag{stream_shard!="unknown"})` 1000 entries 이하 |
 
 ## 5. Log / Trace 필수 필드
 

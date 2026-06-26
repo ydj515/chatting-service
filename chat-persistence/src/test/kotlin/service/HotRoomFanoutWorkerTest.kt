@@ -126,6 +126,49 @@ class HotRoomFanoutWorkerTest {
     }
 
     @Test
+    fun `fanout worker는 여러 stream shard에 대해 owner lease를 각각 획득하고 batch를 publish한다`() {
+        val consumer = FakeMessageStreamConsumer(
+            records = listOf(
+                streamRecord(recordId = "1749790000000-0", roomSeq = 1L, streamShard = 0),
+                streamRecord(recordId = "1749790000001-0", roomSeq = 2L, streamShard = 1),
+            ),
+        )
+        val redisMessageBroker = mock(RedisMessageBroker::class.java)
+        val leaseService = PerShardFanoutOwnerLeaseService()
+        val worker = HotRoomFanoutWorker(
+            messageStreamConsumer = consumer,
+            redisMessageBroker = redisMessageBroker,
+            workerProperties = ChatWorkerProperties(
+                consumerName = "worker-1",
+                fanout = ChatWorkerProperties.StreamConsumer(
+                    consumerGroup = "fanout",
+                    readCount = 10,
+                ),
+            ),
+            fanoutOwnerLeaseService = leaseService,
+        )
+
+        val broadcastCount = worker.pollAndFanout()
+
+        assertEquals(2, broadcastCount)
+        assertEquals(listOf("10:0", "10:1"), leaseService.acquireAttempts)
+        assertEquals(
+            listOf(
+                "chat:stream:room:10:shard:0:fanout",
+                "chat:stream:room:10:shard:1:fanout",
+            ),
+            consumer.ensuredGroups,
+        )
+        assertEquals(
+            listOf(
+                "chat:stream:room:10:shard:0:fanout:1749790000000-0",
+                "chat:stream:room:10:shard:1:fanout:1749790000001-0",
+            ),
+            consumer.acked,
+        )
+    }
+
+    @Test
     fun `fanout worker는 publish 직전 owner token이 유효하지 않으면 broadcast와 ack를 하지 않는다`() {
         val consumer = FakeMessageStreamConsumer(
             records = listOf(streamRecord(recordId = "1749790000000-0", roomSeq = 12L)),
@@ -248,9 +291,13 @@ class HotRoomFanoutWorkerTest {
         assertEquals(1.0, counter?.count())
     }
 
-    private fun streamRecord(recordId: String, roomSeq: Long): MessageStreamRecord {
+    private fun streamRecord(
+        recordId: String,
+        roomSeq: Long,
+        streamShard: Int = 0,
+    ): MessageStreamRecord {
         return MessageStreamRecord(
-            streamKey = "chat:stream:room:10:shard:0",
+            streamKey = "chat:stream:room:10:shard:$streamShard",
             recordId = recordId,
             envelope = MessageStreamEnvelope(
                 messageId = "msg-$roomSeq",
@@ -262,9 +309,9 @@ class HotRoomFanoutWorkerTest {
                 content = "hello-$roomSeq",
                 sequenceNumber = roomSeq,
                 roomSeq = roomSeq,
-                streamShard = 0,
+                streamShard = streamShard,
                 writeShard = 1,
-                fanoutShard = 2,
+                fanoutShard = streamShard,
                 createdAt = LocalDateTime.parse("2026-06-13T12:00:00"),
             ),
         )
@@ -293,8 +340,8 @@ class HotRoomFanoutWorkerTest {
             streamKeys: Set<String>,
             count: Long,
         ): List<MessageStreamRecord> {
-            reads += "${streamKeys.first()}:$consumerGroup:$consumerName"
-            return records
+            reads += "${streamKeys.sorted().joinToString(",")}:$consumerGroup:$consumerName"
+            return records.filter { it.streamKey in streamKeys }
         }
 
         override fun acknowledge(streamKey: String, consumerGroup: String, recordId: String) {
@@ -308,8 +355,8 @@ class HotRoomFanoutWorkerTest {
             count: Long,
             minIdleMillis: Long,
         ): List<MessageStreamRecord> {
-            claims += "${streamKeys.first()}:$consumerGroup:$consumerName:$minIdleMillis"
-            return claimedRecords
+            claims += "${streamKeys.sorted().joinToString(",")}:$consumerGroup:$consumerName:$minIdleMillis"
+            return claimedRecords.filter { it.streamKey in streamKeys }
         }
 
         override fun sendToDeadLetter(
@@ -340,6 +387,27 @@ class HotRoomFanoutWorkerTest {
             validations += stage
             return validationResults[stage] ?: true
         }
+
+        override fun release(lease: FanoutOwnerLease) = Unit
+    }
+
+    private class PerShardFanoutOwnerLeaseService : FanoutOwnerLeaseService {
+        val acquireAttempts = mutableListOf<String>()
+
+        override fun acquire(roomId: Long, streamShard: Int): FanoutOwnerLease? {
+            acquireAttempts += "$roomId:$streamShard"
+            return FanoutOwnerLease(
+                key = "chat:fanout:owner:room:$roomId:shard:$streamShard",
+                value = "worker-1:token-$streamShard",
+                roomId = roomId,
+                streamShard = streamShard,
+            )
+        }
+
+        override fun validate(
+            lease: FanoutOwnerLease,
+            stage: FanoutOwnerLeaseValidationStage,
+        ): Boolean = true
 
         override fun release(lease: FanoutOwnerLease) = Unit
     }

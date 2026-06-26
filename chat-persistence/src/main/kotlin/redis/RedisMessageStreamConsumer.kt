@@ -55,6 +55,27 @@ class RedisMessageStreamConsumer(
             return emptyList()
         }
 
+        val mappedRecords = streamKeys
+            .groupBy { streamKey -> keyResolver.streamReadGroupKey(streamKey) }
+            .values
+            .flatMap { groupedStreamKeys ->
+                readNewFromSingleSlot(
+                    consumerGroup = consumerGroup,
+                    consumerName = consumerName,
+                    streamKeys = groupedStreamKeys.toSet(),
+                    count = count,
+                )
+            }
+        recordConsumerRecords(consumerGroup, SOURCE_NEW, mappedRecords)
+        return mappedRecords
+    }
+
+    private fun readNewFromSingleSlot(
+        consumerGroup: String,
+        consumerName: String,
+        streamKeys: Set<String>,
+        count: Long,
+    ): List<MessageStreamRecord> {
         val offsets = streamKeys
             .map { StreamOffset.create(it, ReadOffset.lastConsumed()) }
             .toTypedArray()
@@ -72,7 +93,6 @@ class RedisMessageStreamConsumer(
                 envelope = objectMapper.readValue(payload, MessageStreamEnvelope::class.java),
             )
         }
-        recordConsumerRecords(consumerGroup, SOURCE_NEW, mappedRecords)
         return mappedRecords
     }
 

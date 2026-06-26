@@ -36,11 +36,13 @@ class PartitionedMessageRepository(
         ps.setString(2, request.clientMessageId)
         ps.setLong(3, request.chatRoomId)
         ps.setLong(4, request.roomSeq)
-        ps.setInt(5, request.writeShard)
-        ps.setLong(6, request.senderId)
-        ps.setString(7, request.messageType.name)
-        ps.setString(8, request.content)
-        ps.setTimestamp(9, Timestamp.valueOf(request.createdAt))
+        ps.setInt(5, request.streamShard)
+        ps.setInt(6, request.writeShard)
+        ps.setInt(7, request.fanoutShard)
+        ps.setLong(8, request.senderId)
+        ps.setString(9, request.messageType.name)
+        ps.setString(10, request.content)
+        ps.setTimestamp(11, Timestamp.valueOf(request.createdAt))
     }
 
     private fun toInsertResult(updateCount: Int): Boolean {
@@ -54,13 +56,15 @@ class PartitionedMessageRepository(
                 client_message_id,
                 room_id,
                 room_seq,
+                stream_shard,
                 write_shard,
+                fanout_shard,
                 sender_id,
                 message_type,
                 content,
                 created_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT DO NOTHING
         """.trimIndent()
     }

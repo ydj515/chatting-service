@@ -10,7 +10,9 @@ CREATE TABLE IF NOT EXISTS chat_messages (
     client_message_id text,
     room_id bigint NOT NULL,
     room_seq bigint NOT NULL,
+    stream_shard smallint NOT NULL DEFAULT 0,
     write_shard smallint NOT NULL DEFAULT 0,
+    fanout_shard smallint NOT NULL DEFAULT 0,
     sender_id bigint NOT NULL,
     message_type varchar(20) NOT NULL,
     content text,
@@ -40,6 +42,12 @@ BEGIN
     END IF;
 END;
 $$;
+
+ALTER TABLE IF EXISTS chat_messages
+ADD COLUMN IF NOT EXISTS stream_shard smallint NOT NULL DEFAULT 0;
+
+ALTER TABLE IF EXISTS chat_messages
+ADD COLUMN IF NOT EXISTS fanout_shard smallint NOT NULL DEFAULT 0;
 
 CREATE TABLE IF NOT EXISTS room_storage_configs (
     room_id bigint PRIMARY KEY,

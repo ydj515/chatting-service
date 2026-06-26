@@ -34,7 +34,7 @@ class RedisMessageStreamProducerTest {
         val setOperations = setOperations()
         `when`(redisTemplate.opsForStream<String, String>()).thenReturn(streamOperations)
         `when`(redisTemplate.opsForSet()).thenReturn(setOperations)
-        `when`(streamOperations.add(eq("chat:stream:room:42:shard:3"), anyStringMap()))
+        `when`(streamOperations.add(eq("chat:stream:room:{42}:shard:3"), anyStringMap()))
             .thenReturn(RecordId.of("1749790000000-0"))
 
         val objectMapper = ObjectMapper()
@@ -68,7 +68,7 @@ class RedisMessageStreamProducerTest {
         assertEquals("1749790000000-0", recordId)
 
         val fieldsCaptor = stringMapCaptor()
-        verify(streamOperations).add(eq("chat:stream:room:42:shard:3"), captureStringMap(fieldsCaptor))
+        verify(streamOperations).add(eq("chat:stream:room:{42}:shard:3"), captureStringMap(fieldsCaptor))
         val fields = fieldsCaptor.value
         assertEquals("msg-1", fields["messageId"])
         assertEquals("42", fields["chatRoomId"])
@@ -76,7 +76,7 @@ class RedisMessageStreamProducerTest {
         assertEquals("3", fields["streamShard"])
         assertTrue(fields["payload"]!!.contains("\"messageId\":\"msg-1\""))
         assertTrue(fields["payload"]!!.contains("\"clientMessageId\":\"client-1\""))
-        verify(setOperations).add("chat:stream:rooms", "chat:stream:room:42:shard:3")
+        verify(setOperations).add("chat:stream:rooms", "chat:stream:room:{42}:shard:3")
     }
 
     @Test
@@ -86,7 +86,7 @@ class RedisMessageStreamProducerTest {
         val setOperations = setOperations()
         `when`(redisTemplate.opsForStream<String, String>()).thenReturn(streamOperations)
         `when`(redisTemplate.opsForSet()).thenReturn(setOperations)
-        `when`(streamOperations.add(eq("chat:stream:room:42:shard:3"), anyStringMap()))
+        `when`(streamOperations.add(eq("chat:stream:room:{42}:shard:3"), anyStringMap()))
             .thenReturn(RecordId.of("1749790000000-0"), RecordId.of("1749790000000-1"))
 
         val objectMapper = ObjectMapper()
@@ -117,8 +117,8 @@ class RedisMessageStreamProducerTest {
         producer.append(envelope)
         producer.append(envelope.copy(messageId = "msg-2", roomSeq = 12L, sequenceNumber = 12L))
 
-        verify(setOperations, times(1)).add("chat:stream:rooms", "chat:stream:room:42:shard:3")
-        verify(streamOperations, times(2)).add(eq("chat:stream:room:42:shard:3"), anyStringMap())
+        verify(setOperations, times(1)).add("chat:stream:rooms", "chat:stream:room:{42}:shard:3")
+        verify(streamOperations, times(2)).add(eq("chat:stream:room:{42}:shard:3"), anyStringMap())
     }
 
     @Test
@@ -129,7 +129,7 @@ class RedisMessageStreamProducerTest {
         val meterRegistry = SimpleMeterRegistry()
         `when`(redisTemplate.opsForStream<String, String>()).thenReturn(streamOperations)
         `when`(redisTemplate.opsForSet()).thenReturn(setOperations)
-        `when`(streamOperations.add(eq("chat:stream:room:42:shard:3"), anyStringMap()))
+        `when`(streamOperations.add(eq("chat:stream:room:{42}:shard:3"), anyStringMap()))
             .thenReturn(RecordId.of("1749790000000-0"))
 
         val producer = RedisMessageStreamProducer(
