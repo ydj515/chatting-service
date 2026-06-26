@@ -49,7 +49,7 @@
 - Modify: `chat-domain/src/main/kotlin/dto/AdminModerationDto.kt`
 - Test: `chat-domain/src/test/kotlin/dto/AdminModerationDtoTest.kt`
 
-- [ ] **Step 1: Write the failing enum contract test**
+- [x] **Step 1: Write the failing enum contract test**
 
 Add this test to `chat-domain/src/test/kotlin/dto/AdminModerationDtoTest.kt`:
 
@@ -60,7 +60,7 @@ fun `user sanction type은 suspend를 실제 전역 제재 타입으로 제공�
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run:
 
@@ -70,7 +70,7 @@ Run:
 
 Expected: FAIL because `UserSanctionType.SUSPEND` does not exist.
 
-- [ ] **Step 3: Add domain ports and service methods**
+- [x] **Step 3: Add domain ports and service methods**
 
 Create `chat-domain/src/main/kotlin/service/SessionTokenRevocationStore.kt`:
 
@@ -122,7 +122,7 @@ enum class UserSanctionType {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run:
 
@@ -132,7 +132,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add chat-domain/src/main/kotlin/service/SessionTokenRevocationStore.kt \
@@ -150,7 +150,7 @@ git commit -m "feat: add session revocation domain contracts"
 - Create: `chat-persistence/src/main/kotlin/service/RedisSessionTokenRevocationStore.kt`
 - Test: `chat-persistence/src/test/kotlin/service/RedisSessionTokenRevocationStoreTest.kt`
 
-- [ ] **Step 1: Write failing revocation store tests**
+- [x] **Step 1: Write failing revocation store tests**
 
 Create `chat-persistence/src/test/kotlin/service/RedisSessionTokenRevocationStoreTest.kt`:
 
@@ -233,7 +233,7 @@ class RedisSessionTokenRevocationStoreTest {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run:
 
@@ -243,7 +243,7 @@ Run:
 
 Expected: FAIL because `RedisSessionTokenRevocationStore` and new properties do not exist.
 
-- [ ] **Step 3: Implement Redis store and properties**
+- [x] **Step 3: Implement Redis store and properties**
 
 Add fields to `ChatAuthProperties.Session`:
 
@@ -319,7 +319,7 @@ class RedisSessionTokenRevocationStore(
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run:
 
@@ -329,7 +329,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add chat-persistence/src/main/kotlin/config/ChatAuthProperties.kt \
@@ -344,7 +344,7 @@ git commit -m "feat: add redis session token revocation store"
 - Modify: `chat-persistence/src/main/kotlin/service/HmacSessionTokenService.kt`
 - Modify: `chat-persistence/src/test/kotlin/service/HmacSessionTokenServiceTest.kt`
 
-- [ ] **Step 1: Write failing token service tests**
+- [x] **Step 1: Write failing token service tests**
 
 Add tests to `HmacSessionTokenServiceTest`:
 
@@ -398,7 +398,7 @@ private class InMemoryRevocationStore : SessionTokenRevocationStore {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run:
 
@@ -408,7 +408,7 @@ Run:
 
 Expected: FAIL because constructor and revoke methods do not match.
 
-- [ ] **Step 3: Implement claim parsing and revocation checks**
+- [x] **Step 3: Implement claim parsing and revocation checks**
 
 Update `HmacSessionTokenService` constructor:
 
@@ -472,7 +472,7 @@ override fun revokeUserTokens(userId: Long) {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run:
 
@@ -482,7 +482,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add chat-persistence/src/main/kotlin/service/HmacSessionTokenService.kt \
@@ -496,11 +496,11 @@ git commit -m "feat: enforce session token revocation"
 - Modify: `chat-api/src/main/kotlin/controller/UserController.kt`
 - Modify: `chat-api/src/test/kotlin/controller/UserControllerTest.kt`
 
-- [ ] **Step 1: Write failing logout controller test**
+- [x] **Step 1: Write failing logout controller test**
 
 Add a test that posts to `/logout` with `Authorization: Bearer session-token`, expects `204`, and verifies `sessionTokenService.revokeToken("session-token")`.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run:
 
@@ -510,7 +510,7 @@ Run:
 
 Expected: FAIL because `/logout` does not exist.
 
-- [ ] **Step 3: Implement endpoint**
+- [x] **Step 3: Implement endpoint**
 
 Add to `UserController`:
 
@@ -531,7 +531,7 @@ fun logout(@RequestHeader(HttpHeaders.AUTHORIZATION, required = false) authoriza
 
 If `UserService` does not expose logout, add `fun logout(sessionToken: String)` and delegate to `SessionTokenService.revokeToken(sessionToken)`.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run:
 
@@ -541,7 +541,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add chat-domain/src/main/kotlin/service/UserService.kt \
@@ -559,14 +559,14 @@ git commit -m "feat: add session logout endpoint"
 - Test: `chat-persistence/src/test/kotlin/service/RedisSessionControlBrokerTest.kt`
 - Test: `chat-persistence/src/test/kotlin/service/WebSocketSessionManagerTest.kt`
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 Add tests for:
 
 - `RedisSessionControlBroker.forceLogoutUser()` publishes JSON to `chat.session.control`.
 - `WebSocketSessionManager.closeSessionsForUser()` closes only sessions for the target user and removes indexes.
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run:
 
@@ -576,7 +576,7 @@ Run:
 
 Expected: FAIL because broker and close method do not exist.
 
-- [ ] **Step 3: Implement broker and session closing**
+- [x] **Step 3: Implement broker and session closing**
 
 Create `RedisSessionControlBroker` as a `MessageListener` that subscribes to `authProperties.session.controlTopic` at `@PostConstruct`, publishes `FORCE_LOGOUT_USER`, and invokes a local handler for remote events.
 
@@ -599,7 +599,7 @@ fun closeSessionsForUser(userId: Long, closeStatus: CloseStatus = SESSION_REVOKE
 }
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run:
 
@@ -609,7 +609,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add chat-persistence/src/main/kotlin/service/RedisSessionControlBroker.kt \
@@ -630,7 +630,7 @@ git commit -m "feat: add distributed session force logout"
 - Modify: `chat-persistence/src/test/kotlin/repository/UserSanctionJdbcRepositoryTest.kt`
 - Modify: `chat-persistence/src/test/kotlin/service/UserSanctionServiceTest.kt`
 
-- [ ] **Step 1: Write failing sanction tests**
+- [x] **Step 1: Write failing sanction tests**
 
 Add tests:
 
@@ -641,7 +641,7 @@ Add tests:
 - `UserSanctionService` treats `SUSPEND` as a send blocker if a global suspend record is present.
 - `UserSanctionJdbcRepository.activeGlobalSanctionsForUser(userId)` queries `active = true`, `scope_type = 'GLOBAL'`, and `room_id IS NULL`.
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run:
 
@@ -651,7 +651,7 @@ Run:
 
 Expected: FAIL because `SUSPEND` policy is not implemented.
 
-- [ ] **Step 3: Implement SUSPEND policy**
+- [x] **Step 3: Implement SUSPEND policy**
 
 In `AdminModerationServiceImpl.validateSanctionRequest()`:
 
@@ -724,7 +724,7 @@ val sanction = sanctions
     ?: return
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run:
 
@@ -734,7 +734,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add infra/postgres/message-partitions.sql \
@@ -754,7 +754,7 @@ git commit -m "feat: enforce global suspend sanctions"
 - Modify: `docs/configuration.md`
 - Modify: `docs/superpowers/specs/2026-06-26-phase8-5-moderation-sanctions-design.md`
 
-- [ ] **Step 1: Add configuration docs**
+- [x] **Step 1: Add configuration docs**
 
 Add these entries to `docs/configuration.md`:
 
@@ -764,7 +764,7 @@ Add these entries to `docs/configuration.md`:
 | `CHAT_AUTH_SESSION_CONTROL_TOPIC` | `chat.session.control` | Redis pub/sub topic for distributed force logout |
 ```
 
-- [ ] **Step 2: Add runtime config**
+- [x] **Step 2: Add runtime config**
 
 Add to `application-docker.yml` under `chat.auth.session`:
 
@@ -774,7 +774,7 @@ user-revocation-grace-ttl: ${CHAT_AUTH_SESSION_USER_REVOCATION_GRACE_TTL:1h}
 control-topic: ${CHAT_AUTH_SESSION_CONTROL_TOPIC:chat.session.control}
 ```
 
-- [ ] **Step 3: Update Phase 8.5 follow-up text**
+- [x] **Step 3: Update Phase 8.5 follow-up text**
 
 Update `docs/superpowers/specs/2026-06-26-phase8-5-moderation-sanctions-design.md`:
 
@@ -782,7 +782,7 @@ Update `docs/superpowers/specs/2026-06-26-phase8-5-moderation-sanctions-design.m
 - Change the note that admin API rejects `SUSPEND_RESERVED` to say Phase 8.5 rejected global suspend until Phase 8.6.
 - Change the follow-up question about promoting `SUSPEND_RESERVED` to say Phase 8.6 implements `GLOBAL + SUSPEND` with token revocation.
 
-- [ ] **Step 4: Run doc/config smoke checks**
+- [x] **Step 4: Run doc/config smoke checks**
 
 Run:
 
@@ -792,7 +792,7 @@ Run:
 
 Expected: SUCCESS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add chat-runtime-config/src/main/resources/application-docker.yml \
@@ -806,7 +806,7 @@ git commit -m "docs: document session revocation configuration"
 **Files:**
 - All touched files.
 
-- [ ] **Step 1: Run focused tests**
+- [x] **Step 1: Run focused tests**
 
 Run:
 
@@ -816,7 +816,7 @@ Run:
 
 Expected: SUCCESS.
 
-- [ ] **Step 2: Run full test suite**
+- [x] **Step 2: Run full test suite**
 
 Run:
 
@@ -826,7 +826,7 @@ Run:
 
 Expected: SUCCESS.
 
-- [ ] **Step 3: Run moderation smoke verification**
+- [x] **Step 3: Run moderation smoke verification**
 
 Run:
 
@@ -836,7 +836,9 @@ mise run verify:moderation
 
 Expected: SUCCESS. If this requires services not running, report the exact missing dependency and run `node --check scripts/verify-moderation.mjs` as a syntax fallback.
 
-- [ ] **Step 4: Check diff hygiene**
+Actual: `mise run verify:moderation` could not connect to `http://localhost/api/admin` because no service was listening on `localhost:80`; fallback `node --check scripts/verify-moderation.mjs` passed.
+
+- [x] **Step 4: Check diff hygiene**
 
 Run:
 
@@ -847,7 +849,7 @@ git status --short --branch
 
 Expected: no whitespace errors, branch ahead with clean or intentionally staged state.
 
-- [ ] **Step 5: Final commit if verification/doc fixes remain**
+- [x] **Step 5: Final commit if verification/doc fixes remain**
 
 ```bash
 git add docs/configuration.md docs/superpowers/specs/2026-06-26-phase8-5-moderation-sanctions-design.md
