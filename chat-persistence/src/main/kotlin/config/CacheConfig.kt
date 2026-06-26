@@ -36,6 +36,8 @@ class CacheConfig(
             .withCacheConfiguration("messages", configuration.entryTtl(cacheProperties.messagesTtl))
             .withCacheConfiguration("roomAdmissionPolicies", configuration.entryTtl(cacheProperties.roomAdmissionPoliciesTtl))
             .withCacheConfiguration("roomShardConfigs", configuration.entryTtl(cacheProperties.roomShardConfigsTtl))
+            .withCacheConfiguration("moderationRules", configuration.entryTtl(cacheProperties.moderationRulesTtl))
+            .withCacheConfiguration("userSanctions", configuration.entryTtl(cacheProperties.userSanctionsTtl))
             .build()
     }
 

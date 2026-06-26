@@ -1,6 +1,7 @@
 package com.chat.api.controller
 
 import com.chat.domain.exception.MessageAdmissionRejectedException
+import com.chat.domain.exception.MessageModerationRejectedException
 import com.fasterxml.jackson.annotation.JsonInclude
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.validation.ConstraintViolationException
@@ -85,6 +86,18 @@ class GlobalExceptionHandler {
         return buildResponse(
             status = HttpStatus.TOO_MANY_REQUESTS,
             message = exception.message ?: "메시지 전송 제한을 초과했습니다.",
+            path = request.requestURI,
+        )
+    }
+
+    @ExceptionHandler(MessageModerationRejectedException::class)
+    fun handleMessageModerationRejectedException(
+        exception: MessageModerationRejectedException,
+        request: HttpServletRequest,
+    ): ResponseEntity<ApiErrorResponse> {
+        return buildResponse(
+            status = HttpStatus.FORBIDDEN,
+            message = exception.message ?: "메시지가 moderation 정책에 의해 거부되었습니다.",
             path = request.requestURI,
         )
     }

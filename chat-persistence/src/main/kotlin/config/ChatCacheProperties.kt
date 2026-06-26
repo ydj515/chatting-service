@@ -12,4 +12,6 @@ data class ChatCacheProperties(
     val messagesTtl: Duration = Duration.ofMinutes(5),
     val roomAdmissionPoliciesTtl: Duration = Duration.ofSeconds(10),
     val roomShardConfigsTtl: Duration = Duration.ofSeconds(10),
+    val moderationRulesTtl: Duration = Duration.ofSeconds(10),
+    val userSanctionsTtl: Duration = Duration.ofSeconds(10),
 )

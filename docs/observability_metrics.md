@@ -101,6 +101,7 @@ Reconnect load test 시나리오와 정상 reconnect 실패율 계산 기준은 
 | messages accepted/sec | Counter | `roomHeat` | 수락 처리량 |
 | messages rejected/sec | Counter | `reason`, `roomHeat` | rate limit, moderation, validation 실패 |
 | `chat.message.admission.rejected` | Counter | `reason=room_rate_limited|user_rate_limited|slow_mode_active|redis_error|script_error` | Redis admission policy가 메시지 수락을 거부한 이유 |
+| `chat.message.moderation.rejected` | Counter | `reason=blocked_word\|muted\|banned`, `scope=global\|room`, `action=reject` | 금칙어, mute, ban으로 메시지 수락 전 거부된 횟수 |
 | room messages/sec | Counter | `roomHeat` 또는 top N room | hot room 판정 |
 | room traffic snapshot p95 | Gauge 또는 synthetic 계산 | `roomHeat` 또는 top N room | `room-policy` worker의 자동 downgrade 입력값 |
 | `chat.redis.stream.append.latency` | Timer | `stream_shard`, `outcome=success|failure` | Redis Streams append p50/p95/p99 |

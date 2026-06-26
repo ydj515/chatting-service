@@ -125,6 +125,55 @@ ON admin_audit_logs (created_at DESC);
 CREATE INDEX IF NOT EXISTS ix_admin_audit_logs_actor_created_at
 ON admin_audit_logs (actor, created_at DESC);
 
+CREATE TABLE IF NOT EXISTS moderation_rules (
+    id bigserial PRIMARY KEY,
+    scope_type varchar(20) NOT NULL,
+    room_id bigint,
+    pattern text NOT NULL,
+    match_type varchar(20) NOT NULL DEFAULT 'CONTAINS',
+    action varchar(20) NOT NULL DEFAULT 'REJECT',
+    reason varchar(100),
+    enabled boolean NOT NULL DEFAULT true,
+    created_by varchar(100) NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT ck_moderation_rules_scope CHECK (
+        (scope_type = 'GLOBAL' AND room_id IS NULL) OR
+        (scope_type = 'ROOM' AND room_id IS NOT NULL)
+    ),
+    CONSTRAINT ck_moderation_rules_match_type CHECK (match_type IN ('CONTAINS')),
+    CONSTRAINT ck_moderation_rules_action CHECK (action IN ('REJECT'))
+);
+
+CREATE INDEX IF NOT EXISTS ix_moderation_rules_active_scope
+ON moderation_rules (enabled, scope_type, room_id);
+
+CREATE TABLE IF NOT EXISTS user_sanctions (
+    id bigserial PRIMARY KEY,
+    scope_type varchar(20) NOT NULL,
+    room_id bigint,
+    user_id bigint NOT NULL,
+    type varchar(20) NOT NULL,
+    reason text,
+    expires_at timestamptz,
+    active boolean NOT NULL DEFAULT true,
+    created_by varchar(100) NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    revoked_by varchar(100),
+    revoked_at timestamptz,
+    CONSTRAINT ck_user_sanctions_scope CHECK (
+        (scope_type = 'ROOM' AND room_id IS NOT NULL) OR
+        (scope_type = 'GLOBAL' AND room_id IS NULL)
+    ),
+    CONSTRAINT ck_user_sanctions_type CHECK (type IN ('MUTE', 'BAN'))
+);
+
+CREATE INDEX IF NOT EXISTS ix_user_sanctions_active_lookup
+ON user_sanctions (active, user_id, scope_type, room_id, type, expires_at);
+
+CREATE INDEX IF NOT EXISTS ix_user_sanctions_room_user_created_at
+ON user_sanctions (room_id, user_id, created_at DESC);
+
 CREATE TABLE IF NOT EXISTS admin_message_export_jobs (
     job_id text PRIMARY KEY,
     actor text NOT NULL,

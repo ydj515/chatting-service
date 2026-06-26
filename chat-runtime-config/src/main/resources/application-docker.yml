@@ -252,3 +252,5 @@ chat:
     messages-ttl: ${CHAT_CACHE_MESSAGES_TTL:5m}
     room-admission-policies-ttl: ${CHAT_CACHE_ROOM_ADMISSION_POLICIES_TTL:10s}
     room-shard-configs-ttl: ${CHAT_CACHE_ROOM_SHARD_CONFIGS_TTL:10s}
+    moderation-rules-ttl: ${CHAT_CACHE_MODERATION_RULES_TTL:10s}
+    user-sanctions-ttl: ${CHAT_CACHE_USER_SANCTIONS_TTL:10s}

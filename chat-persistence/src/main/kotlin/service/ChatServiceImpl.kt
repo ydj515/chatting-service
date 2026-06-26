@@ -42,6 +42,8 @@ class ChatServiceImpl(
     private val messageAdmissionPolicyService: MessageAdmissionPolicyService,
     private val roomTrafficStatsService: RoomTrafficStatsService,
     private val roomStorageConfigReader: RoomStorageConfigReader,
+    private val messageModerationPolicyService: MessageModerationPolicyService,
+    private val userSanctionPolicyService: UserSanctionPolicyService,
 ) : ChatService {
 
     private val logger = LoggerFactory.getLogger(ChatServiceImpl::class.java)
@@ -351,6 +353,16 @@ class ChatServiceImpl(
             }
         }
 
+        userSanctionPolicyService.requireAllowedToSend(
+            roomId = request.chatRoomId,
+            userId = senderId,
+        )
+        messageModerationPolicyService.requireAllowed(
+            roomId = request.chatRoomId,
+            senderId = senderId,
+            content = request.content,
+            messageType = request.type ?: MessageType.TEXT,
+        )
         messageAdmissionPolicyService.requireAllowed(
             roomId = request.chatRoomId,
             senderId = senderId,
