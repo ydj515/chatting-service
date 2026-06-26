@@ -38,6 +38,11 @@ class AdminModerationDtoTest {
     }
 
     @Test
+    fun `user sanction type은 suspend를 실제 전역 제재 타입으로 제공한다`() {
+        assertEquals(UserSanctionType.SUSPEND, UserSanctionType.valueOf("SUSPEND"))
+    }
+
+    @Test
     fun `moderation rule 응답은 생성자와 갱신 시각을 포함한다`() {
         val createdAt = Instant.parse("2026-06-26T00:00:00Z")
         val updatedAt = Instant.parse("2026-06-26T00:01:00Z")
