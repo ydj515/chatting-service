@@ -69,11 +69,11 @@ class UserSanctionServiceTest {
     }
 
     @Test
-    fun `reserved suspend는 phase 8_5 메시지 전송 차단 대상에서 제외한다`() {
+    fun `suspend는 phase 8_6 전역 제재 연계 전까지 메시지 전송 차단 대상에서 제외한다`() {
         val repository = mock(UserSanctionJdbcRepository::class.java)
         val now = Instant.parse("2026-06-26T00:00:00Z")
         `when`(repository.activeSanctionsForUser(10L, 7L)).thenReturn(
-            listOf(sanction(UserSanctionType.SUSPEND_RESERVED)),
+            listOf(sanction(UserSanctionType.SUSPEND)),
         )
         val service = UserSanctionService(repository, Clock.fixed(now, ZoneOffset.UTC), null)
 

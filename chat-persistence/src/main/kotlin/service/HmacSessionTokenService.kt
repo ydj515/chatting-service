@@ -76,6 +76,10 @@ class HmacSessionTokenService(
         return AuthenticatedSession(userId = userId, expiresAt = expiresAt)
     }
 
+    override fun revokeToken(token: String): Boolean = false
+
+    override fun revokeUserTokens(userId: Long) = Unit
+
     private fun sign(encodedPayload: String): String {
         val mac = Mac.getInstance("HmacSHA256")
         val key = SecretKeySpec(

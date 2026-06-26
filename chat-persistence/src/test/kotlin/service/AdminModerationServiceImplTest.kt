@@ -135,12 +135,12 @@ class AdminModerationServiceImplTest {
     }
 
     @Test
-    fun `createSanction은 SUSPEND_RESERVED 생성을 거부한다`() {
+    fun `createSanction은 phase 8_6 연계 전까지 SUSPEND 생성을 거부한다`() {
         val fixture = fixture()
         val request = AdminCreateUserSanctionRequest(
             scopeType = ModerationScopeType.GLOBAL,
             userId = 7L,
-            type = UserSanctionType.SUSPEND_RESERVED,
+            type = UserSanctionType.SUSPEND,
         )
 
         assertThrows(IllegalArgumentException::class.java) {

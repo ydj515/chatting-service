@@ -116,8 +116,8 @@ class AdminModerationServiceImpl(
     }
 
     private fun validateSanctionRequest(request: AdminCreateUserSanctionRequest) {
-        if (request.type == UserSanctionType.SUSPEND_RESERVED) {
-            throw IllegalArgumentException("SUSPEND_RESERVED is reserved for Phase 8.6")
+        if (request.type == UserSanctionType.SUSPEND) {
+            throw IllegalArgumentException("SUSPEND requires Phase 8.6 token revocation")
         }
         if (request.scopeType != ModerationScopeType.ROOM || request.roomId == null) {
             throw IllegalArgumentException("Phase 8.5 supports ROOM scoped sanctions only")

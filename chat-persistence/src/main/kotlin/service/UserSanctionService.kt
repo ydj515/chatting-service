@@ -41,7 +41,7 @@ class UserSanctionService(
         val reason = when (sanction.type) {
             UserSanctionType.MUTE -> "muted"
             UserSanctionType.BAN -> "banned"
-            UserSanctionType.SUSPEND_RESERVED -> "suspend_reserved"
+            UserSanctionType.SUSPEND -> "suspended"
         }
 
         meterRegistryProvider?.ifAvailable { registry ->
