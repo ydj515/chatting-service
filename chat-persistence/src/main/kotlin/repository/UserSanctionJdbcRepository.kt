@@ -50,9 +50,9 @@ class UserSanctionJdbcRepository(
 ) {
     @Cacheable(
         value = ["userSanctions"],
-        key = "T(java.lang.String).valueOf(#roomId).concat(':').concat(T(java.lang.String).valueOf(#userId))",
+        key = "#roomId + ':' + #userId",
     )
-    fun activeSanctionsForUser(roomId: Long, userId: Long, now: Instant): List<UserSanctionRecord> {
+    fun activeSanctionsForUser(roomId: Long, userId: Long): List<UserSanctionRecord> {
         return jdbcTemplate.query(
             """
             SELECT id, scope_type, room_id, user_id, type, reason, expires_at, active, created_by, created_at, revoked_by, revoked_at
@@ -61,13 +61,11 @@ class UserSanctionJdbcRepository(
               AND user_id = ?
               AND scope_type = 'ROOM'
               AND room_id = ?
-              AND (expires_at IS NULL OR expires_at > ?)
             ORDER BY id DESC
             """.trimIndent(),
             ROW_MAPPER,
             userId,
             roomId,
-            Timestamp.from(now),
         )
     }
 

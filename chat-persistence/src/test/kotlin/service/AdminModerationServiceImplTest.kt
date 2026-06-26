@@ -22,6 +22,7 @@ import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.verifyNoInteractions
 import org.mockito.Mockito.`when`
+import org.springframework.cache.annotation.CacheEvict
 import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
 
@@ -36,6 +37,37 @@ class AdminModerationServiceImplTest {
         )
 
         assertNotNull(method.getAnnotation(Transactional::class.java))
+    }
+
+    @Test
+    fun `listRules와 listSanctions는 readOnly transaction으로 조회한다`() {
+        val listRulesMethod = AdminModerationServiceImpl::class.java.getMethod(
+            "listRules",
+            String::class.java,
+            java.lang.Long::class.java,
+            java.lang.Boolean::class.java,
+        )
+        val listSanctionsMethod = AdminModerationServiceImpl::class.java.getMethod(
+            "listSanctions",
+            String::class.java,
+            java.lang.Long::class.java,
+            java.lang.Long::class.java,
+            java.lang.Boolean::class.java,
+        )
+
+        assertEquals(true, listRulesMethod.getAnnotation(Transactional::class.java)?.readOnly)
+        assertEquals(true, listSanctionsMethod.getAnnotation(Transactional::class.java)?.readOnly)
+    }
+
+    @Test
+    fun `createSanction은 roomId와 userId 기반의 단순 cache key를 evict한다`() {
+        val method = AdminModerationServiceImpl::class.java.getMethod(
+            "createSanction",
+            String::class.java,
+            AdminCreateUserSanctionRequest::class.java,
+        )
+
+        assertEquals("#request.roomId + ':' + #request.userId", method.getAnnotation(CacheEvict::class.java)?.key)
     }
 
     @Test

@@ -27,7 +27,7 @@ class MessageModerationService(
 ) : MessageModerationPolicyService {
 
     override fun requireAllowed(roomId: Long, senderId: Long, content: String?, messageType: MessageType) {
-        if (messageType != MessageType.TEXT || content.isNullOrBlank()) {
+        if (content.isNullOrBlank()) {
             return
         }
 

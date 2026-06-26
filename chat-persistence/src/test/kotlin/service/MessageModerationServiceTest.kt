@@ -71,18 +71,36 @@ class MessageModerationServiceTest {
     }
 
     @Test
-    fun `text 메시지가 아니면 moderation rule 조회 없이 통과한다`() {
+    fun `content가 비어 있으면 moderation rule 조회 없이 통과한다`() {
         val repository = mock(ModerationRuleJdbcRepository::class.java)
         val service = MessageModerationService(repository, null)
 
         service.requireAllowed(
             roomId = 10L,
             senderId = 7L,
-            content = "blocked",
+            content = "   ",
             messageType = MessageType.SYSTEM,
         )
 
         verifyNoInteractions(repository)
+    }
+
+    @Test
+    fun `SYSTEM 타입이어도 사용자 content가 차단어와 매칭되면 거부한다`() {
+        val repository = mock(ModerationRuleJdbcRepository::class.java)
+        `when`(repository.activeRulesForRoom(10L)).thenReturn(
+            listOf(rule(scopeType = ModerationScopeType.ROOM, roomId = 10L, pattern = "blocked")),
+        )
+        val service = MessageModerationService(repository, null)
+
+        assertThrows(MessageModerationRejectedException::class.java) {
+            service.requireAllowed(
+                roomId = 10L,
+                senderId = 7L,
+                content = "blocked",
+                messageType = MessageType.SYSTEM,
+            )
+        }
     }
 
     private fun rule(

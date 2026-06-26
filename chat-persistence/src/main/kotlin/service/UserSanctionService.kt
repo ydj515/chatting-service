@@ -26,7 +26,10 @@ class UserSanctionService(
 ) : UserSanctionPolicyService {
 
     override fun requireAllowedToSend(roomId: Long, userId: Long) {
-        val sanction = userSanctionRepository.activeSanctionsForUser(roomId, userId, clock.instant())
+        val now = clock.instant()
+        val sanction = userSanctionRepository.activeSanctionsForUser(roomId, userId)
+            .asSequence()
+            .filter { sanction -> sanction.expiresAt == null || sanction.expiresAt.isAfter(now) }
             .firstOrNull { sanction -> sanction.type == UserSanctionType.MUTE || sanction.type == UserSanctionType.BAN }
             ?: return
 

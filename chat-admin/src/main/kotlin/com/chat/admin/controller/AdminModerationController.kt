@@ -9,6 +9,7 @@ import com.chat.domain.dto.AdminUserSanctionDto
 import com.chat.domain.service.AdminModerationService
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
+import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PatchMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -95,6 +96,13 @@ class AdminModerationController(
     ): AdminUserSanctionDto {
         val actor = adminTokenVerifier.requireActor(adminToken)
         return adminModerationService.revokeSanction(actor, sanctionId)
+    }
+
+    @ExceptionHandler(IllegalArgumentException::class)
+    fun handleIllegalArgumentException(exception: IllegalArgumentException): ResponseEntity<Map<String, String>> {
+        return ResponseEntity
+            .status(HttpStatus.BAD_REQUEST)
+            .body(mapOf("message" to (exception.message ?: "잘못된 요청입니다.")))
     }
 
     private companion object {

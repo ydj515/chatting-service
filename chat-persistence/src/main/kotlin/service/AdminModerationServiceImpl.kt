@@ -25,6 +25,7 @@ class AdminModerationServiceImpl(
     private val objectMapper: ObjectMapper,
 ) : AdminModerationService {
 
+    @Transactional(readOnly = true)
     override fun listRules(actor: String, roomId: Long?, enabled: Boolean?): List<AdminModerationRuleDto> {
         return ruleRepository.listRules(roomId, enabled).map { it.toDto() }
     }
@@ -71,6 +72,7 @@ class AdminModerationServiceImpl(
         return record.toDto()
     }
 
+    @Transactional(readOnly = true)
     override fun listSanctions(actor: String, roomId: Long?, userId: Long?, active: Boolean?): List<AdminUserSanctionDto> {
         return sanctionRepository.listSanctions(roomId, userId, active).map { it.toDto() }
     }
@@ -78,7 +80,7 @@ class AdminModerationServiceImpl(
     @Transactional
     @CacheEvict(
         value = ["userSanctions"],
-        key = "T(java.lang.String).valueOf(#request.roomId).concat(':').concat(T(java.lang.String).valueOf(#request.userId))",
+        key = "#request.roomId + ':' + #request.userId",
     )
     override fun createSanction(actor: String, request: AdminCreateUserSanctionRequest): AdminUserSanctionDto {
         validateSanctionRequest(request)

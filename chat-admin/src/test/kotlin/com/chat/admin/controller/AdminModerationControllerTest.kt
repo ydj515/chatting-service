@@ -97,9 +97,31 @@ class AdminModerationControllerTest {
             .andExpect { status { isUnauthorized() } }
     }
 
+    @Test
+    fun `service 검증 실패는 400으로 응답한다`() {
+        service.createRuleFailure = IllegalArgumentException("GLOBAL rule must not have roomId")
+
+        mockMvc.post("/admin/moderation/rules") {
+            header("X-Admin-Token", "local-admin-token")
+            contentType = MediaType.APPLICATION_JSON
+            content = """
+                {
+                  "scopeType": "GLOBAL",
+                  "roomId": 10,
+                  "pattern": "blocked",
+                  "matchType": "CONTAINS",
+                  "action": "REJECT"
+                }
+            """.trimIndent()
+        }.andExpect {
+            status { isBadRequest() }
+        }
+    }
+
     private class RecordingAdminModerationService : AdminModerationService {
         var createRuleActor: String? = null
         var createRuleRequest: AdminCreateModerationRuleRequest? = null
+        var createRuleFailure: RuntimeException? = null
         var createSanctionActor: String? = null
         var createSanctionRequest: AdminCreateUserSanctionRequest? = null
 
@@ -108,6 +130,7 @@ class AdminModerationControllerTest {
         }
 
         override fun createRule(actor: String, request: AdminCreateModerationRuleRequest): AdminModerationRuleDto {
+            createRuleFailure?.let { throw it }
             createRuleActor = actor
             createRuleRequest = request
             return AdminModerationRuleDto(

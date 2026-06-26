@@ -3,16 +3,16 @@ package com.chat.persistence.repository
 import com.chat.domain.dto.ModerationScopeType
 import com.chat.domain.dto.UserSanctionType
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Test
+import org.mockito.ArgumentCaptor
 import org.mockito.ArgumentMatchers.any
-import org.mockito.ArgumentMatchers.contains
 import org.mockito.ArgumentMatchers.eq
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.jdbc.core.RowMapper
-import java.sql.Timestamp
 import java.time.Instant
 
 class UserSanctionJdbcRepositoryTest {
@@ -28,24 +28,23 @@ class UserSanctionJdbcRepositoryTest {
                 any<RowMapper<UserSanctionRecord>>(),
                 eq(7L),
                 eq(10L),
-                any(Timestamp::class.java),
             ),
         ).thenReturn(listOf(sanction(id = 2L, type = UserSanctionType.MUTE)))
 
         val sanctions = repository.activeSanctionsForUser(
             roomId = 10L,
             userId = 7L,
-            now = Instant.parse("2026-06-26T00:00:00Z"),
         )
 
         assertEquals(listOf(UserSanctionType.MUTE), sanctions.map { it.type })
+        val sqlCaptor = ArgumentCaptor.forClass(String::class.java)
         verify(jdbcTemplate).query(
-            contains("active = true"),
+            sqlCaptor.capture(),
             any<RowMapper<UserSanctionRecord>>(),
             eq(7L),
             eq(10L),
-            any(Timestamp::class.java),
         )
+        assertFalse(sqlCaptor.value.contains("expires_at > ?"))
     }
 
     private fun sanction(
