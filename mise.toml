@@ -210,6 +210,10 @@ docker compose run --rm \
 description = "실행 중인 채팅 클러스터의 REST, WebSocket, 메시지 저장 흐름을 검증한다."
 run = "node scripts/verify-chat.mjs"
 
+[tasks."verify:moderation"]
+description = "실행 중인 관리자 API의 moderation 인증과 rule 생성 흐름을 검증한다."
+run = "node scripts/verify-moderation.mjs"
+
 # ---------- ops ----------
 
 [tasks.ps]
