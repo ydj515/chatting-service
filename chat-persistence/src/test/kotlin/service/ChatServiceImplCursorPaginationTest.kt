@@ -163,6 +163,8 @@ class ChatServiceImplCursorPaginationTest {
             messageAdmissionPolicyService = MessageAdmissionPolicyService.Noop,
             roomTrafficStatsService = RoomTrafficStatsService.Noop,
             roomStorageConfigReader = TestRoomStorageConfigReader,
+            messageModerationPolicyService = MessageModerationPolicyService.Noop,
+            userSanctionPolicyService = UserSanctionPolicyService.Noop,
         )
     }
 

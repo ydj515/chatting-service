@@ -4,6 +4,7 @@ import com.chat.domain.dto.ErrorMessage
 import com.chat.domain.dto.MessageAccepted
 import com.chat.domain.dto.SendMessageRequest
 import com.chat.domain.exception.MessageAdmissionRejectedException
+import com.chat.domain.exception.MessageModerationRejectedException
 import com.chat.domain.model.MessageType
 import com.chat.domain.service.ChatService
 import com.chat.persistence.service.WebSocketSessionManager
@@ -182,6 +183,13 @@ class ChatWebSocketHandler(
                 errorCode = WebSocketErrorCode.MESSAGE_ADMISSION_REJECTED.name,
             )
             return
+        } catch (e: MessageModerationRejectedException) {
+            sendErrorMessage(
+                session = session,
+                errorMessage = e.message ?: "메시지가 moderation 정책에 의해 거부되었습니다.",
+                errorCode = WebSocketErrorCode.MESSAGE_MODERATION_REJECTED.name,
+            )
+            return
         }
         sendAcceptedMessage(session, savedMessage)
     }
@@ -222,6 +230,7 @@ class ChatWebSocketHandler(
         UNKNOWN_MESSAGE_TYPE,
         INVALID_MESSAGE_FORMAT,
         MESSAGE_ADMISSION_REJECTED,
+        MESSAGE_MODERATION_REJECTED,
     }
 
     private fun writeWebSocketMessage(message: com.chat.domain.dto.WebSocketMessage): String {

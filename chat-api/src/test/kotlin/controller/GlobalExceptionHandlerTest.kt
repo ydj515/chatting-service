@@ -2,6 +2,7 @@ package com.chat.api.controller
 
 import com.chat.domain.dto.CreateUserRequest
 import com.chat.domain.exception.MessageAdmissionRejectedException
+import com.chat.domain.exception.MessageModerationRejectedException
 import jakarta.validation.Valid
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -91,6 +92,18 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    fun `moderation 거부는 403 응답으로 변환한다`() {
+        mockMvc.get("/test/message-moderation-rejected")
+            .andExpect {
+                status { isForbidden() }
+                jsonPath("$.status") { value(403) }
+                jsonPath("$.error") { value("FORBIDDEN") }
+                jsonPath("$.message") { value("message blocked by moderation policy") }
+                jsonPath("$.path") { value("/test/message-moderation-rejected") }
+            }
+    }
+
+    @Test
     fun `예상하지 못한 예외는 상세 내용을 숨긴 500 응답으로 변환한다`() {
         mockMvc.get("/test/server-error")
             .andExpect {
@@ -120,6 +133,11 @@ class GlobalExceptionHandlerTest {
         @GetMapping("/test/message-admission-rejected")
         fun messageAdmissionRejected(): String {
             throw MessageAdmissionRejectedException("room rate limit exceeded")
+        }
+
+        @GetMapping("/test/message-moderation-rejected")
+        fun messageModerationRejected(): String {
+            throw MessageModerationRejectedException("message blocked by moderation policy")
         }
 
         @GetMapping("/test/server-error")

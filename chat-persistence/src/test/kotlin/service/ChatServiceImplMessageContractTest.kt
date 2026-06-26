@@ -2,6 +2,7 @@ package com.chat.persistence.service
 
 import com.chat.domain.dto.SendMessageRequest
 import com.chat.domain.exception.MessageAdmissionRejectedException
+import com.chat.domain.exception.MessageModerationRejectedException
 import com.chat.domain.model.ChatRoom
 import com.chat.domain.model.ChatRoomMember
 import com.chat.domain.model.MemberRole
@@ -370,6 +371,127 @@ class ChatServiceImplMessageContractTest {
     }
 
     @Test
+    fun `moderation 거부 시 sequence 발급과 stream append를 수행하지 않는다`() {
+        val messageStreamProducer = mock(MessageStreamProducer::class.java)
+        val fixture = chatServiceFixture(
+            messageStreamProducer = messageStreamProducer,
+            messageModerationPolicyService = RejectingMessageModerationPolicyService(
+                "message blocked by moderation policy",
+            ),
+        )
+        val clientMessageId = "client-message-1"
+        `when`(
+            fixture.messageRepository.findByChatRoomIdAndSenderIdAndClientMessageId(
+                10L,
+                7L,
+                clientMessageId,
+            )
+        ).thenReturn(Optional.empty())
+
+        val exception = assertThrows(MessageModerationRejectedException::class.java) {
+            fixture.chatService.sendMessage(
+                SendMessageRequest(
+                    chatRoomId = 10L,
+                    type = MessageType.TEXT,
+                    content = "blocked",
+                    clientMessageId = clientMessageId,
+                ),
+                senderId = 7L,
+            )
+        }
+
+        assertEquals("message blocked by moderation policy", exception.message)
+        verify(messageStreamProducer, never()).append(anyMessageStreamEnvelope())
+        verify(fixture.redisTemplate.opsForValue(), never()).increment("chat:sequence:10", 1L)
+        verify(fixture.messageRepository, never()).saveAndFlush(any(Message::class.java))
+    }
+
+    @Test
+    fun `sanction 거부 시 moderation과 admission 전에 메시지 수락을 중단한다`() {
+        val messageStreamProducer = mock(MessageStreamProducer::class.java)
+        val moderationPolicyService = RecordingMessageModerationPolicyService()
+        val admissionPolicyService = RecordingMessageAdmissionPolicyService()
+        val fixture = chatServiceFixture(
+            messageStreamProducer = messageStreamProducer,
+            userSanctionPolicyService = RejectingUserSanctionPolicyService("user is restricted from sending messages"),
+            messageModerationPolicyService = moderationPolicyService,
+            messageAdmissionPolicyService = admissionPolicyService,
+        )
+        val clientMessageId = "client-message-1"
+        `when`(
+            fixture.messageRepository.findByChatRoomIdAndSenderIdAndClientMessageId(
+                10L,
+                7L,
+                clientMessageId,
+            )
+        ).thenReturn(Optional.empty())
+
+        val exception = assertThrows(MessageModerationRejectedException::class.java) {
+            fixture.chatService.sendMessage(
+                SendMessageRequest(
+                    chatRoomId = 10L,
+                    type = MessageType.TEXT,
+                    content = "hello",
+                    clientMessageId = clientMessageId,
+                ),
+                senderId = 7L,
+            )
+        }
+
+        assertEquals("user is restricted from sending messages", exception.message)
+        assertEquals(0, moderationPolicyService.callCount)
+        assertEquals(0, admissionPolicyService.callCount)
+        verify(messageStreamProducer, never()).append(anyMessageStreamEnvelope())
+        verify(fixture.redisTemplate.opsForValue(), never()).increment("chat:sequence:10", 1L)
+    }
+
+    @Test
+    fun `같은 clientMessageId 재전송은 moderation과 sanction을 다시 검사하지 않는다`() {
+        val moderationPolicyService = RecordingMessageModerationPolicyService()
+        val userSanctionPolicyService = RecordingUserSanctionPolicyService()
+        val fixture = chatServiceFixture(
+            messageModerationPolicyService = moderationPolicyService,
+            userSanctionPolicyService = userSanctionPolicyService,
+        )
+        val clientMessageId = "client-message-1"
+        val existingMessage = Message(
+            id = 101L,
+            messageId = "msg-existing",
+            clientMessageId = clientMessageId,
+            chatRoom = fixture.chatRoom,
+            sender = fixture.sender,
+            type = MessageType.TEXT,
+            content = "hello",
+            sequenceNumber = 5L,
+            roomSeq = 5L,
+            streamShard = 1,
+            writeShard = 2,
+            fanoutShard = 3,
+            createdAt = LocalDateTime.parse("2026-06-12T12:00:00"),
+        )
+        `when`(
+            fixture.messageRepository.findByChatRoomIdAndSenderIdAndClientMessageId(
+                10L,
+                7L,
+                clientMessageId,
+            )
+        ).thenReturn(Optional.of(existingMessage))
+
+        fixture.chatService.sendMessage(
+            SendMessageRequest(
+                chatRoomId = 10L,
+                type = MessageType.TEXT,
+                content = "hello",
+                clientMessageId = clientMessageId,
+            ),
+            senderId = 7L,
+        )
+
+        assertEquals(0, moderationPolicyService.callCount)
+        assertEquals(0, userSanctionPolicyService.callCount)
+    }
+
+    @Test
     fun `메시지 수락 정책은 채팅방 멤버 역할을 함께 전달받는다`() {
         val admissionPolicyService = RecordingMessageAdmissionPolicyService()
         val fixture = chatServiceFixture(
@@ -462,6 +584,8 @@ class ChatServiceImplMessageContractTest {
     private fun chatServiceFixture(
         messageStreamProducer: MessageStreamProducer = successfulMessageStreamProducer(),
         messageAdmissionPolicyService: MessageAdmissionPolicyService = MessageAdmissionPolicyService.Noop,
+        messageModerationPolicyService: MessageModerationPolicyService = MessageModerationPolicyService.Noop,
+        userSanctionPolicyService: UserSanctionPolicyService = UserSanctionPolicyService.Noop,
         roomTrafficStatsService: RoomTrafficStatsService = RoomTrafficStatsService.Noop,
         memberRole: MemberRole = MemberRole.MEMBER,
         roomStorageConfigReader: RoomStorageConfigReader = FixedRoomStorageConfigReader(RoomShardConfig()),
@@ -526,6 +650,8 @@ class ChatServiceImplMessageContractTest {
                 webSocketSessionManager = webSocketSessionManager,
                 messageStreamProducer = messageStreamProducer,
                 messageAdmissionPolicyService = messageAdmissionPolicyService,
+                messageModerationPolicyService = messageModerationPolicyService,
+                userSanctionPolicyService = userSanctionPolicyService,
                 roomTrafficStatsService = roomTrafficStatsService,
                 roomStorageConfigReader = roomStorageConfigReader,
             ),
@@ -589,6 +715,42 @@ class ChatServiceImplMessageContractTest {
         override fun requireAllowed(roomId: Long, senderId: Long, memberRole: MemberRole) {
             callCount += 1
             lastMemberRole = memberRole
+        }
+    }
+
+    private class RejectingMessageModerationPolicyService(
+        private val message: String,
+    ) : MessageModerationPolicyService {
+
+        override fun requireAllowed(roomId: Long, senderId: Long, content: String?, messageType: MessageType) {
+            throw MessageModerationRejectedException(message)
+        }
+    }
+
+    private class RecordingMessageModerationPolicyService : MessageModerationPolicyService {
+        var callCount: Int = 0
+            private set
+
+        override fun requireAllowed(roomId: Long, senderId: Long, content: String?, messageType: MessageType) {
+            callCount += 1
+        }
+    }
+
+    private class RejectingUserSanctionPolicyService(
+        private val message: String,
+    ) : UserSanctionPolicyService {
+
+        override fun requireAllowedToSend(roomId: Long, userId: Long) {
+            throw MessageModerationRejectedException(message)
+        }
+    }
+
+    private class RecordingUserSanctionPolicyService : UserSanctionPolicyService {
+        var callCount: Int = 0
+            private set
+
+        override fun requireAllowedToSend(roomId: Long, userId: Long) {
+            callCount += 1
         }
     }
 

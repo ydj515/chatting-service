@@ -179,6 +179,8 @@ class ChatServiceImplCanonicalHistoryTest {
                 messageAdmissionPolicyService = MessageAdmissionPolicyService.Noop,
                 roomTrafficStatsService = RoomTrafficStatsService.Noop,
                 roomStorageConfigReader = TestRoomStorageConfigReader,
+                messageModerationPolicyService = MessageModerationPolicyService.Noop,
+                userSanctionPolicyService = UserSanctionPolicyService.Noop,
             ),
             chatRoomMemberRepository = chatRoomMemberRepository,
         )
