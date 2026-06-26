@@ -47,6 +47,33 @@ class UserSanctionJdbcRepositoryTest {
         assertFalse(sqlCaptor.value.contains("expires_at > ?"))
     }
 
+    @Test
+    fun `activeGlobalSanctionsForUser는 global active sanction만 조회한다`() {
+        val jdbcTemplate = mock(JdbcTemplate::class.java)
+        val repository = UserSanctionJdbcRepository(jdbcTemplate)
+
+        `when`(
+            jdbcTemplate.query(
+                any(String::class.java),
+                any<RowMapper<UserSanctionRecord>>(),
+                eq(7L),
+            ),
+        ).thenReturn(listOf(sanction(id = 3L, type = UserSanctionType.SUSPEND)))
+
+        val sanctions = repository.activeGlobalSanctionsForUser(userId = 7L)
+
+        assertEquals(listOf(UserSanctionType.SUSPEND), sanctions.map { it.type })
+        val sqlCaptor = ArgumentCaptor.forClass(String::class.java)
+        verify(jdbcTemplate).query(
+            sqlCaptor.capture(),
+            any<RowMapper<UserSanctionRecord>>(),
+            eq(7L),
+        )
+        assertFalse(sqlCaptor.value.contains("room_id = ?"))
+        assertEquals(true, sqlCaptor.value.contains("scope_type = 'GLOBAL'"))
+        assertEquals(true, sqlCaptor.value.contains("room_id IS NULL"))
+    }
+
     private fun sanction(
         id: Long,
         type: UserSanctionType,

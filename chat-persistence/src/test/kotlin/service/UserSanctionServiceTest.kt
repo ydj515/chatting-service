@@ -20,6 +20,7 @@ class UserSanctionServiceTest {
     fun `mute 제재가 있으면 메시지 전송을 거부한다`() {
         val repository = mock(UserSanctionJdbcRepository::class.java)
         val now = Instant.parse("2026-06-26T00:00:00Z")
+        `when`(repository.activeGlobalSanctionsForUser(7L)).thenReturn(emptyList())
         `when`(repository.activeSanctionsForUser(10L, 7L)).thenReturn(
             listOf(sanction(UserSanctionType.MUTE)),
         )
@@ -36,6 +37,7 @@ class UserSanctionServiceTest {
     fun `ban 제재가 있으면 메시지 전송을 거부한다`() {
         val repository = mock(UserSanctionJdbcRepository::class.java)
         val now = Instant.parse("2026-06-26T00:00:00Z")
+        `when`(repository.activeGlobalSanctionsForUser(7L)).thenReturn(emptyList())
         `when`(repository.activeSanctionsForUser(10L, 7L)).thenReturn(
             listOf(sanction(UserSanctionType.BAN)),
         )
@@ -50,6 +52,7 @@ class UserSanctionServiceTest {
     fun `활성 제재가 없으면 통과한다`() {
         val repository = mock(UserSanctionJdbcRepository::class.java)
         val now = Instant.parse("2026-06-26T00:00:00Z")
+        `when`(repository.activeGlobalSanctionsForUser(7L)).thenReturn(emptyList())
         `when`(repository.activeSanctionsForUser(10L, 7L)).thenReturn(emptyList())
         val service = UserSanctionService(repository, Clock.fixed(now, ZoneOffset.UTC), null)
 
@@ -60,6 +63,7 @@ class UserSanctionServiceTest {
     fun `캐시에서 반환된 만료 제재는 메시지 전송 차단 대상에서 제외한다`() {
         val repository = mock(UserSanctionJdbcRepository::class.java)
         val now = Instant.parse("2026-06-26T00:00:00Z")
+        `when`(repository.activeGlobalSanctionsForUser(7L)).thenReturn(emptyList())
         `when`(repository.activeSanctionsForUser(10L, 7L)).thenReturn(
             listOf(sanction(UserSanctionType.MUTE, expiresAt = now.minusSeconds(1))),
         )
@@ -69,22 +73,36 @@ class UserSanctionServiceTest {
     }
 
     @Test
-    fun `suspend는 phase 8_6 전역 제재 연계 전까지 메시지 전송 차단 대상에서 제외한다`() {
+    fun `global suspend 제재가 있으면 메시지 전송을 거부한다`() {
         val repository = mock(UserSanctionJdbcRepository::class.java)
         val now = Instant.parse("2026-06-26T00:00:00Z")
-        `when`(repository.activeSanctionsForUser(10L, 7L)).thenReturn(
-            listOf(sanction(UserSanctionType.SUSPEND)),
+        `when`(repository.activeGlobalSanctionsForUser(7L)).thenReturn(
+            listOf(
+                sanction(
+                    type = UserSanctionType.SUSPEND,
+                    scopeType = ModerationScopeType.GLOBAL,
+                    roomId = null,
+                ),
+            ),
         )
+        `when`(repository.activeSanctionsForUser(10L, 7L)).thenReturn(emptyList())
         val service = UserSanctionService(repository, Clock.fixed(now, ZoneOffset.UTC), null)
 
-        service.requireAllowedToSend(roomId = 10L, userId = 7L)
+        assertThrows(MessageModerationRejectedException::class.java) {
+            service.requireAllowedToSend(roomId = 10L, userId = 7L)
+        }
     }
 
-    private fun sanction(type: UserSanctionType, expiresAt: Instant? = null): UserSanctionRecord {
+    private fun sanction(
+        type: UserSanctionType,
+        expiresAt: Instant? = null,
+        scopeType: ModerationScopeType = ModerationScopeType.ROOM,
+        roomId: Long? = 10L,
+    ): UserSanctionRecord {
         return UserSanctionRecord(
             id = 1L,
-            scopeType = ModerationScopeType.ROOM,
-            roomId = 10L,
+            scopeType = scopeType,
+            roomId = roomId,
             userId = 7L,
             type = type,
             reason = "spam",

@@ -165,7 +165,7 @@ CREATE TABLE IF NOT EXISTS user_sanctions (
         (scope_type = 'ROOM' AND room_id IS NOT NULL) OR
         (scope_type = 'GLOBAL' AND room_id IS NULL)
     ),
-    CONSTRAINT ck_user_sanctions_type CHECK (type IN ('MUTE', 'BAN'))
+    CONSTRAINT ck_user_sanctions_type CHECK (type IN ('MUTE', 'BAN', 'SUSPEND'))
 );
 
 CREATE INDEX IF NOT EXISTS ix_user_sanctions_active_lookup

@@ -6,6 +6,8 @@ import com.chat.domain.dto.ModerationAction
 import com.chat.domain.dto.ModerationMatchType
 import com.chat.domain.dto.ModerationScopeType
 import com.chat.domain.dto.UserSanctionType
+import com.chat.domain.service.SessionControlPublisher
+import com.chat.domain.service.SessionTokenService
 import com.chat.persistence.repository.AdminAuditLogRepository
 import com.chat.persistence.repository.ModerationRuleJdbcRepository
 import com.chat.persistence.repository.ModerationRuleRecord
@@ -60,14 +62,14 @@ class AdminModerationServiceImplTest {
     }
 
     @Test
-    fun `createSanction은 roomId와 userId 기반의 단순 cache key를 evict한다`() {
+    fun `createSanction은 userSanctions cache 전체를 evict한다`() {
         val method = AdminModerationServiceImpl::class.java.getMethod(
             "createSanction",
             String::class.java,
             AdminCreateUserSanctionRequest::class.java,
         )
 
-        assertEquals("#request.roomId + ':' + #request.userId", method.getAnnotation(CacheEvict::class.java)?.key)
+        assertEquals(true, method.getAnnotation(CacheEvict::class.java)?.allEntries)
     }
 
     @Test
@@ -135,12 +137,53 @@ class AdminModerationServiceImplTest {
     }
 
     @Test
-    fun `createSanction은 phase 8_6 연계 전까지 SUSPEND 생성을 거부한다`() {
+    fun `createSanction은 global suspend를 저장하고 token revoke와 force logout을 요청한다`() {
         val fixture = fixture()
         val request = AdminCreateUserSanctionRequest(
             scopeType = ModerationScopeType.GLOBAL,
             userId = 7L,
             type = UserSanctionType.SUSPEND,
+            reason = "abuse",
+        )
+        `when`(fixture.sanctionRepository.create("admin-local", request)).thenReturn(
+            sanctionRecord(
+                scopeType = ModerationScopeType.GLOBAL,
+                roomId = null,
+                type = UserSanctionType.SUSPEND,
+            ),
+        )
+
+        val response = fixture.service.createSanction("admin-local", request)
+
+        assertEquals(UserSanctionType.SUSPEND, response.type)
+        verify(fixture.sessionTokenService).revokeUserTokens(7L)
+        verify(fixture.sessionControlPublisher).forceLogoutUser(7L, "suspended")
+    }
+
+    @Test
+    fun `room scoped suspend는 거부한다`() {
+        val fixture = fixture()
+        val request = AdminCreateUserSanctionRequest(
+            scopeType = ModerationScopeType.ROOM,
+            roomId = 10L,
+            userId = 7L,
+            type = UserSanctionType.SUSPEND,
+        )
+
+        assertThrows(IllegalArgumentException::class.java) {
+            fixture.service.createSanction("admin-local", request)
+        }
+
+        verifyNoInteractions(fixture.sanctionRepository)
+    }
+
+    @Test
+    fun `global mute는 거부한다`() {
+        val fixture = fixture()
+        val request = AdminCreateUserSanctionRequest(
+            scopeType = ModerationScopeType.GLOBAL,
+            userId = 7L,
+            type = UserSanctionType.MUTE,
         )
 
         assertThrows(IllegalArgumentException::class.java) {
@@ -154,16 +197,22 @@ class AdminModerationServiceImplTest {
         val ruleRepository = mock(ModerationRuleJdbcRepository::class.java)
         val sanctionRepository = mock(UserSanctionJdbcRepository::class.java)
         val auditRepository = mock(AdminAuditLogRepository::class.java)
+        val sessionTokenService = mock(SessionTokenService::class.java)
+        val sessionControlPublisher = mock(SessionControlPublisher::class.java)
         return Fixture(
             service = AdminModerationServiceImpl(
                 ruleRepository = ruleRepository,
                 sanctionRepository = sanctionRepository,
                 auditLogRepository = auditRepository,
                 objectMapper = jacksonObjectMapper(),
+                sessionTokenService = sessionTokenService,
+                sessionControlPublisher = sessionControlPublisher,
             ),
             ruleRepository = ruleRepository,
             sanctionRepository = sanctionRepository,
             auditRepository = auditRepository,
+            sessionTokenService = sessionTokenService,
+            sessionControlPublisher = sessionControlPublisher,
         )
     }
 
@@ -172,6 +221,8 @@ class AdminModerationServiceImplTest {
         val ruleRepository: ModerationRuleJdbcRepository,
         val sanctionRepository: UserSanctionJdbcRepository,
         val auditRepository: AdminAuditLogRepository,
+        val sessionTokenService: SessionTokenService,
+        val sessionControlPublisher: SessionControlPublisher,
     )
 
     private fun ruleRecord(): ModerationRuleRecord {
@@ -190,13 +241,17 @@ class AdminModerationServiceImplTest {
         )
     }
 
-    private fun sanctionRecord(): UserSanctionRecord {
+    private fun sanctionRecord(
+        scopeType: ModerationScopeType = ModerationScopeType.ROOM,
+        roomId: Long? = 10L,
+        type: UserSanctionType = UserSanctionType.MUTE,
+    ): UserSanctionRecord {
         return UserSanctionRecord(
             id = 2L,
-            scopeType = ModerationScopeType.ROOM,
-            roomId = 10L,
+            scopeType = scopeType,
+            roomId = roomId,
             userId = 7L,
-            type = UserSanctionType.MUTE,
+            type = type,
             reason = "spam",
             expiresAt = null,
             active = true,

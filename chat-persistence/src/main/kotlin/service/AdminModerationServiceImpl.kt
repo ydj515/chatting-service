@@ -8,6 +8,8 @@ import com.chat.domain.dto.AdminUserSanctionDto
 import com.chat.domain.dto.ModerationScopeType
 import com.chat.domain.dto.UserSanctionType
 import com.chat.domain.service.AdminModerationService
+import com.chat.domain.service.SessionControlPublisher
+import com.chat.domain.service.SessionTokenService
 import com.chat.persistence.repository.AdminAuditLogRepository
 import com.chat.persistence.repository.ModerationRuleJdbcRepository
 import com.chat.persistence.repository.UserSanctionJdbcRepository
@@ -23,6 +25,8 @@ class AdminModerationServiceImpl(
     private val sanctionRepository: UserSanctionJdbcRepository,
     private val auditLogRepository: AdminAuditLogRepository,
     private val objectMapper: ObjectMapper,
+    private val sessionTokenService: SessionTokenService,
+    private val sessionControlPublisher: SessionControlPublisher,
 ) : AdminModerationService {
 
     @Transactional(readOnly = true)
@@ -78,14 +82,15 @@ class AdminModerationServiceImpl(
     }
 
     @Transactional
-    @CacheEvict(
-        value = ["userSanctions"],
-        key = "#request.roomId + ':' + #request.userId",
-    )
+    @CacheEvict(value = ["userSanctions"], allEntries = true)
     override fun createSanction(actor: String, request: AdminCreateUserSanctionRequest): AdminUserSanctionDto {
         validateSanctionRequest(request)
         val record = sanctionRepository.create(actor, request)
         audit(actor, "ADMIN_USER_SANCTION_CREATED", "USER_SANCTION", "sanction:${record.id}", request)
+        if (record.type == UserSanctionType.SUSPEND) {
+            sessionTokenService.revokeUserTokens(record.userId)
+            sessionControlPublisher.forceLogoutUser(record.userId, "suspended")
+        }
         return record.toDto()
     }
 
@@ -116,11 +121,17 @@ class AdminModerationServiceImpl(
     }
 
     private fun validateSanctionRequest(request: AdminCreateUserSanctionRequest) {
-        if (request.type == UserSanctionType.SUSPEND) {
-            throw IllegalArgumentException("SUSPEND requires Phase 8.6 token revocation")
-        }
-        if (request.scopeType != ModerationScopeType.ROOM || request.roomId == null) {
-            throw IllegalArgumentException("Phase 8.5 supports ROOM scoped sanctions only")
+        when (request.type) {
+            UserSanctionType.MUTE, UserSanctionType.BAN -> {
+                if (request.scopeType != ModerationScopeType.ROOM || request.roomId == null) {
+                    throw IllegalArgumentException("MUTE and BAN require ROOM scope")
+                }
+            }
+            UserSanctionType.SUSPEND -> {
+                if (request.scopeType != ModerationScopeType.GLOBAL || request.roomId != null) {
+                    throw IllegalArgumentException("SUSPEND requires GLOBAL scope")
+                }
+            }
         }
         // 만료 시각이 과거/현재면 send 경로(activeSanctionsForUser)에서 절대 적용되지 않으므로 거부한다.
         val expiresAt = request.expiresAt
