@@ -39,6 +39,8 @@ Phase 8.2 Compose 기준 전체 Docker backend는 `cluster` profile의 3 master 
 
 현재 권장안은 대부분 단일 key 연산이므로 hash tag를 기본으로 쓰지 않는다. 예외적으로 room stream shard key는 `XREADGROUP`가 같은 방의 여러 shard key를 함께 읽을 수 있도록 room hash tag를 사용하고, consumer는 room/slot 단위로 stream key를 나누어 읽는다.
 
+hash tag 도입 이전의 legacy key(`chat:stream:room:<roomId>:shard:<shardNo>`)는 full key hash로 slot이 결정되므로 같은 방이라도 shard마다 slot이 다르다. 따라서 마이그레이션 기간에 legacy key와 hash tagged key가 공존하면, consumer는 hash tagged key만 room 단위로 묶고 legacy key는 key 단위로 분리해 읽어 한 번의 multi-key `XREADGROUP`가 단일 slot을 넘지 않도록 한다.
+
 ### 2.1 Room Sequence Ordering 정정
 
 2026-06-18 방 `id=3` 검증에서 sequence block 선할당이 트위치식 실시간 채팅 순서를 깨는 문제가 확인되었다.

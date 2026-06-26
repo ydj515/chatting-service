@@ -23,12 +23,17 @@ class MessageStreamKeyResolver(
     }
 
     fun streamReadGroupKey(streamKey: String): String {
-        val parsed = parseRoomStreamKey(streamKey)
-        return if (parsed != null) {
-            "room:${parsed.roomId}"
-        } else {
-            "stream:$streamKey"
+        if (streamKey.startsWith(redisProperties.streams.roomStreamKeyPrefix)) {
+            val suffix = streamKey.removePrefix(redisProperties.streams.roomStreamKeyPrefix)
+            val hashTagged = HASH_TAGGED_PATTERN.matchEntire(suffix)
+            if (hashTagged != null) {
+                return "room:${hashTagged.groupValues[1]}"
+            }
         }
+        // Legacy keys (chat:stream:room:10:shard:N) and non-room keys hash by the full
+        // key, so each lands on its own cluster slot. Grouping them per key keeps a
+        // multi-key XREADGROUP within a single slot during a hash-tag migration.
+        return "stream:$streamKey"
     }
 
     fun parseRoomStreamKey(streamKey: String): RoomStreamKey? {

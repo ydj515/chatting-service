@@ -126,6 +126,8 @@ Redis Cluster host port는 `127.0.0.1`에만 bind한다. `infra/redis/redis-clus
 
 Phase 8.4부터 메시지 수락 경로는 `room_storage_configs`의 `current_shard_count`와 `fanout_shard_count`를 읽어 새 메시지의 `writeShard`, `streamShard`, `fanoutShard`를 계산한다. `writeShard`는 `messageId` hash 기반이고, `streamShard`와 `fanoutShard`는 `roomSeq` round-robin 기반이다.
 
+shard 값은 수락 시점에 한 번 계산해 `MessageStreamEnvelope`에 담고, canonical writer는 이 값을 재계산 없이 그대로 PostgreSQL `chat_messages`에 기록한다. canonical PK가 `write_shard`를 포함하므로, ack 유실 후 shard 확장이 일어난 뒤 같은 메시지를 replay해도 produce 시점 `writeShard`를 유지해야 `ON CONFLICT DO NOTHING` 기준 idempotent insert가 보장된다. `chat_messages`는 `stream_shard`, `write_shard`, `fanout_shard` 컬럼을 모두 가진다.
+
 `room-policy` worker는 `HOT=16`, `VERY_HOT=64`를 기본 shard count로 upsert한다. 자동 downgrade는 live feed window와 rate/slow-mode 정책은 갱신하지만 shard count를 줄이지 않는다. 이미 확장된 hot room이 다시 트래픽을 받을 때 단일 stream shard로 되돌아가 fanout owner 병목을 만들지 않기 위함이다.
 
 10k release gate는 다음 명령으로 실행한다.
