@@ -5,6 +5,9 @@ import com.chat.domain.dto.UserSanctionType
 import com.chat.domain.exception.MessageModerationRejectedException
 import com.chat.persistence.repository.UserSanctionJdbcRepository
 import com.chat.persistence.repository.UserSanctionRecord
+import io.micrometer.core.instrument.MeterRegistry
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry
+import org.springframework.beans.factory.ObjectProvider
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
@@ -13,6 +16,7 @@ import org.mockito.Mockito.`when`
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
+import java.util.stream.Stream
 
 class UserSanctionServiceTest {
 
@@ -93,6 +97,41 @@ class UserSanctionServiceTest {
         }
     }
 
+    @Test
+    fun `global sanction rejection metric은 global scope로 기록한다`() {
+        val repository = mock(UserSanctionJdbcRepository::class.java)
+        val meterRegistry = SimpleMeterRegistry()
+        val now = Instant.parse("2026-06-26T00:00:00Z")
+        `when`(repository.activeGlobalSanctionsForUser(7L)).thenReturn(
+            listOf(
+                sanction(
+                    type = UserSanctionType.SUSPEND,
+                    scopeType = ModerationScopeType.GLOBAL,
+                    roomId = null,
+                ),
+            ),
+        )
+        `when`(repository.activeSanctionsForUser(10L, 7L)).thenReturn(emptyList())
+        val service = UserSanctionService(
+            repository,
+            Clock.fixed(now, ZoneOffset.UTC),
+            meterRegistryProvider(meterRegistry),
+        )
+
+        assertThrows(MessageModerationRejectedException::class.java) {
+            service.requireAllowedToSend(roomId = 10L, userId = 7L)
+        }
+
+        val counter = requireNotNull(
+            meterRegistry.find("chat.message.moderation.rejected")
+                .tag("reason", "suspended")
+                .tag("scope", "global")
+                .tag("action", "reject")
+                .counter(),
+        )
+        assertEquals(1.0, counter.count())
+    }
+
     private fun sanction(
         type: UserSanctionType,
         expiresAt: Instant? = null,
@@ -113,5 +152,17 @@ class UserSanctionServiceTest {
             revokedBy = null,
             revokedAt = null,
         )
+    }
+
+    private fun meterRegistryProvider(meterRegistry: MeterRegistry): ObjectProvider<MeterRegistry> {
+        return object : ObjectProvider<MeterRegistry> {
+            override fun getObject(): MeterRegistry = meterRegistry
+            override fun getObject(vararg args: Any?): MeterRegistry = meterRegistry
+            override fun getIfAvailable(): MeterRegistry = meterRegistry
+            override fun getIfUnique(): MeterRegistry = meterRegistry
+            override fun iterator(): MutableIterator<MeterRegistry> = mutableListOf(meterRegistry).iterator()
+            override fun stream(): Stream<MeterRegistry> = Stream.of(meterRegistry)
+            override fun orderedStream(): Stream<MeterRegistry> = Stream.of(meterRegistry)
+        }
     }
 }

@@ -92,10 +92,8 @@ class HmacSessionTokenService(
             String(decoder.decode(encodedPayload), StandardCharsets.UTF_8)
         }.getOrNull() ?: return null
         val payloadParts = payload.split(':')
-        if (payloadParts.size != 3) {
-            if (payloadParts.size != 4) {
-                return null
-            }
+        if (payloadParts.size != 3 && payloadParts.size != 4) {
+            return null
         }
 
         val userId = payloadParts[0].toLongOrNull() ?: return null

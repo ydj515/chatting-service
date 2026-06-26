@@ -14,6 +14,8 @@ import org.springframework.data.redis.listener.ChannelTopic
 import org.springframework.data.redis.listener.RedisMessageListenerContainer
 import org.springframework.stereotype.Service
 import java.time.LocalDateTime
+import java.time.ZoneOffset
+import java.util.UUID
 
 @Service
 class RedisSessionControlBroker(
@@ -28,6 +30,7 @@ class RedisSessionControlBroker(
     private val serverId = redisProperties.broker.serverId
         ?.takeIf { it.isNotBlank() }
         ?: "server-${System.currentTimeMillis()}"
+    private val controlPublisherId = "$serverId-session-control-${UUID.randomUUID()}"
     private var localForceLogoutHandler: ((Long, String) -> Unit)? = null
 
     @PostConstruct
@@ -47,12 +50,12 @@ class RedisSessionControlBroker(
 
     override fun forceLogoutUser(userId: Long, reason: String) {
         val event = SessionControlEvent(
-            id = "$serverId-session-control-${System.currentTimeMillis()}-${System.nanoTime()}",
-            serverId = serverId,
+            id = "$controlPublisherId-${System.currentTimeMillis()}-${System.nanoTime()}",
+            serverId = controlPublisherId,
             type = EventType.FORCE_LOGOUT_USER,
             userId = userId,
             reason = reason,
-            timestamp = LocalDateTime.now(),
+            timestamp = LocalDateTime.now(ZoneOffset.UTC),
         )
         redisTemplate.convertAndSend(authProperties.session.controlTopic, objectMapper.writeValueAsString(event))
     }
@@ -60,7 +63,7 @@ class RedisSessionControlBroker(
     override fun onMessage(message: Message, pattern: ByteArray?) {
         try {
             val event = objectMapper.readValue(message.body, SessionControlEvent::class.java)
-            if (event.serverId == serverId) {
+            if (event.serverId == controlPublisherId) {
                 return
             }
             when (event.type) {

@@ -40,6 +40,17 @@ class UserControllerTest {
         assertEquals("session-token", userService.logoutToken)
     }
 
+    @Test
+    fun `logout은 bearer token이 아니면 400으로 응답하고 revoke를 호출하지 않는다`() {
+        mockMvc.post("/users/logout") {
+            header(HttpHeaders.AUTHORIZATION, "Basic session-token")
+        }.andExpect {
+            status { isBadRequest() }
+        }
+
+        assertEquals(null, userService.logoutToken)
+    }
+
     private class RecordingUserService : UserService {
         var logoutToken: String? = null
 

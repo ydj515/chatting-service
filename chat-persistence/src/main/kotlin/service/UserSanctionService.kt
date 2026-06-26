@@ -53,7 +53,7 @@ class UserSanctionService(
         meterRegistryProvider?.ifAvailable { registry ->
             Counter.builder("chat.message.moderation.rejected")
                 .tag("reason", reason)
-                .tag("scope", "room")
+                .tag("scope", sanction.scopeType.name.lowercase())
                 .tag("action", "reject")
                 .register(registry)
                 .increment()

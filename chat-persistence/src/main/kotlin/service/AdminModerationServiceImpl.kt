@@ -13,10 +13,14 @@ import com.chat.domain.service.SessionTokenService
 import com.chat.persistence.repository.AdminAuditLogRepository
 import com.chat.persistence.repository.ModerationRuleJdbcRepository
 import com.chat.persistence.repository.UserSanctionJdbcRepository
+import com.chat.persistence.repository.UserSanctionRecord
 import com.fasterxml.jackson.databind.ObjectMapper
+import org.springframework.cache.CacheManager
 import org.springframework.cache.annotation.CacheEvict
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import org.springframework.transaction.support.TransactionSynchronization
+import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.time.Instant
 
 @Service
@@ -27,6 +31,7 @@ class AdminModerationServiceImpl(
     private val objectMapper: ObjectMapper,
     private val sessionTokenService: SessionTokenService,
     private val sessionControlPublisher: SessionControlPublisher,
+    private val cacheManager: CacheManager,
 ) : AdminModerationService {
 
     @Transactional(readOnly = true)
@@ -82,20 +87,21 @@ class AdminModerationServiceImpl(
     }
 
     @Transactional
-    @CacheEvict(value = ["userSanctions"], allEntries = true)
     override fun createSanction(actor: String, request: AdminCreateUserSanctionRequest): AdminUserSanctionDto {
         validateSanctionRequest(request)
         val record = sanctionRepository.create(actor, request)
         audit(actor, "ADMIN_USER_SANCTION_CREATED", "USER_SANCTION", "sanction:${record.id}", request)
+        evictUserSanctionCache(record)
         if (record.type == UserSanctionType.SUSPEND) {
-            sessionTokenService.revokeUserTokens(record.userId)
-            sessionControlPublisher.forceLogoutUser(record.userId, "suspended")
+            afterCommit {
+                sessionTokenService.revokeUserTokens(record.userId)
+                sessionControlPublisher.forceLogoutUser(record.userId, "suspended")
+            }
         }
         return record.toDto()
     }
 
     @Transactional
-    @CacheEvict(value = ["userSanctions"], allEntries = true)
     override fun revokeSanction(actor: String, sanctionId: Long): AdminUserSanctionDto {
         val record = sanctionRepository.revoke(actor, sanctionId)
         audit(
@@ -105,6 +111,7 @@ class AdminModerationServiceImpl(
             "sanction:${record.id}",
             mapOf("sanctionId" to sanctionId),
         )
+        evictUserSanctionCache(record)
         return record.toDto()
     }
 
@@ -148,5 +155,32 @@ class AdminModerationServiceImpl(
             targetId = targetId,
             metadataJson = objectMapper.writeValueAsString(metadata),
         )
+    }
+
+    private fun evictUserSanctionCache(record: UserSanctionRecord) {
+        val cache = cacheManager.getCache(USER_SANCTIONS_CACHE) ?: return
+        when (record.scopeType) {
+            ModerationScopeType.GLOBAL -> cache.evict("global:${record.userId}")
+            ModerationScopeType.ROOM -> record.roomId?.let { roomId -> cache.evict("$roomId:${record.userId}") }
+        }
+    }
+
+    private fun afterCommit(action: () -> Unit) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            action()
+            return
+        }
+
+        TransactionSynchronizationManager.registerSynchronization(
+            object : TransactionSynchronization {
+                override fun afterCommit() {
+                    action()
+                }
+            },
+        )
+    }
+
+    private companion object {
+        const val USER_SANCTIONS_CACHE = "userSanctions"
     }
 }

@@ -24,8 +24,10 @@ import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.verifyNoInteractions
 import org.mockito.Mockito.`when`
-import org.springframework.cache.annotation.CacheEvict
+import org.springframework.cache.Cache
+import org.springframework.cache.CacheManager
 import org.springframework.transaction.annotation.Transactional
+import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.time.Instant
 
 class AdminModerationServiceImplTest {
@@ -62,14 +64,19 @@ class AdminModerationServiceImplTest {
     }
 
     @Test
-    fun `createSanction은 userSanctions cache 전체를 evict한다`() {
-        val method = AdminModerationServiceImpl::class.java.getMethod(
-            "createSanction",
-            String::class.java,
-            AdminCreateUserSanctionRequest::class.java,
+    fun `createSanction은 대상 user sanction cache key를 evict한다`() {
+        val fixture = fixture()
+        val request = AdminCreateUserSanctionRequest(
+            scopeType = ModerationScopeType.ROOM,
+            roomId = 10L,
+            userId = 7L,
+            type = UserSanctionType.MUTE,
         )
+        `when`(fixture.sanctionRepository.create("admin-local", request)).thenReturn(sanctionRecord())
 
-        assertEquals(true, method.getAnnotation(CacheEvict::class.java)?.allEntries)
+        fixture.service.createSanction("admin-local", request)
+
+        verify(fixture.userSanctionsCache).evict("10:7")
     }
 
     @Test
@@ -153,9 +160,18 @@ class AdminModerationServiceImplTest {
             ),
         )
 
-        val response = fixture.service.createSanction("admin-local", request)
+        TransactionSynchronizationManager.initSynchronization()
+        try {
+            val response = fixture.service.createSanction("admin-local", request)
 
-        assertEquals(UserSanctionType.SUSPEND, response.type)
+            assertEquals(UserSanctionType.SUSPEND, response.type)
+            verifyNoInteractions(fixture.sessionTokenService, fixture.sessionControlPublisher)
+            TransactionSynchronizationManager.getSynchronizations().forEach { it.afterCommit() }
+        } finally {
+            if (TransactionSynchronizationManager.isSynchronizationActive()) {
+                TransactionSynchronizationManager.clearSynchronization()
+            }
+        }
         verify(fixture.sessionTokenService).revokeUserTokens(7L)
         verify(fixture.sessionControlPublisher).forceLogoutUser(7L, "suspended")
     }
@@ -175,6 +191,7 @@ class AdminModerationServiceImplTest {
         }
 
         verifyNoInteractions(fixture.sanctionRepository)
+        verifyNoInteractions(fixture.sessionTokenService, fixture.sessionControlPublisher)
     }
 
     @Test
@@ -191,6 +208,7 @@ class AdminModerationServiceImplTest {
         }
 
         verifyNoInteractions(fixture.sanctionRepository)
+        verifyNoInteractions(fixture.sessionTokenService, fixture.sessionControlPublisher)
     }
 
     private fun fixture(): Fixture {
@@ -199,6 +217,9 @@ class AdminModerationServiceImplTest {
         val auditRepository = mock(AdminAuditLogRepository::class.java)
         val sessionTokenService = mock(SessionTokenService::class.java)
         val sessionControlPublisher = mock(SessionControlPublisher::class.java)
+        val cacheManager = mock(CacheManager::class.java)
+        val userSanctionsCache = mock(Cache::class.java)
+        `when`(cacheManager.getCache("userSanctions")).thenReturn(userSanctionsCache)
         return Fixture(
             service = AdminModerationServiceImpl(
                 ruleRepository = ruleRepository,
@@ -207,12 +228,14 @@ class AdminModerationServiceImplTest {
                 objectMapper = jacksonObjectMapper(),
                 sessionTokenService = sessionTokenService,
                 sessionControlPublisher = sessionControlPublisher,
+                cacheManager = cacheManager,
             ),
             ruleRepository = ruleRepository,
             sanctionRepository = sanctionRepository,
             auditRepository = auditRepository,
             sessionTokenService = sessionTokenService,
             sessionControlPublisher = sessionControlPublisher,
+            userSanctionsCache = userSanctionsCache,
         )
     }
 
@@ -223,6 +246,7 @@ class AdminModerationServiceImplTest {
         val auditRepository: AdminAuditLogRepository,
         val sessionTokenService: SessionTokenService,
         val sessionControlPublisher: SessionControlPublisher,
+        val userSanctionsCache: Cache,
     )
 
     private fun ruleRecord(): ModerationRuleRecord {
