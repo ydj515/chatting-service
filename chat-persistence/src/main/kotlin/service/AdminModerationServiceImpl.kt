@@ -15,6 +15,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import org.springframework.cache.annotation.CacheEvict
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.time.Instant
 
 @Service
 class AdminModerationServiceImpl(
@@ -118,6 +119,11 @@ class AdminModerationServiceImpl(
         }
         if (request.scopeType != ModerationScopeType.ROOM || request.roomId == null) {
             throw IllegalArgumentException("Phase 8.5 supports ROOM scoped sanctions only")
+        }
+        // 만료 시각이 과거/현재면 send 경로(activeSanctionsForUser)에서 절대 적용되지 않으므로 거부한다.
+        val expiresAt = request.expiresAt
+        if (expiresAt != null && !expiresAt.isAfter(Instant.now())) {
+            throw IllegalArgumentException("expiresAt must be in the future")
         }
     }
 

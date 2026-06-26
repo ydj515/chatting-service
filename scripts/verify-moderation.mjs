@@ -2,10 +2,13 @@
 
 const adminBaseUrl = process.env.CHAT_ADMIN_BASE_URL ?? 'http://localhost/api/admin';
 const adminToken = process.env.CHAT_ADMIN_TOKEN ?? 'my-secure-admin-token-change-me';
+const REQUEST_TIMEOUT_MS = 30000;
 
 async function main() {
   const blockedPattern = `phase85-blocked-${Date.now()}`;
-  const unauthorized = await fetch(`${adminBaseUrl}/moderation/rules`);
+  const unauthorized = await fetch(`${adminBaseUrl}/moderation/rules`, {
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
   if (unauthorized.status !== 401) {
     throw new Error(`expected unauthenticated moderation rules request to return 401, got ${unauthorized.status}`);
   }
@@ -34,7 +37,10 @@ async function main() {
 }
 
 async function requestJson(url, init) {
-  const response = await fetch(url, init);
+  const response = await fetch(url, {
+    ...init,
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
   const body = await response.text();
   if (!response.ok) {
     throw new Error(`${init.method ?? 'GET'} ${url} failed with ${response.status}: ${body}`);

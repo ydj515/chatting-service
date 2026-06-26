@@ -8,6 +8,7 @@ import com.chat.domain.dto.ModerationMatchType
 import com.chat.domain.dto.ModerationScopeType
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.cache.annotation.Cacheable
+import org.springframework.dao.EmptyResultDataAccessException
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.jdbc.core.RowMapper
 import org.springframework.stereotype.Repository
@@ -109,22 +110,28 @@ class ModerationRuleJdbcRepository(
     }
 
     fun update(ruleId: Long, request: AdminUpdateModerationRuleRequest): ModerationRuleRecord {
-        return jdbcTemplate.queryForObject(
-            """
-            UPDATE moderation_rules
-            SET pattern = COALESCE(?, pattern),
-                reason = COALESCE(?, reason),
-                enabled = COALESCE(?, enabled),
-                updated_at = now()
-            WHERE id = ?
-            RETURNING id, scope_type, room_id, pattern, match_type, action, reason, enabled, created_by, created_at, updated_at
-            """.trimIndent(),
-            ROW_MAPPER,
-            request.pattern,
-            request.reason,
-            request.enabled,
-            ruleId,
-        ) ?: error("moderation rule not found: $ruleId")
+        // queryForObject는 0행일 때 EmptyResultDataAccessException을 던지므로(null 반환 아님)
+        // 존재하지 않는 ruleId를 명시적으로 not-found 오류로 변환한다.
+        return try {
+            jdbcTemplate.queryForObject(
+                """
+                UPDATE moderation_rules
+                SET pattern = COALESCE(?, pattern),
+                    reason = COALESCE(?, reason),
+                    enabled = COALESCE(?, enabled),
+                    updated_at = now()
+                WHERE id = ?
+                RETURNING id, scope_type, room_id, pattern, match_type, action, reason, enabled, created_by, created_at, updated_at
+                """.trimIndent(),
+                ROW_MAPPER,
+                request.pattern,
+                request.reason,
+                request.enabled,
+                ruleId,
+            )
+        } catch (e: EmptyResultDataAccessException) {
+            null
+        } ?: error("moderation rule not found: $ruleId")
     }
 
     fun disable(ruleId: Long): ModerationRuleRecord {

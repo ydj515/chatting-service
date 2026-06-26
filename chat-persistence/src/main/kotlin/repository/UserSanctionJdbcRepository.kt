@@ -119,12 +119,14 @@ class UserSanctionJdbcRepository(
     }
 
     fun revoke(actor: String, sanctionId: Long): UserSanctionRecord {
+        // revoke를 멱등하게 만든다: 이미 취소된 제재를 다시 호출해도
+        // COALESCE로 최초 취소자/취소 시각(revoked_by, revoked_at)을 보존한다.
         return jdbcTemplate.queryForObject(
             """
             UPDATE user_sanctions
             SET active = false,
-                revoked_by = ?,
-                revoked_at = now()
+                revoked_by = COALESCE(revoked_by, ?),
+                revoked_at = COALESCE(revoked_at, now())
             WHERE id = ?
             RETURNING id, scope_type, room_id, user_id, type, reason, expires_at, active, created_by, created_at, revoked_by, revoked_at
             """.trimIndent(),
