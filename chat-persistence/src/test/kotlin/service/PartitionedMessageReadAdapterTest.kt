@@ -36,9 +36,9 @@ class PartitionedMessageReadAdapterTest {
         assertEquals(false, message.isDeleted)
         assertEquals(123L, message.sequenceNumber)
         assertEquals(123L, message.roomSeq)
-        assertEquals(0, message.streamShard)
+        assertEquals(4, message.streamShard)
         assertEquals(3, message.writeShard)
-        assertEquals(0, message.fanoutShard)
+        assertEquals(5, message.fanoutShard)
     }
 
     @Test
@@ -60,7 +60,9 @@ class PartitionedMessageReadAdapterTest {
             clientMessageId = "client-123",
             roomId = 10L,
             roomSeq = 123L,
+            streamShard = 4,
             writeShard = 3,
+            fanoutShard = 5,
             senderId = 7L,
             senderUsername = "user7",
             senderDisplayName = "User 7",

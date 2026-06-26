@@ -3,6 +3,8 @@ package com.chat.persistence.repository
 import com.chat.persistence.service.RoomHeatPolicy
 import com.chat.persistence.service.RoomPolicyRepository
 import org.springframework.beans.factory.annotation.Qualifier
+import org.springframework.cache.annotation.CacheEvict
+import org.springframework.cache.annotation.Caching
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
 
@@ -12,6 +14,12 @@ class RoomPolicyJdbcRepository(
     private val jdbcTemplate: JdbcTemplate,
 ) : RoomPolicyRepository {
 
+    @Caching(
+        evict = [
+            CacheEvict(value = ["roomAdmissionPolicies"], key = "#policy.roomId"),
+            CacheEvict(value = ["roomShardConfigs"], key = "#policy.roomId"),
+        ],
+    )
     override fun applyAutomaticPolicy(policy: RoomHeatPolicy) {
         jdbcTemplate.update(
             UPSERT_AUTOMATIC_POLICY_SQL,

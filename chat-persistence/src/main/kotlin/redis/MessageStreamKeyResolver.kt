@@ -13,7 +13,7 @@ class MessageStreamKeyResolver(
     )
 
     fun roomStreamKey(roomId: Long, streamShard: Int): String {
-        return "${redisProperties.streams.roomStreamKeyPrefix}$roomId:shard:$streamShard"
+        return "${redisProperties.streams.roomStreamKeyPrefix}{$roomId}:shard:$streamShard"
     }
 
     fun knownStreamsKey(): String = redisProperties.streams.knownStreamsKey
@@ -22,19 +22,29 @@ class MessageStreamKeyResolver(
         return "${redisProperties.streams.deadLetterStreamKeyPrefix}$consumerGroup"
     }
 
+    fun streamReadGroupKey(streamKey: String): String {
+        val parsed = parseRoomStreamKey(streamKey)
+        return if (parsed != null) {
+            "room:${parsed.roomId}"
+        } else {
+            "stream:$streamKey"
+        }
+    }
+
     fun parseRoomStreamKey(streamKey: String): RoomStreamKey? {
         if (!streamKey.startsWith(redisProperties.streams.roomStreamKeyPrefix)) {
             return null
         }
 
         val suffix = streamKey.removePrefix(redisProperties.streams.roomStreamKeyPrefix)
-        val parts = suffix.split(":shard:", limit = 2)
-        if (parts.size != 2) {
-            return null
-        }
-
-        val roomId = parts[0].toLongOrNull() ?: return null
-        val streamShard = parts[1].toIntOrNull() ?: return null
+        val match = HASH_TAGGED_PATTERN.matchEntire(suffix) ?: LEGACY_PATTERN.matchEntire(suffix) ?: return null
+        val roomId = match.groupValues[1].toLongOrNull() ?: return null
+        val streamShard = match.groupValues[2].toIntOrNull() ?: return null
         return RoomStreamKey(roomId = roomId, streamShard = streamShard)
+    }
+
+    private companion object {
+        val HASH_TAGGED_PATTERN = Regex("""\{(\d+)}:shard:(\d+)""")
+        val LEGACY_PATTERN = Regex("""(\d+):shard:(\d+)""")
     }
 }

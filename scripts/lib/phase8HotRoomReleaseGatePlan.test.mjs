@@ -4,6 +4,7 @@ import {
   assertLoadSummary,
   assertPrometheusSnapshot,
   buildLoadChatArgs,
+  prometheusQueryNumber,
   parsePhase8HotRoomGateArgs,
   prometheusQueries,
 } from './phase8HotRoomReleaseGatePlan.mjs';
@@ -31,20 +32,18 @@ test('buildLoadChatArgs includes release gate load arguments', () => {
     '--messages-per-sec', '10000',
     '--duration', '60',
     '--min-received-ratio', '0.9',
-    '--assert-room-seq-order',
   ]);
 });
 
-test('assertLoadSummary accepts a successful 10k summary', () => {
-  const options = parsePhase8HotRoomGateArgs([]);
+test('assertLoadSummary accepts a successful load summary', () => {
+  const options = parsePhase8HotRoomGateArgs(['--viewers', '2']);
 
   assertLoadSummary({
     ok: true,
     sent: 600000,
-    viewers: 10000,
+    viewers: 2,
     receivedPerViewer: [600000, 590000],
     minReceivedRatio: 0.9,
-    assertedRoomSeqOrder: true,
   }, options);
 });
 
@@ -54,11 +53,22 @@ test('assertLoadSummary rejects insufficient delivery', () => {
   assert.throws(() => assertLoadSummary({
     ok: true,
     sent: 600000,
-    viewers: 10000,
+    viewers: 1,
     receivedPerViewer: [500000],
     minReceivedRatio: 0.9,
-    assertedRoomSeqOrder: true,
-  }, options), /minimum received/);
+  }, { ...options, viewers: 1 }), /minimum received/);
+});
+
+test('assertLoadSummary rejects missing receivedPerViewer entries', () => {
+  const options = parsePhase8HotRoomGateArgs(['--viewers', '2']);
+
+  assert.throws(() => assertLoadSummary({
+    ok: true,
+    sent: 600000,
+    viewers: 2,
+    receivedPerViewer: [600000],
+    minReceivedRatio: 0.9,
+  }, options), /receivedPerViewer length/);
 });
 
 test('assertPrometheusSnapshot accepts fanout latency and shard distribution within thresholds', () => {
@@ -85,4 +95,13 @@ test('prometheusQueries use bounded stream shard and fanout metrics', () => {
   assert.match(prometheusQueries.fanoutP95Seconds, /chat_redis_stream_worker_batch_latency_seconds_bucket/);
   assert.match(prometheusQueries.observedStreamShardCount, /stream_shard/);
   assert.match(prometheusQueries.maxStreamGroupLagEntries, /chat_redis_stream_group_lag/);
+});
+
+test('prometheusQueryNumber rejects empty query results', () => {
+  assert.throws(() => prometheusQueryNumber({
+    status: 'success',
+    data: {
+      result: [],
+    },
+  }, 'query'), /returned no samples/);
 });

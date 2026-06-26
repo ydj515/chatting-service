@@ -454,7 +454,7 @@ class ChatServiceImplMessageContractTest {
         envelopes.forEach { envelope ->
             assertTrue(envelope.writeShard in 0..3)
         }
-        assertEquals(listOf(10L, 10L), shardReader.requestedRoomIds)
+        assertEquals(listOf(10L, 10L), shardReader.shardConfigRoomIds)
     }
 
 
@@ -595,15 +595,14 @@ class ChatServiceImplMessageContractTest {
     private class FixedRoomStorageConfigReader(
         private val config: RoomShardConfig,
     ) : RoomStorageConfigReader {
-        val requestedRoomIds = mutableListOf<Long>()
+        val shardConfigRoomIds = mutableListOf<Long>()
 
         override fun currentShardCount(roomId: Long): Int {
-            requestedRoomIds += roomId
-            return config.writeShardCount
+            error("sendMessage must read shardConfig(roomId), not currentShardCount(roomId)")
         }
 
         override fun shardConfig(roomId: Long): RoomShardConfig {
-            requestedRoomIds += roomId
+            shardConfigRoomIds += roomId
             return config
         }
     }

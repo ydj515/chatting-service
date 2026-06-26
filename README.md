@@ -77,6 +77,8 @@ Phase 8.4 hot room shard 분산 release gate:
 CHAT_PROMETHEUS_URL=http://localhost:9090 node scripts/phase8-hot-room-release-gate.mjs
 ```
 
+10,000 viewer gate를 실행할 때는 backend 시작 전 `CHAT_AUTH_WEB_SOCKET_TICKET_RATE_LIMIT_PER_IP`를 viewer 수 이상으로 설정해야 합니다.
+
 종료:
 ```bash
 mise run stop

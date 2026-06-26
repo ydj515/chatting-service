@@ -136,6 +136,8 @@ node scripts/phase8-hot-room-release-gate.mjs
 
 이 명령은 `scripts/load-chat.mjs`로 10,000 msg/sec 60초 부하를 생성하고, Prometheus에서 fanout p95, stream shard 관측 수, Redis Streams group lag를 조회해 threshold를 넘으면 실패한다.
 
+10,000 viewer gate는 같은 client IP에서 WebSocket ticket을 대량 발급하므로, backend를 시작하기 전에 `CHAT_AUTH_WEB_SOCKET_TICKET_RATE_LIMIT_PER_IP`를 viewer 수 이상으로 올리거나 부하 발생 IP를 분산해야 한다.
+
 ## 로드 밸런싱
 
 Nginx는 역할별 upstream으로 트래픽을 분리합니다.

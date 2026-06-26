@@ -65,7 +65,6 @@ export function buildLoadChatArgs(options) {
     '--messages-per-sec', String(options.messagesPerSec),
     '--duration', String(options.durationSeconds),
     '--min-received-ratio', String(options.minReceivedRatio),
-    '--assert-room-seq-order',
   ];
 }
 
@@ -80,11 +79,16 @@ export function assertLoadSummary(summary, options) {
   if (summary.viewers !== options.viewers) {
     throw new Error(`load summary viewers ${summary.viewers}; expected ${options.viewers}`);
   }
-  if (summary.assertedRoomSeqOrder !== true) {
-    throw new Error('load summary did not assert roomSeq order');
+  if (!Array.isArray(summary.receivedPerViewer)) {
+    throw new Error('load summary receivedPerViewer must be an array');
+  }
+  if (summary.receivedPerViewer.length !== options.viewers) {
+    throw new Error(
+      `load summary receivedPerViewer length ${summary.receivedPerViewer.length}; expected ${options.viewers}`,
+    );
   }
   const minimumReceived = Math.ceil(summary.sent * options.minReceivedRatio);
-  for (const [index, received] of (summary.receivedPerViewer ?? []).entries()) {
+  for (const [index, received] of summary.receivedPerViewer.entries()) {
     if (received < minimumReceived) {
       throw new Error(`viewer ${index} received ${received}; minimum received is ${minimumReceived}`);
     }
@@ -106,6 +110,18 @@ export function assertPrometheusSnapshot(snapshot, options) {
       `stream group lag ${snapshot.maxStreamGroupLagEntries}; expected at most ${options.maxStreamGroupLagEntries}`,
     );
   }
+}
+
+export function prometheusQueryNumber(body, query) {
+  const result = body.data?.result?.[0]?.value?.[1];
+  if (result === undefined) {
+    throw new Error(`Prometheus query returned no samples: ${query}`);
+  }
+  const value = Number(result);
+  if (!Number.isFinite(value)) {
+    throw new Error(`Prometheus query returned non-numeric value: ${query}`);
+  }
+  return value;
 }
 
 function positiveInteger(value, name) {

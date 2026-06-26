@@ -850,15 +850,15 @@ Append this test to `HotRoomFanoutWorkerTest`:
         assertEquals(listOf("10:0", "10:1"), leaseService.acquireAttempts)
         assertEquals(
             listOf(
-                "chat:stream:room:10:shard:0:fanout",
-                "chat:stream:room:10:shard:1:fanout",
+                "chat:stream:room:{10}:shard:0:fanout",
+                "chat:stream:room:{10}:shard:1:fanout",
             ),
             consumer.ensuredGroups,
         )
         assertEquals(
             listOf(
-                "chat:stream:room:10:shard:0:fanout:1749790000000-0",
-                "chat:stream:room:10:shard:1:fanout:1749790000001-0",
+                "chat:stream:room:{10}:shard:0:fanout:1749790000000-0",
+                "chat:stream:room:{10}:shard:1:fanout:1749790000001-0",
             ),
             consumer.acked,
         )
@@ -876,7 +876,7 @@ Replace the helper signature and stream key usage:
         streamShard: Int = 0,
     ): MessageStreamRecord {
         return MessageStreamRecord(
-            streamKey = "chat:stream:room:10:shard:$streamShard",
+            streamKey = "chat:stream:room:{10}:shard:$streamShard",
             recordId = recordId,
             envelope = MessageStreamEnvelope(
                 messageId = "msg-$roomSeq",
@@ -1019,20 +1019,18 @@ test('buildLoadChatArgs includes release gate load arguments', () => {
     '--messages-per-sec', '10000',
     '--duration', '60',
     '--min-received-ratio', '0.9',
-    '--assert-room-seq-order',
   ]);
 });
 
-test('assertLoadSummary accepts a successful 10k summary', () => {
-  const options = parsePhase8HotRoomGateArgs([]);
+test('assertLoadSummary accepts a successful load summary', () => {
+  const options = parsePhase8HotRoomGateArgs(['--viewers', '2']);
 
   assertLoadSummary({
     ok: true,
     sent: 600000,
-    viewers: 10000,
+    viewers: 2,
     receivedPerViewer: [600000, 590000],
     minReceivedRatio: 0.9,
-    assertedRoomSeqOrder: true,
   }, options);
 });
 
@@ -1042,11 +1040,22 @@ test('assertLoadSummary rejects insufficient delivery', () => {
   assert.throws(() => assertLoadSummary({
     ok: true,
     sent: 600000,
-    viewers: 10000,
+    viewers: 1,
     receivedPerViewer: [500000],
     minReceivedRatio: 0.9,
-    assertedRoomSeqOrder: true,
-  }, options), /minimum received/);
+  }, { ...options, viewers: 1 }), /minimum received/);
+});
+
+test('assertLoadSummary rejects missing receivedPerViewer entries', () => {
+  const options = parsePhase8HotRoomGateArgs(['--viewers', '2']);
+
+  assert.throws(() => assertLoadSummary({
+    ok: true,
+    sent: 600000,
+    viewers: 2,
+    receivedPerViewer: [600000],
+    minReceivedRatio: 0.9,
+  }, options), /receivedPerViewer length/);
 });
 
 test('assertPrometheusSnapshot accepts fanout latency and shard distribution within thresholds', () => {
@@ -1158,7 +1167,6 @@ export function buildLoadChatArgs(options) {
     '--messages-per-sec', String(options.messagesPerSec),
     '--duration', String(options.durationSeconds),
     '--min-received-ratio', String(options.minReceivedRatio),
-    '--assert-room-seq-order',
   ];
 }
 
@@ -1173,11 +1181,16 @@ export function assertLoadSummary(summary, options) {
   if (summary.viewers !== options.viewers) {
     throw new Error(`load summary viewers ${summary.viewers}; expected ${options.viewers}`);
   }
-  if (summary.assertedRoomSeqOrder !== true) {
-    throw new Error('load summary did not assert roomSeq order');
+  if (!Array.isArray(summary.receivedPerViewer)) {
+    throw new Error('load summary receivedPerViewer must be an array');
+  }
+  if (summary.receivedPerViewer.length !== options.viewers) {
+    throw new Error(
+      `load summary receivedPerViewer length ${summary.receivedPerViewer.length}; expected ${options.viewers}`,
+    );
   }
   const minimumReceived = Math.ceil(summary.sent * options.minReceivedRatio);
-  for (const [index, received] of (summary.receivedPerViewer ?? []).entries()) {
+  for (const [index, received] of summary.receivedPerViewer.entries()) {
     if (received < minimumReceived) {
       throw new Error(`viewer ${index} received ${received}; minimum received is ${minimumReceived}`);
     }

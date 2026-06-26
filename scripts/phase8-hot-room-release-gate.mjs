@@ -5,6 +5,7 @@ import {
   assertPrometheusSnapshot,
   buildLoadChatArgs,
   parsePhase8HotRoomGateArgs,
+  prometheusQueryNumber,
   prometheusQueries,
 } from './lib/phase8HotRoomReleaseGatePlan.mjs';
 
@@ -57,10 +58,15 @@ function runProcess(command, args) {
 }
 
 async function readPrometheusSnapshot(prometheusUrl) {
+  const [fanoutP95Seconds, observedStreamShardCount, maxStreamGroupLagEntries] = await Promise.all([
+    queryPrometheusNumber(prometheusUrl, prometheusQueries.fanoutP95Seconds),
+    queryPrometheusNumber(prometheusUrl, prometheusQueries.observedStreamShardCount),
+    queryPrometheusNumber(prometheusUrl, prometheusQueries.maxStreamGroupLagEntries),
+  ]);
   return {
-    fanoutP95Seconds: await queryPrometheusNumber(prometheusUrl, prometheusQueries.fanoutP95Seconds),
-    observedStreamShardCount: await queryPrometheusNumber(prometheusUrl, prometheusQueries.observedStreamShardCount),
-    maxStreamGroupLagEntries: await queryPrometheusNumber(prometheusUrl, prometheusQueries.maxStreamGroupLagEntries),
+    fanoutP95Seconds,
+    observedStreamShardCount,
+    maxStreamGroupLagEntries,
   };
 }
 
@@ -72,12 +78,7 @@ async function queryPrometheusNumber(prometheusUrl, query) {
   if (!response.ok || body.status !== 'success') {
     throw new Error(`Prometheus query failed: ${query}`);
   }
-  const result = body.data?.result?.[0]?.value?.[1];
-  const value = Number(result ?? 0);
-  if (!Number.isFinite(value)) {
-    throw new Error(`Prometheus query returned non-numeric value: ${query}`);
-  }
-  return value;
+  return prometheusQueryNumber(body, query);
 }
 
 main().catch((error) => {

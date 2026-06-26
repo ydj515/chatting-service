@@ -8,6 +8,7 @@ import org.mockito.ArgumentCaptor
 import org.mockito.ArgumentMatchers.eq
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
+import org.springframework.cache.annotation.Caching
 import org.springframework.jdbc.core.JdbcTemplate
 
 class RoomPolicyJdbcRepositoryTest {
@@ -52,5 +53,16 @@ class RoomPolicyJdbcRepositoryTest {
         assertTrue(sqlCaptor.value.contains("GREATEST(room_storage_configs.fanout_shard_count, EXCLUDED.fanout_shard_count)"))
         assertTrue(sqlCaptor.value.contains("auto_policy_enabled"))
         assertTrue(sqlCaptor.value.contains("WHERE room_storage_configs.auto_policy_enabled = true"))
+    }
+
+    @Test
+    fun `automatic heat policy 적용 후 admission과 shard config cache를 evict한다`() {
+        val method = RoomPolicyJdbcRepository::class.java.getMethod("applyAutomaticPolicy", RoomHeatPolicy::class.java)
+
+        val caching = method.getAnnotation(Caching::class.java)
+        val evictedCaches = caching.evict.flatMap { it.cacheNames.toList() + it.value.toList() }
+
+        assertTrue(evictedCaches.contains("roomAdmissionPolicies"))
+        assertTrue(evictedCaches.contains("roomShardConfigs"))
     }
 }

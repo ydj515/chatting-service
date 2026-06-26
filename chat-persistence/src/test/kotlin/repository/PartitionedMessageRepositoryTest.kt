@@ -51,11 +51,13 @@ class PartitionedMessageRepositoryTest {
         verify(preparedStatement).setString(2, "client-1")
         verify(preparedStatement).setLong(3, 10L)
         verify(preparedStatement).setLong(4, 11L)
-        verify(preparedStatement).setInt(5, 1)
-        verify(preparedStatement).setLong(6, 7L)
-        verify(preparedStatement).setString(7, MessageType.TEXT.name)
-        verify(preparedStatement).setString(8, "hello")
-        verify(preparedStatement).setTimestamp(9, Timestamp.valueOf(LocalDateTime.parse("2026-06-13T12:00:00")))
+        verify(preparedStatement).setInt(5, 0)
+        verify(preparedStatement).setInt(6, 1)
+        verify(preparedStatement).setInt(7, 2)
+        verify(preparedStatement).setLong(8, 7L)
+        verify(preparedStatement).setString(9, MessageType.TEXT.name)
+        verify(preparedStatement).setString(10, "hello")
+        verify(preparedStatement).setTimestamp(11, Timestamp.valueOf(LocalDateTime.parse("2026-06-13T12:00:00")))
     }
 
     private fun writeRequest(messageId: String): MessageWriteRequest {

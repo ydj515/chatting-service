@@ -21,6 +21,7 @@ dependencies {
     // Redis 캐시 및 Pub/Sub
     implementation(libs.spring.boot.starter.data.redis)
     implementation(libs.spring.boot.starter.cache)
+    implementation(libs.spring.boot.starter.validation)
 
     // WebSocket (WebSocketSessionManager에서 사용)
     implementation(libs.spring.boot.starter.websocket)
