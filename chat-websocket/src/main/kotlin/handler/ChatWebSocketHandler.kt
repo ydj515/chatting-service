@@ -14,6 +14,7 @@ import org.slf4j.LoggerFactory
 import org.springframework.data.domain.PageRequest
 import org.springframework.stereotype.Component
 import org.springframework.web.socket.CloseStatus
+import org.springframework.web.socket.PongMessage
 import org.springframework.web.socket.TextMessage
 import org.springframework.web.socket.WebSocketHandler
 import org.springframework.web.socket.WebSocketMessage
@@ -51,9 +52,14 @@ class ChatWebSocketHandler(
         val userId = getUserIdFromSession(session) ?: return
 
         try {
+            sessionManager.recordSessionActivity(session)
             when (message) {
                 is TextMessage -> {
                     handleTextMessage(session, userId, message.payload)
+                }
+
+                is PongMessage -> {
+                    logger.debug("Received heartbeat pong from user $userId")
                 }
 
                 else -> {

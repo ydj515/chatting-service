@@ -13,11 +13,15 @@ import org.slf4j.LoggerFactory
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.stereotype.Service
 import org.springframework.web.socket.CloseStatus
+import org.springframework.web.socket.PingMessage
 import org.springframework.web.socket.TextMessage
 import org.springframework.web.socket.WebSocketSession
 import org.springframework.web.socket.handler.ConcurrentWebSocketSessionDecorator
+import java.nio.ByteBuffer
+import java.time.Clock
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executor
+import java.util.concurrent.atomic.AtomicLong
 
 @Service
 class WebSocketSessionManager(
@@ -31,6 +35,7 @@ class WebSocketSessionManager(
     private val outboundExecutor: Executor,
     private val gatewayMetrics: WebSocketGatewayMetrics = WebSocketGatewayMetrics.Noop,
     private val sessionControlBroker: RedisSessionControlBroker? = null,
+    private val clock: Clock = Clock.systemUTC(),
 ) {
     private val logger = LoggerFactory.getLogger(WebSocketSessionManager::class.java)
 
@@ -81,11 +86,14 @@ class WebSocketSessionManager(
             gatewayProperties.outboundSendTimeLimitMillis,
             gatewayProperties.outboundSendBufferSizeLimitBytes,
         )
+        val nowMillis = clock.millis()
 
         val sessionRef = SessionRef(
             userId = userId,
             session = outboundSession,
             roomIds = ConcurrentHashMap.newKeySet(),
+            lastActivityAtMillis = AtomicLong(nowMillis),
+            lastHeartbeatSentAtMillis = AtomicLong(nowMillis),
             outboundQueue = BoundedOutboundSessionQueue(
                 maxPendingMessages = gatewayProperties.outboundQueueMaxPendingMessages,
                 executor = outboundExecutor,
@@ -113,6 +121,43 @@ class WebSocketSessionManager(
         )
         sessionsById[session.id] = sessionRef
         addSessionIdToUser(userId, session.id)
+    }
+
+    fun recordSessionActivity(session: WebSocketSession) {
+        recordSessionActivity(session, clock.millis())
+    }
+
+    fun recordSessionActivity(session: WebSocketSession, nowMillis: Long) {
+        sessionsById[session.id]?.lastActivityAtMillis?.set(nowMillis)
+    }
+
+    fun pollHeartbeats() {
+        pollHeartbeats(clock.millis())
+    }
+
+    fun pollHeartbeats(nowMillis: Long) {
+        if (!gatewayProperties.heartbeatEnabled) {
+            return
+        }
+
+        sessionsById.values.forEach { sessionRef ->
+            val session = sessionRef.session
+            if (!session.isOpen) {
+                removeSession(sessionRef.userId, session)
+                return@forEach
+            }
+
+            if (nowMillis - sessionRef.lastActivityAtMillis.get() > gatewayProperties.heartbeatTimeoutMillis) {
+                logger.warn("Closing session ${session.id} because heartbeat timed out")
+                closeSession(session, HEARTBEAT_TIMEOUT_STATUS)
+                removeSession(sessionRef.userId, session)
+                return@forEach
+            }
+
+            if (nowMillis - sessionRef.lastHeartbeatSentAtMillis.get() >= gatewayProperties.heartbeatIntervalMillis) {
+                sendHeartbeat(sessionRef, nowMillis)
+            }
+        }
     }
 
     fun removeSession(userId: Long, session: WebSocketSession) {
@@ -281,8 +326,21 @@ class WebSocketSessionManager(
         val userId: Long,
         val session: WebSocketSession,
         val roomIds: MutableSet<Long>,
+        val lastActivityAtMillis: AtomicLong,
+        val lastHeartbeatSentAtMillis: AtomicLong,
         val outboundQueue: BoundedOutboundSessionQueue,
     )
+
+    private fun sendHeartbeat(sessionRef: SessionRef, nowMillis: Long) {
+        try {
+            sessionRef.session.sendMessage(PingMessage(ByteBuffer.allocate(0)))
+            sessionRef.lastHeartbeatSentAtMillis.set(nowMillis)
+        } catch (e: Exception) {
+            logger.debug("Failed to send heartbeat ping to WebSocket session ${sessionRef.session.id}", e)
+            closeSession(sessionRef.session, HEARTBEAT_TIMEOUT_STATUS)
+            removeSession(sessionRef.userId, sessionRef.session)
+        }
+    }
 
     private fun serverRoomKey(serverId: String): String {
         return "${redisProperties.serverRoomsKeyPrefix}$serverId"
@@ -301,5 +359,6 @@ class WebSocketSessionManager(
     private companion object {
         val OUTBOUND_QUEUE_FULL_STATUS = CloseStatus(1013, "Outbound queue full")
         val SESSION_REVOKED_STATUS = CloseStatus(4003, "Session revoked")
+        val HEARTBEAT_TIMEOUT_STATUS = CloseStatus(4004, "Heartbeat timeout")
     }
 }

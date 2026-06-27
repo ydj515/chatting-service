@@ -1945,11 +1945,11 @@ node scripts/load-chat.mjs --room hot --viewers 10000 --messages-per-sec 10000 -
 - `HmacSessionTokenService`는 현재 TTL 만료만 검증한다. 로그아웃/제재/유출 시 즉시 무효화하는 revocation 경로(Redis 기반 denylist 또는 token version)를 추가한다.
 - 강제 로그아웃, 서명 키 롤오버, refresh 정책을 추가한다. WebSocket one-time ticket의 기반이 되는 session token 수명 관리를 강화한다.
 
-8.7 생존성 보강 (MAXLEN/gap audit 이번 PR, heartbeat 후속 PR)
+8.7 생존성 보강 (MAXLEN/gap audit, heartbeat)
 
 - Redis Streams append에 `MAXLEN`(기본 approximate trim)을 적용해 HPA 지연이나 worker 정체 시 Redis OOM을 방지한다. 유실을 감수하는 대신 Redis lag/memory metric과 `roomSeq` gap audit metric으로 경보한다.
 - `roomSeq` gap audit job을 추가한다. canonical store의 `(room_id, room_seq)`를 스캔해 비어 있는 sequence를 aggregate metric으로 노출한다. MAXLEN trim이나 장애로 유실이 생겨도 감지 수단이 있어야 한다.
-- WebSocket heartbeat(ping-pong)는 다음 작은 PR에서 명시적으로 구현한다. 일정 시간 내 pong/메시지가 없는 zombie connection을 강제 종료해 File Descriptor와 메모리를 회수하는 범위는 이번 PR에 포함하지 않는다.
+- WebSocket heartbeat(ping-pong)는 본 PR에서 구현한다. 일정 시간 내 pong/메시지가 없는 zombie connection을 강제 종료해 File Descriptor와 메모리를 회수한다.
 
 이번 Phase에서 하지 않을 것:
 
@@ -1982,7 +1982,7 @@ node scripts/load-chat.mjs --room hot --viewers 10000 --messages-per-sec 10000 -
 - hot room shard 분산이 적용되어 10,000 msg/sec를 60초 이상 유지하고, 단일 owner 병목 없이 fanout p95가 기준을 만족한다.
 - WebSocket이 `wss://`로 동작하고, Redis AUTH와 시크릿 외부화가 적용된다.
 - 로그아웃/제재 시 토큰이 즉시 무효화되고 키 롤오버가 가능하다.
-- Streams `MAXLEN`이 적용되고, `roomSeq` gap audit가 유실 구간을 aggregate metric으로 감지한다. heartbeat의 zombie connection 회수는 다음 PR의 완료 기준으로 둔다.
+- Streams `MAXLEN`이 적용되고, `roomSeq` gap audit가 유실 구간을 aggregate metric으로 감지한다. WebSocket heartbeat는 zombie connection을 timeout close로 회수한다.
 
 검증:
 
@@ -2004,7 +2004,7 @@ node scripts/load-chat.mjs --room hot --viewers 10000 --messages-per-sec 10000 -
 > 주의사항
 > - 관측 파이프라인 없이 토대만 채우면 release gate를 형식 통과시키는 Phase 7의 함정을 그대로 반복한다. 8.1을 반드시 먼저 끝낸다.
 > - Redis Cluster는 가용성을 주지만, 단일 key Lua script 제약과 hot room slot skew를 함께 본다. very hot room 하나가 특정 slot을 압박할 수 있다.
-> - `MAXLEN` trim은 유실을 감수하는 backpressure다. gap audit와 alert가 없으면 유실을 감지하지 못하므로 MAXLEN과 gap audit은 이번 PR에서 함께 완료한다. heartbeat는 독립 후속 PR로 검증한다.
+> - `MAXLEN` trim은 유실을 감수하는 backpressure다. gap audit와 alert가 없으면 유실을 감지하지 못하므로 MAXLEN과 gap audit은 함께 운영한다. heartbeat는 독립 PR로 검증해 zombie connection 회수만 담당한다.
 > - 모든 토대는 Compose 한정 자산이 아니라 K8s 재사용 가능한 형태(S3 추상화, Cluster 전제, 엣지 TLS)로 만든다. 그래야 Phase 9에서 재작성이 아니라 배포 계층 교체로 끝난다.
 
 ### Phase 8.5. Moderation과 사용자 제재
@@ -2149,7 +2149,7 @@ mise run verify:pitr-restore
 | Phase 5 | admin history/search/export, audit log, 1천만건 seed | `chat-admin`, `chat-admin-application`, `chat-persistence`, `admin-web 또는 client` |
 | Phase 6 | Redis TTL fanout owner lease, hot room heat classifier, bounded live feed override, rate limit/slow mode | `chat-domain`, `chat-persistence`, `chat-admin`, `chat-websocket`, `client` |
 | Phase 7 | load/chaos/observability/release gate, fanout owner takeover metric semantics 정합성 검증 | `scripts`, `docs`, observability config |
-| Phase 8 | 관측 파이프라인+Gateway metric, Redis Cluster HA, Object Storage/cold archive, shard 분산+10k gate, TLS/wss, 토큰 revocation, MAXLEN/gap audit, heartbeat 후속 PR | `build.gradle.kts`, `docker-compose.yml`, `infra/prometheus`, `infra/grafana`, `infra/redis`, `infra/nginx`, `chat-persistence` |
+| Phase 8 | 관측 파이프라인+Gateway metric, Redis Cluster HA, Object Storage/cold archive, shard 분산+10k gate, TLS/wss, 토큰 revocation, MAXLEN/gap audit, heartbeat | `build.gradle.kts`, `docker-compose.yml`, `infra/prometheus`, `infra/grafana`, `infra/redis`, `infra/nginx`, `chat-persistence`, `chat-websocket` |
 | Phase 8.5 | moderation 필터, ban/mute/suspend 제재, audit 연계 | `chat-domain`, `chat-persistence`, `chat-admin` |
 | Phase 9 | Kubernetes 전환(Deployment/HPA/Ingress), Redis Operator, cert-manager, hot room 전용 Gateway pool, DR/백업(PITR/RTO/RPO) | 신규 `k8s` 또는 `helm`, DR runbook |
 
