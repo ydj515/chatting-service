@@ -120,6 +120,9 @@ Redis Cluster node의 host port는 `127.0.0.1`에만 bind한다. Cluster discove
 | `CHAT_CACHE_ROOM_SHARD_CONFIGS_TTL` | `10s` | 메시지 수락 경로가 읽는 `room_storage_configs.current_shard_count/fanout_shard_count` cache TTL |
 | `CHAT_CACHE_MODERATION_RULES_TTL` | `10s` | 메시지 수락 전 `GLOBAL + ROOM` moderation rule cache TTL. admin rule 변경 시 cache를 evict |
 | `CHAT_CACHE_USER_SANCTIONS_TTL` | `10s` | 메시지 수락 전 room scoped user sanction cache TTL. sanction 생성/해제 시 관련 cache를 evict |
+| `CHAT_AUTH_SESSION_REVOCATION_KEY_PREFIX` | `chat:auth:session:revoked:` | Redis session revocation key prefix. token 원문 대신 hash key를 저장 |
+| `CHAT_AUTH_SESSION_USER_REVOCATION_GRACE_TTL` | `1h` | user-wide revocation marker를 session TTL 이후 추가로 유지하는 시간 |
+| `CHAT_AUTH_SESSION_CONTROL_TOPIC` | `chat.session.control` | 분산 WebSocket force logout을 전달하는 Redis pub/sub topic |
 | `CHAT_ROOM_POLICY_HOT_MESSAGES_PER_SECOND` | `1000` | room heat `HOT` 전환 초당 메시지 임계값 |
 | `CHAT_ROOM_POLICY_VERY_HOT_MESSAGES_PER_SECOND` | `5000` | room heat `VERY_HOT` 전환 초당 메시지 또는 1분 p95 임계값 |
 | `CHAT_ROOM_POLICY_HOT_SHARD_COUNT` | `16` | `HOT` 방으로 자동 승격될 때 적용하는 `current_shard_count`와 `fanout_shard_count` 목표값. 자동 정책은 기존 값보다 작게 줄이지 않음 |

@@ -9,6 +9,7 @@ import com.chat.persistence.repository.ChatRoomMemberRepository
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
 import com.fasterxml.jackson.module.kotlin.KotlinModule
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentMatchers.any
 import org.mockito.ArgumentMatchers.anyLong
@@ -22,6 +23,7 @@ import org.springframework.data.redis.connection.DefaultMessage
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.data.redis.core.SetOperations
 import org.springframework.data.redis.listener.RedisMessageListenerContainer
+import org.springframework.web.socket.CloseStatus
 import org.springframework.web.socket.TextMessage
 import org.springframework.web.socket.WebSocketSession
 import java.time.LocalDateTime
@@ -114,6 +116,23 @@ class WebSocketSessionManagerTest {
         verify(sessionInRoom).sendMessage(any(TextMessage::class.java))
         verify(sessionOutsideRoom, never()).sendMessage(any(TextMessage::class.java))
         verify(chatRoomMemberRepository, never()).existsByChatRoomIdAndUserIdAndIsActiveTrue(anyLong(), anyLong())
+    }
+
+    @Test
+    fun `force logout은 대상 user의 local session만 닫고 인덱스에서 제거한다`() {
+        val chatRoomMemberRepository = mock(ChatRoomMemberRepository::class.java)
+        val targetSession = session("target-session")
+        val otherSession = session("other-session")
+        val manager = sessionManager(chatRoomMemberRepository)
+
+        manager.addSession(7L, targetSession)
+        manager.addSession(8L, otherSession)
+
+        manager.closeSessionsForUser(7L)
+
+        verify(targetSession).close(any(CloseStatus::class.java))
+        verify(otherSession, never()).close(any(CloseStatus::class.java))
+        assertFalse(manager.sendTextToSession(targetSession, """{"type":"PING"}"""))
     }
 
     private fun session(id: String): WebSocketSession {

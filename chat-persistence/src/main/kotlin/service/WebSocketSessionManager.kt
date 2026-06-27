@@ -30,6 +30,7 @@ class WebSocketSessionManager(
     @Qualifier("webSocketOutboundExecutor")
     private val outboundExecutor: Executor,
     private val gatewayMetrics: WebSocketGatewayMetrics = WebSocketGatewayMetrics.Noop,
+    private val sessionControlBroker: RedisSessionControlBroker? = null,
 ) {
     private val logger = LoggerFactory.getLogger(WebSocketSessionManager::class.java)
 
@@ -51,6 +52,9 @@ class WebSocketSessionManager(
                 }
                 RedisMessageBroker.MembershipAction.LEAVE -> leaveRoom(event.userId, event.roomId)
             }
+        }
+        sessionControlBroker?.setLocalForceLogoutHandler { userId, _ ->
+            closeSessionsForUser(userId)
         }
 
         gatewayMetrics.registerGauges(
@@ -191,6 +195,13 @@ class WebSocketSessionManager(
         return openSessionRefsForUser(userId).isNotEmpty()
     }
 
+    fun closeSessionsForUser(userId: Long, closeStatus: CloseStatus = SESSION_REVOKED_STATUS) {
+        openSessionRefsForUser(userId).forEach { sessionRef ->
+            closeSession(sessionRef.session, closeStatus)
+            removeSession(sessionRef.userId, sessionRef.session)
+        }
+    }
+
     private fun openSessionRefsForUser(userId: Long): List<SessionRef> {
         val sessionIds = sessionIdsByUserId[userId]?.toList() ?: return emptyList()
         val sessionRefs = mutableListOf<SessionRef>()
@@ -289,5 +300,6 @@ class WebSocketSessionManager(
 
     private companion object {
         val OUTBOUND_QUEUE_FULL_STATUS = CloseStatus(1013, "Outbound queue full")
+        val SESSION_REVOKED_STATUS = CloseStatus(4003, "Session revoked")
     }
 }

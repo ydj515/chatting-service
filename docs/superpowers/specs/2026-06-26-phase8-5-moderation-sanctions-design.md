@@ -110,7 +110,7 @@ CREATE TABLE IF NOT EXISTS user_sanctions (
         (scope_type = 'ROOM' AND room_id IS NOT NULL) OR
         (scope_type = 'GLOBAL' AND room_id IS NULL)
     ),
-    CONSTRAINT ck_user_sanctions_type CHECK (type IN ('MUTE', 'BAN', 'SUSPEND_RESERVED'))
+    CONSTRAINT ck_user_sanctions_type CHECK (type IN ('MUTE', 'BAN', 'SUSPEND'))
 );
 ```
 
@@ -156,7 +156,7 @@ enum class ModerationAction {
 enum class UserSanctionType {
     MUTE,
     BAN,
-    SUSPEND_RESERVED,
+    SUSPEND,
 }
 ```
 
@@ -164,9 +164,9 @@ enum class UserSanctionType {
 
 - `MUTE`: 방 안에서 말할 수 없는 상태
 - `BAN`: 방에서 말할 수 없으며 운영상 더 강한 제재 상태
-- `SUSPEND_RESERVED`: Phase 8.6 token revocation과 함께 전역 계정 차단으로 승격할 reserved type
+- `SUSPEND`: Phase 8.6 token revocation과 함께 전역 계정 차단으로 승격되는 type
 
-admin API는 8.5에서 `SUSPEND_RESERVED` 생성을 거부한다.
+admin API는 8.5에서 global suspend 생성을 거부했고, Phase 8.6에서 `GLOBAL + SUSPEND`와 session token revocation을 함께 구현한다.
 
 ### Runtime flow
 
@@ -342,7 +342,7 @@ moderation 거부 metric은 다음이다.
 > - 금칙어 pattern 원문을 client-facing error, metric tag, 일반 application log에 노출하지 않는다.
 > - `GLOBAL` rule 변경은 모든 방의 moderation 결과에 영향을 준다. cache 전체 evict가 필요하다.
 > - `BAN`은 membership을 끊지 않는다. 사용자는 방에는 남아 있지만 메시지를 보낼 수 없는 상태가 된다.
-> - `SUSPEND_RESERVED`는 Phase 8.6 token revocation과 함께 처리해야 보안 의미가 완성된다.
+> - `SUSPEND`는 Phase 8.6 token revocation과 함께 처리해야 보안 의미가 완성된다.
 > - regex 실행은 ReDoS 위험이 있으므로 1차에서 제외한다.
 > - moderation을 admission보다 먼저 실행하므로 차단된 메시지는 rate limit counter를 소모하지 않는다. 이는 의도된 정책이다.
 
@@ -360,6 +360,6 @@ moderation 거부 metric은 다음이다.
 
 ## 8. 후속 질문
 
-- Phase 8.6에서 `SUSPEND_RESERVED`를 실제 global suspend와 token revocation으로 승격할 때 session token denylist를 Redis로 둘 것인가?
+- Phase 8.6은 `GLOBAL + SUSPEND`를 Redis session token denylist와 WebSocket force logout으로 구현한다. 이후 Redis pub/sub control event를 stream 기반으로 강화할 것인가?
 - `CONTAINS` 기반 금칙어 우회를 줄이기 위해 Unicode normalization과 whitespace folding을 다음 moderation hardening에 포함할 것인가?
 - moderation rule이 많아질 경우 Aho-Corasick 같은 multi-pattern matcher로 전환할 기준을 어떤 metric으로 잡을 것인가?

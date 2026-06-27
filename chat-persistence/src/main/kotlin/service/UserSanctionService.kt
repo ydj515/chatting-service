@@ -27,10 +27,16 @@ class UserSanctionService(
 
     override fun requireAllowedToSend(roomId: Long, userId: Long) {
         val now = clock.instant()
-        val sanction = userSanctionRepository.activeSanctionsForUser(roomId, userId)
+        val sanctions = userSanctionRepository.activeGlobalSanctionsForUser(userId) +
+            userSanctionRepository.activeSanctionsForUser(roomId, userId)
+        val sanction = sanctions
             .asSequence()
             .filter { sanction -> sanction.expiresAt == null || sanction.expiresAt.isAfter(now) }
-            .firstOrNull { sanction -> sanction.type == UserSanctionType.MUTE || sanction.type == UserSanctionType.BAN }
+            .firstOrNull { sanction ->
+                sanction.type == UserSanctionType.SUSPEND ||
+                    sanction.type == UserSanctionType.MUTE ||
+                    sanction.type == UserSanctionType.BAN
+            }
             ?: return
 
         recordRejected(sanction)
@@ -41,13 +47,13 @@ class UserSanctionService(
         val reason = when (sanction.type) {
             UserSanctionType.MUTE -> "muted"
             UserSanctionType.BAN -> "banned"
-            UserSanctionType.SUSPEND_RESERVED -> "suspend_reserved"
+            UserSanctionType.SUSPEND -> "suspended"
         }
 
         meterRegistryProvider?.ifAvailable { registry ->
             Counter.builder("chat.message.moderation.rejected")
                 .tag("reason", reason)
-                .tag("scope", "room")
+                .tag("scope", sanction.scopeType.name.lowercase())
                 .tag("action", "reject")
                 .register(registry)
                 .increment()

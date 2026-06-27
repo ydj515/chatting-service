@@ -1,14 +1,47 @@
-# 개인 로컬 설정 (Git 추적 제외)
-/shelf/
+# ============================================================
+# 팀 공유 설정 (형상관리 대상)
+#   - runConfigurations/   : Compound·개별 실행 구성
+#   - codeStyles/          : 프로젝트 코드 스타일
+#   - compiler.xml         : 컴파일러 설정
+#   - gradle.xml           : Gradle 프로젝트 설정
+#   - kotlinc.xml          : Kotlin 컴파일러 옵션
+#   - misc.xml             : 프로젝트 SDK·언어 수준
+#   - vcs.xml              : VCS 루트 매핑
+# ============================================================
+
+# ---------- 개인 로컬 설정 (Git 추적 제외) ----------
+
+# 에디터 UI 설정 (폰트, 탭 크기, 코드 접기 상태 등)
+/editor.xml
+
+# 워크스페이스 (창 배치, 열린 파일, 브레이크포인트 등)
 /workspace.xml
+
+# 로컬 선반 (shelved changes)
+/shelf/
+
 # HTTP Client 요청 기록
 /httpRequests/
-# Query 파일
+
+# 데이터베이스 콘솔 쿼리
 /queries/
+
 # 데이터소스 로컬 저장소
 /dataSources/
 /dataSources.local.xml
+
 # 사용 통계
 /usage.statistics.xml
-# 테마 설정 (개인 취향)
+
+# 테마·플러그인 개인 설정
 /material_theme_project_new.xml
+/sonarlint/
+
+# Android (이 프로젝트에서 불필요)
+/AndroidProjectSystem.xml
+
+# 개인 사전
+/dictionaries/
+
+# 동적 플러그인 설정
+/dynamic.xml

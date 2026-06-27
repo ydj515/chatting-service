@@ -69,6 +69,26 @@ class UserSanctionJdbcRepository(
         )
     }
 
+    @Cacheable(
+        value = ["userSanctions"],
+        key = "'global:' + #userId",
+    )
+    fun activeGlobalSanctionsForUser(userId: Long): List<UserSanctionRecord> {
+        return jdbcTemplate.query(
+            """
+            SELECT id, scope_type, room_id, user_id, type, reason, expires_at, active, created_by, created_at, revoked_by, revoked_at
+            FROM user_sanctions
+            WHERE active = true
+              AND user_id = ?
+              AND scope_type = 'GLOBAL'
+              AND room_id IS NULL
+            ORDER BY id DESC
+            """.trimIndent(),
+            ROW_MAPPER,
+            userId,
+        )
+    }
+
     fun listSanctions(roomId: Long?, userId: Long?, active: Boolean?): List<UserSanctionRecord> {
         val conditions = mutableListOf<String>()
         val args = mutableListOf<Any>()

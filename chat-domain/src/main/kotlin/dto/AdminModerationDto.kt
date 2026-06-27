@@ -18,7 +18,7 @@ enum class ModerationAction {
 enum class UserSanctionType {
     MUTE,
     BAN,
-    SUSPEND_RESERVED,
+    SUSPEND,
 }
 
 data class AdminModerationRuleDto(

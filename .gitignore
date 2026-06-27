@@ -17,16 +17,7 @@ build/
 .mtj.tmp/
 hs_err_pid*
 
-# IntelliJ IDEA - 개인 설정만 무시 (팀 공유 설정은 추적)
-.idea/workspace.xml
-.idea/shelf/
-.idea/httpRequests/
-.idea/queries/
-.idea/dataSources/
-.idea/dataSources.local.xml
-.idea/usage.statistics.xml
-.idea/dictionaries/
-.idea/material_theme_project_new.xml
+# IntelliJ IDEA - 세부 규칙은 .idea/.gitignore 에서 관리
 *.iml
 *.iws
 *.ipr

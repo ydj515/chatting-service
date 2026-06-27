@@ -4,15 +4,18 @@ import com.chat.domain.dto.CreateUserRequest
 import com.chat.domain.dto.LoginRequest
 import com.chat.domain.dto.LoginResponse
 import com.chat.domain.dto.UserDto
+import com.chat.domain.dto.UserSanctionType
 import com.chat.domain.model.User
 import com.chat.domain.service.SessionTokenService
 import com.chat.domain.service.UserService
 import com.chat.persistence.repository.UserRepository
+import com.chat.persistence.repository.UserSanctionJdbcRepository
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.security.MessageDigest
+import java.time.Clock
 import java.time.LocalDateTime
 
 
@@ -21,6 +24,8 @@ import java.time.LocalDateTime
 class UserServiceImpl(
     private val userRepository: UserRepository,
     private val sessionTokenService: SessionTokenService,
+    private val userSanctionRepository: UserSanctionJdbcRepository,
+    private val clock: Clock,
 ) : UserService {
     override fun createUser(request: CreateUserRequest): UserDto {
         // 이미 존재하는 사용자인지 확인
@@ -46,12 +51,18 @@ class UserServiceImpl(
             throw IllegalArgumentException("사용자를 찾을 수 없거나 비밀번호가 일치하지 않습니다.")
         }
 
+        requireNotSuspended(user.id)
+
         val sessionToken = sessionTokenService.issueToken(user.id)
         return LoginResponse(
             user = userToDto(user),
             sessionToken = sessionToken.token,
             expiresAt = sessionToken.expiresAt,
         )
+    }
+
+    override fun logout(sessionToken: String) {
+        sessionTokenService.revokeToken(sessionToken)
     }
 
     override fun getUserById(userId: Long): UserDto {
@@ -80,6 +91,18 @@ class UserServiceImpl(
     private fun hashPassword(password: String): String {
         val bytes = MessageDigest.getInstance("SHA-256").digest(password.toByteArray())
         return bytes.joinToString("") { "%02x".format(it) }
+    }
+
+    private fun requireNotSuspended(userId: Long) {
+        val now = clock.instant()
+        val suspended = userSanctionRepository.activeGlobalSanctionsForUser(userId)
+            .any { sanction ->
+                sanction.type == UserSanctionType.SUSPEND &&
+                    (sanction.expiresAt == null || sanction.expiresAt.isAfter(now))
+            }
+        if (suspended) {
+            throw IllegalStateException("정지된 사용자는 로그인할 수 없습니다.")
+        }
     }
 
     private fun userToDto(user: User): UserDto {
