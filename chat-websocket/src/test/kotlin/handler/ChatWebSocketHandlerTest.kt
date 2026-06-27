@@ -18,12 +18,38 @@ import org.junit.jupiter.api.Assertions.assertSame
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.mockingDetails
+import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
+import org.springframework.web.socket.PongMessage
 import org.springframework.web.socket.TextMessage
 import org.springframework.web.socket.WebSocketSession
+import java.nio.ByteBuffer
 import java.time.LocalDateTime
 
 class ChatWebSocketHandlerTest {
+
+    @Test
+    fun `PONG frame은 세션 activity로 기록하고 비즈니스 메시지로 처리하지 않는다`() {
+        val sessionManager = mock(WebSocketSessionManager::class.java)
+        val chatService = mock(ChatService::class.java)
+        val objectMapper = ObjectMapper()
+            .registerModule(JavaTimeModule())
+            .registerModule(KotlinModule.Builder().build())
+            .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+        val handler = ChatWebSocketHandler(
+            sessionManager = sessionManager,
+            chatService = chatService,
+            objectMapper = objectMapper,
+            webSocketProperties = WebSocketProperties(userIdAttribute = "userId"),
+        )
+        val session = mock(WebSocketSession::class.java)
+        `when`(session.id).thenReturn("session-1")
+        `when`(session.attributes).thenReturn(mutableMapOf<String, Any>("userId" to 7L))
+
+        handler.handleMessage(session, PongMessage(ByteBuffer.allocate(0)))
+
+        verify(sessionManager).recordSessionActivity(session)
+    }
 
     @Test
     fun `SEND_MESSAGE ACK는 raw session이 아니라 session manager outbound 경로로 전송한다`() {

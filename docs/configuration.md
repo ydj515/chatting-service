@@ -120,6 +120,9 @@ Redis Cluster node의 host port는 `127.0.0.1`에만 bind한다. Cluster discove
 | `CHAT_WEBSOCKET_GATEWAY_OUTBOUND_EXECUTOR_THREADS` | `32` | WebSocket outbound queue drain executor thread 수 |
 | `CHAT_WEBSOCKET_GATEWAY_OUTBOUND_SEND_TIME_LIMIT_MILLIS` | `10000` | WebSocket session 단일 send 허용 시간 |
 | `CHAT_WEBSOCKET_GATEWAY_OUTBOUND_SEND_BUFFER_SIZE_LIMIT_BYTES` | `524288` | WebSocket session send buffer 상한 |
+| `CHAT_WEBSOCKET_GATEWAY_HEARTBEAT_ENABLED` | `true` | WebSocket Gateway protocol ping/pong heartbeat 활성화 여부 |
+| `CHAT_WEBSOCKET_GATEWAY_HEARTBEAT_INTERVAL_MILLIS` | `30000` | 열린 WebSocket session에 heartbeat ping을 보내는 주기 |
+| `CHAT_WEBSOCKET_GATEWAY_HEARTBEAT_TIMEOUT_MILLIS` | `90000` | pong 또는 inbound message 없이 zombie connection으로 보고 닫는 idle timeout |
 | `CHAT_MESSAGE_SEQUENCE_TTL` | `24h` | Redis 메시지 시퀀스 키 TTL. `roomSeq`는 메시지마다 Redis `INCR 1`로 발급하며 block 선할당은 사용하지 않음 |
 | `CHAT_CACHE_ROOM_ADMISSION_POLICIES_TTL` | `10s` | `room_storage_configs`의 rate limit/slow mode 정책 캐시 TTL. admin 정책 변경 시 해당 방 캐시는 즉시 evict |
 | `CHAT_CACHE_ROOM_SHARD_CONFIGS_TTL` | `10s` | 메시지 수락 경로가 읽는 `room_storage_configs.current_shard_count/fanout_shard_count` cache TTL |

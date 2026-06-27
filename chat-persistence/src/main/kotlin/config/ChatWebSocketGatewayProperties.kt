@@ -8,6 +8,9 @@ data class ChatWebSocketGatewayProperties(
     val outboundExecutorThreads: Int = 32,
     val outboundSendTimeLimitMillis: Int = 10_000,
     val outboundSendBufferSizeLimitBytes: Int = 512 * 1024,
+    val heartbeatEnabled: Boolean = true,
+    val heartbeatIntervalMillis: Long = 30_000,
+    val heartbeatTimeoutMillis: Long = 90_000,
     // metric의 gatewayGroup tag 값. cardinality 통제를 위해 bounded 값만 쓴다.
     val gatewayGroup: String = "default",
 )
