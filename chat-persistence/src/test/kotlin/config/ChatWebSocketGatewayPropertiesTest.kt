@@ -1,5 +1,6 @@
 package com.chat.persistence.config
 
+import org.junit.jupiter.api.Assertions.assertDoesNotThrow
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
 
@@ -24,8 +25,8 @@ class ChatWebSocketGatewayPropertiesTest {
     }
 
     @Test
-    fun `heartbeat scheduler poll interval은 heartbeat interval보다 짧아야 한다`() {
-        assertThrows(IllegalArgumentException::class.java) {
+    fun `heartbeat scheduler poll interval은 heartbeat interval과 같을 수 있다`() {
+        assertDoesNotThrow {
             ChatWebSocketGatewayProperties(
                 heartbeatIntervalMillis = 30_000,
                 heartbeatSchedulerPollIntervalMillis = 30_000,

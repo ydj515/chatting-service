@@ -22,8 +22,8 @@ data class ChatWebSocketGatewayProperties(
         require(heartbeatSchedulerPollIntervalMillis > 0) {
             "chat.websocket.gateway.heartbeat-scheduler-poll-interval-millis must be > 0"
         }
-        require(heartbeatSchedulerPollIntervalMillis < heartbeatIntervalMillis) {
-            "chat.websocket.gateway.heartbeat-scheduler-poll-interval-millis must be less than heartbeat-interval-millis"
+        require(heartbeatSchedulerPollIntervalMillis <= heartbeatIntervalMillis) {
+            "chat.websocket.gateway.heartbeat-scheduler-poll-interval-millis must be less than or equal to heartbeat-interval-millis"
         }
         require(heartbeatTimeoutMillis > heartbeatIntervalMillis) {
             "chat.websocket.gateway.heartbeat-timeout-millis must be greater than heartbeat-interval-millis"
