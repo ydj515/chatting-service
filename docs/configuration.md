@@ -67,6 +67,9 @@
 | `CHAT_WORKER_FANOUT_CLAIM_INTERVAL_MILLIS` | `10000` | fanout worker가 pending claim을 수행하는 최소 주기 |
 | `CHAT_WORKER_FANOUT_MAX_DELIVERY_COUNT` | `5` | fanout worker record 처리 실패 후 DLQ로 보내는 delivery count 임계값 |
 | `CHAT_WORKER_ROOM_POLICY_POLL_DELAY_MILLIS` | `1000` | active room traffic snapshot을 읽어 heat/live feed/rate/slow-mode 정책을 자동 적용하는 주기 |
+| `CHAT_WORKER_ROOM_SEQ_GAP_AUDIT_ENABLED` | `true` | canonical `chat_messages`의 `room_seq` gap audit worker 활성화 여부 |
+| `CHAT_WORKER_ROOM_SEQ_GAP_AUDIT_POLL_DELAY_MILLIS` | `60000` | `room_seq` gap audit polling fixed delay |
+| `CHAT_WORKER_ROOM_SEQ_GAP_AUDIT_LOOKBACK` | `1h` | gap audit가 최근 canonical 메시지를 스캔하는 lookback window |
 | `REDIS_HOST` | `redis` | standalone Redis host. host Gradle 개발 모드에서 사용 |
 | `REDIS_PORT` | `6379` | standalone Redis 내부 포트. host Gradle 개발 모드에서 사용 |
 | `REDIS_CLUSTER_NODES` | `redis-cluster-node-1:6379,...,redis-cluster-node-6:6379` | `redis-cluster` Spring profile에서 사용하는 Lettuce cluster seed node 목록 |
@@ -83,6 +86,8 @@
 | `CHAT_REDIS_STREAMS_KNOWN_STREAMS_KEY` | `chat:stream:rooms` | worker가 poll할 stream key index set |
 | `CHAT_REDIS_STREAMS_DEAD_LETTER_STREAM_KEY_PREFIX` | `chat:stream:dlq:` | worker consumer group별 dead letter stream key prefix |
 | `CHAT_REDIS_STREAMS_SHARD_COUNT` | `1` | room stream shard 개수 |
+| `CHAT_REDIS_STREAMS_MAX_LEN` | `1000000` | Redis Streams `XADD MAXLEN` entry 상한. `0` 이하이면 bounded append를 비활성화 |
+| `CHAT_REDIS_STREAMS_MAX_LEN_APPROXIMATE` | `true` | Redis Streams `MAXLEN ~` approximate trim 사용 여부. `false`이면 exact trim을 사용 |
 | `CHAT_REDIS_ADMISSION_KEY_PREFIX` | `chat:admission:room:` | 메시지 수락 rate limit/slow mode Redis key prefix. 실제 key는 Redis Cluster hash tag를 포함해 `<prefix>{roomId}:...` 형태 |
 | `CHAT_REDIS_ADMISSION_RATE_LIMIT_WINDOW_TTL` | `2s` | 초당 rate limit bucket key 정리 TTL. 고정 1초 bucket을 다음 초 이후까지 보존하기 위한 값 |
 | `CHAT_AUTH_SESSION_SECRET` | `local-development-session-secret-change-me` | 로그인 session token HMAC 서명 secret. 운영 환경에서는 반드시 교체 |
@@ -107,7 +112,7 @@ Redis cache value serializer는 Kotlin/JavaTime module과 함께 `GenericJackson
 
 Redis Cluster node의 host port는 `127.0.0.1`에만 bind한다. Cluster discovery를 위해 container 내부 설정은 `protected-mode no`를 사용하므로, host 외부 인터페이스에는 Redis port를 공개하지 않는다.
 
-> Redis Cluster node 설정은 `appendfsync everysec`를 사용한다. Redis node 장애 또는 host crash 시 마지막 fsync 이후 최대 1초의 Redis ingest가 손실될 수 있으며, Phase 8.7 gap audit에서 감지 경로를 제공한다.
+> Redis Cluster node 설정은 `appendfsync everysec`를 사용한다. Redis node 장애 또는 host crash 시 마지막 fsync 이후 최대 1초의 Redis ingest가 손실될 수 있으며, Phase 8.7 gap audit에서 감지 경로를 제공한다. `CHAT_REDIS_STREAMS_MAX_LEN`은 Redis OOM 방어용 backpressure이고 메시지 보존 보장이 아니므로, `chat.room_seq.gap.*` metric alert와 함께 운영해야 한다.
 
 | `CHAT_API_CORS_ALLOWED_ORIGINS` | `*` | REST API CORS 허용 origin |
 | `CHAT_WEBSOCKET_ALLOWED_ORIGINS` | `*` | WebSocket 허용 origin |

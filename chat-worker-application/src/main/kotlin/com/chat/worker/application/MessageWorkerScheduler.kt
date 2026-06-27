@@ -6,6 +6,7 @@ import com.chat.persistence.service.HotRoomFanoutWorker
 import com.chat.persistence.service.MessageWriterWorker
 import com.chat.persistence.service.RedisStreamLagMonitor
 import com.chat.persistence.service.RoomPolicyWorker
+import com.chat.persistence.service.RoomSeqGapAuditWorker
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
 
@@ -17,6 +18,7 @@ class MessageWorkerScheduler(
     private val adminMessageExportWorker: AdminMessageExportWorker,
     private val roomPolicyWorker: RoomPolicyWorker,
     private val redisStreamLagMonitor: RedisStreamLagMonitor,
+    private val roomSeqGapAuditWorker: RoomSeqGapAuditWorker,
 ) {
 
     @Scheduled(fixedDelayString = "\${chat.worker.poll-delay-millis:100}")
@@ -51,6 +53,13 @@ class MessageWorkerScheduler(
     fun pollRedisStreamLag() {
         if (workerProperties.redisStreamLag.enabled) {
             redisStreamLagMonitor.poll()
+        }
+    }
+
+    @Scheduled(fixedDelayString = "\${chat.worker.room-seq-gap-audit.poll-delay-millis:60000}")
+    fun pollRoomSeqGapAudit() {
+        if (workerProperties.roomSeqGapAudit.enabled) {
+            roomSeqGapAuditWorker.poll()
         }
     }
 

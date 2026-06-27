@@ -9,6 +9,8 @@ import com.chat.persistence.service.MessageStreamMetrics
 import io.micrometer.core.instrument.MeterRegistry
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertArrayEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.ObjectProvider
@@ -18,11 +20,16 @@ import org.mockito.Mockito.mock
 import org.mockito.Mockito.times
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
+import org.springframework.data.redis.connection.RedisConnection
+import org.springframework.data.redis.connection.RedisStreamCommands
+import org.springframework.data.redis.connection.stream.MapRecord
 import org.springframework.data.redis.connection.stream.RecordId
+import org.springframework.data.redis.core.RedisCallback
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.data.redis.core.SetOperations
 import org.springframework.data.redis.core.StreamOperations
 import java.time.LocalDateTime
+import java.nio.charset.StandardCharsets
 import java.util.stream.Stream
 
 class RedisMessageStreamProducerTest {
@@ -43,8 +50,8 @@ class RedisMessageStreamProducerTest {
         val producer = RedisMessageStreamProducer(
             redisTemplate = redisTemplate,
             objectMapper = objectMapper,
-            redisProperties = ChatRedisProperties(),
-            keyResolver = MessageStreamKeyResolver(ChatRedisProperties()),
+            redisProperties = unboundedRedisProperties(),
+            keyResolver = MessageStreamKeyResolver(unboundedRedisProperties()),
         )
 
         val recordId = producer.append(
@@ -95,8 +102,8 @@ class RedisMessageStreamProducerTest {
         val producer = RedisMessageStreamProducer(
             redisTemplate = redisTemplate,
             objectMapper = objectMapper,
-            redisProperties = ChatRedisProperties(),
-            keyResolver = MessageStreamKeyResolver(ChatRedisProperties()),
+            redisProperties = unboundedRedisProperties(),
+            keyResolver = MessageStreamKeyResolver(unboundedRedisProperties()),
         )
         val envelope = MessageStreamEnvelope(
             messageId = "msg-1",
@@ -135,8 +142,8 @@ class RedisMessageStreamProducerTest {
         val producer = RedisMessageStreamProducer(
             redisTemplate = redisTemplate,
             objectMapper = objectMapper(),
-            redisProperties = ChatRedisProperties(),
-            keyResolver = MessageStreamKeyResolver(ChatRedisProperties()),
+            redisProperties = unboundedRedisProperties(),
+            keyResolver = MessageStreamKeyResolver(unboundedRedisProperties()),
             messageStreamMetrics = MessageStreamMetrics(meterRegistryProvider(meterRegistry)),
         )
 
@@ -148,6 +155,89 @@ class RedisMessageStreamProducerTest {
             .timer()
 
         assertEquals(1, timer?.count())
+    }
+
+    @Test
+    fun `maxLen이 양수이면 XADD MAXLEN 옵션으로 bounded append한다`() {
+        val redisTemplate = redisTemplate()
+        val setOperations = setOperations()
+        val redisConnection = mock(RedisConnection::class.java)
+        val streamCommands = mock(RedisStreamCommands::class.java)
+        val recordCaptor = byteMapRecordCaptor()
+        val optionsCaptor = ArgumentCaptor.forClass(RedisStreamCommands.XAddOptions::class.java)
+        `when`(redisTemplate.opsForSet()).thenReturn(setOperations)
+        `when`(redisConnection.streamCommands()).thenReturn(streamCommands)
+        `when`(streamCommands.xAdd(captureByteMapRecord(recordCaptor), optionsCaptor.capture()))
+            .thenReturn(RecordId.of("1749790000000-0"))
+        `when`(redisTemplate.execute(anyRecordIdRedisCallback())).thenAnswer { invocation ->
+            @Suppress("UNCHECKED_CAST")
+            val callback = invocation.arguments[0] as RedisCallback<RecordId>
+            callback.doInRedis(redisConnection)
+        }
+        val redisProperties = ChatRedisProperties(
+            streams = ChatRedisProperties.Streams(
+                maxLen = 128,
+                maxLenApproximate = true,
+            ),
+        )
+        val producer = RedisMessageStreamProducer(
+            redisTemplate = redisTemplate,
+            objectMapper = objectMapper(),
+            redisProperties = redisProperties,
+            keyResolver = MessageStreamKeyResolver(redisProperties),
+        )
+
+        val recordId = producer.append(envelope())
+
+        assertEquals("1749790000000-0", recordId)
+        assertEquals(128L, optionsCaptor.value.maxlen ?: -1L)
+        assertTrue(optionsCaptor.value.isApproximateTrimming)
+        assertArrayEquals(bytes("chat:stream:room:{42}:shard:3"), recordCaptor.value.stream)
+
+        val fields = recordCaptor.value.value.entries.associate { entry ->
+            String(entry.key, StandardCharsets.UTF_8) to String(entry.value, StandardCharsets.UTF_8)
+        }
+        assertEquals("msg-1", fields["messageId"])
+        assertEquals("42", fields["chatRoomId"])
+        assertEquals("11", fields["roomSeq"])
+        assertEquals("3", fields["streamShard"])
+        assertTrue(fields["payload"]!!.contains("\"messageId\":\"msg-1\""))
+        verify(setOperations).add("chat:stream:rooms", "chat:stream:room:{42}:shard:3")
+    }
+
+    @Test
+    fun `maxLen approximate가 꺼져 있으면 exact trim 옵션으로 bounded append한다`() {
+        val redisTemplate = redisTemplate()
+        val setOperations = setOperations()
+        val redisConnection = mock(RedisConnection::class.java)
+        val streamCommands = mock(RedisStreamCommands::class.java)
+        val optionsCaptor = ArgumentCaptor.forClass(RedisStreamCommands.XAddOptions::class.java)
+        `when`(redisTemplate.opsForSet()).thenReturn(setOperations)
+        `when`(redisConnection.streamCommands()).thenReturn(streamCommands)
+        `when`(streamCommands.xAdd(anyByteMapRecord(), optionsCaptor.capture()))
+            .thenReturn(RecordId.of("1749790000000-0"))
+        `when`(redisTemplate.execute(anyRecordIdRedisCallback())).thenAnswer { invocation ->
+            @Suppress("UNCHECKED_CAST")
+            val callback = invocation.arguments[0] as RedisCallback<RecordId>
+            callback.doInRedis(redisConnection)
+        }
+        val redisProperties = ChatRedisProperties(
+            streams = ChatRedisProperties.Streams(
+                maxLen = 64,
+                maxLenApproximate = false,
+            ),
+        )
+        val producer = RedisMessageStreamProducer(
+            redisTemplate = redisTemplate,
+            objectMapper = objectMapper(),
+            redisProperties = redisProperties,
+            keyResolver = MessageStreamKeyResolver(redisProperties),
+        )
+
+        producer.append(envelope())
+
+        assertEquals(64L, optionsCaptor.value.maxlen ?: -1L)
+        assertFalse(optionsCaptor.value.isApproximateTrimming)
     }
 
     @Suppress("UNCHECKED_CAST")
@@ -181,7 +271,39 @@ class RedisMessageStreamProducerTest {
     }
 
     @Suppress("UNCHECKED_CAST")
+    private fun byteMapRecordCaptor(): ArgumentCaptor<MapRecord<ByteArray, ByteArray, ByteArray>> {
+        return ArgumentCaptor.forClass(MapRecord::class.java) as ArgumentCaptor<MapRecord<ByteArray, ByteArray, ByteArray>>
+    }
+
+    private fun anyByteMapRecord(): MapRecord<ByteArray, ByteArray, ByteArray> {
+        org.mockito.ArgumentMatchers.any<MapRecord<ByteArray, ByteArray, ByteArray>>()
+        return uninitialized()
+    }
+
+    private fun captureByteMapRecord(
+        captor: ArgumentCaptor<MapRecord<ByteArray, ByteArray, ByteArray>>,
+    ): MapRecord<ByteArray, ByteArray, ByteArray> {
+        captor.capture()
+        return uninitialized()
+    }
+
+    private fun anyRecordIdRedisCallback(): RedisCallback<RecordId> {
+        org.mockito.ArgumentMatchers.any<RedisCallback<RecordId>>()
+        return uninitialized()
+    }
+
+    @Suppress("UNCHECKED_CAST")
     private fun <T> uninitialized(): T = null as T
+
+    private fun unboundedRedisProperties(): ChatRedisProperties {
+        return ChatRedisProperties(
+            streams = ChatRedisProperties.Streams(maxLen = 0),
+        )
+    }
+
+    private fun bytes(value: String): ByteArray {
+        return value.toByteArray(StandardCharsets.UTF_8)
+    }
 
     private fun objectMapper(): ObjectMapper {
         return ObjectMapper()

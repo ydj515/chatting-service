@@ -1,6 +1,7 @@
 package com.chat.persistence.config
 
 import org.springframework.boot.context.properties.ConfigurationProperties
+import java.time.Duration
 
 @ConfigurationProperties(prefix = "chat.worker")
 data class ChatWorkerProperties(
@@ -14,6 +15,7 @@ data class ChatWorkerProperties(
         consumerGroup = "fanout",
     ),
     val redisStreamLag: RedisStreamLag = RedisStreamLag(),
+    val roomSeqGapAudit: RoomSeqGapAudit = RoomSeqGapAudit(),
 ) {
     fun roleEnabled(role: String): Boolean = roles.contains(role)
 
@@ -36,5 +38,11 @@ data class ChatWorkerProperties(
     data class RedisStreamLag(
         val enabled: Boolean = true,
         val pollDelayMillis: Long = 5_000,
+    )
+
+    data class RoomSeqGapAudit(
+        val enabled: Boolean = true,
+        val pollDelayMillis: Long = 60_000,
+        val lookback: Duration = Duration.ofHours(1),
     )
 }

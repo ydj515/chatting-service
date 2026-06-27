@@ -25,6 +25,8 @@ data class ChatRedisProperties(
         val knownStreamsKey: String = "chat:stream:rooms",
         val deadLetterStreamKeyPrefix: String = "chat:stream:dlq:",
         val shardCount: Int = 1,
+        val maxLen: Long = 1_000_000,
+        val maxLenApproximate: Boolean = true,
     )
 
     data class Admission(

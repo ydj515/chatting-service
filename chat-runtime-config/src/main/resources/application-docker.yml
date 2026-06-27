@@ -186,6 +186,8 @@ chat:
       known-streams-key: ${CHAT_REDIS_STREAMS_KNOWN_STREAMS_KEY:chat:stream:rooms}
       dead-letter-stream-key-prefix: ${CHAT_REDIS_STREAMS_DEAD_LETTER_STREAM_KEY_PREFIX:chat:stream:dlq:}
       shard-count: ${CHAT_REDIS_STREAMS_SHARD_COUNT:1}
+      max-len: ${CHAT_REDIS_STREAMS_MAX_LEN:1000000}
+      max-len-approximate: ${CHAT_REDIS_STREAMS_MAX_LEN_APPROXIMATE:true}
     admission:
       key-prefix: ${CHAT_REDIS_ADMISSION_KEY_PREFIX:chat:admission:room:}
       rate-limit-window-ttl: ${CHAT_REDIS_ADMISSION_RATE_LIMIT_WINDOW_TTL:2s}
@@ -196,6 +198,10 @@ chat:
     redis-stream-lag:
       enabled: ${CHAT_WORKER_REDIS_STREAM_LAG_ENABLED:true}
       poll-delay-millis: ${CHAT_WORKER_REDIS_STREAM_LAG_POLL_DELAY_MILLIS:5000}
+    room-seq-gap-audit:
+      enabled: ${CHAT_WORKER_ROOM_SEQ_GAP_AUDIT_ENABLED:true}
+      poll-delay-millis: ${CHAT_WORKER_ROOM_SEQ_GAP_AUDIT_POLL_DELAY_MILLIS:60000}
+      lookback: ${CHAT_WORKER_ROOM_SEQ_GAP_AUDIT_LOOKBACK:1h}
     writer:
       consumer-group: ${CHAT_WORKER_WRITER_CONSUMER_GROUP:message-writer}
       read-count: ${CHAT_WORKER_WRITER_READ_COUNT:100}
