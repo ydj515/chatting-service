@@ -108,20 +108,45 @@ data class RoomSeqGapAuditSummary(
 SQL 개념:
 
 ```sql
-WITH ordered AS (
-    SELECT
-        room_id,
-        room_seq,
-        lag(room_seq) OVER (PARTITION BY room_id ORDER BY room_seq) AS previous_room_seq
+WITH recent_rooms AS (
+    SELECT DISTINCT room_id
     FROM chat_messages
     WHERE created_at >= ?
+),
+candidate_rows AS (
+    SELECT cm.room_id, cm.room_seq, cm.created_at
+    FROM chat_messages cm
+    JOIN recent_rooms rr ON rr.room_id = cm.room_id
+    WHERE cm.created_at >= ?
+
+    UNION ALL
+
+    SELECT predecessor.room_id, predecessor.room_seq, predecessor.created_at
+    FROM recent_rooms rr
+    JOIN LATERAL (
+        SELECT cm.room_id, cm.room_seq, cm.created_at
+        FROM chat_messages cm
+        WHERE cm.room_id = rr.room_id
+          AND cm.created_at < ?
+        ORDER BY cm.room_seq DESC
+        LIMIT 1
+    ) predecessor ON true
+),
+ordered AS (
+    SELECT
+        room_id,
+        created_at,
+        room_seq,
+        lag(room_seq) OVER (PARTITION BY room_id ORDER BY room_seq) AS previous_room_seq
+    FROM candidate_rows
 ),
 gaps AS (
     SELECT
         room_id,
         room_seq - previous_room_seq - 1 AS gap_width
     FROM ordered
-    WHERE previous_room_seq IS NOT NULL
+    WHERE created_at >= ?
+      AND previous_room_seq IS NOT NULL
       AND room_seq > previous_room_seq + 1
 )
 SELECT
@@ -145,7 +170,7 @@ worker 애플리케이션에 scheduled poll을 추가한다.
 data class RoomSeqGapAudit(
     val enabled: Boolean = true,
     val pollDelayMillis: Long = 60_000,
-    val lookback: Duration = Duration.ofHours(1),
+    val lookback: Duration = Duration.ofMinutes(5),
 )
 ```
 
@@ -155,7 +180,7 @@ data class RoomSeqGapAudit(
 - `CHAT_WORKER_ROOM_SEQ_GAP_AUDIT_POLL_DELAY_MILLIS`
 - `CHAT_WORKER_ROOM_SEQ_GAP_AUDIT_LOOKBACK`
 
-worker는 `workerProperties.roomSeqGapAudit.enabled`가 true일 때만 실행한다. 실패 시 exception을 삼키고 warn log를 남긴다. audit 실패 자체가 message writer/fanout 경로를 막으면 안 된다.
+worker는 `workerProperties.roomSeqGapAudit.enabled`가 true이고 `WORKER_ROLES`에 `room-seq-gap-audit`이 있을 때만 실행한다. 실패 시 exception을 삼키고 warn log를 남긴다. audit 실패 자체가 message writer/fanout 경로를 막으면 안 된다.
 
 ### Gap Audit Metrics
 
@@ -217,7 +242,7 @@ chat:
     room-seq-gap-audit:
       enabled: ${CHAT_WORKER_ROOM_SEQ_GAP_AUDIT_ENABLED:true}
       poll-delay-millis: ${CHAT_WORKER_ROOM_SEQ_GAP_AUDIT_POLL_DELAY_MILLIS:60000}
-      lookback: ${CHAT_WORKER_ROOM_SEQ_GAP_AUDIT_LOOKBACK:1h}
+      lookback: ${CHAT_WORKER_ROOM_SEQ_GAP_AUDIT_LOOKBACK:5m}
 ```
 
 ### 문서 갱신
@@ -238,8 +263,9 @@ chat:
 
 - `RoomSeqGapAuditRepositoryTest`
   - SQL이 `lag(room_seq) OVER (PARTITION BY room_id ORDER BY room_seq)`를 사용한다.
+  - cutoff 직전 predecessor row를 포함해 audit window 첫 row와 이전 row 사이 gap을 감지한다.
   - aggregate column을 `RoomSeqGapAuditSummary`로 매핑한다.
-  - `created_at >= ?` lookback cutoff를 바인딩한다.
+  - `created_at >= ?` lookback cutoff를 `Instant` 기반 `Timestamp`로 바인딩한다.
 
 - `RoomSeqGapAuditWorkerTest`
   - repository summary를 metric gauge로 반영한다.
@@ -285,6 +311,7 @@ node scripts/verify-roomseq-gap-audit.mjs
 > - lookback window 밖의 gap은 이번 worker가 놓칠 수 있다. window는 운영 retention과 worker 장애 시간을 고려해 조정해야 한다.
 > - `roomId`를 metric label로 노출하지 않는다. room 수가 늘면 Prometheus cardinality가 급격히 증가할 수 있다.
 > - exact `MAXLEN`은 Redis trim 비용을 키울 수 있다. 기본은 approximate로 둔다.
+> - sequence 발급 이후 Redis append가 실패하면 실제 수락 메시지 유실이 아니어도 `roomSeq` hole이 생길 수 있다. alert는 warning으로 시작하고 append failure, worker lag, canonical 저장 지표를 함께 확인한다.
 > - heartbeat는 이번 PR에서 제외한다. zombie WebSocket connection 회수는 다음 작은 PR에서 별도로 검증한다.
 
 ## 10. 대안

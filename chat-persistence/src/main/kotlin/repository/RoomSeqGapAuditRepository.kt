@@ -6,7 +6,7 @@ import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.jdbc.core.RowMapper
 import org.springframework.stereotype.Repository
 import java.sql.Timestamp
-import java.time.LocalDateTime
+import java.time.Instant
 
 data class RoomSeqGapAuditSummary(
     val roomCountWithGaps: Long,
@@ -26,16 +26,20 @@ data class RoomSeqGapAuditSummary(
 
 @Repository
 class RoomSeqGapAuditRepository(
-    @Qualifier("jdbcTemplate")
-    private val jdbcTemplate: JdbcTemplate,
+    @Qualifier("messageReadJdbcTemplate")
+    private val messageReadJdbcTemplate: JdbcTemplate,
 ) {
 
-    fun auditSince(cutoff: LocalDateTime): RoomSeqGapAuditSummary {
+    fun auditSince(cutoff: Instant): RoomSeqGapAuditSummary {
+        val cutoffTimestamp = Timestamp.from(cutoff)
         return try {
-            jdbcTemplate.queryForObject(
+            messageReadJdbcTemplate.queryForObject(
                 AUDIT_SQL,
                 ROW_MAPPER,
-                Timestamp.valueOf(cutoff),
+                cutoffTimestamp,
+                cutoffTimestamp,
+                cutoffTimestamp,
+                cutoffTimestamp,
             ) ?: RoomSeqGapAuditSummary.ZERO
         } catch (e: EmptyResultDataAccessException) {
             RoomSeqGapAuditSummary.ZERO
@@ -53,20 +57,54 @@ class RoomSeqGapAuditRepository(
         }
 
         val AUDIT_SQL = """
-            WITH ordered AS (
-                SELECT
-                    room_id,
-                    room_seq,
-                    lag(room_seq) OVER (PARTITION BY room_id ORDER BY room_seq) AS previous_room_seq
+            WITH recent_rooms AS (
+                SELECT DISTINCT room_id
                 FROM chat_messages
                 WHERE created_at >= ?
+            ),
+            candidate_rows AS (
+                SELECT
+                    cm.room_id,
+                    cm.room_seq,
+                    cm.created_at
+                FROM chat_messages cm
+                JOIN recent_rooms rr ON rr.room_id = cm.room_id
+                WHERE cm.created_at >= ?
+
+                UNION ALL
+
+                SELECT
+                    predecessor.room_id,
+                    predecessor.room_seq,
+                    predecessor.created_at
+                FROM recent_rooms rr
+                JOIN LATERAL (
+                    SELECT
+                        cm.room_id,
+                        cm.room_seq,
+                        cm.created_at
+                    FROM chat_messages cm
+                    WHERE cm.room_id = rr.room_id
+                      AND cm.created_at < ?
+                    ORDER BY cm.room_seq DESC
+                    LIMIT 1
+                ) predecessor ON true
+            ),
+            ordered AS (
+                SELECT
+                    room_id,
+                    created_at,
+                    room_seq,
+                    lag(room_seq) OVER (PARTITION BY room_id ORDER BY room_seq) AS previous_room_seq
+                FROM candidate_rows
             ),
             gaps AS (
                 SELECT
                     room_id,
                     room_seq - previous_room_seq - 1 AS gap_width
                 FROM ordered
-                WHERE previous_room_seq IS NOT NULL
+                WHERE ordered.created_at >= ?
+                  AND previous_room_seq IS NOT NULL
                   AND room_seq > previous_room_seq + 1
             ),
             gap_summary AS (
@@ -77,8 +115,8 @@ class RoomSeqGapAuditRepository(
                 FROM gaps
             ),
             scanned AS (
-                SELECT count(DISTINCT room_id) AS scanned_room_count
-                FROM ordered
+                SELECT count(*) AS scanned_room_count
+                FROM recent_rooms
             )
             SELECT
                 gap_summary.room_count_with_gaps,

@@ -13,7 +13,6 @@ import org.mockito.Mockito.`when`
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
-import java.time.LocalDateTime
 import java.time.ZoneOffset
 
 class RoomSeqGapAuditWorkerTest {
@@ -29,7 +28,7 @@ class RoomSeqGapAuditWorkerTest {
             scannedRoomCount = 7,
         )
         val clock = Clock.fixed(Instant.parse("2026-06-27T12:00:00Z"), ZoneOffset.UTC)
-        `when`(repository.auditSince(LocalDateTime.parse("2026-06-27T10:00:00"))).thenReturn(summary)
+        `when`(repository.auditSince(Instant.parse("2026-06-27T10:00:00Z"))).thenReturn(summary)
         val worker = RoomSeqGapAuditWorker(
             workerProperties = ChatWorkerProperties(
                 roomSeqGapAudit = ChatWorkerProperties.RoomSeqGapAudit(
@@ -44,7 +43,7 @@ class RoomSeqGapAuditWorkerTest {
 
         worker.poll()
 
-        verify(repository).auditSince(LocalDateTime.parse("2026-06-27T10:00:00"))
+        verify(repository).auditSince(Instant.parse("2026-06-27T10:00:00Z"))
         verify(metrics).update(summary)
     }
 
@@ -71,10 +70,14 @@ class RoomSeqGapAuditWorkerTest {
     fun `repository 실패는 worker 밖으로 전파하지 않고 metric을 갱신하지 않는다`() {
         val repository = mock(RoomSeqGapAuditRepository::class.java)
         val metrics = mock(RoomSeqGapAuditMetrics::class.java)
-        `when`(repository.auditSince(LocalDateTime.parse("2026-06-27T11:00:00")))
+        `when`(repository.auditSince(Instant.parse("2026-06-27T11:00:00Z")))
             .thenThrow(RuntimeException("db down"))
         val worker = RoomSeqGapAuditWorker(
-            workerProperties = ChatWorkerProperties(),
+            workerProperties = ChatWorkerProperties(
+                roomSeqGapAudit = ChatWorkerProperties.RoomSeqGapAudit(
+                    lookback = Duration.ofHours(1),
+                ),
+            ),
             repository = repository,
             metrics = metrics,
             clock = Clock.fixed(Instant.parse("2026-06-27T12:00:00Z"), ZoneOffset.UTC),
@@ -84,7 +87,7 @@ class RoomSeqGapAuditWorkerTest {
             worker.poll()
         }
 
-        verify(repository).auditSince(LocalDateTime.parse("2026-06-27T11:00:00"))
+        verify(repository).auditSince(Instant.parse("2026-06-27T11:00:00Z"))
         verifyNoInteractions(metrics)
     }
 }

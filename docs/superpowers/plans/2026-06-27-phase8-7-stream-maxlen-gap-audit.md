@@ -44,7 +44,7 @@
 - [x] Write failing tests in `RoomSeqGapAuditRepositoryTest` proving the SQL uses `lag(room_seq)`, binds a `Timestamp` cutoff, maps all four aggregate fields, and returns zeros when the query returns no row.
 - [x] Run `./gradlew :chat-persistence:test --tests com.chat.persistence.repository.RoomSeqGapAuditRepositoryTest --no-daemon` and verify failure because the repository does not exist.
 - [x] Create `RoomSeqGapAuditSummary` and `RoomSeqGapAuditRepository`.
-- [x] Implement `auditSince(cutoff: LocalDateTime)` with one aggregate SQL query against `chat_messages`.
+- [x] Implement `auditSince(cutoff: Instant)` with one aggregate SQL query against `chat_messages`.
 - [x] Re-run the repository test and verify it passes.
 
 ### Task 3: Gap Audit Metrics

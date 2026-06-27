@@ -5,7 +5,6 @@ import com.chat.persistence.repository.RoomSeqGapAuditRepository
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import java.time.Clock
-import java.time.LocalDateTime
 
 @Service
 class RoomSeqGapAuditWorker(
@@ -22,7 +21,7 @@ class RoomSeqGapAuditWorker(
         }
 
         try {
-            val cutoff = LocalDateTime.now(clock).minus(properties.lookback)
+            val cutoff = clock.instant().minus(properties.lookback)
             val summary = repository.auditSince(cutoff)
             metrics.update(summary)
         } catch (e: RuntimeException) {

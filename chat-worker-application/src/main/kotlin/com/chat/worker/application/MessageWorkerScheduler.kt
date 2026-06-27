@@ -58,7 +58,7 @@ class MessageWorkerScheduler(
 
     @Scheduled(fixedDelayString = "\${chat.worker.room-seq-gap-audit.poll-delay-millis:60000}")
     fun pollRoomSeqGapAudit() {
-        if (workerProperties.roomSeqGapAudit.enabled) {
+        if (workerProperties.roleEnabled(ROLE_ROOM_SEQ_GAP_AUDIT) && workerProperties.roomSeqGapAudit.enabled) {
             roomSeqGapAuditWorker.poll()
         }
     }
@@ -68,5 +68,6 @@ class MessageWorkerScheduler(
         const val ROLE_FANOUT = "fanout"
         const val ROLE_ADMIN_EXPORT = "admin-export"
         const val ROLE_ROOM_POLICY = "room-policy"
+        const val ROLE_ROOM_SEQ_GAP_AUDIT = "room-seq-gap-audit"
     }
 }

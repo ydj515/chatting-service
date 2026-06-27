@@ -67,9 +67,9 @@
 | `CHAT_WORKER_FANOUT_CLAIM_INTERVAL_MILLIS` | `10000` | fanout worker가 pending claim을 수행하는 최소 주기 |
 | `CHAT_WORKER_FANOUT_MAX_DELIVERY_COUNT` | `5` | fanout worker record 처리 실패 후 DLQ로 보내는 delivery count 임계값 |
 | `CHAT_WORKER_ROOM_POLICY_POLL_DELAY_MILLIS` | `1000` | active room traffic snapshot을 읽어 heat/live feed/rate/slow-mode 정책을 자동 적용하는 주기 |
-| `CHAT_WORKER_ROOM_SEQ_GAP_AUDIT_ENABLED` | `true` | canonical `chat_messages`의 `room_seq` gap audit worker 활성화 여부 |
+| `CHAT_WORKER_ROOM_SEQ_GAP_AUDIT_ENABLED` | `true` | canonical `chat_messages`의 `room_seq` gap audit worker 활성화 여부. scheduler 실행에는 `WORKER_ROLES`에 `room-seq-gap-audit`도 포함되어야 함 |
 | `CHAT_WORKER_ROOM_SEQ_GAP_AUDIT_POLL_DELAY_MILLIS` | `60000` | `room_seq` gap audit polling fixed delay |
-| `CHAT_WORKER_ROOM_SEQ_GAP_AUDIT_LOOKBACK` | `1h` | gap audit가 최근 canonical 메시지를 스캔하는 lookback window |
+| `CHAT_WORKER_ROOM_SEQ_GAP_AUDIT_LOOKBACK` | `5m` | gap audit가 최근 canonical 메시지를 스캔하는 lookback window |
 | `REDIS_HOST` | `redis` | standalone Redis host. host Gradle 개발 모드에서 사용 |
 | `REDIS_PORT` | `6379` | standalone Redis 내부 포트. host Gradle 개발 모드에서 사용 |
 | `REDIS_CLUSTER_NODES` | `redis-cluster-node-1:6379,...,redis-cluster-node-6:6379` | `redis-cluster` Spring profile에서 사용하는 Lettuce cluster seed node 목록 |
@@ -112,7 +112,7 @@ Redis cache value serializer는 Kotlin/JavaTime module과 함께 `GenericJackson
 
 Redis Cluster node의 host port는 `127.0.0.1`에만 bind한다. Cluster discovery를 위해 container 내부 설정은 `protected-mode no`를 사용하므로, host 외부 인터페이스에는 Redis port를 공개하지 않는다.
 
-> Redis Cluster node 설정은 `appendfsync everysec`를 사용한다. Redis node 장애 또는 host crash 시 마지막 fsync 이후 최대 1초의 Redis ingest가 손실될 수 있으며, Phase 8.7 gap audit에서 감지 경로를 제공한다. `CHAT_REDIS_STREAMS_MAX_LEN`은 Redis OOM 방어용 backpressure이고 메시지 보존 보장이 아니므로, `chat.room_seq.gap.*` metric alert와 함께 운영해야 한다.
+> Redis Cluster node 설정은 `appendfsync everysec`를 사용한다. Redis node 장애 또는 host crash 시 마지막 fsync 이후 최대 1초의 Redis ingest가 손실될 수 있으며, Phase 8.7 gap audit에서 감지 경로를 제공한다. `CHAT_REDIS_STREAMS_MAX_LEN`은 Redis OOM 방어용 backpressure이고 메시지 보존 보장이 아니므로, `chat.room_seq.gap.*` metric alert와 함께 운영해야 한다. audit worker는 중복 스캔을 피하기 위해 전용 `room-seq-gap-audit` role을 가진 worker에서만 실행한다.
 
 | `CHAT_API_CORS_ALLOWED_ORIGINS` | `*` | REST API CORS 허용 origin |
 | `CHAT_WEBSOCKET_ALLOWED_ORIGINS` | `*` | WebSocket 허용 origin |

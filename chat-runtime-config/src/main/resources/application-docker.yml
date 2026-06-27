@@ -201,7 +201,7 @@ chat:
     room-seq-gap-audit:
       enabled: ${CHAT_WORKER_ROOM_SEQ_GAP_AUDIT_ENABLED:true}
       poll-delay-millis: ${CHAT_WORKER_ROOM_SEQ_GAP_AUDIT_POLL_DELAY_MILLIS:60000}
-      lookback: ${CHAT_WORKER_ROOM_SEQ_GAP_AUDIT_LOOKBACK:1h}
+      lookback: ${CHAT_WORKER_ROOM_SEQ_GAP_AUDIT_LOOKBACK:5m}
     writer:
       consumer-group: ${CHAT_WORKER_WRITER_CONSUMER_GROUP:message-writer}
       read-count: ${CHAT_WORKER_WRITER_READ_COUNT:100}

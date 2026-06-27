@@ -43,6 +43,6 @@ data class ChatWorkerProperties(
     data class RoomSeqGapAudit(
         val enabled: Boolean = true,
         val pollDelayMillis: Long = 60_000,
-        val lookback: Duration = Duration.ofHours(1),
+        val lookback: Duration = Duration.ofMinutes(5),
     )
 }

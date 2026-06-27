@@ -111,6 +111,10 @@ Reconnect load test 시나리오와 정상 reconnect 실패율 계산 기준은 
 | `chat.redis.stream.dead_letters` | Counter | `consumer_group`, `stream_shard` | max delivery 초과 후 dead-letter stream으로 이동한 record 수 |
 | `chat.redis.stream.group.lag` | Gauge | `stream_shard`, `consumer_group` | `XINFO GROUPS`의 group lag를 stream shard 단위로 합산 |
 | `chat.redis.stream.group.pending` | Gauge | `stream_shard`, `consumer_group` | `XPENDING` summary pending count를 stream shard 단위로 합산 |
+| `chat.room_seq.gap.rooms` | Gauge | 없음 | 최근 canonical audit window에서 `room_seq` gap이 있는 room 수 |
+| `chat.room_seq.gap.missing_sequences` | Gauge | 없음 | 최근 canonical audit window에서 비어 있는 `room_seq` 총합 |
+| `chat.room_seq.gap.max_width` | Gauge | 없음 | 최근 canonical audit window에서 관측된 가장 큰 단일 gap width |
+| `chat.room_seq.gap.scanned_rooms` | Gauge | 없음 | 최근 canonical audit window에서 스캔한 room 수 |
 | fanout worker lag | Gauge | `fanoutShard` | fan-out 지연 |
 | fanout batch size | DistributionSummary | `fanoutShard` | batch 효율 |
 | `chat.fanout.owner.lease.acquire` | Counter | `outcome=success|failure`, `reason` | owner lease 획득 성공/실패 |
@@ -126,6 +130,7 @@ Phase 7 명시 task:
 - 2026-06-24 Redis Streams worker metric 슬라이스에서 append latency, consumer read/claim records, worker batch latency, worker processed records, dead-letter counters를 추가했다. 이 metric들은 애플리케이션 처리 경로의 event/timer 신호이며, Redis 서버의 전체 backlog를 직접 재는 gauge는 별도 후속 슬라이스로 남긴다.
 - 2026-06-24 Redis Streams direct lag gauge 슬라이스에서 `XINFO GROUPS`와 `XPENDING` summary 기반 `chat.redis.stream.group.lag`, `chat.redis.stream.group.pending` gauge를 추가했다. tag는 `stream_shard`, `consumer_group`으로 제한하고 room stream key와 `roomId`는 tag로 쓰지 않는다.
 - 2026-06-24 Redis Streams lag alert rule 슬라이스에서 `infra/prometheus/rules/phase7-redis-streams-lag.rules.yml`를 추가했다. rule은 `consumer_group`, `stream_shard` aggregation만 사용하며 warning/critical threshold를 분리한다.
+- 2026-06-27 Phase 8.7 roomSeq gap audit 슬라이스에서 `infra/prometheus/rules/phase8-room-seq-gap.rules.yml`를 추가했다. rule은 room별 label 없이 aggregate gauge만 사용하고, sequence allocation 이후 append 실패로 생긴 allowed hole 가능성이 있어 warning으로 시작한다.
 - 일반적인 worker death takeover, 즉 worker A 사망 후 TTL 만료와 worker B 신규 acquire가 발생한 경우를 `takeovers` counter가 직접 세는지 확인한다.
 - 직접 계측이 어렵다면 `lease.lost`, `pending claim`, smoke runner summary를 조합한 derived signal로 정의하고, 문서의 reason tag를 실제 구현 가능한 값으로 낮춘다.
 - 2026-06-20 사전 점검에서 `roomSeq order violated: 77 came after 600` flake가 1회 관측되었으므로, owner kill takeover smoke summary는 raw delivery order와 client-visible render result를 분리해서 기록한다.
@@ -139,6 +144,8 @@ Phase 7 명시 task:
 - `RedisStreamsGroupLagCritical`: `chat_redis_stream_group_lag > 1000` for `5m`
 - `RedisStreamsGroupPendingSustained`: `chat_redis_stream_group_pending > 0` for `5m`
 - `RedisStreamsGroupPendingCritical`: `chat_redis_stream_group_pending > 100` for `10m`
+- `RoomSeqGapDetected`: `max(chat_room_seq_gap_missing_sequences) > 0` for `2m`
+- `RoomSeqGapWidthElevated`: `max(chat_room_seq_gap_max_width) > 100` for `5m`
 - writer failure rate 증가
 - `chat.message.admission.rejected{reason="redis_error"}`가 5분 동안 1건 이상 발생
 - `room_rate_limited`, `user_rate_limited`, `slow_mode_active`가 배포 직후 기준선보다 급증
