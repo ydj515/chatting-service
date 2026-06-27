@@ -86,13 +86,14 @@ class WebSocketSessionManager(
             gatewayProperties.outboundSendTimeLimitMillis,
             gatewayProperties.outboundSendBufferSizeLimitBytes,
         )
+        val nowMillis = clock.millis()
 
         val sessionRef = SessionRef(
             userId = userId,
             session = outboundSession,
             roomIds = ConcurrentHashMap.newKeySet(),
-            lastActivityAtMillis = AtomicLong(clock.millis()),
-            lastHeartbeatSentAtMillis = AtomicLong(0L),
+            lastActivityAtMillis = AtomicLong(nowMillis),
+            lastHeartbeatSentAtMillis = AtomicLong(nowMillis),
             outboundQueue = BoundedOutboundSessionQueue(
                 maxPendingMessages = gatewayProperties.outboundQueueMaxPendingMessages,
                 executor = outboundExecutor,
@@ -139,7 +140,7 @@ class WebSocketSessionManager(
             return
         }
 
-        sessionsById.values.toList().forEach { sessionRef ->
+        sessionsById.values.forEach { sessionRef ->
             val session = sessionRef.session
             if (!session.isOpen) {
                 removeSession(sessionRef.userId, session)
@@ -336,6 +337,7 @@ class WebSocketSessionManager(
             sessionRef.lastHeartbeatSentAtMillis.set(nowMillis)
         } catch (e: Exception) {
             logger.debug("Failed to send heartbeat ping to WebSocket session ${sessionRef.session.id}", e)
+            closeSession(sessionRef.session, HEARTBEAT_TIMEOUT_STATUS)
             removeSession(sessionRef.userId, sessionRef.session)
         }
     }

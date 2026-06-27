@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentMatchers.any
 import org.mockito.Mockito.clearInvocations
+import org.mockito.Mockito.doThrow
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
@@ -45,6 +46,23 @@ class WebSocketSessionManagerHeartbeatTest {
     }
 
     @Test
+    fun `새 세션은 heartbeat interval 전에 즉시 ping을 보내지 않는다`() {
+        val session = session("session-1")
+        val manager = manager(
+            clock = Clock.fixed(Instant.ofEpochMilli(1_000), ZoneOffset.UTC),
+            properties = ChatWebSocketGatewayProperties(
+                heartbeatIntervalMillis = 30_000,
+                heartbeatTimeoutMillis = 90_000,
+            ),
+        )
+        manager.addSession(7L, session)
+
+        manager.pollHeartbeats(nowMillis = 1_001)
+
+        verify(session, never()).sendMessage(any(PingMessage::class.java))
+    }
+
+    @Test
     fun `heartbeat timeout을 넘긴 세션은 닫고 인덱스에서 제거한다`() {
         val session = session("session-1")
         val manager = manager(
@@ -59,7 +77,32 @@ class WebSocketSessionManagerHeartbeatTest {
 
         manager.pollHeartbeats(nowMillis = 91_001)
 
-        verify(session).close(any(CloseStatus::class.java))
+        verify(session).close(
+            CloseStatus(4004, "Heartbeat timeout"),
+        )
+        assertFalse(manager.sendTextToSession(session, """{"type":"PING"}"""))
+    }
+
+    @Test
+    fun `heartbeat ping 전송 실패 시 세션을 닫고 인덱스에서 제거한다`() {
+        val session = session("session-1")
+        val manager = manager(
+            clock = Clock.fixed(Instant.ofEpochMilli(1_000), ZoneOffset.UTC),
+            properties = ChatWebSocketGatewayProperties(
+                heartbeatIntervalMillis = 30_000,
+                heartbeatTimeoutMillis = 90_000,
+            ),
+        )
+        manager.addSession(7L, session)
+        doThrow(RuntimeException("write failed"))
+            .`when`(session)
+            .sendMessage(any(PingMessage::class.java))
+
+        manager.pollHeartbeats(nowMillis = 31_000)
+
+        verify(session).close(
+            CloseStatus(4004, "Heartbeat timeout"),
+        )
         assertFalse(manager.sendTextToSession(session, """{"type":"PING"}"""))
     }
 

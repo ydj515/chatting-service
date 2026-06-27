@@ -124,7 +124,7 @@ Redis Streams append는 기본적으로 `CHAT_REDIS_STREAMS_MAX_LEN=1000000`, `C
 
 `RoomSeqGapAuditWorker`는 `CHAT_WORKER_ROOM_SEQ_GAP_AUDIT_ENABLED=true`이고 `WORKER_ROLES`에 `room-seq-gap-audit`이 포함된 worker에서만 실행한다. 기본적으로 `CHAT_WORKER_ROOM_SEQ_GAP_AUDIT_POLL_DELAY_MILLIS=60000` 주기로 최근 `CHAT_WORKER_ROOM_SEQ_GAP_AUDIT_LOOKBACK=5m` window의 `chat_messages`를 message read datasource에서 스캔한다. audit 실패는 메시지 writer/fanout hot path를 막지 않고 warn log만 남긴다. gap metric은 자동 복구가 아니라 운영 감지 신호이며, sequence 발급 이후 append 실패로 생긴 hole 가능성이 있으므로 alert는 warning으로 시작해 Redis append failure, worker lag, canonical 저장 지표와 함께 판정한다.
 
-WebSocket Gateway는 `CHAT_WEBSOCKET_GATEWAY_HEARTBEAT_ENABLED=true`일 때 `CHAT_WEBSOCKET_GATEWAY_HEARTBEAT_INTERVAL_MILLIS=30000` 주기로 열린 session에 protocol ping frame을 보낸다. `CHAT_WEBSOCKET_GATEWAY_HEARTBEAT_TIMEOUT_MILLIS=90000` 동안 pong frame이나 inbound message가 없으면 zombie connection으로 보고 `4004 Heartbeat timeout`으로 닫아 file descriptor와 outbound queue 상태를 회수한다.
+WebSocket Gateway는 `CHAT_WEBSOCKET_GATEWAY_HEARTBEAT_ENABLED=true`일 때 `CHAT_WEBSOCKET_GATEWAY_HEARTBEAT_SCHEDULER_POLL_INTERVAL_MILLIS=10000` 주기로 열린 session의 heartbeat 상태를 점검하고, 마지막 ping 이후 `CHAT_WEBSOCKET_GATEWAY_HEARTBEAT_INTERVAL_MILLIS=30000`이 지나면 protocol ping frame을 보낸다. `CHAT_WEBSOCKET_GATEWAY_HEARTBEAT_TIMEOUT_MILLIS=90000` 동안 pong frame이나 inbound message가 없으면 zombie connection으로 보고 `4004 Heartbeat timeout`으로 닫아 file descriptor와 outbound queue 상태를 회수한다.
 
 `redis-cluster-init`은 `REDIS_CLUSTER_NODES`와 `REDIS_CLUSTER_BOOTSTRAP_TIMEOUT_SECONDS`를 사용한다. node 준비나 cluster convergence가 timeout 안에 끝나지 않으면 cluster diagnostics를 출력하고 실패한다.
 

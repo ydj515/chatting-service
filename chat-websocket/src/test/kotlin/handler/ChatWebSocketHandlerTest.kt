@@ -19,6 +19,8 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.mockingDetails
 import org.mockito.Mockito.verify
+import org.mockito.Mockito.verifyNoInteractions
+import org.mockito.Mockito.verifyNoMoreInteractions
 import org.mockito.Mockito.`when`
 import org.springframework.web.socket.PongMessage
 import org.springframework.web.socket.TextMessage
@@ -49,6 +51,8 @@ class ChatWebSocketHandlerTest {
         handler.handleMessage(session, PongMessage(ByteBuffer.allocate(0)))
 
         verify(sessionManager).recordSessionActivity(session)
+        verifyNoMoreInteractions(sessionManager)
+        verifyNoInteractions(chatService)
     }
 
     @Test

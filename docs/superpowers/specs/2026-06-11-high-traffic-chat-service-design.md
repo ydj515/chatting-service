@@ -1949,7 +1949,7 @@ node scripts/load-chat.mjs --room hot --viewers 10000 --messages-per-sec 10000 -
 
 - Redis Streams append에 `MAXLEN`(기본 approximate trim)을 적용해 HPA 지연이나 worker 정체 시 Redis OOM을 방지한다. 유실을 감수하는 대신 Redis lag/memory metric과 `roomSeq` gap audit metric으로 경보한다.
 - `roomSeq` gap audit job을 추가한다. canonical store의 `(room_id, room_seq)`를 스캔해 비어 있는 sequence를 aggregate metric으로 노출한다. MAXLEN trim이나 장애로 유실이 생겨도 감지 수단이 있어야 한다.
-- WebSocket heartbeat(ping-pong)는 별도 작은 PR에서 구현한다. 일정 시간 내 pong/메시지가 없는 zombie connection을 강제 종료해 File Descriptor와 메모리를 회수한다.
+- WebSocket heartbeat(ping-pong)는 본 PR에서 구현한다. 일정 시간 내 pong/메시지가 없는 zombie connection을 강제 종료해 File Descriptor와 메모리를 회수한다.
 
 이번 Phase에서 하지 않을 것:
 

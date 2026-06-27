@@ -173,6 +173,7 @@ chat:
       outbound-send-buffer-size-limit-bytes: ${CHAT_WEBSOCKET_GATEWAY_OUTBOUND_SEND_BUFFER_SIZE_LIMIT_BYTES:524288}
       heartbeat-enabled: ${CHAT_WEBSOCKET_GATEWAY_HEARTBEAT_ENABLED:true}
       heartbeat-interval-millis: ${CHAT_WEBSOCKET_GATEWAY_HEARTBEAT_INTERVAL_MILLIS:30000}
+      heartbeat-scheduler-poll-interval-millis: ${CHAT_WEBSOCKET_GATEWAY_HEARTBEAT_SCHEDULER_POLL_INTERVAL_MILLIS:10000}
       heartbeat-timeout-millis: ${CHAT_WEBSOCKET_GATEWAY_HEARTBEAT_TIMEOUT_MILLIS:90000}
   redis:
     sequence-key-prefix: ${CHAT_REDIS_SEQUENCE_KEY_PREFIX:chat:sequence}

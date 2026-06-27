@@ -13,7 +13,7 @@ class WebSocketHeartbeatScheduler(
     private val clock: Clock = Clock.systemUTC(),
 ) {
 
-    @Scheduled(fixedDelayString = "\${chat.websocket.gateway.heartbeat-interval-millis:30000}")
+    @Scheduled(fixedDelayString = "\${chat.websocket.gateway.heartbeat-scheduler-poll-interval-millis:10000}")
     fun pollHeartbeat() {
         if (properties.heartbeatEnabled) {
             sessionManager.pollHeartbeats(clock.millis())
