@@ -118,7 +118,11 @@ docker compose exec -T redis-cluster-node-1 \
 
 Redis Cluster host port는 `127.0.0.1`에만 bind한다. `infra/redis/redis-cluster.conf`는 `protected-mode no`가 필요하므로, Compose port binding으로 외부 인터페이스 노출을 막는다.
 
-`infra/redis/redis-cluster.conf`는 `appendonly yes`, `appendfsync everysec`, `cluster-preferred-endpoint-type hostname`을 사용한다. 따라서 Redis node 장애나 host crash 시 마지막 fsync 이후 최대 1초의 Redis ingest가 손실될 수 있다. 이 위험은 Phase 8.7의 gap audit/heartbeat 경로에서 감지하고 운영 runbook으로 보정한다.
+`infra/redis/redis-cluster.conf`는 `appendonly yes`, `appendfsync everysec`, `cluster-preferred-endpoint-type hostname`을 사용한다. 따라서 Redis node 장애나 host crash 시 마지막 fsync 이후 최대 1초의 Redis ingest가 손실될 수 있다. Phase 8.7의 이번 PR은 Redis Streams `XADD MAXLEN`과 canonical `room_seq` gap audit로 Redis OOM 방어와 유실 감지 경로를 제공한다. WebSocket heartbeat와 zombie connection 회수는 다음 작은 PR에서 별도로 구현한다.
+
+Redis Streams append는 기본적으로 `CHAT_REDIS_STREAMS_MAX_LEN=1000000`, `CHAT_REDIS_STREAMS_MAX_LEN_APPROXIMATE=true`를 사용한다. 이 값은 stream key별 entry 상한이며, `0` 이하이면 bounded append를 비활성화한다. `MAXLEN`은 메시지 보존 보장이 아니라 Redis memory 보호용 backpressure이므로 worker lag, Redis memory, `chat.room_seq.gap.rooms`, `chat.room_seq.gap.missing_sequences`, `chat.room_seq.gap.max_width`, `chat.room_seq.gap.scanned_rooms` metric을 함께 봐야 한다.
+
+`RoomSeqGapAuditWorker`는 `CHAT_WORKER_ROOM_SEQ_GAP_AUDIT_ENABLED=true`이고 `WORKER_ROLES`에 `room-seq-gap-audit`이 포함된 worker에서만 실행한다. 기본적으로 `CHAT_WORKER_ROOM_SEQ_GAP_AUDIT_POLL_DELAY_MILLIS=60000` 주기로 최근 `CHAT_WORKER_ROOM_SEQ_GAP_AUDIT_LOOKBACK=5m` window의 `chat_messages`를 message read datasource에서 스캔한다. audit 실패는 메시지 writer/fanout hot path를 막지 않고 warn log만 남긴다. gap metric은 자동 복구가 아니라 운영 감지 신호이며, sequence 발급 이후 append 실패로 생긴 hole 가능성이 있으므로 alert는 warning으로 시작해 Redis append failure, worker lag, canonical 저장 지표와 함께 판정한다.
 
 `redis-cluster-init`은 `REDIS_CLUSTER_NODES`와 `REDIS_CLUSTER_BOOTSTRAP_TIMEOUT_SECONDS`를 사용한다. node 준비나 cluster convergence가 timeout 안에 끝나지 않으면 cluster diagnostics를 출력하고 실패한다.
 

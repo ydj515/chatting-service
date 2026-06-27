@@ -3,8 +3,14 @@ package com.chat.persistence.redis
 import com.chat.persistence.config.ChatRedisProperties
 import com.chat.persistence.service.MessageStreamMetrics
 import com.fasterxml.jackson.databind.ObjectMapper
+import org.springframework.data.redis.connection.RedisStreamCommands
+import org.springframework.data.redis.connection.stream.RecordId
+import org.springframework.data.redis.connection.stream.StreamRecords
+import org.springframework.data.redis.core.RedisCallback
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.stereotype.Service
+import java.nio.charset.StandardCharsets
+import java.util.LinkedHashMap
 import java.util.concurrent.ConcurrentHashMap
 
 @Service
@@ -29,7 +35,7 @@ class RedisMessageStreamProducer(
                 FIELD_STREAM_SHARD to envelope.streamShard.toString(),
                 FIELD_PAYLOAD to objectMapper.writeValueAsString(envelope),
             )
-            val recordId = redisTemplate.opsForStream<String, String>().add(streamKey, fields)
+            val recordId = appendToStream(streamKey, fields)
                 ?: throw IllegalStateException("Redis Streams append returned null: $streamKey")
 
             if (knownStreamsCache.add(streamKey)) {
@@ -50,6 +56,33 @@ class RedisMessageStreamProducer(
                 durationNanos = System.nanoTime() - startedAtNanos,
             )
         }
+    }
+
+    private fun appendToStream(streamKey: String, fields: Map<String, String>): RecordId? {
+        val streams = redisProperties.streams
+        if (streams.maxLen <= 0) {
+            return redisTemplate.opsForStream<String, String>().add(streamKey, fields)
+        }
+
+        val record = StreamRecords.newRecord()
+            .`in`(bytes(streamKey))
+            .ofBytes(rawFields(fields))
+        val options = RedisStreamCommands.XAddOptions.maxlen(streams.maxLen)
+            .approximateTrimming(streams.maxLenApproximate)
+
+        return redisTemplate.execute(RedisCallback<RecordId> { connection ->
+            connection.streamCommands().xAdd(record, options)
+        })
+    }
+
+    private fun rawFields(fields: Map<String, String>): Map<ByteArray, ByteArray> {
+        return fields.entries.associateTo(LinkedHashMap()) { (key, value) ->
+            bytes(key) to bytes(value)
+        }
+    }
+
+    private fun bytes(value: String): ByteArray {
+        return value.toByteArray(StandardCharsets.UTF_8)
     }
 
     private companion object {
