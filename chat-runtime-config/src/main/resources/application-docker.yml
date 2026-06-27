@@ -196,7 +196,7 @@ chat:
       key-prefix: ${CHAT_REDIS_ADMISSION_KEY_PREFIX:chat:admission:room:}
       rate-limit-window-ttl: ${CHAT_REDIS_ADMISSION_RATE_LIMIT_WINDOW_TTL:2s}
   worker:
-    roles: ${WORKER_ROLES:message-writer,fanout,admin-export,room-policy}
+    roles: ${WORKER_ROLES:message-writer,fanout,admin-export,room-policy,room-seq-gap-audit}
     consumer-name: ${HOSTNAME:worker-local}
     poll-delay-millis: ${CHAT_WORKER_POLL_DELAY_MILLIS:100}
     redis-stream-lag:

@@ -1,0 +1,1 @@
+/Users/dongjin/.local/share/mise/installs/node/24.13.0/bin/node scripts/load-chat.mjs --room hot --viewers 10000 --messages-per-sec 10000 --duration 60 --min-received-ratio 0.9 failed with code 1: fetch failed

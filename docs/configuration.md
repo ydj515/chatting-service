@@ -54,7 +54,7 @@
 | `MINIO_ROOT_PASSWORD` | `chatminiosecret` | Compose MinIO root password |
 | `MINIO_API_PORT` | `9000` | 호스트 loopback에 노출할 MinIO S3 API 포트 |
 | `MINIO_CONSOLE_PORT` | `9001` | 호스트 loopback에 노출할 MinIO console 포트 |
-| `WORKER_ROLES` | `message-writer,fanout,admin-export,room-policy` | `chat-worker-application`에서 활성화할 worker role 목록 |
+| `WORKER_ROLES` | `message-writer,fanout,admin-export,room-policy,room-seq-gap-audit` | `chat-worker-application`에서 활성화할 worker role 목록 |
 | `CHAT_WORKER_POLL_DELAY_MILLIS` | `100` | worker scheduler poll 간격 |
 | `CHAT_WORKER_WRITER_CONSUMER_GROUP` | `message-writer` | Redis Streams writer consumer group 이름 |
 | `CHAT_WORKER_WRITER_READ_COUNT` | `100` | writer worker가 poll 1회에 읽을 최대 stream record 수 |
@@ -67,7 +67,7 @@
 | `CHAT_WORKER_FANOUT_CLAIM_INTERVAL_MILLIS` | `10000` | fanout worker가 pending claim을 수행하는 최소 주기 |
 | `CHAT_WORKER_FANOUT_MAX_DELIVERY_COUNT` | `5` | fanout worker record 처리 실패 후 DLQ로 보내는 delivery count 임계값 |
 | `CHAT_WORKER_ROOM_POLICY_POLL_DELAY_MILLIS` | `1000` | active room traffic snapshot을 읽어 heat/live feed/rate/slow-mode 정책을 자동 적용하는 주기 |
-| `CHAT_WORKER_ROOM_SEQ_GAP_AUDIT_ENABLED` | `true` | canonical `chat_messages`의 `room_seq` gap audit worker 활성화 여부. scheduler 실행에는 `WORKER_ROLES`에 `room-seq-gap-audit`도 포함되어야 함 |
+| `CHAT_WORKER_ROOM_SEQ_GAP_AUDIT_ENABLED` | `true` | canonical `chat_messages`의 `room_seq` gap audit worker 활성화 여부. 기본 Compose cluster의 `WORKER_ROLES`에는 `room-seq-gap-audit`가 포함됨 |
 | `CHAT_WORKER_ROOM_SEQ_GAP_AUDIT_POLL_DELAY_MILLIS` | `60000` | `room_seq` gap audit polling fixed delay |
 | `CHAT_WORKER_ROOM_SEQ_GAP_AUDIT_LOOKBACK` | `5m` | gap audit가 최근 canonical 메시지를 스캔하는 lookback window |
 | `REDIS_HOST` | `redis` | standalone Redis host. host Gradle 개발 모드에서 사용 |
@@ -112,7 +112,7 @@ Redis cache value serializer는 Kotlin/JavaTime module과 함께 `GenericJackson
 
 Redis Cluster node의 host port는 `127.0.0.1`에만 bind한다. Cluster discovery를 위해 container 내부 설정은 `protected-mode no`를 사용하므로, host 외부 인터페이스에는 Redis port를 공개하지 않는다.
 
-> Redis Cluster node 설정은 `appendfsync everysec`를 사용한다. Redis node 장애 또는 host crash 시 마지막 fsync 이후 최대 1초의 Redis ingest가 손실될 수 있으며, Phase 8.7 gap audit에서 감지 경로를 제공한다. `CHAT_REDIS_STREAMS_MAX_LEN`은 Redis OOM 방어용 backpressure이고 메시지 보존 보장이 아니므로, `chat.room_seq.gap.*` metric alert와 함께 운영해야 한다. audit worker는 중복 스캔을 피하기 위해 전용 `room-seq-gap-audit` role을 가진 worker에서만 실행한다.
+> Redis Cluster node 설정은 `appendfsync everysec`를 사용한다. Redis node 장애 또는 host crash 시 마지막 fsync 이후 최대 1초의 Redis ingest가 손실될 수 있으며, Phase 8.7 gap audit에서 감지 경로를 제공한다. `CHAT_REDIS_STREAMS_MAX_LEN`은 Redis OOM 방어용 backpressure이고 메시지 보존 보장이 아니므로, `chat.room_seq.gap.*` metric alert와 함께 운영해야 한다. 기본 Compose cluster는 `room-seq-gap-audit` role을 포함해 audit worker를 활성화한다. 대규모 운영에서는 중복 스캔을 피하기 위해 전용 worker replica로 role을 분리할 수 있다.
 
 | `CHAT_API_CORS_ALLOWED_ORIGINS` | `*` | REST API CORS 허용 origin |
 | `CHAT_WEBSOCKET_ALLOWED_ORIGINS` | `*` | WebSocket 허용 origin |

@@ -91,6 +91,15 @@ class MessageWorkerSchedulerTest {
     }
 
     @Test
+    fun `기본 worker roles에는 roomSeq gap audit role이 포함되어 gap audit worker를 poll한다`() {
+        val fixture = schedulerFixture(ChatWorkerProperties())
+
+        fixture.scheduler.pollRoomSeqGapAudit()
+
+        verify(fixture.roomSeqGapAuditWorker).poll()
+    }
+
+    @Test
     fun `roomSeq gap audit role과 enabled가 모두 켜져 있으면 gap audit worker를 poll한다`() {
         val fixture = schedulerFixture(ChatWorkerProperties(roles = setOf("room-seq-gap-audit")))
 
@@ -101,7 +110,7 @@ class MessageWorkerSchedulerTest {
 
     @Test
     fun `roomSeq gap audit role이 없으면 gap audit worker를 poll하지 않는다`() {
-        val fixture = schedulerFixture(ChatWorkerProperties())
+        val fixture = schedulerFixture(ChatWorkerProperties(roles = setOf("message-writer", "fanout")))
 
         fixture.scheduler.pollRoomSeqGapAudit()
 

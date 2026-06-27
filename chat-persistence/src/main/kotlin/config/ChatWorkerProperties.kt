@@ -5,7 +5,13 @@ import java.time.Duration
 
 @ConfigurationProperties(prefix = "chat.worker")
 data class ChatWorkerProperties(
-    val roles: Set<String> = setOf("message-writer", "fanout", "admin-export", "room-policy"),
+    val roles: Set<String> = setOf(
+        "message-writer",
+        "fanout",
+        "admin-export",
+        "room-policy",
+        "room-seq-gap-audit",
+    ),
     val consumerName: String = "worker-local",
     val pollDelayMillis: Long = 100,
     val writer: StreamConsumer = StreamConsumer(

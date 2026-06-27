@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>고트래픽 채팅 서비스 Production Readiness 평가 (2026-06-28, Phase 8 구현 확인 기준)</title>
+<style>
+  :root {
+    --bg: #101216;
+    --panel: #171b22;
+    --panel-2: #1d232d;
+    --panel-3: #222a35;
+    --border: #303846;
+    --text: #eceff4;
+    --muted: #a7b0bf;
+    --accent: #7ab7ff;
+    --ok: #5ad391;
+    --warn: #ffd05a;
+    --high: #ff9f5a;
+    --bad: #ff6b6b;
+    --code: #11151c;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Apple SD Gothic Neo", "Segoe UI", "Malgun Gothic", sans-serif;
+    line-height: 1.68;
+    font-size: 15px;
+  }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 44px 24px 96px; }
+  header.page {
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 28px;
+    margin-bottom: 34px;
+  }
+  .eyebrow {
+    color: var(--accent);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+  }
+  h1 { margin: 10px 0 8px; font-size: 30px; line-height: 1.28; letter-spacing: 0; }
+  h2 { margin: 52px 0 14px; font-size: 22px; line-height: 1.35; letter-spacing: 0; }
+  h3 { margin: 28px 0 10px; font-size: 17px; line-height: 1.4; letter-spacing: 0; }
+  p { margin: 9px 0; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code {
+    background: var(--code);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    color: #d7eaff;
+    font-family: "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+    font-size: 12.5px;
+    padding: 1px 6px;
+  }
+  .meta { color: var(--muted); font-size: 13.5px; }
+  .verdict {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--warn);
+    border-radius: 8px;
+    padding: 22px 24px;
+    margin: 22px 0;
+  }
+  .verdict .label { color: var(--muted); font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+  .verdict .big { color: #fff; font-size: 21px; font-weight: 800; margin: 6px 0 4px; }
+  .grid { display: grid; gap: 14px; }
+  .cards { grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 18px 0 24px; }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 15px 16px;
+  }
+  .card .n { font-size: 25px; font-weight: 850; }
+  .card .t { color: var(--muted); font-size: 13px; margin-top: 2px; }
+  .ok .n { color: var(--ok); }
+  .warn .n { color: var(--warn); }
+  .high .n { color: var(--high); }
+  .bad .n { color: var(--bad); }
+  .toc {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 15px 20px;
+    columns: 2;
+    column-gap: 34px;
+    margin: 18px 0 22px;
+  }
+  .toc a { display: block; break-inside: avoid; padding: 3px 0; font-size: 13.5px; }
+  table { width: 100%; border-collapse: collapse; margin: 15px 0 20px; font-size: 13.5px; }
+  th, td { border-bottom: 1px solid var(--border); padding: 10px 12px; text-align: left; vertical-align: top; }
+  th { background: var(--panel-2); color: var(--muted); font-size: 12px; font-weight: 750; letter-spacing: .03em; text-transform: uppercase; }
+  tr:hover td { background: rgba(255,255,255,.018); }
+  ul, ol { margin: 8px 0 12px; padding-left: 22px; }
+  li { margin: 4px 0; }
+  .badge {
+    display: inline-block;
+    border-radius: 999px;
+    font-size: 11.5px;
+    font-weight: 800;
+    line-height: 1.4;
+    padding: 2px 9px;
+    white-space: nowrap;
+  }
+  .b-ok { background: rgba(90,211,145,.14); border: 1px solid rgba(90,211,145,.36); color: var(--ok); }
+  .b-warn { background: rgba(255,208,90,.13); border: 1px solid rgba(255,208,90,.34); color: var(--warn); }
+  .b-high { background: rgba(255,159,90,.14); border: 1px solid rgba(255,159,90,.36); color: var(--high); }
+  .b-bad { background: rgba(255,107,107,.14); border: 1px solid rgba(255,107,107,.36); color: var(--bad); }
+  .note {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: 8px;
+    color: #dce3ed;
+    padding: 14px 18px;
+    margin: 16px 0;
+  }
+  blockquote {
+    background: var(--panel);
+    border-left: 3px solid var(--high);
+    border-radius: 8px;
+    color: #dce3ed;
+    margin: 18px 0;
+    padding: 13px 18px;
+  }
+  blockquote p { margin: 6px 0; }
+  .finding {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin: 14px 0;
+    padding: 17px 19px;
+  }
+  .finding h3 { margin-top: 0; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .small { color: var(--muted); font-size: 13px; }
+  .cols { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  footer {
+    color: var(--muted);
+    border-top: 1px solid var(--border);
+    font-size: 12.5px;
+    margin-top: 62px;
+    padding-top: 18px;
+  }
+  @media (max-width: 760px) {
+    .cards, .cols { grid-template-columns: 1fr; }
+    .toc { columns: 1; }
+    .wrap { padding: 34px 16px 72px; }
+    table { font-size: 12.8px; }
+    th, td { padding: 9px 8px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="page">
+  <div class="eyebrow">Production Readiness Assessment</div>
+  <h1>고트래픽 클러스터 채팅 서비스 실서비스 투입 가능성 평가</h1>
+  <p class="meta">
+    평가일: 2026-06-28 (Asia/Seoul) · 기준 브랜치: <code>main</code> · HEAD: <code>697957b</code> ·
+    범위: Phase 8.1부터 Phase 8.7까지 실제 코드, 설정, 문서, 테스트 확인 및 full Docker release gate 실행 ·
+    이전 보고서: <code>production-readiness-assessment-2026-06-25.html</code>
+  </p>
+</header>
+
+<section class="verdict">
+  <div class="label">종합 판정</div>
+  <div class="big">Phase 8 구현으로 운영 검증 토대는 크게 보강됨. 다만 공개 고트래픽 production은 아직 조건부 No-Go.</div>
+  <p>
+    2026-06-25 보고서의 핵심 Blocker였던 Redis SPOF, Object Storage 부재, Prometheus 수집 파이프라인 부재,
+    hot room shard 미분산, moderation, token revocation, MAXLEN/gap audit, heartbeat는 코드, Compose, running-stack smoke 기준으로 대부분 해소되었다.
+    그러나 TLS/wss, 운영 secret 관리, K8s/HPA/DR, Alertmanager/온콜, 실제 10k running-stack gate가
+    2026-06-28 01:40 KST 재시도에서 5,104 ticket 발급/소비 후 <code>fetch failed</code>로 실패했으므로
+    공개 인터넷 SLA를 받는 production으로는 보류가 맞다. 제한 베타 또는 production rehearsal 환경으로는 진입 가능하다.
+  </p>
+</section>
+
+<div class="grid cards">
+  <div class="card ok"><div class="n">7/7</div><div class="t">Phase 8 슬라이스 코드 구현 확인</div></div>
+  <div class="card ok"><div class="n">통과</div><div class="t">Gradle 전체 테스트와 Phase 8 Node 테스트</div></div>
+  <div class="card high"><div class="n">5</div><div class="t">공개 production 전 High/Blocker 잔여 축</div></div>
+  <div class="card bad"><div class="n">실패</div><div class="t">full 10k stack release gate 실행 결과</div></div>
+</div>
+
+<nav class="toc">
+  <a href="#requirements">1. 평가 조건과 목표</a>
+  <a href="#delta">2. 2026-06-25 보고서 대비 변화</a>
+  <a href="#phase8">3. Phase 8 구현 확인 결과</a>
+  <a href="#residual">4. 남은 운영 리스크</a>
+  <a href="#verification">5. 이번에 실행한 검증</a>
+  <a href="#complexity">6. 복잡도와 평가 한계</a>
+  <a href="#alternatives">7. 배포 대안</a>
+  <a href="#roadmap">8. 권장 실행 순서</a>
+  <a href="#caveats">9. 주의사항</a>
+  <a href="#next">10. 후속 질문</a>
+</nav>
+
+<h2 id="requirements">1. 평가 조건과 목표</h2>
+<table>
+  <thead>
+    <tr><th>구분</th><th>내용</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>조건</td>
+      <td>
+        현재 저장소의 <code>main</code> HEAD <code>697957b</code>를 기준으로 코드, Docker Compose, infra 설정, 운영 문서,
+        테스트를 직접 확인했다. 외부 클라우드, 실제 managed Redis/S3, K8s 클러스터, 온콜 알림 시스템은 평가 범위 밖이다.
+      </td>
+    </tr>
+    <tr>
+      <td>목표</td>
+      <td>
+        2026-06-25 보고서에서 Blocker/High로 지적한 항목이 Phase 8 구현으로 얼마나 해소됐는지 확인하고,
+        공개 production 투입 전 남은 위험을 분리해 정리한다.
+      </td>
+    </tr>
+    <tr>
+      <td>판정 기준</td>
+      <td>
+        단순 기능 구현 여부가 아니라, 장애 감지, 데이터 보존, 확장성, 보안, 배포 자동화, 실제 release gate 실행 가능성을 함께 본다.
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="delta">2. 2026-06-25 보고서 대비 변화</h2>
+<p>
+  이전 HTML 보고서는 Phase 7 기준으로 작성되어, 관측 파이프라인과 인프라 토대가 크게 비어 있었다.
+  현재 HEAD에서는 Phase 8.1부터 8.7까지의 보강이 반영되어 판정이 크게 바뀐다.
+</p>
+
+<table>
+  <thead>
+    <tr><th>이전 지적</th><th>현재 상태</th><th>판정 변화</th><th>주요 근거</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Prometheus/관측 파이프라인 부재</td>
+      <td>Prometheus registry, <code>/actuator/prometheus</code>, Prometheus/Grafana Compose, dashboard, rules 추가</td>
+      <td><span class="badge b-ok">해소</span></td>
+      <td><code>chat-persistence/build.gradle.kts</code>, <code>application-docker.yml</code>, <code>infra/prometheus</code>, <code>infra/grafana</code></td>
+    </tr>
+    <tr>
+      <td>Gateway/Fan-out 실측 metric 부재</td>
+      <td>connection, room subscription, send queue depth, outbound bytes, batch frames, write latency histogram, slow client disconnect metric 추가</td>
+      <td><span class="badge b-ok">대부분 해소</span></td>
+      <td><code>WebSocketGatewayMetrics</code>, <code>WebSocketSessionManager</code></td>
+    </tr>
+    <tr>
+      <td>Redis 단일 인스턴스 SPOF</td>
+      <td>cluster profile 기준 6노드 Redis Cluster와 init gate, Lettuce cluster profile 추가</td>
+      <td><span class="badge b-ok">해소</span></td>
+      <td><code>docker-compose.yml</code>, <code>application-redis-cluster.yml</code>, <code>infra/redis/redis-cluster.conf</code></td>
+    </tr>
+    <tr>
+      <td>Object Storage와 cold archive 부재</td>
+      <td>MinIO, S3 adapter, admin export object upload, partition archive CSV/metadata upload 구현</td>
+      <td><span class="badge b-ok">해소</span></td>
+      <td><code>S3ObjectStorageAdapter</code>, <code>AdminMessageExportWorker</code>, <code>archive-partitions.sh</code></td>
+    </tr>
+    <tr>
+      <td>hot room shard 실제 분산 미적용</td>
+      <td>room policy 기반 shard count 확장과 수락 시 write/stream/fanout shard 계산은 구현됨. 10k release gate는 full Docker cluster에서 실제 실행했으나 rate-limit 보강 후에도 viewer 준비 중 5,104 ticket 지점에서 실패</td>
+      <td><span class="badge b-bad">shard 구현 완료, gate 실측 실패</span></td>
+      <td><code>ChatServiceImpl</code>, <code>RoomHeatClassifier</code>, <code>phase8-hot-room-release-gate.mjs</code></td>
+    </tr>
+    <tr>
+      <td>moderation, ban/mute/suspend 부재</td>
+      <td>GLOBAL/ROOM moderation rule, ROOM MUTE/BAN, GLOBAL SUSPEND, admin API, audit log, rejection metric 추가</td>
+      <td><span class="badge b-ok">해소</span></td>
+      <td><code>AdminModerationController</code>, <code>MessageModerationService</code>, <code>UserSanctionService</code></td>
+    </tr>
+    <tr>
+      <td>token revocation과 강제 logout 부재</td>
+      <td>token denylist, user revoke-after, logout endpoint, global suspend 후 force logout pub/sub 구현</td>
+      <td><span class="badge b-ok">해소</span></td>
+      <td><code>HmacSessionTokenService</code>, <code>RedisSessionTokenRevocationStore</code>, <code>RedisSessionControlBroker</code></td>
+    </tr>
+    <tr>
+      <td>Redis Streams MAXLEN 부재</td>
+      <td><code>XADD MAXLEN</code> bounded append와 approximate/exact trim 설정 구현, 관련 단위 테스트 통과</td>
+      <td><span class="badge b-ok">구현 및 테스트 완료</span></td>
+      <td><code>RedisMessageStreamProducer</code>, <code>RedisMessageStreamProducerTest</code></td>
+    </tr>
+    <tr>
+      <td>roomSeq gap audit와 heartbeat 미구현 지적</td>
+      <td>gap audit repository/worker/metric/rule과 WebSocket ping/pong heartbeat 구현. 기본 Compose worker role, <code>.env.example</code>, 로컬 cluster env를 <code>room-seq-gap-audit</code>와 <code>docker,redis-cluster</code> 기준으로 정렬했고, running stack에서 gap metric scrape와 heartbeat ping smoke를 확인함</td>
+      <td><span class="badge b-ok">구현, 활성화, 런타임 smoke 완료</span></td>
+      <td><code>RedisMessageStreamProducer</code>, <code>RoomSeqGapAuditWorker</code>, <code>WebSocketHeartbeatScheduler</code></td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="phase8">3. Phase 8 구현 확인 결과</h2>
+
+<div class="finding">
+  <h3><span class="badge b-ok">8.1 완료</span> Observability pipeline과 Gateway metric</h3>
+  <p>
+    <code>micrometer-registry-prometheus</code> 의존성과 actuator <code>prometheus</code> endpoint가 추가되었고,
+    Docker Compose cluster profile에 Prometheus와 Grafana가 들어왔다. Prometheus는 API/WebSocket/Worker/Admin을
+    역할별 job으로 직접 scrape한다.
+  </p>
+  <ul>
+    <li>Gateway metric: <code>chat.websocket.gateway.connections</code>, <code>room.subscriptions</code>, <code>send.queue.depth</code>, <code>write.latency</code>, <code>outbound.bytes</code>, <code>slow_client.disconnects</code></li>
+    <li>Streams metric: append latency, worker records, batch latency, dead letters, group lag/pending gauge</li>
+    <li>Grafana datasource와 <code>chat-release-gate.json</code> dashboard 확인</li>
+  </ul>
+  <p class="small">
+    잔여: Prometheus rule은 있지만 Alertmanager/notification wiring은 없다. 실제 운영에서는 알림 채널과 SLO burn-rate rule이 별도 필요하다.
+  </p>
+</div>
+
+<div class="finding">
+  <h3><span class="badge b-ok">8.2 완료</span> Redis Cluster HA</h3>
+  <p>
+    전체 Docker backend 기본 profile은 <code>docker,redis-cluster</code>이고, cluster profile은 Redis 6노드와
+    <code>redis-cluster-init</code> one-shot gate를 사용한다. Redis key naming은 room hash tag를 사용해 방 단위 Lua/Streams 조작이
+    같은 slot에 들어가도록 설계되어 있다.
+  </p>
+  <ul>
+    <li>3 master + 3 replica 구성을 위한 6개 node 정의</li>
+    <li><code>appendonly yes</code>, <code>appendfsync everysec</code>, <code>cluster-preferred-endpoint-type hostname</code></li>
+    <li>호스트 노출 port는 loopback에 bind되어 외부 인터페이스 노출을 줄임</li>
+  </ul>
+  <p class="small">
+    잔여: Redis password/TLS는 없다. Compose 네트워크 경계에 의존하므로 실제 production에서는 ACL/TLS 또는 managed Redis 보안 설정이 필요하다.
+  </p>
+</div>
+
+<div class="finding">
+  <h3><span class="badge b-ok">8.3 완료</span> Object Storage와 cold archive</h3>
+  <p>
+    MinIO와 bucket init, S3 호환 adapter, admin export 완료 산출물 업로드, partition archive CSV/metadata 업로드가 구현되었다.
+    <code>DROP_AFTER_COPY=true</code>에서 Object Storage 업로드가 비활성화되면 archive script가 중단되므로 장기 보관 없는 drop을 막는다.
+  </p>
+  <ul>
+    <li>admin export: 로컬 staging CSV 작성 후 <code>s3://chat-archives/admin-exports/{jobId}.csv</code> 업로드</li>
+    <li>download: 조회 시점에 presigned URL 발급</li>
+    <li>partition archive: CSV와 metadata JSON에 sha256, bytes, rowCount, object URI 기록</li>
+  </ul>
+  <p class="small">
+    잔여: local staging은 여전히 worker 디스크를 사용한다. 관리형 S3/IAM/KMS/lifecycle/restore runbook은 별도 운영 작업이다.
+  </p>
+</div>
+
+<div class="finding">
+  <h3><span class="badge b-bad">8.4 shard 구현 완료 / gate 실측 실패</span> Hot room shard 분산과 release gate</h3>
+  <p>
+    메시지 수락 경로는 <code>room_storage_configs</code>의 <code>current_shard_count</code>와 <code>fanout_shard_count</code>를 읽고,
+    <code>roomSeq</code> round-robin 기반 <code>streamShard</code>/<code>fanoutShard</code>, <code>messageId</code> hash 기반 <code>writeShard</code>를 계산한다.
+    room-policy worker는 HOT 16, VERY_HOT/OVERLOAD 64 shard를 목표로 upsert하며, 이미 확장된 shard count는 줄이지 않는다.
+  </p>
+  <ul>
+    <li>Hot room shard 분산 자체는 구현 완료로 본다. 수락 경로의 shard 계산, room-policy shard 확장, canonical writer의 shard 보존 경로가 코드와 테스트에 있다.</li>
+    <li>release gate는 스크립트와 plan 단위 테스트까지 완료됐다. 기본값은 10,000 viewers, 10,000 msg/sec, 60초, stream shard 16개 이상, fanout p95 500ms 이하, stream lag 1000 이하이다.</li>
+    <li>2026-06-28 01:27 KST 1차 실행은 <code>POST http://localhost/api/ws-tickets failed: 429</code>로 실패했다. 이때 Prometheus 기준 <code>issue.success=60</code>, <code>issue.rate_limited_ip=1</code>, <code>consume.success=60</code>이었다.</li>
+    <li>이후 <code>docker-compose.yml</code> 공통 앱 환경에 <code>CHAT_AUTH_WEB_SOCKET_TICKET_RATE_LIMIT_*</code>를 추가하고, gate 실행용으로 <code>PER_IP=20000</code>, <code>PER_USER=20</code>을 주입해 API 컨테이너 env 반영을 확인했다.</li>
+    <li>2026-06-28 01:40 KST 재실행은 429를 넘겼지만 <code>fetch failed</code>로 실패했다. Prometheus 기준 <code>issue.success=5104</code>, <code>consume.success=5104</code>까지 진행했고 DB 기준 room 2 member는 5,105명까지 생성됐다.</li>
+    <li>실패는 shard/fanout 부하 본문 이전의 viewer 준비 단계에서 발생했다. nginx/app 컨테이너는 실패 후에도 healthy였고 명시적인 app exception은 없었지만, nginx 런타임 기본값은 <code>worker_connections 1024</code>로 확인되어 10k WebSocket gate 전용 proxy capacity 조정이 다음 확인 지점이다.</li>
+    <li>worker와 WebSocket Gateway가 분리된 배포에서는 gateway send queue depth가 cross-process로 room-policy worker에 전달되지 않는다. 현재 같은 프로세스에 session manager가 없으면 0으로 폴백한다.</li>
+  </ul>
+</div>
+
+<div class="finding">
+  <h3><span class="badge b-ok">8.5 완료</span> Moderation과 사용자 제재</h3>
+  <p>
+    DB 기반 moderation rule과 user sanction이 추가되었다. 메시지 전송 전에 user sanction과 content moderation을 확인하고,
+    거부 시 <code>MessageModerationRejectedException</code>으로 API/WebSocket에 명시적으로 실패를 반환한다.
+  </p>
+  <ul>
+    <li>GLOBAL/ROOM <code>CONTAINS</code> rule, <code>REJECT</code> action</li>
+    <li>ROOM <code>MUTE</code>/<code>BAN</code>, GLOBAL <code>SUSPEND</code> 제약</li>
+    <li>admin API: rule 생성/수정/비활성화, sanction 생성/조회/해제</li>
+    <li>거부 metric: <code>chat.message.moderation.rejected</code></li>
+  </ul>
+  <p class="small">
+    잔여: 현재 필터는 단순 contains 중심이다. 스팸 패턴, 링크/첨부/이미지 안전성, appeal workflow, moderator UI는 production 운영 범위에서 추가 검토가 필요하다.
+  </p>
+</div>
+
+<div class="finding">
+  <h3><span class="badge b-ok">8.6 완료</span> Token revocation과 global suspend</h3>
+  <p>
+    session token은 <code>v1</code> payload에 issuedAt을 포함하고, Redis token denylist와 user revoke-after marker를 확인한다.
+    <code>POST /users/logout</code>는 bearer token을 revoke하며, GLOBAL SUSPEND 생성 후에는 transaction commit 이후 user token revoke와 Redis pub/sub force logout을 실행한다.
+  </p>
+  <ul>
+    <li>token 단위 revoke: <code>chat:auth:session:revoked:token:{sha256}</code></li>
+    <li>user 단위 revoke-after: <code>chat:auth:session:revoked:user:{userId}</code></li>
+    <li>인증 시 revocation store 오류는 fail-closed 처리</li>
+    <li>force logout 이벤트 수신 gateway는 해당 user의 local WebSocket session을 <code>4003 Session revoked</code>로 종료</li>
+  </ul>
+  <p class="small">
+    잔여: Redis pub/sub force logout은 best-effort다. 놓친 이벤트가 있어도 이후 인증은 막히지만 이미 열린 연결 즉시 종료는 보장하지 못한다.
+  </p>
+</div>
+
+<div class="finding">
+  <h3><span class="badge b-ok">8.7 구현, 활성화, 테스트 완료</span> MAXLEN, roomSeq gap audit, heartbeat</h3>
+  <p>
+    Redis Streams append는 기본 <code>MAXLEN 1000000</code> approximate trim을 사용하고,
+    canonical <code>chat_messages</code>의 <code>room_seq</code> gap을 aggregate metric으로 노출하는 audit worker와 warning rule이 추가되었다.
+    WebSocket Gateway는 ping/pong heartbeat로 zombie connection을 닫는다.
+  </p>
+  <table>
+    <thead>
+      <tr><th>항목</th><th>상태</th><th>남은 확인</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Redis Streams <code>MAXLEN</code></td>
+        <td><span class="badge b-ok">구현 및 단위 테스트 완료</span></td>
+        <td>운영 값 <code>1000000</code>이 실제 10k 부하에서 충분한지 running-stack으로 조정 필요</td>
+      </tr>
+      <tr>
+        <td><code>roomSeq</code> gap audit</td>
+        <td><span class="badge b-ok">구현, metric, Prometheus rule, 기본 role, runtime scrape 완료</span></td>
+        <td>기본 Compose cluster에서 <code>room-seq-gap-audit</code> role이 활성화됨. worker actuator와 Prometheus에서 <code>chat_room_seq_gap_*</code> scrape 확인. 대규모 운영에서는 중복 스캔 방지를 위해 전용 worker 분리 가능</td>
+      </tr>
+      <tr>
+        <td>WebSocket heartbeat</td>
+        <td><span class="badge b-ok">구현, Compose env, runtime ping smoke 완료</span></td>
+        <td>기본 Compose cluster에 heartbeat enabled/interval/poll/timeout env가 명시됨. <code>verify-websocket-heartbeat.mjs</code>로 실제 서버 ping frame 수신 확인. 장시간 soak와 no-pong timeout rehearsal은 release rehearsal 항목으로 유지</td>
+      </tr>
+    </tbody>
+  </table>
+  <ul>
+    <li><code>RedisMessageStreamProducer</code>: <code>XAddOptions.maxlen(...).approximateTrimming(...)</code></li>
+    <li><code>RoomSeqGapAuditRepository</code>: 최근 lookback window에서 <code>lag(room_seq)</code> 기반 gap 집계</li>
+    <li><code>RoomSeqGapAuditMetrics</code>: rooms, missing_sequences, max_width, scanned_rooms gauge</li>
+    <li><code>WebSocketHeartbeatScheduler</code>: 기본 10초 poll, 30초 ping, 90초 timeout</li>
+  </ul>
+  <p class="small">
+    잔여: 장시간 soak, proxy timeout, no-pong timeout cleanup, 실제 장애 리허설은 release rehearsal 항목으로 남는다. 기능 미구현, 기본 role 미반영, running-stack scrape/ping 미확인은 해소됐다.
+  </p>
+</div>
+
+<h2 id="residual">4. 남은 운영 리스크</h2>
+
+<table>
+  <thead>
+    <tr><th>우선순위</th><th>리스크</th><th>상태와 영향</th><th>권장 조치</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><span class="badge b-bad">Blocker</span></td>
+      <td>TLS/wss와 secret 관리</td>
+      <td>Nginx는 HTTP 80만 listen한다. WebSocket 안내도 <code>ws://</code>이고, Redis/MinIO/app secret은 개발용 기본값 중심이다.</td>
+      <td>TLS termination, wss, 운영 CORS/origin 제한, secret manager 또는 ExternalSecret, HMAC key rotation 절차 추가</td>
+    </tr>
+    <tr>
+      <td><span class="badge b-bad">Blocker</span></td>
+      <td>실제 release gate 실패</td>
+      <td>10k msg/sec 60초 gate를 full Docker cluster에서 실행했다. Compose rate-limit env 추가 후 재시도에서는 ticket 5,104건까지 성공했으나 viewer 준비 중 <code>fetch failed</code>로 중단됐다. Redis failover, archive upload, moderation smoke도 running stack에서는 아직 미확인이다.</td>
+      <td>nginx worker connection/file limit, load generator HTTP 실패 원인, app/proxy connection budget을 조정한 뒤 hot-room gate, Redis node kill/failover, MinIO upload, moderation smoke, heartbeat soak를 재실행해 artifact 보관</td>
+    </tr>
+    <tr>
+      <td><span class="badge b-high">High</span></td>
+      <td>K8s/HPA/DR 부재</td>
+      <td>역할별 실행 모듈은 준비됐지만 K8s/Helm manifest는 없다. HPA, rolling update, pod disruption budget, PITR/RTO/RPO가 정의되지 않았다.</td>
+      <td>Phase 9에서 Deployment/Service/Ingress/HPA, Redis/S3/PostgreSQL managed resource, backup/restore rehearsal 작성</td>
+    </tr>
+    <tr>
+      <td><span class="badge b-high">High</span></td>
+      <td>Alertmanager와 온콜 연결 부재</td>
+      <td>Prometheus rule은 로드되지만 알림 전달, severity routing, silence/runbook 링크 체계가 없다.</td>
+      <td>Alertmanager, Slack/PagerDuty, runbook URL, alert owner, release-blocking rule을 연결</td>
+    </tr>
+    <tr>
+      <td><span class="badge b-high">High</span></td>
+      <td>room-policy의 cross-process signal gap</td>
+      <td>worker가 별도 프로세스이면 Gateway send queue depth가 0으로 폴백한다. OVERLOAD 판정의 gateway 압력 신호가 운영에서 빠질 수 있다.</td>
+      <td>Gateway queue depth를 Redis/metric snapshot으로 publish하고 room-policy worker가 aggregate하도록 보강</td>
+    </tr>
+    <tr>
+      <td><span class="badge b-warn">Medium</span></td>
+      <td>PgBouncer/DB connection 운영 토대 없음</td>
+      <td>다중 app/worker scale-out 시 PostgreSQL connection 수와 failover handling이 병목이 될 수 있다.</td>
+      <td>PgBouncer 또는 managed pooler, max connection budget, app별 Hikari cap 정의</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="verification">5. 이번에 실행한 검증</h2>
+<table>
+  <thead>
+    <tr><th>명령</th><th>결과</th><th>의미</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>./gradlew test --no-daemon</code></td>
+      <td><span class="badge b-ok">성공</span></td>
+      <td>전체 Kotlin/Gradle 테스트 통과. 마지막 출력 기준 <code>BUILD SUCCESSFUL</code>, 34 actionable tasks 중 13 executed.</td>
+    </tr>
+    <tr>
+      <td><code>node --test scripts/lib/phase8*.test.mjs ...</code></td>
+      <td><span class="badge b-ok">성공</span></td>
+      <td>Phase 8 Redis Cluster, Object Storage, hot room release gate plan, roomSeq gap alert rule 테스트 25개 통과.</td>
+    </tr>
+    <tr>
+      <td><code>./gradlew :chat-worker-application:test --tests com.chat.worker.application.MessageWorkerSchedulerTest --no-daemon</code></td>
+      <td><span class="badge b-ok">성공</span></td>
+      <td>기본 worker role에 <code>room-seq-gap-audit</code>가 포함되어 gap audit worker가 poll되는지 검증.</td>
+    </tr>
+    <tr>
+      <td><code>./gradlew :chat-persistence:test ...RoomSeqGap... ...WebSocketSessionManagerHeartbeatTest... --no-daemon</code></td>
+      <td><span class="badge b-ok">성공</span></td>
+      <td>gap audit SQL/metric/worker와 WebSocket ping/timeout/session cleanup heartbeat 동작 검증.</td>
+    </tr>
+    <tr>
+      <td><code>./gradlew :chat-websocket:test --tests com.chat.websocket.service.WebSocketHeartbeatSchedulerTest --no-daemon</code></td>
+      <td><span class="badge b-ok">성공</span></td>
+      <td>heartbeat scheduler가 설정된 fixed delay로 session manager를 poll하고 disabled 상태를 존중하는지 검증.</td>
+    </tr>
+    <tr>
+      <td><code>node --test scripts/lib/dockerComposeWorkerScale.test.mjs scripts/lib/phase8RoomSeqGapAlertRules.test.mjs</code></td>
+      <td><span class="badge b-ok">성공</span></td>
+      <td>Compose 기본 worker role, gap audit env, heartbeat env, <code>.env.example</code>의 cluster/profile drift, Prometheus alert rule 동기화 검증.</td>
+    </tr>
+    <tr>
+      <td><code>node --check scripts/phase8-hot-room-release-gate.mjs</code>, <code>node --check scripts/verify-moderation.mjs</code></td>
+      <td><span class="badge b-ok">성공</span></td>
+      <td>주요 Phase 8 운영 스크립트 문법 확인.</td>
+    </tr>
+    <tr>
+      <td><code>SPRING_PROFILES_ACTIVE=docker,redis-cluster ... docker compose --profile cluster up -d --build --wait</code></td>
+      <td><span class="badge b-ok">성공</span></td>
+      <td>full Docker cluster 기동 성공. API 2대, WebSocket 2대, Worker, Admin, Redis Cluster 6노드, PostgreSQL primary/replica, MinIO, Prometheus, Grafana, Nginx가 healthy 상태에 도달.</td>
+    </tr>
+    <tr>
+      <td><code>CHAT_LOAD_TIMEOUT_MS=30000 CHAT_PROMETHEUS_URL=http://localhost:9090 node scripts/phase8-hot-room-release-gate.mjs</code></td>
+      <td><span class="badge b-bad">실패</span></td>
+      <td>1차 기본 gate 실행. <code>POST http://localhost/api/ws-tickets failed: 429</code>로 exit 1.</td>
+    </tr>
+    <tr>
+      <td><code>sum by(event) (chat_websocket_ticket_events_total)</code></td>
+      <td><span class="badge b-warn">실패 원인 확인</span></td>
+      <td>Prometheus snapshot 기준 <code>issue.success=60</code>, <code>issue.rate_limited_ip=1</code>, <code>consume.success=60</code>. 컨테이너 env에는 <code>CHAT_AUTH_WEB_SOCKET_TICKET_RATE_LIMIT_*</code>가 없었다.</td>
+    </tr>
+    <tr>
+      <td><code>docker compose config | rg CHAT_AUTH_WEB_SOCKET_TICKET_RATE_LIMIT</code></td>
+      <td><span class="badge b-ok">성공</span></td>
+      <td><code>docker-compose.yml</code>에 rate-limit env 4개를 추가했다. override config에서 <code>PER_IP=20000</code>, <code>PER_USER=20</code> 반영을 확인했다.</td>
+    </tr>
+    <tr>
+      <td><code>docker compose exec chat-api-app-* env</code></td>
+      <td><span class="badge b-ok">성공</span></td>
+      <td>API 컨테이너 내부 env에서 <code>CHAT_AUTH_WEB_SOCKET_TICKET_RATE_LIMIT_PER_IP=20000</code>, <code>PER_USER=20</code>, <code>WINDOW=1m</code>, <code>KEY_PREFIX=chat:ws-ticket:rate:</code> 확인.</td>
+    </tr>
+    <tr>
+      <td><code>node scripts/phase8-hot-room-release-gate.mjs &gt; .artifacts/phase8-gate/phase8-hot-room-release-gate-20260628-014035.json</code></td>
+      <td><span class="badge b-bad">실패</span></td>
+      <td>rate-limit env 보강 후 2차 기본 gate 실행. stderr artifact 기준 <code>failed with code 1: fetch failed</code>, stdout artifact는 0B.</td>
+    </tr>
+    <tr>
+      <td><code>sum by(event) (chat_websocket_ticket_events_total)</code>, DB member count</td>
+      <td><span class="badge b-warn">진행 지점 확인</span></td>
+      <td>2차 실행은 <code>issue.success=5104</code>, <code>consume.success=5104</code>까지 진행. PostgreSQL 기준 room 2 member는 5,105명.</td>
+    </tr>
+    <tr>
+      <td><code>nginx -T | grep worker_connections</code></td>
+      <td><span class="badge b-warn">병목 후보 확인</span></td>
+      <td>nginx 런타임 설정은 <code>worker_connections 1024</code>. 10k WebSocket gate 전용 proxy connection budget 보강이 필요하다.</td>
+    </tr>
+    <tr>
+      <td><code>docker compose --profile cluster config | rg "SPRING_PROFILES_ACTIVE|WORKER_ROLES|CHAT_WORKER_ROOM_SEQ_GAP_AUDIT|CHAT_WEBSOCKET_GATEWAY_HEARTBEAT"</code></td>
+      <td><span class="badge b-ok">성공</span></td>
+      <td>cluster profile 렌더링 기준 <code>SPRING_PROFILES_ACTIVE=docker,redis-cluster</code>, <code>WORKER_ROLES=...room-seq-gap-audit</code>, gap audit env, heartbeat env 반영 확인.</td>
+    </tr>
+    <tr>
+      <td><code>docker compose --profile cluster up -d --wait --force-recreate chat-websocket-app-1 chat-websocket-app-2 chat-worker-app-1</code></td>
+      <td><span class="badge b-ok">성공</span></td>
+      <td>WebSocket 2대와 Worker를 새 설정으로 재생성했고 세 컨테이너 모두 healthy 도달.</td>
+    </tr>
+    <tr>
+      <td><code>docker compose exec chat-worker-app-1 env</code>, <code>docker compose exec chat-websocket-app-1 env</code></td>
+      <td><span class="badge b-ok">성공</span></td>
+      <td>실제 컨테이너 내부에서 <code>room-seq-gap-audit</code> role, <code>CHAT_WORKER_ROOM_SEQ_GAP_AUDIT_*</code>, <code>CHAT_WEBSOCKET_GATEWAY_HEARTBEAT_*</code>, <code>docker,redis-cluster</code> profile 확인.</td>
+    </tr>
+    <tr>
+      <td><code>/actuator/prometheus</code>, <code>Prometheus query chat_room_seq_gap_*</code></td>
+      <td><span class="badge b-ok">성공</span></td>
+      <td>worker actuator와 Prometheus에서 <code>chat_room_seq_gap_rooms</code>, <code>missing_sequences</code>, <code>max_width</code>, <code>scanned_rooms</code> scrape 확인. 현재 값은 gap 없음 기준 0.</td>
+    </tr>
+    <tr>
+      <td><code>node scripts/verify-websocket-heartbeat.mjs</code></td>
+      <td><span class="badge b-ok">성공</span></td>
+      <td>실제 사용자 등록, 로그인, ticket 발급, WebSocket handshake 후 65초 이내 서버 heartbeat protocol ping frame 수신 확인.</td>
+    </tr>
+    <tr>
+      <td><code>HTML structure check</code>, <code>git diff --no-index --check /dev/null ...</code>, stale phrase scan</td>
+      <td><span class="badge b-ok">성공</span></td>
+      <td>보고서 태그 균형, whitespace, 예전 gate 상태 표현이 남지 않았는지 확인했다.</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="note">
+  이번 검증에서는 Docker 전체 클러스터를 띄운 뒤 end-to-end release gate를 실제 실행했다.
+  1차는 ticket 발급 429에서 실패했고, <code>docker-compose.yml</code> env 보강 후 2차는 5,104 ticket 발급/소비 뒤
+  <code>fetch failed</code>로 실패했다. 10,000 msg/sec 60초 부하 본문, fanout p95, stream shard count,
+  stream lag threshold 판정까지는 아직 도달하지 못했다. gap audit scrape와 heartbeat ping smoke는 running stack에서 확인했지만,
+  Redis node failover, 실제 MinIO upload, live moderation smoke, heartbeat no-pong timeout rehearsal은 아직 실행하지 않았다.
+</div>
+
+<h2 id="complexity">6. 복잡도와 평가 한계</h2>
+<table>
+  <thead>
+    <tr><th>항목</th><th>복잡도</th><th>설명</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>저장소 근거 수집</td>
+      <td>시간 <code>O(F + L)</code>, 공간 <code>O(R)</code></td>
+      <td><code>F</code>는 확인한 파일 수, <code>L</code>은 검색/열람한 라인 수, <code>R</code>은 보고서에 보관한 근거 수다.</td>
+    </tr>
+    <tr>
+      <td>테스트 실행</td>
+      <td>시간 <code>O(T)</code>, 공간 <code>O(A)</code></td>
+      <td><code>T</code>는 실행된 테스트/태스크 수, <code>A</code>는 Gradle/Node 테스트 산출물 크기다.</td>
+    </tr>
+    <tr>
+      <td>Docker gate 실행</td>
+      <td>시간 <code>O(C + V + M)</code>, 공간 <code>O(C + V)</code></td>
+      <td><code>C</code>는 기동 컨테이너 수, <code>V</code>는 WebSocket viewer 수, <code>M</code>은 전송 메시지 수다. 이번 실행은 <code>V=10000</code>, <code>M=600000</code> 목표였으나 2차 재시도 기준 5,104 ticket 발급/소비 후 viewer 준비 단계에서 실패했다.</td>
+    </tr>
+    <tr>
+      <td>HTML 보고서 생성</td>
+      <td>시간 <code>O(S)</code>, 공간 <code>O(S)</code></td>
+      <td><code>S</code>는 생성된 HTML 문서 크기다.</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="alternatives">7. 배포 대안</h2>
+<table>
+  <thead>
+    <tr><th>대안</th><th>장점</th><th>단점</th><th>권장도</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>제한 베타 / production rehearsal</td>
+      <td>Phase 8 구현을 실제 운영 흐름에서 검증할 수 있고, 리스크를 작은 트래픽으로 관찰 가능</td>
+      <td>TLS/secret/K8s/DR 공백은 운영 합의로 제한해야 함</td>
+      <td><span class="badge b-ok">권장</span></td>
+    </tr>
+    <tr>
+      <td>공개 production 즉시 투입</td>
+      <td>일정이 가장 빠름</td>
+      <td>보안, 배포, 자동 확장, 재해복구 공백이 있고 release gate가 실제 실패한 상태라 장애 시 방어가 어렵다</td>
+      <td><span class="badge b-bad">비권장</span></td>
+    </tr>
+    <tr>
+      <td>Phase 9 완료 후 production 투입</td>
+      <td>K8s/HPA/TLS/secret/DR/Alertmanager까지 묶어 공개 production 기준에 가까움</td>
+      <td>일정이 늘어나고 실제 사용자 피드백이 늦어진다</td>
+      <td><span class="badge b-ok">공개 SLA 기준 권장</span></td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="roadmap">8. 권장 실행 순서</h2>
+<ol>
+  <li>nginx worker connection/file limit과 load generator HTTP 실패 원인을 보강한 뒤 <code>phase8-hot-room-release-gate.mjs</code>를 재실행해 결과 JSON과 Prometheus snapshot을 보관한다.</li>
+  <li>heartbeat no-pong timeout/cleanup, Redis node kill/failover, worker kill, MinIO upload failure를 포함한 장애 리허설을 실행한다.</li>
+  <li>TLS/wss, 운영 origin/CORS, secret manager, HMAC key rotation을 정리한다.</li>
+  <li>Alertmanager와 온콜 notification을 붙이고, release-blocking alert와 warning alert를 분리한다.</li>
+  <li>Gateway send queue depth를 cross-process signal로 publish해 room-policy OVERLOAD 판정을 완성한다.</li>
+  <li>K8s/Helm 또는 동등한 배포 매니페스트, HPA, PDB, backup/restore runbook을 작성한다.</li>
+  <li>제한 베타로 낮은 트래픽을 받아 SLO와 비용을 관찰한 뒤 공개 production으로 확장한다.</li>
+</ol>
+
+<h2 id="caveats">9. 주의사항</h2>
+<blockquote>
+  <p>- 이 평가는 코드와 로컬 구성의 readiness 평가다. 실제 클라우드 managed resource, 네트워크, 디스크, TLS, IAM, 장애 전파 시간은 검증하지 않았다.</p>
+  <p>- <code>MAXLEN</code>은 Redis OOM 방어용 backpressure이며 메시지 보존 보장이 아니다. gap audit와 alert, archive/backup runbook이 함께 있어야 의미가 있다.</p>
+  <p>- Redis pub/sub force logout은 best-effort다. 사용자 revoke marker는 이후 인증을 막지만, 이미 열린 연결 즉시 종료는 event 유실 시 놓칠 수 있다.</p>
+  <p>- Compose cluster는 production-like 검증 환경에 가깝지만, production 배포 모델 자체는 아니다. K8s 또는 managed platform의 rollout, HPA, secret, storage 정책이 별도로 필요하다.</p>
+  <p>- 10k release gate는 실제 실행했지만 1차는 ticket 발급 429, 2차는 5,104 ticket 발급/소비 후 <code>fetch failed</code>로 실패했다. 공개 production 판정에는 viewer 준비, 부하 본문, Prometheus threshold까지 통과한 artifact가 필요하다.</p>
+</blockquote>
+
+<h2 id="next">10. 후속 질문 (Next Questions)</h2>
+<ul>
+  <li>다음 단계는 제한 베타를 목표로 할까요, 아니면 Phase 9 production platform 작업을 먼저 끝낼까요?</li>
+  <li>제가 이어서 nginx connection budget과 load generator 실패 원인까지 보강해 gate를 다시 밀어볼까요?</li>
+  <li><code>room-seq-gap-audit</code>를 전용 worker replica로 분리하는 운영 topology까지 설계할까요?</li>
+  <li>TLS/wss와 secret manager를 Compose/K8s 중 어느 배포 모델 기준으로 먼저 설계할까요?</li>
+  <li>Alertmanager/Slack 또는 다른 알림 채널 기준의 운영 alert wiring 문서를 새로 만들까요?</li>
+</ul>
+
+<footer>
+  생성 방식: 저장소 코드/설정/문서 직접 열람, Gradle/Node 테스트 실행 후 작성 ·
+  주요 근거: <code>docker-compose.yml</code>, <code>chat-runtime-config/src/main/resources/application-docker.yml</code>,
+  <code>chat-persistence/src/main/kotlin</code>, <code>chat-worker-application/src/main/kotlin</code>,
+  <code>chat-websocket/src/main/kotlin</code>, <code>infra/prometheus</code>, <code>infra/grafana</code>,
+  <code>infra/redis</code>, <code>infra/postgres/archive</code>, <code>docs/infrastructure.md</code>, <code>docs/configuration.md</code>.
+</footer>
+
+</div>
+</body>
+</html>
