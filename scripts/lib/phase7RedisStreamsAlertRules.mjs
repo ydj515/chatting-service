@@ -9,6 +9,7 @@ export const REDIS_STREAMS_LAG_ALERT_RULES = [
       severity: 'warning',
       phase: 'phase7',
       release_gate: 'redis_streams_lag',
+      owner: 'platform-oncall',
     },
     annotations: {
       summary: 'Redis Streams group lag is sustained',
@@ -24,6 +25,8 @@ export const REDIS_STREAMS_LAG_ALERT_RULES = [
       severity: 'critical',
       phase: 'phase7',
       release_gate: 'redis_streams_lag',
+      release_blocking: 'true',
+      owner: 'platform-oncall',
     },
     annotations: {
       summary: 'Redis Streams group lag crossed the critical threshold',
@@ -39,6 +42,7 @@ export const REDIS_STREAMS_LAG_ALERT_RULES = [
       severity: 'warning',
       phase: 'phase7',
       release_gate: 'redis_streams_pending',
+      owner: 'platform-oncall',
     },
     annotations: {
       summary: 'Redis Streams pending entries are sustained',
@@ -54,6 +58,8 @@ export const REDIS_STREAMS_LAG_ALERT_RULES = [
       severity: 'critical',
       phase: 'phase7',
       release_gate: 'redis_streams_pending',
+      release_blocking: 'true',
+      owner: 'platform-oncall',
     },
     annotations: {
       summary: 'Redis Streams pending entries crossed the critical threshold',

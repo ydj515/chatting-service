@@ -36,6 +36,21 @@ test('room sequence gap alert rules keep labels bounded', () => {
   assert.doesNotMatch(rendered, /roomId|room_id|message_id|stream_key|chat:stream:/);
 });
 
+test('room sequence gap alert rules include owner metadata without paging by default', () => {
+  assert.equal(
+    ROOM_SEQ_GAP_ALERT_RULES.every((rule) => rule.labels.owner === 'platform-oncall'),
+    true,
+  );
+  assert.equal(
+    ROOM_SEQ_GAP_ALERT_RULES.every((rule) => rule.labels.severity === 'warning'),
+    true,
+  );
+  assert.equal(
+    ROOM_SEQ_GAP_ALERT_RULES.every((rule) => rule.labels.release_blocking === undefined),
+    true,
+  );
+});
+
 test('room sequence gap prometheus rule file stays in sync with renderer', () => {
   const file = readFileSync(
     new URL('../../infra/prometheus/rules/phase8-room-seq-gap.rules.yml', import.meta.url),

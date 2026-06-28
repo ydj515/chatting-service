@@ -73,6 +73,11 @@ logs/
 # Environment
 .env
 .env.local
+.secrets/
+
+# Alertmanager local secrets
+infra/alertmanager/secrets/alertmanager_slack_webhook_url
+infra/alertmanager/secrets/alertmanager_pagerduty_routing_key
 
 # ai
 .claude

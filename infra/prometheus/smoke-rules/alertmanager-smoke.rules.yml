@@ -1,0 +1,28 @@
+groups:
+  - name: alertmanager-smoke
+    rules:
+      - alert: AlertmanagerSmokeWarning
+        expr: vector(1)
+        labels:
+          severity: "warning"
+          phase: "smoke"
+          release_gate: "alertmanager_delivery"
+          smoke: "true"
+          owner: "platform-oncall"
+        annotations:
+          summary: "Alertmanager warning delivery smoke test"
+          description: "Synthetic warning alert used to verify Prometheus to Alertmanager to Slack-compatible webhook delivery."
+          runbook: "docs/alertmanager_oncall_wiring.md"
+      - alert: AlertmanagerSmokeCritical
+        expr: vector(1)
+        labels:
+          severity: "critical"
+          phase: "smoke"
+          release_gate: "alertmanager_delivery"
+          release_blocking: "true"
+          smoke: "true"
+          owner: "platform-oncall"
+        annotations:
+          summary: "Alertmanager critical delivery smoke test"
+          description: "Synthetic critical alert used to verify Prometheus to Alertmanager to PagerDuty delivery."
+          runbook: "docs/alertmanager_oncall_wiring.md"

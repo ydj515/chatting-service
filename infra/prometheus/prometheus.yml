@@ -5,6 +5,11 @@ global:
 rule_files:
   - /etc/prometheus/rules/*.rules.yml
 
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ["alertmanager:9093"]
+
 scrape_configs:
   - job_name: chat-api
     metrics_path: /api/actuator/prometheus
@@ -26,3 +31,8 @@ scrape_configs:
     static_configs:
       - targets: ["chat-admin-app-1:8080"]
         labels: { role: chat-admin }
+  - job_name: alertmanager
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["alertmanager:9093"]
+        labels: { role: alertmanager }

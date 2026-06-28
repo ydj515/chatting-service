@@ -1,0 +1,47 @@
+global:
+  resolve_timeout: "5m"
+route:
+  receiver: "slack-warning"
+  group_by:
+    - "alertname"
+    - "severity"
+    - "release_gate"
+    - "owner"
+  group_wait: "30s"
+  group_interval: "5m"
+  repeat_interval: "4h"
+  routes:
+    - receiver: "pagerduty-critical"
+      matchers:
+        - "release_blocking=\"true\""
+      group_wait: "10s"
+      repeat_interval: "30m"
+    - receiver: "pagerduty-critical"
+      matchers:
+        - "severity=\"critical\""
+      group_wait: "10s"
+      repeat_interval: "30m"
+    - receiver: "slack-warning"
+      matchers:
+        - "severity=\"warning\""
+receivers:
+  - name: "slack-warning"
+    slack_configs:
+      - api_url_file: "/run/secrets/alertmanager_slack_webhook_url"
+        send_resolved: true
+        title: "{{ .CommonLabels.alertname }} ({{ .CommonLabels.severity }})"
+        text: "{{ .CommonAnnotations.summary }}\n{{ .CommonAnnotations.description }}\nRunbook: {{ .CommonAnnotations.runbook }}\nOwner: {{ .CommonLabels.owner }}"
+  - name: "pagerduty-critical"
+    pagerduty_configs:
+      - routing_key_file: "/run/secrets/alertmanager_pagerduty_routing_key"
+        severity: "critical"
+        class: "{{ .CommonLabels.release_gate }}"
+        component: "{{ .CommonLabels.alertname }}"
+        group: "{{ .CommonLabels.owner }}"
+        send_resolved: true
+        description: "{{ .CommonAnnotations.summary }}"
+        details:
+          description: "{{ .CommonAnnotations.description }}"
+          runbook: "{{ .CommonAnnotations.runbook }}"
+          release_gate: "{{ .CommonLabels.release_gate }}"
+          owner: "{{ .CommonLabels.owner }}"
