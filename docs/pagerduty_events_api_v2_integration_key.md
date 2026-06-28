@@ -75,6 +75,8 @@ docker run --rm \
 
 ```bash
 CHAT_ADMIN_TOKEN='change-me' \
+ALERTMANAGER_SLACK_WEBHOOK_URL_FILE=infra/alertmanager/secrets/alertmanager_slack_webhook_url \
+ALERTMANAGER_PAGERDUTY_ROUTING_KEY_FILE=infra/alertmanager/secrets/alertmanager_pagerduty_routing_key \
 docker compose --profile alert-smoke up -d alertmanager prometheus-alert-smoke
 ```
 

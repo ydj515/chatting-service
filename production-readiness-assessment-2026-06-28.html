@@ -12,7 +12,8 @@
         --bg: #101216;
         --panel: #171b22;
         --panel-2: #1d232d;
-        --panel-3: #222a35 --border: #303846;
+        --panel-3: #222a35;
+        --border: #303846;
         --text: #eceff4;
         --muted: #a7b0bf;
         --accent: #7ab7ff;
@@ -862,7 +863,7 @@
         <code>AlertmanagerSmokeCritical</code>은 PagerDuty로 라우팅됐고, 사용자
         확인 기준 실제 수신까지 완료됐다. 결과 증거:
         <a href="docs/images/alert-slack.png">Slack warning 수신</a>,
-        <a href="docs/images/alert-pagerduty.png">PagerDuty critical incident 수신</a>.
+        <a href="docs/images/alert-pagerduty.png">PagerDuty critical incident 수신, 담당자명 제거</a>.
         Alertmanager 로그에는 firing/resolved notify 오류가 없었으며 smoke alert
         active count도 0으로 정리됐다.
       </div>
@@ -952,7 +953,7 @@
       <table>
         <thead>
           <tr>
-            <th>명령</th>
+            <th>명령 또는 실행 요약</th>
             <th>결과</th>
             <th>의미</th>
           </tr>
@@ -967,7 +968,9 @@
             </td>
           </tr>
           <tr>
-            <td><code>node --test scripts/lib/phase8*.test.mjs ...</code></td>
+            <td>
+              <code>요약: node --test scripts/lib/phase8*.test.mjs ...</code>
+            </td>
             <td><span class="badge b-ok">성공</span></td>
             <td>
               Phase 8 Redis Cluster, Object Storage, hot room release gate plan,
@@ -991,7 +994,7 @@
           <tr>
             <td>
               <code
-                >./gradlew :chat-persistence:test ...RoomSeqGap...
+                >요약: ./gradlew :chat-persistence:test ...RoomSeqGap...
                 ...WebSocketSessionManagerHeartbeatTest... --no-daemon</code
               >
             </td>
@@ -1093,7 +1096,7 @@
             </td>
           </tr>
           <tr>
-            <td><code>docker compose exec chat-api-app-* env</code></td>
+            <td><code>요약: docker compose exec chat-api-app-* env</code></td>
             <td><span class="badge b-ok">성공</span></td>
             <td>
               API 컨테이너 내부 env에서
@@ -1214,7 +1217,7 @@
               <code>pagerduty-critical</code> receiver로 라우팅됐고, 사용자 확인
               기준
               <a href="docs/images/alert-slack.png">Slack message</a>와
-              <a href="docs/images/alert-pagerduty.png">PagerDuty incident</a>
+              <a href="docs/images/alert-pagerduty.png">PagerDuty incident, 담당자명 제거</a>
               delivery가 모두 확인됐다.
             </td>
           </tr>
@@ -1237,7 +1240,7 @@
           <tr>
             <td>
               <code>HTML structure check</code>,
-              <code>git diff --no-index --check /dev/null ...</code>, stale
+              <code>요약: git diff --no-index --check /dev/null ...</code>, stale
               phrase scan
             </td>
             <td><span class="badge b-ok">성공</span></td>

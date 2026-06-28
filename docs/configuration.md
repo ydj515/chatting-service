@@ -156,8 +156,8 @@ Redis Cluster node의 host port는 `127.0.0.1`에만 bind한다. Cluster discove
 | `CHAT_ROOM_POLICY_TRAFFIC_COUNTER_TTL_SECONDS` | `120` | room traffic second counter TTL |
 | `CHAT_PROMETHEUS_URL` | `http://localhost:9090` | `scripts/phase8-hot-room-release-gate.mjs`가 release gate metric을 조회하는 Prometheus base URL |
 | `ALERTMANAGER_PORT` | `9093` | Compose cluster Alertmanager host bind port. 기본값은 `127.0.0.1:9093` |
-| `ALERTMANAGER_SLACK_WEBHOOK_URL_FILE` | `./infra/alertmanager/secrets/alertmanager_slack_webhook_url` | Slack-compatible webhook URL을 담은 secret 파일 경로. `*_sample`을 복사한 뒤 실제 값을 설정 |
-| `ALERTMANAGER_PAGERDUTY_ROUTING_KEY_FILE` | `./infra/alertmanager/secrets/alertmanager_pagerduty_routing_key` | PagerDuty routing key를 담은 secret 파일 경로. `*_sample`을 복사한 뒤 실제 값을 설정 |
+| `ALERTMANAGER_SLACK_WEBHOOK_URL_FILE` | `./infra/alertmanager/secrets/alertmanager_slack_webhook_url_sample` | Slack-compatible webhook URL을 담은 secret 파일 경로. 기본값은 fresh checkout 기동용 sample이며, 실제 delivery smoke에서는 `.gitignore` 처리된 실제 값 파일로 override |
+| `ALERTMANAGER_PAGERDUTY_ROUTING_KEY_FILE` | `./infra/alertmanager/secrets/alertmanager_pagerduty_routing_key_sample` | PagerDuty routing key를 담은 secret 파일 경로. 기본값은 fresh checkout 기동용 sample이며, 실제 delivery smoke에서는 `.gitignore` 처리된 실제 값 파일로 override |
 | `PROMETHEUS_ALERT_SMOKE_PORT` | `9094` | `alert-smoke` profile의 synthetic alert 전용 Prometheus host bind port |
 
 `room_storage_configs.auto_policy_enabled`는 `room-policy` worker의 자동 heat/live feed/rate/slow-mode upsert 허용 여부다. admin policy override는 기본적으로 이 값을 `false`로 바꿔 수동 정책을 보호하며, 자동 정책을 다시 허용하려면 admin API에서 `autoPolicyEnabled=true`를 명시한다.

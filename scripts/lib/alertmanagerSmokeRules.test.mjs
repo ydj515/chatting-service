@@ -57,13 +57,13 @@ test('default prometheus config does not load smoke rules', () => {
   assert.doesNotMatch(file, /AlertmanagerSmoke/);
 });
 
-test('alert smoke prometheus config loads normal and smoke rules', () => {
+test('alert smoke prometheus config loads smoke rules only', () => {
   const file = readFileSync(
     new URL('../../infra/prometheus/alert-smoke-prometheus.yml', import.meta.url),
     'utf8',
   );
 
-  assert.match(file, /- \/etc\/prometheus\/rules\/\*\.rules\.yml/);
+  assert.doesNotMatch(file, /- \/etc\/prometheus\/rules\/\*\.rules\.yml/);
   assert.match(file, /- \/etc\/prometheus\/smoke-rules\/\*\.rules\.yml/);
   assert.match(file, /targets: \["alertmanager:9093"\]/);
 });
@@ -73,11 +73,13 @@ test('compose isolates synthetic alert rules behind the alert-smoke profile', ()
     new URL('../../docker-compose.yml', import.meta.url),
     'utf8',
   );
+  const smokeService = file.match(/prometheus-alert-smoke:\n[\s\S]*?(?=\n  [a-zA-Z0-9_-]+:|\nvolumes:)/)?.[0] ?? '';
 
   assert.match(file, /prometheus-alert-smoke:\n[\s\S]*profiles: \[ "alert-smoke" \]/);
   assert.match(file, /alertmanager:\n[\s\S]*profiles: \[ "cluster", "alert-smoke" \]/);
-  assert.match(file, /\.\/infra\/prometheus\/alert-smoke-prometheus\.yml:\/etc\/prometheus\/prometheus\.yml:ro/);
-  assert.match(file, /\.\/infra\/prometheus\/smoke-rules:\/etc\/prometheus\/smoke-rules:ro/);
-  assert.match(file, /127\.0\.0\.1:\$\{PROMETHEUS_ALERT_SMOKE_PORT:-9094\}:9090/);
-  assert.match(file, /prometheus_alert_smoke_data:/);
+  assert.match(smokeService, /\.\/infra\/prometheus\/alert-smoke-prometheus\.yml:\/etc\/prometheus\/prometheus\.yml:ro/);
+  assert.doesNotMatch(smokeService, /\.\/infra\/prometheus\/rules:\/etc\/prometheus\/rules:ro/);
+  assert.match(smokeService, /\.\/infra\/prometheus\/smoke-rules:\/etc\/prometheus\/smoke-rules:ro/);
+  assert.match(smokeService, /127\.0\.0\.1:\$\{PROMETHEUS_ALERT_SMOKE_PORT:-9094\}:9090/);
+  assert.match(smokeService, /prometheus_alert_smoke_data:/);
 });

@@ -55,7 +55,7 @@ mise run dev:api    # 작업 중인 앱 하나만 (인프라 자동 기동). web
 
 이미지를 빌드해 nginx 게이트웨이와 다중 인스턴스를 포함한 전체 클러스터를 기동합니다.
 
-Alertmanager를 실제 Slack/PagerDuty와 연결하려면 로컬 secret 파일을 한 번 생성해야 합니다. `_sample` 파일은 형식 예시이며, 실제 값 파일은 `.gitignore` 처리되어 Git에 올라가지 않습니다. 실제 연동 전에는 sample 값을 복사해 cluster를 기동할 수 있습니다.
+Alertmanager는 fresh checkout에서도 cluster가 기동되도록 기본값으로 tracked sample secret을 읽습니다. 실제 Slack/PagerDuty delivery를 확인하려면 로컬 secret 파일을 생성하고, 해당 파일 경로를 `ALERTMANAGER_SLACK_WEBHOOK_URL_FILE`, `ALERTMANAGER_PAGERDUTY_ROUTING_KEY_FILE`로 지정해야 합니다. 실제 값 파일은 `.gitignore` 처리되어 Git에 올라가지 않습니다.
 
 ```bash
 cp infra/alertmanager/secrets/alertmanager_slack_webhook_url_sample \
@@ -73,7 +73,7 @@ cp infra/alertmanager/secrets/alertmanager_pagerduty_routing_key_sample \
 
 PagerDuty key는 [PagerDuty Events API v2 Integration Key 발급 절차](docs/pagerduty_events_api_v2_integration_key.md)를 따라 발급합니다. 현재 Alertmanager 설정은 `pagerduty_configs.routing_key_file`을 사용하므로 `Events API v2` integration type의 `Integration Key`가 필요합니다.
 
-실제 운영 secret 파일을 다른 경로에 둘 경우 `ALERTMANAGER_SLACK_WEBHOOK_URL_FILE`, `ALERTMANAGER_PAGERDUTY_ROUTING_KEY_FILE` 환경변수로 경로를 지정합니다.
+기본 sample secret은 기동용 placeholder일 뿐 실제 알림을 보내지 않습니다. 실제 운영 secret 파일을 다른 경로에 둘 경우에도 같은 환경변수로 경로를 지정합니다.
 
 PagerDuty notification 실패는 Alertmanager 자체 metric 기반의 `AlertmanagerPagerDutyNotificationFailures` warning alert로 감지하며, PagerDuty가 아닌 Slack으로 전송합니다. 자세한 운영 절차는 [Alertmanager On-call Wiring](docs/alertmanager_oncall_wiring.md)을 참고합니다.
 

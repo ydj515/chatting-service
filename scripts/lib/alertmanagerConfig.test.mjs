@@ -9,6 +9,10 @@ import {
 test('alertmanager routes warning alerts to Slack and paging alerts to PagerDuty', () => {
   assert.equal(ALERTMANAGER_CONFIG.route.receiver, 'slack-warning');
   assert.deepEqual(
+    ALERTMANAGER_CONFIG.route.group_by,
+    ['alertname', 'severity', 'release_gate', 'release_blocking', 'owner'],
+  );
+  assert.deepEqual(
     ALERTMANAGER_CONFIG.route.routes.map((route) => ({
       receiver: route.receiver,
       matchers: route.matchers,
@@ -42,6 +46,26 @@ test('alertmanager receivers use file-based secrets instead of checked-in secret
   assert.doesNotMatch(rendered, /routing_key: "[a-f0-9]{32}"/);
 });
 
+test('alertmanager Slack notifications preserve per-alert annotations in grouped pages', () => {
+  const [slackConfig] = ALERTMANAGER_CONFIG.receivers
+    .find((receiver) => receiver.name === 'slack-warning')
+    .slack_configs;
+
+  assert.match(slackConfig.text, /range \.Alerts/);
+  assert.match(slackConfig.text, /\.Annotations\.description/);
+  assert.doesNotMatch(slackConfig.text, /\.CommonAnnotations\.description/);
+});
+
+test('alertmanager PagerDuty payload carries release gate and release-blocking context', () => {
+  const [pagerDutyConfig] = ALERTMANAGER_CONFIG.receivers
+    .find((receiver) => receiver.name === 'pagerduty-critical')
+    .pagerduty_configs;
+
+  assert.equal(pagerDutyConfig.class, '{{ .CommonLabels.release_gate }}');
+  assert.equal(pagerDutyConfig.details.release_gate, '{{ .CommonLabels.release_gate }}');
+  assert.equal(pagerDutyConfig.details.release_blocking, '{{ .CommonLabels.release_blocking }}');
+});
+
 test('alertmanager config file stays in sync with renderer', () => {
   const file = readFileSync(
     new URL('../../infra/alertmanager/alertmanager.yml', import.meta.url),
@@ -70,8 +94,8 @@ test('compose starts alertmanager with file-backed Slack and PagerDuty secrets',
   assert.doesNotMatch(file, /--config\.expand-env/);
   assert.match(file, /source: alertmanager_slack_webhook_url/);
   assert.match(file, /source: alertmanager_pagerduty_routing_key/);
-  assert.match(file, /file: \$\{ALERTMANAGER_SLACK_WEBHOOK_URL_FILE:-\.\/infra\/alertmanager\/secrets\/alertmanager_slack_webhook_url\}/);
-  assert.match(file, /file: \$\{ALERTMANAGER_PAGERDUTY_ROUTING_KEY_FILE:-\.\/infra\/alertmanager\/secrets\/alertmanager_pagerduty_routing_key\}/);
+  assert.match(file, /file: \$\{ALERTMANAGER_SLACK_WEBHOOK_URL_FILE:-\.\/infra\/alertmanager\/secrets\/alertmanager_slack_webhook_url_sample\}/);
+  assert.match(file, /file: \$\{ALERTMANAGER_PAGERDUTY_ROUTING_KEY_FILE:-\.\/infra\/alertmanager\/secrets\/alertmanager_pagerduty_routing_key_sample\}/);
   assert.match(file, /\.\/infra\/alertmanager\/alertmanager\.yml:\/etc\/alertmanager\/alertmanager\.yml:ro/);
   assert.match(file, /alertmanager_data:/);
 });
@@ -104,6 +128,9 @@ test('readme documents required Alertmanager secret setup', () => {
   assert.match(readme, /alertmanager_pagerduty_routing_key/);
   assert.match(readme, /Slack-compatible webhook URL/);
   assert.match(readme, /PagerDuty Events API v2 Integration Key/);
+  assert.match(readme, /sample secret/);
+  assert.match(readme, /ALERTMANAGER_SLACK_WEBHOOK_URL_FILE/);
+  assert.match(readme, /ALERTMANAGER_PAGERDUTY_ROUTING_KEY_FILE/);
   assert.match(readme, /\[PagerDuty Events API v2 Integration Key 발급 절차\]\(docs\/pagerduty_events_api_v2_integration_key\.md\)/);
   assert.doesNotMatch(readme, /Add integration/);
 });

@@ -43,7 +43,7 @@
 
 ## 3. Secret 주입
 
-`*_sample` 파일은 민감하지 않은 예시다. 실제 Compose 기본값은 sample이 아니라 `.gitignore` 처리된 실제 secret 파일을 읽는다.
+`*_sample` 파일은 민감하지 않은 예시다. Compose 기본값은 fresh checkout에서도 cluster가 기동되도록 tracked sample secret을 읽는다. 실제 delivery smoke나 운영 연결 시에는 `.gitignore` 처리된 실제 secret 파일을 만들고 `ALERTMANAGER_SLACK_WEBHOOK_URL_FILE`, `ALERTMANAGER_PAGERDUTY_ROUTING_KEY_FILE`로 경로를 지정한다.
 
 ```bash
 cp infra/alertmanager/secrets/alertmanager_slack_webhook_url_sample \
@@ -112,6 +112,7 @@ alertmanager_notification_requests_failed_total{integration="pagerduty"}
 ```bash
 node --test scripts/lib/alertmanagerConfig.test.mjs \
   scripts/lib/alertmanagerSelfMonitoringRules.test.mjs \
+  scripts/lib/alertmanagerSmokeRules.test.mjs \
   scripts/lib/phase7RedisStreamsAlertRules.test.mjs \
   scripts/lib/phase8RoomSeqGapAlertRules.test.mjs
 
@@ -158,7 +159,7 @@ docker compose --profile alert-smoke up -d alertmanager prometheus-alert-smoke
 실제 delivery smoke 결과 증거:
 
 - [Slack warning 수신 결과](./images/alert-slack.png)
-- [PagerDuty critical incident 수신 결과](./images/alert-pagerduty.png)
+- [PagerDuty critical incident 수신 결과, 담당자명 제거](./images/alert-pagerduty.png)
 
 상태 확인:
 

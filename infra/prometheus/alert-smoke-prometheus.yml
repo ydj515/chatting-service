@@ -3,7 +3,6 @@ global:
   evaluation_interval: 15s
 
 rule_files:
-  - /etc/prometheus/rules/*.rules.yml
   - /etc/prometheus/smoke-rules/*.rules.yml
 
 alerting:

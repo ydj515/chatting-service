@@ -630,7 +630,6 @@ services:
     container_name: chat-prometheus-alert-smoke
     volumes:
       - ./infra/prometheus/alert-smoke-prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - ./infra/prometheus/rules:/etc/prometheus/rules:ro
       - ./infra/prometheus/smoke-rules:/etc/prometheus/smoke-rules:ro
       - prometheus_alert_smoke_data:/prometheus
     ports:
@@ -749,6 +748,6 @@ networks:
 
 secrets:
   alertmanager_slack_webhook_url:
-    file: ${ALERTMANAGER_SLACK_WEBHOOK_URL_FILE:-./infra/alertmanager/secrets/alertmanager_slack_webhook_url}
+    file: ${ALERTMANAGER_SLACK_WEBHOOK_URL_FILE:-./infra/alertmanager/secrets/alertmanager_slack_webhook_url_sample}
   alertmanager_pagerduty_routing_key:
-    file: ${ALERTMANAGER_PAGERDUTY_ROUTING_KEY_FILE:-./infra/alertmanager/secrets/alertmanager_pagerduty_routing_key}
+    file: ${ALERTMANAGER_PAGERDUTY_ROUTING_KEY_FILE:-./infra/alertmanager/secrets/alertmanager_pagerduty_routing_key_sample}
