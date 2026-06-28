@@ -155,6 +155,11 @@ docker compose --profile alert-smoke up -d alertmanager prometheus-alert-smoke
 | `AlertmanagerSmokeWarning` | `warning` | Slack | Slack-compatible webhook delivery 확인 |
 | `AlertmanagerSmokeCritical` | `critical` | PagerDuty | PagerDuty incident/escalation 확인 |
 
+실제 delivery smoke 결과 증거:
+
+- [Slack warning 수신 결과](./images/alert-slack.png)
+- [PagerDuty critical incident 수신 결과](./images/alert-pagerduty.png)
+
 상태 확인:
 
 ```bash

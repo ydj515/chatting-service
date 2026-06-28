@@ -860,8 +860,11 @@
         해소 처리한다. 실제 Slack/PagerDuty secret을 주입한 뒤
         <code>AlertmanagerSmokeWarning</code>은 Slack,
         <code>AlertmanagerSmokeCritical</code>은 PagerDuty로 라우팅됐고, 사용자
-        확인 기준 실제 수신까지 완료됐다. Alertmanager 로그에는 firing/resolved
-        notify 오류가 없었으며 smoke alert active count도 0으로 정리됐다.
+        확인 기준 실제 수신까지 완료됐다. 결과 증거:
+        <a href="docs/images/alert-slack.png">Slack warning 수신</a>,
+        <a href="docs/images/alert-pagerduty.png">PagerDuty critical incident 수신</a>.
+        Alertmanager 로그에는 firing/resolved notify 오류가 없었으며 smoke alert
+        active count도 0으로 정리됐다.
       </div>
 
       <table>
@@ -1209,7 +1212,10 @@
               warning/critical alert를 firing했다. Alertmanager API 기준
               warning은 <code>slack-warning</code>, critical은
               <code>pagerduty-critical</code> receiver로 라우팅됐고, 사용자 확인
-              기준 Slack message와 PagerDuty incident delivery가 모두 확인됐다.
+              기준
+              <a href="docs/images/alert-slack.png">Slack message</a>와
+              <a href="docs/images/alert-pagerduty.png">PagerDuty incident</a>
+              delivery가 모두 확인됐다.
             </td>
           </tr>
           <tr>
