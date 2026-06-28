@@ -9,6 +9,7 @@ export const ROOM_SEQ_GAP_ALERT_RULES = [
       severity: 'warning',
       phase: 'phase8',
       release_gate: 'room_seq_gap',
+      owner: 'platform-oncall',
     },
     annotations: {
       summary: 'Canonical room sequence gap detected',
@@ -24,6 +25,7 @@ export const ROOM_SEQ_GAP_ALERT_RULES = [
       severity: 'warning',
       phase: 'phase8',
       release_gate: 'room_seq_gap',
+      owner: 'platform-oncall',
     },
     annotations: {
       summary: 'Canonical room sequence gap width is elevated',

@@ -595,6 +595,48 @@ services:
     ports:
       # 호스트 로컬에만 바인딩한다. 외부 공개는 K8s에서 인증된 Ingress로 다룬다.
       - "127.0.0.1:${PROMETHEUS_PORT:-9090}:9090"
+    depends_on:
+      - alertmanager
+    networks:
+      - chat-network
+
+  # Alertmanager (severity별 운영 알림 라우팅)
+  alertmanager:
+    image: ${ALERTMANAGER_IMAGE:-prom/alertmanager:v0.27.0}
+    profiles: [ "cluster", "alert-smoke" ]
+    container_name: chat-alertmanager
+    command:
+      - "--config.file=/etc/alertmanager/alertmanager.yml"
+      - "--storage.path=/alertmanager"
+    volumes:
+      - ./infra/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager_data:/alertmanager
+    secrets:
+      - source: alertmanager_slack_webhook_url
+        target: alertmanager_slack_webhook_url
+      - source: alertmanager_pagerduty_routing_key
+        target: alertmanager_pagerduty_routing_key
+    ports:
+      # 호스트 로컬에만 바인딩한다. 외부 공개는 K8s에서 인증된 Ingress로 다룬다.
+      - "127.0.0.1:${ALERTMANAGER_PORT:-9093}:9093"
+    networks:
+      - chat-network
+
+  # Alertmanager delivery smoke 전용 Prometheus.
+  # alert-smoke profile을 명시했을 때만 synthetic alert rule을 평가한다.
+  prometheus-alert-smoke:
+    image: ${PROMETHEUS_IMAGE:-prom/prometheus:v2.53.0}
+    profiles: [ "alert-smoke" ]
+    container_name: chat-prometheus-alert-smoke
+    volumes:
+      - ./infra/prometheus/alert-smoke-prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./infra/prometheus/smoke-rules:/etc/prometheus/smoke-rules:ro
+      - prometheus_alert_smoke_data:/prometheus
+    ports:
+      # 기본 Prometheus(:9090)와 충돌하지 않도록 별도 loopback port를 사용한다.
+      - "127.0.0.1:${PROMETHEUS_ALERT_SMOKE_PORT:-9094}:9090"
+    depends_on:
+      - alertmanager
     networks:
       - chat-network
 
@@ -692,6 +734,10 @@ volumes:
     driver: local
   prometheus_data:
     driver: local
+  prometheus_alert_smoke_data:
+    driver: local
+  alertmanager_data:
+    driver: local
   grafana_data:
     driver: local
 
@@ -699,3 +745,9 @@ volumes:
 networks:
   chat-network:
     driver: bridge
+
+secrets:
+  alertmanager_slack_webhook_url:
+    file: ${ALERTMANAGER_SLACK_WEBHOOK_URL_FILE:-./infra/alertmanager/secrets/alertmanager_slack_webhook_url_sample}
+  alertmanager_pagerduty_routing_key:
+    file: ${ALERTMANAGER_PAGERDUTY_ROUTING_KEY_FILE:-./infra/alertmanager/secrets/alertmanager_pagerduty_routing_key_sample}

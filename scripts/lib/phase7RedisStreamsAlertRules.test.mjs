@@ -48,6 +48,30 @@ test('redis streams lag alert rules keep metric labels bounded', () => {
   assert.doesNotMatch(rendered, /roomId|room_id|stream_key|room_stream|chat:stream:/);
 });
 
+test('redis streams lag alert rules include owner and release-blocking metadata', () => {
+  assert.equal(
+    REDIS_STREAMS_LAG_ALERT_RULES.every((rule) => rule.labels.owner === 'platform-oncall'),
+    true,
+  );
+
+  assert.deepEqual(
+    REDIS_STREAMS_LAG_ALERT_RULES
+      .filter((rule) => rule.labels.severity === 'critical')
+      .map((rule) => [rule.alert, rule.labels.release_blocking]),
+    [
+      ['RedisStreamsGroupLagCritical', 'true'],
+      ['RedisStreamsGroupPendingCritical', 'true'],
+    ],
+  );
+
+  assert.equal(
+    REDIS_STREAMS_LAG_ALERT_RULES
+      .filter((rule) => rule.labels.severity === 'warning')
+      .every((rule) => rule.labels.release_blocking === undefined),
+    true,
+  );
+});
+
 test('redis streams lag alert renderer skips empty optional label blocks', () => {
   const rendered = renderRedisStreamsLagAlertRules({
     rules: [

@@ -8,6 +8,7 @@ groups:
           severity: "warning"
           phase: "phase7"
           release_gate: "redis_streams_lag"
+          owner: "platform-oncall"
         annotations:
           summary: "Redis Streams group lag is sustained"
           description: "Redis Streams group lag has stayed above zero for 3 minutes on consumer_group={{ $labels.consumer_group }}, stream_shard={{ $labels.stream_shard }}."
@@ -19,6 +20,8 @@ groups:
           severity: "critical"
           phase: "phase7"
           release_gate: "redis_streams_lag"
+          release_blocking: "true"
+          owner: "platform-oncall"
         annotations:
           summary: "Redis Streams group lag crossed the critical threshold"
           description: "Redis Streams group lag is above 1000 entries for 5 minutes on consumer_group={{ $labels.consumer_group }}, stream_shard={{ $labels.stream_shard }}."
@@ -30,6 +33,7 @@ groups:
           severity: "warning"
           phase: "phase7"
           release_gate: "redis_streams_pending"
+          owner: "platform-oncall"
         annotations:
           summary: "Redis Streams pending entries are sustained"
           description: "Redis Streams pending entries have stayed above zero for 5 minutes on consumer_group={{ $labels.consumer_group }}, stream_shard={{ $labels.stream_shard }}."
@@ -41,6 +45,8 @@ groups:
           severity: "critical"
           phase: "phase7"
           release_gate: "redis_streams_pending"
+          release_blocking: "true"
+          owner: "platform-oncall"
         annotations:
           summary: "Redis Streams pending entries crossed the critical threshold"
           description: "Redis Streams pending entries are above 100 for 10 minutes on consumer_group={{ $labels.consumer_group }}, stream_shard={{ $labels.stream_shard }}."

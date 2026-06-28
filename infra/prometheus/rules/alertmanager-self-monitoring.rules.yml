@@ -1,0 +1,16 @@
+groups:
+  - name: alertmanager-self-monitoring
+    rules:
+      - alert: AlertmanagerPagerDutyNotificationFailures
+        expr: increase(alertmanager_notification_requests_failed_total{integration="pagerduty"}[5m]) > 0
+        for: 1m
+        labels:
+          severity: "warning"
+          phase: "operations"
+          release_gate: "alertmanager_notification_delivery"
+          owner: "platform-oncall"
+          failed_integration: "pagerduty"
+        annotations:
+          summary: "Alertmanager PagerDuty notification delivery is failing"
+          description: "Alertmanager has failed at least one PagerDuty notification request in the last 5 minutes. Check the PagerDuty Events API v2 Integration Key, network/DNS reachability, PagerDuty service status, and Alertmanager logs before relying on critical paging."
+          runbook: "docs/alertmanager_oncall_wiring.md"

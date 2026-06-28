@@ -15,6 +15,8 @@
 
 - Redis Streams lag/pending warning과 critical alert를 Prometheus rule 파일로 제공한다.
 - alert label cardinality를 `consumer_group`, `stream_shard`로 제한한다.
+- 모든 rule에 `owner="platform-oncall"`을 붙인다.
+- critical rule은 `release_blocking="true"`를 붙여 PagerDuty route와 release gate에서 식별한다.
 - staging 부하 테스트 전 기준선을 명확히 문서화한다.
 
 ## 2. Rule Artifact
@@ -33,12 +35,12 @@ scripts/lib/phase7RedisStreamsAlertRules.mjs
 
 ## 3. Alert Contract
 
-| Alert | Expr | For | Severity | 의미 |
-| --- | --- | --- | --- | --- |
-| `RedisStreamsGroupLagSustained` | `max by (consumer_group, stream_shard) (chat_redis_stream_group_lag) > 0` | `3m` | `warning` | lag가 transient가 아니라 지속됨 |
-| `RedisStreamsGroupLagCritical` | `max by (consumer_group, stream_shard) (chat_redis_stream_group_lag) > 1000` | `5m` | `critical` | backlog가 release-blocking 수준으로 커짐 |
-| `RedisStreamsGroupPendingSustained` | `max by (consumer_group, stream_shard) (chat_redis_stream_group_pending) > 0` | `5m` | `warning` | ack되지 않은 pending entry가 지속됨 |
-| `RedisStreamsGroupPendingCritical` | `max by (consumer_group, stream_shard) (chat_redis_stream_group_pending) > 100` | `10m` | `critical` | pending recovery가 장시간 따라잡지 못함 |
+| Alert | Expr | For | Severity | Release blocking | 의미 |
+| --- | --- | --- | --- | --- | --- |
+| `RedisStreamsGroupLagSustained` | `max by (consumer_group, stream_shard) (chat_redis_stream_group_lag) > 0` | `3m` | `warning` | 없음 | lag가 transient가 아니라 지속됨 |
+| `RedisStreamsGroupLagCritical` | `max by (consumer_group, stream_shard) (chat_redis_stream_group_lag) > 1000` | `5m` | `critical` | `true` | backlog가 release-blocking 수준으로 커짐 |
+| `RedisStreamsGroupPendingSustained` | `max by (consumer_group, stream_shard) (chat_redis_stream_group_pending) > 0` | `5m` | `warning` | 없음 | ack되지 않은 pending entry가 지속됨 |
+| `RedisStreamsGroupPendingCritical` | `max by (consumer_group, stream_shard) (chat_redis_stream_group_pending) > 100` | `10m` | `critical` | `true` | pending recovery가 장시간 따라잡지 못함 |
 
 ## 4. 운영 절차
 
@@ -46,7 +48,7 @@ scripts/lib/phase7RedisStreamsAlertRules.mjs
 2. Prometheus reload 전에 `promtool check rules`로 문법을 확인한다.
 3. `RedisStreamsGroupLagSustained`는 worker 처리량, Redis latency, stream shard skew를 확인한다.
 4. `RedisStreamsGroupPendingSustained`는 worker pending claim, max delivery, dead-letter 증가 여부를 같이 본다.
-5. critical alert가 발생하면 Phase 7 release gate를 blocking으로 본다.
+5. critical alert가 발생하면 Phase 7 release gate를 blocking으로 보고 PagerDuty route를 확인한다.
 
 ## 5. 복잡도
 
@@ -74,5 +76,5 @@ scripts/lib/phase7RedisStreamsAlertRules.mjs
 ## 8. 후속 질문
 
 - staging 부하 테스트 후 critical lag threshold를 1000에서 조정할 것인가?
-- alertmanager route와 paging policy를 별도 slice로 둘 것인가?
+- staging에서 PagerDuty firing smoke를 수행할 것인가?
 - Redis Streams alert를 chaos recovery SLO gate와 연결할 것인가?

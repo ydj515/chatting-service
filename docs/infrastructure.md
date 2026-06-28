@@ -114,13 +114,15 @@ docker compose exec -T redis-cluster-node-1 \
   redis-cli -p 6379 cluster nodes
 ```
 
-로컬 호스트 Gradle 개발 모드(`mise run dev:*`)는 `mise run start:infra`가 명시적으로 시작하는 dev profile의 standalone `redis` 서비스를 사용한다. Redis Cluster 서비스와 전체 backend 앱/nginx/Prometheus/Grafana는 `cluster` profile에 격리되어 있어 `docker compose --profile dev up` 경로에서 함께 뜨지 않는다.
+로컬 호스트 Gradle 개발 모드(`mise run dev:*`)는 `mise run start:infra`가 명시적으로 시작하는 dev profile의 standalone `redis` 서비스를 사용한다. Redis Cluster 서비스와 전체 backend 앱/nginx/Prometheus/Alertmanager/Grafana는 `cluster` profile에 격리되어 있어 `docker compose --profile dev up` 경로에서 함께 뜨지 않는다.
 
 Redis Cluster host port는 `127.0.0.1`에만 bind한다. `infra/redis/redis-cluster.conf`는 `protected-mode no`가 필요하므로, Compose port binding으로 외부 인터페이스 노출을 막는다.
 
 `infra/redis/redis-cluster.conf`는 `appendonly yes`, `appendfsync everysec`, `cluster-preferred-endpoint-type hostname`을 사용한다. 따라서 Redis node 장애나 host crash 시 마지막 fsync 이후 최대 1초의 Redis ingest가 손실될 수 있다. Phase 8.7은 Redis Streams `XADD MAXLEN`, canonical `room_seq` gap audit, WebSocket heartbeat로 Redis OOM 방어와 유실/좀비 연결 감지 경로를 제공한다.
 
 Redis Streams append는 기본적으로 `CHAT_REDIS_STREAMS_MAX_LEN=1000000`, `CHAT_REDIS_STREAMS_MAX_LEN_APPROXIMATE=true`를 사용한다. 이 값은 stream key별 entry 상한이며, `0` 이하이면 bounded append를 비활성화한다. `MAXLEN`은 메시지 보존 보장이 아니라 Redis memory 보호용 backpressure이므로 worker lag, Redis memory, `chat.room_seq.gap.rooms`, `chat.room_seq.gap.missing_sequences`, `chat.room_seq.gap.max_width`, `chat.room_seq.gap.scanned_rooms` metric을 함께 봐야 한다.
+
+Prometheus alert는 Compose `cluster` profile의 Alertmanager로 전달된다. `severity="warning"`은 Slack-compatible webhook receiver로, `severity="critical"` 또는 `release_blocking="true"`는 PagerDuty receiver로 라우팅한다. Prometheus는 Alertmanager 자체 metric도 scrape하며, PagerDuty notification 실패는 `AlertmanagerPagerDutyNotificationFailures` warning alert로 감지해 Slack에 보낸다. 실제 secret 파일 주입, silence, synthetic delivery smoke 절차는 [alertmanager_oncall_wiring.md](./alertmanager_oncall_wiring.md)를 따른다. `alert-smoke` profile은 별도 `prometheus-alert-smoke` 서비스를 띄워 기본 Prometheus와 분리된 synthetic alert rule만 추가 평가한다.
 
 `RoomSeqGapAuditWorker`는 `CHAT_WORKER_ROOM_SEQ_GAP_AUDIT_ENABLED=true`이고 `WORKER_ROLES`에 `room-seq-gap-audit`이 포함된 worker에서 실행한다. 기본 Compose cluster의 worker role에는 `room-seq-gap-audit`이 포함되므로 gap audit은 별도 opt-in 없이 활성화된다. 기본적으로 `CHAT_WORKER_ROOM_SEQ_GAP_AUDIT_POLL_DELAY_MILLIS=60000` 주기로 최근 `CHAT_WORKER_ROOM_SEQ_GAP_AUDIT_LOOKBACK=5m` window의 `chat_messages`를 message read datasource에서 스캔한다. audit 실패는 메시지 writer/fanout hot path를 막지 않고 warn log만 남긴다. gap metric은 자동 복구가 아니라 운영 감지 신호이며, sequence 발급 이후 append 실패로 생긴 hole 가능성이 있으므로 alert는 warning으로 시작해 Redis append failure, worker lag, canonical 저장 지표와 함께 판정한다.
 
@@ -226,4 +228,5 @@ mise run verify:chat
 | [phase7_admin_search_slow_query_plan_capture.md](./phase7_admin_search_slow_query_plan_capture.md) | 관리자 검색 cold p99 실패 시 PostgreSQL 실행 계획 수집 절차 |
 | [phase7_redis_streams_direct_lag_gauge.md](./phase7_redis_streams_direct_lag_gauge.md) | Redis Streams group lag/pending direct gauge 운영 기준 |
 | [phase7_redis_streams_lag_alert_rule.md](./phase7_redis_streams_lag_alert_rule.md) | Redis Streams lag/pending Prometheus alert rule 기준 |
+| [alertmanager_oncall_wiring.md](./alertmanager_oncall_wiring.md) | Alertmanager Slack/PagerDuty severity routing과 secret 주입 절차 |
 | [architecture_overview.md](./architecture_overview.md) | 분산 웹소켓 서버 아키텍처 및 실시간 채팅 데이터 흐름 (Mermaid 다이어그램) |
