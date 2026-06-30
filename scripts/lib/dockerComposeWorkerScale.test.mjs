@@ -69,6 +69,29 @@ test('compose passes websocket heartbeat settings to app containers', () => {
   );
 });
 
+test('compose passes websocket outbound budget settings to app containers', () => {
+  assert.match(
+    compose,
+    /CHAT_WEBSOCKET_GATEWAY_OUTBOUND_QUEUE_MAX_PENDING_MESSAGES: \${CHAT_WEBSOCKET_GATEWAY_OUTBOUND_QUEUE_MAX_PENDING_MESSAGES:-1024}/,
+  );
+  assert.match(
+    compose,
+    /CHAT_WEBSOCKET_GATEWAY_OUTBOUND_EXECUTOR_THREADS: \${CHAT_WEBSOCKET_GATEWAY_OUTBOUND_EXECUTOR_THREADS:-128}/,
+  );
+  assert.match(
+    compose,
+    /CHAT_WEBSOCKET_GATEWAY_OUTBOUND_SEND_TIME_LIMIT_MILLIS: \${CHAT_WEBSOCKET_GATEWAY_OUTBOUND_SEND_TIME_LIMIT_MILLIS:-30000}/,
+  );
+  assert.match(
+    compose,
+    /CHAT_WEBSOCKET_GATEWAY_OUTBOUND_SEND_BUFFER_SIZE_LIMIT_BYTES: \${CHAT_WEBSOCKET_GATEWAY_OUTBOUND_SEND_BUFFER_SIZE_LIMIT_BYTES:-4194304}/,
+  );
+  assert.match(envExample, /^CHAT_WEBSOCKET_GATEWAY_OUTBOUND_QUEUE_MAX_PENDING_MESSAGES=1024$/m);
+  assert.match(envExample, /^CHAT_WEBSOCKET_GATEWAY_OUTBOUND_EXECUTOR_THREADS=128$/m);
+  assert.match(envExample, /^CHAT_WEBSOCKET_GATEWAY_OUTBOUND_SEND_TIME_LIMIT_MILLIS=30000$/m);
+  assert.match(envExample, /^CHAT_WEBSOCKET_GATEWAY_OUTBOUND_SEND_BUFFER_SIZE_LIMIT_BYTES=4194304$/m);
+});
+
 test('nginx main config exposes worker connection budget through envsubst', () => {
   assert.match(nginxMainConfig, /worker_processes \$\{NGINX_WORKER_PROCESSES\};/);
   assert.match(nginxMainConfig, /worker_connections \$\{NGINX_WORKER_CONNECTIONS\};/);

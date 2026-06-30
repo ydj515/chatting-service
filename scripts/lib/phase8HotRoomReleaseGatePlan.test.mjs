@@ -28,6 +28,8 @@ test('parsePhase8HotRoomGateArgs defaults to staged 1k 3k 5k 7k 10k gate', () =>
     { name: '10k', viewers: 10000, messagesPerSec: 10000, durationSeconds: 60 },
   ]);
   assert.equal(options.minReceivedRatio, 0.9);
+  assert.equal(options.minAcceptedRatio, 0.99);
+  assert.equal(options.senderCount, 16);
   assert.equal(options.minStreamShardCount, 16);
   assert.equal(options.maxFanoutP95Ms, 500);
   assert.equal(options.maxStreamGroupLagEntries, 1000);
@@ -84,8 +86,11 @@ test('buildLoadChatArgs includes staged release gate load arguments', () => {
     '--messages-per-sec', '1000',
     '--duration', '60',
     '--min-received-ratio', '0.9',
+    '--min-accepted-ratio', '0.99',
+    '--senders', '16',
     '--summary-mode', 'counts',
     '--label', '1k',
+    '--seed-room-shards', '16',
   ]);
 });
 
@@ -95,6 +100,9 @@ test('assertLoadSummary accepts a successful load summary', () => {
   assertLoadSummary({
     ok: true,
     sent: 600000,
+    sender: {
+      accepted: 600000,
+    },
     viewers: 2,
     receivedPerViewer: [600000, 590000],
     minReceivedRatio: 0.9,
@@ -107,10 +115,33 @@ test('assertLoadSummary rejects insufficient delivery', () => {
   assert.throws(() => assertLoadSummary({
     ok: true,
     sent: 600000,
+    sender: {
+      accepted: 600000,
+    },
     viewers: 1,
     receivedPerViewer: [500000],
     minReceivedRatio: 0.9,
   }, options.stages[0], options), /minimum received/);
+});
+
+test('assertLoadSummary rejects insufficient sender acceptance', () => {
+  const options = parsePhase8HotRoomGateArgs([
+    '--single-stage',
+    '--viewers', '1',
+    '--messages-per-sec', '1000',
+    '--duration', '60',
+  ]);
+
+  assert.throws(() => assertLoadSummary({
+    ok: true,
+    sent: 60000,
+    sender: {
+      accepted: 59000,
+    },
+    viewers: 1,
+    receivedPerViewer: [59000],
+    minReceivedRatio: 0.9,
+  }, options.stages[0], options), /accepted/);
 });
 
 test('assertLoadSummary rejects missing receivedPerViewer entries', () => {
@@ -119,6 +150,9 @@ test('assertLoadSummary rejects missing receivedPerViewer entries', () => {
   assert.throws(() => assertLoadSummary({
     ok: true,
     sent: 600000,
+    sender: {
+      accepted: 600000,
+    },
     viewers: 2,
     receivedPerViewer: [600000],
     minReceivedRatio: 0.9,

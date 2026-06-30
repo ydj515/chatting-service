@@ -3,46 +3,30 @@ package com.chat.persistence.service
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.Executors
-import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.Executor
 
 class BoundedOutboundSessionQueueTest {
 
     @Test
-    fun `pending message가 상한을 넘으면 overflow callback을 실행하고 큐를 닫는다`() {
-        val firstSendStarted = CountDownLatch(1)
-        val releaseFirstSend = CountDownLatch(1)
-        val overflowCount = AtomicInteger(0)
-        val executor = Executors.newSingleThreadExecutor()
+    fun `priority enqueue makes room by dropping newest normal payload and drains first`() {
+        val scheduled = mutableListOf<Runnable>()
+        val sent = mutableListOf<String>()
+        var overflowCount = 0
         val queue = BoundedOutboundSessionQueue(
-            maxPendingMessages = 1,
-            executor = executor,
-            sender = {
-                firstSendStarted.countDown()
-                releaseFirstSend.await(3, TimeUnit.SECONDS)
-            },
-            onOverflow = {
-                overflowCount.incrementAndGet()
-            },
-            onFailure = {},
+            maxPendingMessages = 2,
+            executor = Executor { scheduled.add(it) },
+            sender = { sent.add(it) },
+            onOverflow = { overflowCount += 1 },
+            onFailure = { throw it },
         )
 
-        try {
-            assertTrue(queue.enqueue("first"))
-            assertTrue(firstSendStarted.await(3, TimeUnit.SECONDS))
-            assertTrue(queue.enqueue("second"))
+        assertTrue(queue.enqueue("normal-1"))
+        assertTrue(queue.enqueue("normal-2"))
+        assertTrue(queue.enqueue("priority", priority = true))
 
-            val accepted = queue.enqueue("third")
+        scheduled.single().run()
 
-            assertEquals(false, accepted)
-            assertEquals(1, overflowCount.get())
-            assertTrue(queue.isClosed())
-            assertTrue(queue.pendingSize() <= 1)
-        } finally {
-            releaseFirstSend.countDown()
-            executor.shutdownNow()
-        }
+        assertEquals(0, overflowCount)
+        assertEquals(listOf("priority", "normal-1"), sent)
     }
 }

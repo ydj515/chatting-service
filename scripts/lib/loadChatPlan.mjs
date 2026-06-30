@@ -11,6 +11,9 @@ export function parseLoadChatArgs(argv) {
     takeoverDeliverySummary: false,
     summaryMode: 'messages',
     label: null,
+    seedRoomShards: null,
+    minAcceptedRatio: 0,
+    senders: 1,
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -51,6 +54,12 @@ export function parseLoadChatArgs(argv) {
       options.summaryMode = value;
     } else if (arg === '--label') {
       options.label = value;
+    } else if (arg === '--seed-room-shards') {
+      options.seedRoomShards = positiveInteger(value, arg);
+    } else if (arg === '--min-accepted-ratio') {
+      options.minAcceptedRatio = ratio(value, arg);
+    } else if (arg === '--senders') {
+      options.senders = positiveInteger(value, arg);
     } else {
       throw new Error(`Unknown argument: ${arg}`);
     }
@@ -100,6 +109,22 @@ export function assertMinimumReceivedCounts(receivedCounts, sent, minReceivedRat
   });
 }
 
+export function assertMinimumAcceptedMessages(senderSummary, targetMessages, minAcceptedRatio) {
+  if (minAcceptedRatio <= 0) {
+    return;
+  }
+  const accepted = senderSummary?.accepted;
+  if (!Number.isInteger(accepted) || accepted < 0) {
+    throw new Error('sender accepted count is missing');
+  }
+  const minimum = Math.ceil(targetMessages * minAcceptedRatio);
+  if (accepted < minimum) {
+    throw new Error(
+      `sender accepted only ${accepted}/${targetMessages}; minimum ratio ${minAcceptedRatio} requires ${minimum}`,
+    );
+  }
+}
+
 export function flattenChatMessages(frame) {
   if (frame?.type === 'CHAT_MESSAGE') {
     return [frame];
@@ -136,6 +161,13 @@ export function createViewerMessageCollector({ retainMessages, sampleLimit = 3 }
         record.messages.push(...messages);
       }
     },
+    recordCount(userId, count) {
+      const record = records.get(userId);
+      if (!record || count <= 0) {
+        return;
+      }
+      record.received += count;
+    },
     receivedCounts() {
       return [...records.values()].map((record) => record.received);
     },
@@ -152,6 +184,119 @@ export function createViewerMessageCollector({ retainMessages, sampleLimit = 3 }
   };
 }
 
+export function createSenderAckTracker() {
+  const pending = new Set();
+  const acceptedIds = new Set();
+  let attempted = 0;
+  let flushed = 0;
+  let accepted = 0;
+  let unknownAccepted = 0;
+  let duplicateAccepted = 0;
+
+  return {
+    recordAttempt(clientMessageId) {
+      attempted += 1;
+      pending.add(clientMessageId);
+    },
+    recordFlush() {
+      flushed += 1;
+    },
+    recordAccepted(clientMessageId) {
+      if (typeof clientMessageId !== 'string' || clientMessageId.length === 0) {
+        unknownAccepted += 1;
+        return;
+      }
+      if (pending.delete(clientMessageId)) {
+        accepted += 1;
+        acceptedIds.add(clientMessageId);
+      } else if (acceptedIds.has(clientMessageId)) {
+        duplicateAccepted += 1;
+      } else {
+        unknownAccepted += 1;
+      }
+    },
+    recordFrame(frame) {
+      if (frame?.type !== 'MESSAGE_ACCEPTED') {
+        return;
+      }
+      this.recordAccepted(frame.clientMessageId);
+    },
+    snapshot() {
+      return {
+        attempted,
+        flushed,
+        accepted,
+        pendingAcks: pending.size,
+        unknownAccepted,
+        duplicateAccepted,
+        acceptanceRatio: ratioOrZero(accepted, attempted),
+      };
+    },
+  };
+}
+
+export function writeSocketBuffer(socket, buffer) {
+  if (!socket || socket.destroyed) {
+    return Promise.reject(new Error('WebSocket socket is closed'));
+  }
+
+  try {
+    if (socket.write(buffer)) {
+      return undefined;
+    }
+  } catch (error) {
+    return Promise.reject(error);
+  }
+
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const cleanup = () => {
+      socket.off?.('drain', onDrain);
+      socket.off?.('error', onError);
+      socket.off?.('close', onClose);
+    };
+    const finish = (callback, value) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      cleanup();
+      callback(value);
+    };
+    const onDrain = () => finish(resolve);
+    const onError = (error) => finish(reject, error);
+    const onClose = () => finish(reject, new Error('WebSocket socket closed before drain'));
+
+    socket.once('drain', onDrain);
+    socket.once('error', onError);
+    socket.once('close', onClose);
+  });
+}
+
+export function senderIndexForAttempt(attempt, senderCount) {
+  const safeAttempt = positiveInteger(attempt, 'attempt');
+  const safeSenderCount = positiveInteger(senderCount, 'senderCount');
+  return (safeAttempt - 1) % safeSenderCount;
+}
+
+export function acceptedClientMessageIdFromRawFrame(rawMessage) {
+  if (!rawMessage.includes('"MESSAGE_ACCEPTED"')) {
+    return null;
+  }
+  try {
+    const frame = JSON.parse(rawMessage);
+    return frame?.type === 'MESSAGE_ACCEPTED' && typeof frame.clientMessageId === 'string'
+      ? frame.clientMessageId
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+export function countChatMessagesInRawFrame(rawMessage) {
+  return rawMessage.match(/"type"\s*:\s*"CHAT_MESSAGE"/g)?.length ?? 0;
+}
+
 export function redactSensitiveUrl(value) {
   const url = new URL(value.toString());
   for (const name of ['ticket', 'token']) {
@@ -166,6 +311,56 @@ export function formatLoadStepError({ label, viewerIndex, step, method, url, cau
   const prefix = label ? `[${label}] ` : '';
   const actor = viewerIndex === undefined ? '' : `viewer ${viewerIndex} `;
   return `${prefix}${actor}${step} ${method} ${redactSensitiveUrl(url)} failed: ${cause.message}`;
+}
+
+export function buildRoomShardSeedSql({ roomId, shardCount }) {
+  const safeRoomId = positiveInteger(roomId, 'roomId');
+  const safeShardCount = positiveInteger(shardCount, 'shardCount');
+  return `
+INSERT INTO room_storage_configs (
+  room_id,
+  hot_room_policy,
+  current_shard_count,
+  fanout_shard_count,
+  auto_policy_enabled,
+  updated_at
+)
+VALUES (
+  ${safeRoomId},
+  'HOT',
+  ${safeShardCount},
+  ${safeShardCount},
+  true,
+  now()
+)
+ON CONFLICT (room_id) DO UPDATE SET
+  hot_room_policy = 'HOT',
+  current_shard_count = GREATEST(room_storage_configs.current_shard_count, EXCLUDED.current_shard_count),
+  fanout_shard_count = GREATEST(room_storage_configs.fanout_shard_count, EXCLUDED.fanout_shard_count),
+  auto_policy_enabled = true,
+  updated_at = now()
+`;
+}
+
+export function buildRoomShardSeedCommand({ roomId, shardCount, env = process.env }) {
+  return {
+    command: 'docker',
+    args: [
+      'compose',
+      'exec',
+      '-T',
+      'postgres',
+      'psql',
+      '-U',
+      env.DB_USERNAME ?? 'chatuser',
+      '-d',
+      env.DB_NAME ?? 'chatdb',
+      '-v',
+      'ON_ERROR_STOP=1',
+      '-c',
+      buildRoomShardSeedSql({ roomId, shardCount }),
+    ],
+  };
 }
 
 export function buildLoadUsername(prefix, entropy) {

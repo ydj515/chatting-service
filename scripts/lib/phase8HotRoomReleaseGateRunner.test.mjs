@@ -13,6 +13,9 @@ test('runReleaseGate executes staged gates in order', async () => {
       return {
         ok: true,
         sent: stage.messagesPerSec * stage.durationSeconds,
+        sender: {
+          accepted: stage.messagesPerSec * stage.durationSeconds,
+        },
         viewers: stage.viewers,
         receivedPerViewer: Array.from(
           { length: stage.viewers },
@@ -45,6 +48,9 @@ test('runReleaseGate stops after the first failing stage', async () => {
       return {
         ok: true,
         sent: stage.messagesPerSec * stage.durationSeconds,
+        sender: {
+          accepted: stage.messagesPerSec * stage.durationSeconds,
+        },
         viewers: stage.viewers,
         receivedPerViewer: Array.from(
           { length: stage.viewers },

@@ -1,20 +1,28 @@
 #!/usr/bin/env node
 import crypto from 'node:crypto';
+import { spawn } from 'node:child_process';
 import fs from 'node:fs/promises';
 import net from 'node:net';
 import tls from 'node:tls';
 import { URL } from 'node:url';
 import {
+  assertMinimumAcceptedMessages,
   assertMinimumReceivedCounts,
   assertRoomSeqOrder,
+  acceptedClientMessageIdFromRawFrame,
+  buildRoomShardSeedCommand,
   buildLoadUsername,
+  countChatMessagesInRawFrame,
+  createSenderAckTracker,
   createViewerMessageCollector,
   flattenChatMessages,
   formatLoadStepError,
   parseLoadChatArgs,
   readJsonResponse,
   redactSensitiveUrl,
+  senderIndexForAttempt,
   summarizeTakeoverDelivery,
+  writeSocketBuffer,
 } from './lib/loadChatPlan.mjs';
 import { RawWebSocketFrameDecoder } from './lib/rawWebSocketFrameDecoder.mjs';
 
@@ -110,10 +118,86 @@ async function connectSession(login, onJson, context = {}) {
   return ws;
 }
 
+async function seedRoomShards(room, options) {
+  if (!options.seedRoomShards) {
+    return;
+  }
+  const seedTarget = new URL('postgres://room_storage_configs');
+  await withLoadStep({
+    label: options.label,
+    step: 'seed-room-shards',
+    method: 'SQL',
+    url: seedTarget,
+  }, async () => {
+    const { command, args } = buildRoomShardSeedCommand({
+      roomId: room.id,
+      shardCount: options.seedRoomShards,
+    });
+    await runCommand(command, args);
+  });
+}
+
+async function createSenderLogins(room, primarySenderLogin, options) {
+  const senderLogins = [primarySenderLogin];
+  for (let index = 1; index < options.senders; index += 1) {
+    const context = { label: options.label };
+    const sender = await registerUser(`load_sender_${index}`, { ...context, step: 'register-sender' });
+    const login = await loginUser(sender, { ...context, step: 'login-sender' });
+    await requestJson(`/chat-rooms/${room.id}/members`, {
+      method: 'POST',
+      headers: authorizationHeaders(login),
+    }, { ...context, step: 'join-sender' });
+    senderLogins.push(login);
+  }
+  return senderLogins;
+}
+
+function runCommand(command, args) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+    let stderr = '';
+    child.stderr.on('data', (chunk) => {
+      stderr += chunk.toString('utf8');
+    });
+    child.on('error', reject);
+    child.on('close', (code) => {
+      if (code !== 0) {
+        reject(new Error(`${command} ${args.join(' ')} failed with code ${code}: ${stderr.trim()}`));
+        return;
+      }
+      resolve();
+    });
+  });
+}
+
+async function connectSenderSessions(senderLogins, senderAckTracker, options) {
+  const senderSessions = [];
+  for (const login of senderLogins) {
+    senderSessions.push(await connectSession(login, {
+      onText: (rawMessage) => {
+        const clientMessageId = acceptedClientMessageIdFromRawFrame(rawMessage);
+        if (clientMessageId) {
+          senderAckTracker.recordAccepted(clientMessageId);
+        }
+      },
+    }, {
+      label: options.label,
+      step: 'connect-sender',
+    }));
+  }
+  return senderSessions;
+}
+
 class RawWebSocket {
-  constructor(url, onJson = () => {}) {
+  constructor(url, handlers = {}) {
     this.url = new URL(url);
-    this.onJson = onJson;
+    if (typeof handlers === 'function') {
+      this.onJson = handlers;
+      this.onText = null;
+    } else {
+      this.onJson = handlers.onJson ?? (() => {});
+      this.onText = handlers.onText ?? null;
+    }
     this.socket = null;
     this.decoder = new RawWebSocketFrameDecoder({
       onText: (text) => this.handleText(text),
@@ -179,6 +263,14 @@ class RawWebSocket {
   }
 
   handleText(rawMessage) {
+    if (this.onText) {
+      try {
+        this.onText(rawMessage);
+      } catch {
+        // Ignore frame-level load collection errors.
+      }
+      return;
+    }
     try {
       this.onJson(JSON.parse(rawMessage));
     } catch {
@@ -187,7 +279,7 @@ class RawWebSocket {
   }
 
   sendJson(payload) {
-    this.writeFrame(0x1, Buffer.from(JSON.stringify(payload)));
+    return this.writeFrame(0x1, Buffer.from(JSON.stringify(payload)));
   }
 
   writeFrame(opcode, payload) {
@@ -208,7 +300,7 @@ class RawWebSocket {
       header.writeBigUInt64BE(BigInt(length), 2);
     }
     const maskedPayload = Buffer.from(payload.map((byte, index) => byte ^ mask[index % 4]));
-    this.socket.write(Buffer.concat([header, mask, maskedPayload]));
+    return writeSocketBuffer(this.socket, Buffer.concat([header, mask, maskedPayload]));
   }
 
   close() {
@@ -226,6 +318,8 @@ async function main() {
     label: options.label,
     step: 'create-room',
   });
+  await seedRoomShards(room, options);
+  const senderLogins = await createSenderLogins(room, senderLogin, options);
   if (options.metadataFile) {
     await fs.writeFile(
       options.metadataFile,
@@ -248,37 +342,50 @@ async function main() {
       headers: authorizationHeaders(login),
     }, { ...context, step: 'join-room' });
     collector.addViewer(user.id);
-    viewers.push(await connectSession(login, (frame) => {
-      const messages = flattenChatMessages(frame).filter((message) => message.chatRoomId === room.id);
-      if (messages.length > 0) {
-        collector.record(user.id, messages);
-      }
-    }));
+    if (retainMessages) {
+      viewers.push(await connectSession(login, (frame) => {
+        const messages = flattenChatMessages(frame).filter((message) => message.chatRoomId === room.id);
+        if (messages.length > 0) {
+          collector.record(user.id, messages);
+        }
+      }));
+    } else {
+      viewers.push(await connectSession(login, {
+        onText: (rawMessage) => {
+          collector.recordCount(user.id, countChatMessagesInRawFrame(rawMessage));
+        },
+      }));
+    }
   }
 
-  const senderWs = await connectSession(senderLogin, undefined, {
-    label: options.label,
-    step: 'connect-sender',
-  });
+  const senderAckTracker = createSenderAckTracker();
+  const senderSessions = await connectSenderSessions(senderLogins, senderAckTracker, options);
   await sleep(1000);
 
   const totalMessages = options.messagesPerSec * options.durationSeconds;
   const tickMillis = 100;
   const messagesPerTick = Math.max(1, Math.round(options.messagesPerSec * tickMillis / 1000));
-  let sent = 0;
+  let attempted = 0;
   const startedAt = Date.now();
 
-  while (sent < totalMessages) {
+  while (attempted < totalMessages) {
     const tickStart = Date.now();
-    for (let index = 0; index < messagesPerTick && sent < totalMessages; index += 1) {
-      sent += 1;
-      senderWs.sendJson({
+    for (let index = 0; index < messagesPerTick && attempted < totalMessages; index += 1) {
+      attempted += 1;
+      const clientMessageId = `load-${startedAt}-${attempted}`;
+      senderAckTracker.recordAttempt(clientMessageId);
+      const senderWs = senderSessions[senderIndexForAttempt(attempted, senderSessions.length)];
+      const flush = senderWs.sendJson({
         type: 'SEND_MESSAGE',
         chatRoomId: room.id,
         messageType: 'TEXT',
-        content: `load-message-${sent}`,
-        clientMessageId: `load-${startedAt}-${sent}`,
+        content: `load-message-${attempted}`,
+        clientMessageId,
       });
+      if (flush) {
+        await flush;
+      }
+      senderAckTracker.recordFlush();
     }
     const elapsed = Date.now() - tickStart;
     await sleep(Math.max(0, tickMillis - elapsed));
@@ -286,7 +393,10 @@ async function main() {
 
   await sleep(options.drainWaitSeconds * 1000);
   const receivedCounts = collector.receivedCounts();
-  assertMinimumReceivedCounts(receivedCounts, sent, options.minReceivedRatio);
+  const senderStats = senderAckTracker.snapshot();
+  assertMinimumAcceptedMessages(senderStats, totalMessages, options.minAcceptedRatio);
+  const receivedBaseline = options.minAcceptedRatio > 0 ? senderStats.accepted : attempted;
+  assertMinimumReceivedCounts(receivedCounts, receivedBaseline, options.minReceivedRatio);
   const receivedSamples = collector.receivedSamples();
 
   if (options.assertRoomSeqOrder) {
@@ -295,18 +405,24 @@ async function main() {
     }
   }
 
-  senderWs.close();
+  senderSessions.forEach((senderSession) => senderSession.close());
   viewers.forEach((viewer) => viewer.close());
   const takeoverDelivery = options.takeoverDeliverySummary
     ? summarizeTakeoverDelivery(receivedSamples, {
-      sent,
+      sent: receivedBaseline,
       minReceivedRatio: options.minReceivedRatio,
     })
     : null;
   const summary = {
     ok: true,
     roomId: room.id,
-    sent,
+    sent: attempted,
+    sender: {
+      targetMessages: totalMessages,
+      connections: senderSessions.length,
+      ...senderStats,
+      minAcceptedRatio: options.minAcceptedRatio,
+    },
     viewers: options.viewers,
     receivedPerViewer: receivedCounts,
     minReceivedRatio: options.minReceivedRatio,

@@ -225,7 +225,7 @@ class WebSocketSessionManager(
         }
     }
 
-    fun sendTextToSession(session: WebSocketSession, payload: String): Boolean {
+    fun sendTextToSession(session: WebSocketSession, payload: String, priority: Boolean = false): Boolean {
         val sessionRef = sessionsById[session.id] ?: return false
         val outboundSession = sessionRef.session
         if (!outboundSession.isOpen) {
@@ -233,7 +233,7 @@ class WebSocketSessionManager(
             return false
         }
 
-        return sessionRef.outboundQueue.enqueue(payload)
+        return sessionRef.outboundQueue.enqueue(payload, priority = priority)
     }
 
     fun isUserOnlineLocally(userId: Long): Boolean {

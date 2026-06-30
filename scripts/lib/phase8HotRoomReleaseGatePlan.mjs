@@ -29,6 +29,8 @@ export function parsePhase8HotRoomGateArgs(argv, env = process.env) {
     stages: DEFAULT_STAGE_VIEWERS.map((viewers) => buildStageOptions(viewers)),
     durationSeconds: 60,
     minReceivedRatio: 0.9,
+    minAcceptedRatio: 0.99,
+    senderCount: 16,
     minStreamShardCount: 16,
     maxFanoutP95Ms: 500,
     maxStreamGroupLagEntries: 1000,
@@ -65,6 +67,10 @@ export function parsePhase8HotRoomGateArgs(argv, env = process.env) {
       options.durationSeconds = positiveInteger(value, arg);
     } else if (arg === '--min-received-ratio') {
       options.minReceivedRatio = ratio(value, arg);
+    } else if (arg === '--min-accepted-ratio') {
+      options.minAcceptedRatio = ratio(value, arg);
+    } else if (arg === '--senders') {
+      options.senderCount = positiveInteger(value, arg);
     } else if (arg === '--min-stream-shards') {
       options.minStreamShardCount = positiveInteger(value, arg);
     } else if (arg === '--max-fanout-p95-ms') {
@@ -117,16 +123,22 @@ export function parsePhase8HotRoomGateArgs(argv, env = process.env) {
 }
 
 export function buildLoadChatArgs(options, stage = options.stages?.[0] ?? options) {
-  return [
+  const args = [
     options.loadScript,
     '--room', options.room,
     '--viewers', String(stage.viewers),
     '--messages-per-sec', String(stage.messagesPerSec),
     '--duration', String(stage.durationSeconds),
     '--min-received-ratio', String(options.minReceivedRatio),
+    '--min-accepted-ratio', String(options.minAcceptedRatio),
+    '--senders', String(options.senderCount),
     '--summary-mode', 'counts',
     '--label', stage.name,
   ];
+  if (options.minStreamShardCount > 1) {
+    args.push('--seed-room-shards', String(options.minStreamShardCount));
+  }
+  return args;
 }
 
 export function assertLoadSummary(summary, stage, options) {
@@ -136,6 +148,14 @@ export function assertLoadSummary(summary, stage, options) {
   const expectedSent = stage.messagesPerSec * stage.durationSeconds;
   if (summary.sent < expectedSent) {
     throw new Error(`load summary sent ${summary.sent}; expected at least ${expectedSent}`);
+  }
+  const accepted = summary.sender?.accepted;
+  if (!Number.isInteger(accepted) || accepted < 0) {
+    throw new Error('load summary sender.accepted must be a non-negative integer');
+  }
+  const minimumAccepted = Math.ceil(expectedSent * options.minAcceptedRatio);
+  if (accepted < minimumAccepted) {
+    throw new Error(`load summary accepted ${accepted}; minimum accepted is ${minimumAccepted}`);
   }
   if (summary.viewers !== stage.viewers) {
     throw new Error(`load summary viewers ${summary.viewers}; expected ${stage.viewers}`);
@@ -148,7 +168,7 @@ export function assertLoadSummary(summary, stage, options) {
       `load summary receivedPerViewer length ${summary.receivedPerViewer.length}; expected ${stage.viewers}`,
     );
   }
-  const minimumReceived = Math.ceil(summary.sent * options.minReceivedRatio);
+  const minimumReceived = Math.ceil(accepted * options.minReceivedRatio);
   for (const [index, received] of summary.receivedPerViewer.entries()) {
     if (received < minimumReceived) {
       throw new Error(`viewer ${index} received ${received}; minimum received is ${minimumReceived}`);
@@ -207,6 +227,8 @@ export function buildStageFailure(stage, error) {
 export function gateThresholds(options) {
   return {
     minStreamShardCount: options.minStreamShardCount,
+    minAcceptedRatio: options.minAcceptedRatio,
+    senderCount: options.senderCount,
     maxFanoutP95Ms: options.maxFanoutP95Ms,
     maxStreamGroupLagEntries: options.maxStreamGroupLagEntries,
   };

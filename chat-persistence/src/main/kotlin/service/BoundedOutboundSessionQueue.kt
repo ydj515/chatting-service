@@ -16,7 +16,7 @@ class BoundedOutboundSessionQueue(
     private var sending = false
     private var closed = false
 
-    fun enqueue(message: String): Boolean {
+    fun enqueue(message: String, priority: Boolean = false): Boolean {
         var shouldStartDrain = false
         var overflowed = false
 
@@ -25,7 +25,20 @@ class BoundedOutboundSessionQueue(
                 return false
             }
 
-            if (pendingMessages.size >= maxPendingMessages) {
+            if (priority && pendingMessages.size >= maxPendingMessages) {
+                pendingMessages.removeLast()
+                pendingMessages.addFirst(message)
+                if (!sending) {
+                    sending = true
+                    shouldStartDrain = true
+                }
+            } else if (priority) {
+                pendingMessages.addFirst(message)
+                if (!sending) {
+                    sending = true
+                    shouldStartDrain = true
+                }
+            } else if (pendingMessages.size >= maxPendingMessages) {
                 pendingMessages.clear()
                 closed = true
                 overflowed = true

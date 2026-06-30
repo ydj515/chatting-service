@@ -1,17 +1,25 @@
 import assert from 'node:assert/strict';
+import { EventEmitter } from 'node:events';
 import { test } from 'node:test';
 import {
+  assertMinimumAcceptedMessages,
   assertMinimumReceived,
   assertMinimumReceivedCounts,
   assertRoomSeqOrder,
   buildLoadUsername,
   createViewerMessageCollector,
+  createSenderAckTracker,
   flattenChatMessages,
   formatLoadStepError,
   parseLoadChatArgs,
   readJsonResponse,
   redactSensitiveUrl,
+  buildRoomShardSeedCommand,
+  countChatMessagesInRawFrame,
+  senderIndexForAttempt,
+  acceptedClientMessageIdFromRawFrame,
   summarizeTakeoverDelivery,
+  writeSocketBuffer,
 } from './loadChatPlan.mjs';
 
 test('parseLoadChatArgs maps Phase 6 load-chat options', () => {
@@ -45,6 +53,9 @@ test('parseLoadChatArgs maps Phase 6 load-chat options', () => {
     takeoverDeliverySummary: false,
     summaryMode: 'messages',
     label: null,
+    seedRoomShards: null,
+    minAcceptedRatio: 0,
+    senders: 1,
   });
 });
 
@@ -62,11 +73,32 @@ test('parseLoadChatArgs supports count-only summary mode and run label', () => {
   assert.equal(options.label, '5k');
 });
 
+test('parseLoadChatArgs supports hot room shard seeding', () => {
+  const options = parseLoadChatArgs(['--seed-room-shards', '16']);
+
+  assert.equal(options.seedRoomShards, 16);
+});
+
+test('parseLoadChatArgs supports minimum sender acceptance ratio', () => {
+  const options = parseLoadChatArgs(['--min-accepted-ratio', '0.99']);
+
+  assert.equal(options.minAcceptedRatio, 0.99);
+});
+
+test('parseLoadChatArgs supports multiple sender sessions', () => {
+  const options = parseLoadChatArgs(['--senders', '16']);
+
+  assert.equal(options.senders, 16);
+});
+
 test('parseLoadChatArgs defaults to message retention for compatibility', () => {
   const options = parseLoadChatArgs([]);
 
   assert.equal(options.summaryMode, 'messages');
   assert.equal(options.label, null);
+  assert.equal(options.seedRoomShards, null);
+  assert.equal(options.minAcceptedRatio, 0);
+  assert.equal(options.senders, 1);
 });
 
 test('assertRoomSeqOrder rejects a live feed inversion', () => {
@@ -173,18 +205,101 @@ test('assertMinimumReceivedCounts rejects insufficient received counts', () => {
   );
 });
 
+test('assertMinimumAcceptedMessages rejects weak sender acceptance', () => {
+  assert.throws(
+    () => assertMinimumAcceptedMessages({ accepted: 98 }, 100, 0.99),
+    /sender accepted only 98\/100/,
+  );
+});
+
+test('createSenderAckTracker records attempts flushes and accepted ACK frames', () => {
+  const tracker = createSenderAckTracker();
+
+  tracker.recordAttempt('client-1');
+  tracker.recordFlush();
+  tracker.recordFrame({ type: 'CHAT_MESSAGE', clientMessageId: 'client-1' });
+  tracker.recordFrame({ type: 'MESSAGE_ACCEPTED', clientMessageId: 'client-1' });
+  tracker.recordAccepted('client-1');
+  tracker.recordFrame({ type: 'MESSAGE_ACCEPTED', clientMessageId: 'unknown-client' });
+
+  assert.deepEqual(tracker.snapshot(), {
+    attempted: 1,
+    flushed: 1,
+    accepted: 1,
+    pendingAcks: 0,
+    unknownAccepted: 1,
+    duplicateAccepted: 1,
+    acceptanceRatio: 1,
+  });
+});
+
+test('acceptedClientMessageIdFromRawFrame parses only MESSAGE_ACCEPTED frames', () => {
+  assert.equal(
+    acceptedClientMessageIdFromRawFrame('{"type":"MESSAGE_ACCEPTED","clientMessageId":"client-1"}'),
+    'client-1',
+  );
+  assert.equal(
+    acceptedClientMessageIdFromRawFrame('{"type":"CHAT_MESSAGE","clientMessageId":"client-1"}'),
+    null,
+  );
+});
+
+test('countChatMessagesInRawFrame counts single and batch messages without JSON parsing', () => {
+  assert.equal(countChatMessagesInRawFrame('{"type":"CHAT_MESSAGE","chatRoomId":1}'), 1);
+  assert.equal(
+    countChatMessagesInRawFrame(
+      '{"type":"CHAT_MESSAGE_BATCH","messages":[{"type":"CHAT_MESSAGE"},{"type":"CHAT_MESSAGE"}]}',
+    ),
+    2,
+  );
+  assert.equal(countChatMessagesInRawFrame('{"type":"MESSAGE_ACCEPTED"}'), 0);
+});
+
+test('senderIndexForAttempt distributes messages round-robin across senders', () => {
+  assert.deepEqual(
+    [1, 2, 3, 4, 5, 6].map((attempt) => senderIndexForAttempt(attempt, 3)),
+    [0, 1, 2, 0, 1, 2],
+  );
+});
+
+test('writeSocketBuffer waits for drain when socket reports backpressure', async () => {
+  const socket = new EventEmitter();
+  let drained = false;
+  socket.destroyed = false;
+  socket.write = () => false;
+
+  const write = writeSocketBuffer(socket, Buffer.from('payload')).then(() => {
+    drained = true;
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(drained, false);
+
+  socket.emit('drain');
+  await write;
+  assert.equal(drained, true);
+});
+
+test('writeSocketBuffer returns without a promise when socket flushes immediately', () => {
+  const socket = new EventEmitter();
+  socket.destroyed = false;
+  socket.write = () => true;
+
+  assert.equal(writeSocketBuffer(socket, Buffer.from('payload')), undefined);
+});
+
 test('createViewerMessageCollector can count without retaining every message', () => {
   const collector = createViewerMessageCollector({ retainMessages: false, sampleLimit: 2 });
 
   collector.addViewer(1);
   collector.record(1, [{ roomSeq: 1 }, { roomSeq: 2 }, { roomSeq: 3 }]);
+  collector.recordCount(1, 2);
 
-  assert.deepEqual(collector.receivedCounts(), [3]);
+  assert.deepEqual(collector.receivedCounts(), [5]);
   assert.deepEqual(collector.receivedSamples(), [null]);
   assert.deepEqual(collector.sampleSummary(), [
     {
       userId: 1,
-      received: 3,
+      received: 5,
       samples: [{ roomSeq: 1 }, { roomSeq: 2 }],
     },
   ]);
@@ -232,6 +347,32 @@ test('formatLoadStepError formats sender steps without viewer index', () => {
   });
 
   assert.equal(error, '[1k] create-room POST http://localhost/api/chat-rooms failed: HTTP 502 bad gateway');
+});
+
+test('buildRoomShardSeedCommand targets room_storage_configs through compose postgres', () => {
+  const command = buildRoomShardSeedCommand({
+    roomId: 42,
+    shardCount: 16,
+    env: {
+      DB_USERNAME: 'chatuser',
+      DB_NAME: 'chatdb',
+    },
+  });
+
+  assert.equal(command.command, 'docker');
+  assert.deepEqual(command.args.slice(0, 7), [
+    'compose',
+    'exec',
+    '-T',
+    'postgres',
+    'psql',
+    '-U',
+    'chatuser',
+  ]);
+  assert.match(command.args.at(-1), /room_storage_configs/);
+  assert.match(command.args.at(-1), /fanout_shard_count/);
+  assert.doesNotMatch(command.args.at(-1), /:room_id|:shard_count/);
+  assert.match(command.args.at(-1), /VALUES\s*\(\s*42,\s*'HOT',\s*16,\s*16,/);
 });
 
 test('readJsonResponse reports HTTP status and raw body before parsing JSON', async () => {
