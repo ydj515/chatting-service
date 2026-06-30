@@ -9,6 +9,8 @@ export function parseLoadChatArgs(argv) {
     minReceivedRatio: 0,
     assertRoomSeqOrder: false,
     takeoverDeliverySummary: false,
+    summaryMode: 'messages',
+    label: null,
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -42,6 +44,13 @@ export function parseLoadChatArgs(argv) {
       options.drainWaitSeconds = positiveInteger(value, arg);
     } else if (arg === '--min-received-ratio') {
       options.minReceivedRatio = ratio(value, arg);
+    } else if (arg === '--summary-mode') {
+      if (!['messages', 'counts'].includes(value)) {
+        throw new Error('--summary-mode must be messages or counts');
+      }
+      options.summaryMode = value;
+    } else if (arg === '--label') {
+      options.label = value;
     } else {
       throw new Error(`Unknown argument: ${arg}`);
     }
@@ -77,6 +86,20 @@ export function assertMinimumReceived(receivedSamples, sent, minReceivedRatio) {
   });
 }
 
+export function assertMinimumReceivedCounts(receivedCounts, sent, minReceivedRatio) {
+  if (minReceivedRatio <= 0) {
+    return;
+  }
+  const minimum = Math.ceil(sent * minReceivedRatio);
+  receivedCounts.forEach((received, index) => {
+    if (received < minimum) {
+      throw new Error(
+        `viewer ${index} received only ${received}/${sent}; minimum ratio ${minReceivedRatio} requires ${minimum}`,
+      );
+    }
+  });
+}
+
 export function flattenChatMessages(frame) {
   if (frame?.type === 'CHAT_MESSAGE') {
     return [frame];
@@ -85,6 +108,48 @@ export function flattenChatMessages(frame) {
     return frame.messages;
   }
   return [];
+}
+
+export function createViewerMessageCollector({ retainMessages, sampleLimit = 3 }) {
+  const records = new Map();
+  return {
+    addViewer(userId) {
+      records.set(userId, {
+        userId,
+        received: 0,
+        samples: [],
+        messages: retainMessages ? [] : null,
+      });
+    },
+    record(userId, messages) {
+      const record = records.get(userId);
+      if (!record) {
+        return;
+      }
+      record.received += messages.length;
+      for (const message of messages) {
+        if (record.samples.length < sampleLimit) {
+          record.samples.push(message);
+        }
+      }
+      if (record.messages) {
+        record.messages.push(...messages);
+      }
+    },
+    receivedCounts() {
+      return [...records.values()].map((record) => record.received);
+    },
+    receivedSamples() {
+      return [...records.values()].map((record) => record.messages);
+    },
+    sampleSummary() {
+      return [...records.values()].map(({ userId, received, samples }) => ({
+        userId,
+        received,
+        samples,
+      }));
+    },
+  };
 }
 
 export function buildLoadUsername(prefix, entropy) {

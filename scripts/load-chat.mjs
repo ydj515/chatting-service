@@ -5,9 +5,10 @@ import net from 'node:net';
 import tls from 'node:tls';
 import { URL } from 'node:url';
 import {
-  assertMinimumReceived,
+  assertMinimumReceivedCounts,
   assertRoomSeqOrder,
   buildLoadUsername,
+  createViewerMessageCollector,
   flattenChatMessages,
   parseLoadChatArgs,
   readJsonResponse,
@@ -218,7 +219,10 @@ async function main() {
       'utf8',
     );
   }
-  const receivedByViewer = new Map();
+  const retainMessages = options.summaryMode === 'messages'
+    || options.assertRoomSeqOrder
+    || options.takeoverDeliverySummary;
+  const collector = createViewerMessageCollector({ retainMessages });
   const viewers = [];
 
   for (let index = 0; index < options.viewers; index += 1) {
@@ -228,11 +232,11 @@ async function main() {
       method: 'POST',
       headers: authorizationHeaders(login),
     });
-    receivedByViewer.set(user.id, []);
+    collector.addViewer(user.id);
     viewers.push(await connectSession(login, (frame) => {
       const messages = flattenChatMessages(frame).filter((message) => message.chatRoomId === room.id);
       if (messages.length > 0) {
-        receivedByViewer.get(user.id).push(...messages);
+        collector.record(user.id, messages);
       }
     }));
   }
@@ -263,8 +267,9 @@ async function main() {
   }
 
   await sleep(options.drainWaitSeconds * 1000);
-  const receivedSamples = [...receivedByViewer.values()];
-  assertMinimumReceived(receivedSamples, sent, options.minReceivedRatio);
+  const receivedCounts = collector.receivedCounts();
+  assertMinimumReceivedCounts(receivedCounts, sent, options.minReceivedRatio);
+  const receivedSamples = collector.receivedSamples();
 
   if (options.assertRoomSeqOrder) {
     for (const messages of receivedSamples) {
@@ -285,10 +290,12 @@ async function main() {
     roomId: room.id,
     sent,
     viewers: options.viewers,
-    receivedPerViewer: receivedSamples.map((messages) => messages.length),
+    receivedPerViewer: receivedCounts,
     minReceivedRatio: options.minReceivedRatio,
     assertedRoomSeqOrder: options.assertRoomSeqOrder,
     takeoverDeliverySummary: options.takeoverDeliverySummary,
+    summaryMode: options.summaryMode,
+    sampleSummary: collector.sampleSummary(),
     ...(takeoverDelivery ? { takeoverDelivery } : {}),
   };
   console.log(JSON.stringify(summary, null, 2));

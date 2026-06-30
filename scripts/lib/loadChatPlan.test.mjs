@@ -2,8 +2,10 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
   assertMinimumReceived,
+  assertMinimumReceivedCounts,
   assertRoomSeqOrder,
   buildLoadUsername,
+  createViewerMessageCollector,
   flattenChatMessages,
   parseLoadChatArgs,
   readJsonResponse,
@@ -39,6 +41,8 @@ test('parseLoadChatArgs maps Phase 6 load-chat options', () => {
     minReceivedRatio: 0.9,
     assertRoomSeqOrder: true,
     takeoverDeliverySummary: false,
+    summaryMode: 'messages',
+    label: null,
   });
 });
 
@@ -47,6 +51,20 @@ test('parseLoadChatArgs enables takeover delivery summary without raw order asse
 
   assert.equal(options.takeoverDeliverySummary, true);
   assert.equal(options.assertRoomSeqOrder, false);
+});
+
+test('parseLoadChatArgs supports count-only summary mode and run label', () => {
+  const options = parseLoadChatArgs(['--summary-mode', 'counts', '--label', '5k']);
+
+  assert.equal(options.summaryMode, 'counts');
+  assert.equal(options.label, '5k');
+});
+
+test('parseLoadChatArgs defaults to message retention for compatibility', () => {
+  const options = parseLoadChatArgs([]);
+
+  assert.equal(options.summaryMode, 'messages');
+  assert.equal(options.label, null);
 });
 
 test('assertRoomSeqOrder rejects a live feed inversion', () => {
@@ -144,6 +162,40 @@ test('assertMinimumReceived rejects weak fanout verification samples', () => {
     () => assertMinimumReceived([[{ roomSeq: 1 }]], 200, 0.9),
     /received only 1\/200/,
   );
+});
+
+test('assertMinimumReceivedCounts rejects insufficient received counts', () => {
+  assert.throws(
+    () => assertMinimumReceivedCounts([180, 200], 200, 0.95),
+    /viewer 0 received only 180\/200/,
+  );
+});
+
+test('createViewerMessageCollector can count without retaining every message', () => {
+  const collector = createViewerMessageCollector({ retainMessages: false, sampleLimit: 2 });
+
+  collector.addViewer(1);
+  collector.record(1, [{ roomSeq: 1 }, { roomSeq: 2 }, { roomSeq: 3 }]);
+
+  assert.deepEqual(collector.receivedCounts(), [3]);
+  assert.deepEqual(collector.receivedSamples(), [null]);
+  assert.deepEqual(collector.sampleSummary(), [
+    {
+      userId: 1,
+      received: 3,
+      samples: [{ roomSeq: 1 }, { roomSeq: 2 }],
+    },
+  ]);
+});
+
+test('createViewerMessageCollector keeps full messages when retention is enabled', () => {
+  const collector = createViewerMessageCollector({ retainMessages: true });
+
+  collector.addViewer(1);
+  collector.record(1, [{ roomSeq: 1 }, { roomSeq: 2 }]);
+
+  assert.deepEqual(collector.receivedCounts(), [2]);
+  assert.deepEqual(collector.receivedSamples(), [[{ roomSeq: 1 }, { roomSeq: 2 }]]);
 });
 
 test('readJsonResponse reports HTTP status and raw body before parsing JSON', async () => {
