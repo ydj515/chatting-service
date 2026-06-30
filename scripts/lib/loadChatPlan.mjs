@@ -152,6 +152,22 @@ export function createViewerMessageCollector({ retainMessages, sampleLimit = 3 }
   };
 }
 
+export function redactSensitiveUrl(value) {
+  const url = new URL(value.toString());
+  for (const name of ['ticket', 'token']) {
+    if (url.searchParams.has(name)) {
+      url.searchParams.set(name, '[redacted]');
+    }
+  }
+  return url.toString();
+}
+
+export function formatLoadStepError({ label, viewerIndex, step, method, url, cause }) {
+  const prefix = label ? `[${label}] ` : '';
+  const actor = viewerIndex === undefined ? '' : `viewer ${viewerIndex} `;
+  return `${prefix}${actor}${step} ${method} ${redactSensitiveUrl(url)} failed: ${cause.message}`;
+}
+
 export function buildLoadUsername(prefix, entropy) {
   const safePrefix = sanitizeUsernamePart(prefix).slice(0, 8) || 'load';
   const safeEntropy = sanitizeUsernamePart(entropy).slice(-10) || Date.now().toString(36).slice(-10);

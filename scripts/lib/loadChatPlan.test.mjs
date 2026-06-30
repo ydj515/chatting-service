@@ -7,8 +7,10 @@ import {
   buildLoadUsername,
   createViewerMessageCollector,
   flattenChatMessages,
+  formatLoadStepError,
   parseLoadChatArgs,
   readJsonResponse,
+  redactSensitiveUrl,
   summarizeTakeoverDelivery,
 } from './loadChatPlan.mjs';
 
@@ -196,6 +198,40 @@ test('createViewerMessageCollector keeps full messages when retention is enabled
 
   assert.deepEqual(collector.receivedCounts(), [2]);
   assert.deepEqual(collector.receivedSamples(), [[{ roomSeq: 1 }, { roomSeq: 2 }]]);
+});
+
+test('redactSensitiveUrl removes ticket and token query values', () => {
+  assert.equal(
+    redactSensitiveUrl('ws://localhost/api/ws/chat?ticket=secret&token=session&room=1'),
+    'ws://localhost/api/ws/chat?ticket=%5Bredacted%5D&token=%5Bredacted%5D&room=1',
+  );
+});
+
+test('formatLoadStepError includes label viewer step method and redacted URL', () => {
+  const error = formatLoadStepError({
+    label: '5k',
+    viewerIndex: 5104,
+    step: 'issue-ticket',
+    method: 'POST',
+    url: 'http://localhost/api/ws-tickets?token=secret',
+    cause: new Error('fetch failed'),
+  });
+
+  assert.match(error, /^\[5k\] viewer 5104 issue-ticket POST http:\/\/localhost\/api\/ws-tickets/);
+  assert.match(error, /failed: fetch failed$/);
+  assert.doesNotMatch(error, /secret/);
+});
+
+test('formatLoadStepError formats sender steps without viewer index', () => {
+  const error = formatLoadStepError({
+    label: '1k',
+    step: 'create-room',
+    method: 'POST',
+    url: 'http://localhost/api/chat-rooms',
+    cause: new Error('HTTP 502 bad gateway'),
+  });
+
+  assert.equal(error, '[1k] create-room POST http://localhost/api/chat-rooms failed: HTTP 502 bad gateway');
 });
 
 test('readJsonResponse reports HTTP status and raw body before parsing JSON', async () => {

@@ -10,8 +10,10 @@ import {
   buildLoadUsername,
   createViewerMessageCollector,
   flattenChatMessages,
+  formatLoadStepError,
   parseLoadChatArgs,
   readJsonResponse,
+  redactSensitiveUrl,
   summarizeTakeoverDelivery,
 } from './lib/loadChatPlan.mjs';
 import { RawWebSocketFrameDecoder } from './lib/rawWebSocketFrameDecoder.mjs';
@@ -22,44 +24,58 @@ const timeoutMs = Number(process.env.CHAT_LOAD_TIMEOUT_MS ?? 15000);
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-async function requestJson(path, options = {}) {
+async function withLoadStep(context, operation) {
+  try {
+    return await operation();
+  } catch (error) {
+    throw new Error(formatLoadStepError({ ...context, cause: error }), { cause: error });
+  }
+}
+
+async function requestJson(path, options = {}, context = {}) {
   const base = new URL(httpBaseUrl);
   const basePath = base.pathname.endsWith('/') ? base.pathname : `${base.pathname}/`;
   const normalizedPath = path.startsWith('/') ? path.slice(1) : path;
   const url = new URL(`${basePath}${normalizedPath}`, base.origin);
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(options.headers ?? {}),
-    },
+  return withLoadStep({
+    method: options.method ?? 'GET',
+    url,
+    ...context,
+  }, async () => {
+    const response = await fetch(url, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(options.headers ?? {}),
+      },
+    });
+    return readJsonResponse(response, { method: options.method ?? 'GET', url });
   });
-  return readJsonResponse(response, { method: options.method ?? 'GET', url });
 }
 
-async function registerUser(prefix) {
+async function registerUser(prefix, context = {}) {
   const suffix = `${Date.now().toString(36)}${Math.floor(Math.random() * 100000).toString(36)}`;
   const username = buildLoadUsername(prefix, suffix);
   const password = 'password';
   const user = await requestJson('/users/register', {
     method: 'POST',
     body: JSON.stringify({ username, password, displayName: username }),
-  });
+  }, context);
   return { ...user, password };
 }
 
-async function loginUser(user) {
+async function loginUser(user, context = {}) {
   return requestJson('/users/login', {
     method: 'POST',
     body: JSON.stringify({ username: user.username, password: user.password }),
-  });
+  }, context);
 }
 
 function authorizationHeaders(login) {
   return { Authorization: `${login.tokenType} ${login.sessionToken}` };
 }
 
-async function createRoom(namePrefix, login) {
+async function createRoom(namePrefix, login, context = {}) {
   return requestJson('/chat-rooms', {
     method: 'POST',
     headers: authorizationHeaders(login),
@@ -70,22 +86,27 @@ async function createRoom(namePrefix, login) {
       imageUrl: null,
       maxMembers: 20000,
     }),
-  });
+  }, context);
 }
 
-async function issueWebSocketTicket(login) {
+async function issueWebSocketTicket(login, context = {}) {
   return requestJson('/ws-tickets', {
     method: 'POST',
     headers: authorizationHeaders(login),
-  });
+  }, context);
 }
 
-async function connectSession(login, onJson) {
-  const ticket = await issueWebSocketTicket(login);
+async function connectSession(login, onJson, context = {}) {
+  const ticket = await issueWebSocketTicket(login, { ...context, step: 'issue-ticket' });
   const url = new URL(wsBaseUrl);
   url.searchParams.set('ticket', ticket.ticket);
   const ws = new RawWebSocket(url.toString(), onJson);
-  await ws.connect();
+  await withLoadStep({
+    ...context,
+    step: context.step === 'connect-sender' ? 'connect-sender' : 'websocket-handshake',
+    method: 'GET',
+    url,
+  }, () => ws.connect());
   return ws;
 }
 
@@ -197,21 +218,14 @@ class RawWebSocket {
   }
 }
 
-function redactSensitiveUrl(value) {
-  const url = new URL(value.toString());
-  for (const name of ['ticket', 'token']) {
-    if (url.searchParams.has(name)) {
-      url.searchParams.set(name, '[redacted]');
-    }
-  }
-  return url.toString();
-}
-
 async function main() {
   const options = parseLoadChatArgs(process.argv.slice(2));
-  const sender = await registerUser('load_sender');
-  const senderLogin = await loginUser(sender);
-  const room = await createRoom(`load-${options.room}`, senderLogin);
+  const sender = await registerUser('load_sender', { label: options.label, step: 'register-sender' });
+  const senderLogin = await loginUser(sender, { label: options.label, step: 'login-sender' });
+  const room = await createRoom(`load-${options.room}`, senderLogin, {
+    label: options.label,
+    step: 'create-room',
+  });
   if (options.metadataFile) {
     await fs.writeFile(
       options.metadataFile,
@@ -226,12 +240,13 @@ async function main() {
   const viewers = [];
 
   for (let index = 0; index < options.viewers; index += 1) {
-    const user = await registerUser(`load_viewer_${index}`);
-    const login = await loginUser(user);
+    const context = { label: options.label, viewerIndex: index };
+    const user = await registerUser(`load_viewer_${index}`, { ...context, step: 'register-viewer' });
+    const login = await loginUser(user, { ...context, step: 'login-viewer' });
     await requestJson(`/chat-rooms/${room.id}/members`, {
       method: 'POST',
       headers: authorizationHeaders(login),
-    });
+    }, { ...context, step: 'join-room' });
     collector.addViewer(user.id);
     viewers.push(await connectSession(login, (frame) => {
       const messages = flattenChatMessages(frame).filter((message) => message.chatRoomId === room.id);
@@ -241,7 +256,10 @@ async function main() {
     }));
   }
 
-  const senderWs = await connectSession(senderLogin);
+  const senderWs = await connectSession(senderLogin, undefined, {
+    label: options.label,
+    step: 'connect-sender',
+  });
   await sleep(1000);
 
   const totalMessages = options.messagesPerSec * options.durationSeconds;
