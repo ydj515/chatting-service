@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
-import { test } from 'node:test';
+import { test } from 'vitest';
 import {
   buildAdminExportStatusUrl,
   buildAdminHistoryUrl,
   buildAdminSearchUrl,
   createAdminHeaders,
-} from './adminApi.ts';
+} from '@/services/adminApi.ts';
 
 test('admin search URL includes query filters and bounded limit', () => {
   const url = buildAdminSearchUrl('/api', {

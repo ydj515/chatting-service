@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
-import { test } from 'node:test';
-import { loadAdminState, saveAdminState, type AdminStorage } from './adminState.ts';
+import { test } from 'vitest';
+import { loadAdminState, saveAdminState, type AdminStorage } from '@/services/adminState.ts';
 
 interface MemoryStorage extends AdminStorage {
   has(key: string): boolean;

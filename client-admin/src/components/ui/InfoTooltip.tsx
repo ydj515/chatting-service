@@ -13,7 +13,7 @@ type VAlign = 'above' | 'below';
 
 // 어려운 항목 옆에 두는 도움말 아이콘 + 툴팁.
 // client의 InfoTooltip과 동일하게 화살표 + 가장자리 자동 보정을 제공한다.
-// 색상은 CSS 변수(--tooltip-bg 등)를 참조하므로 라이트/다크에서 자동으로 반전된다.
+// 색상은 디자인 토큰(--color-gray-900 등)을 참조하므로 라이트/다크에서 자동으로 반전된다.
 const InfoTooltip: React.FC<InfoTooltipProps> = ({ tip, label = '도움말' }) => {
   const ref = useRef<HTMLSpanElement>(null);
   const [open, setOpen] = useState(false);

@@ -4,8 +4,8 @@ import type {
   AdminFilters,
   AdminMessagePage,
   AdminRoomStatus,
-} from '../types/index';
-import { appConfig } from '../config/appConfig.ts';
+} from '@/types/index.ts';
+import { appConfig } from '@/config/appConfig.ts';
 
 const DEFAULT_MAX_LIMIT = 100;
 

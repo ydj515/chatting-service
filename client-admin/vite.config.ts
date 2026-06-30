@@ -10,6 +10,11 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [tailwindcss(), react()],
+    resolve: {
+      alias: {
+        '@': '/src',
+      },
+    },
     server: {
       // client(:5173)와 동시에 띄울 수 있도록 admin은 5174 고정
       port: 5174,
