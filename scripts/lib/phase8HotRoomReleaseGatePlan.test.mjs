@@ -98,7 +98,7 @@ test('assertLoadSummary accepts a successful load summary', () => {
     viewers: 2,
     receivedPerViewer: [600000, 590000],
     minReceivedRatio: 0.9,
-  }, options);
+  }, options.stages[0], options);
 });
 
 test('assertLoadSummary rejects insufficient delivery', () => {
@@ -110,7 +110,7 @@ test('assertLoadSummary rejects insufficient delivery', () => {
     viewers: 1,
     receivedPerViewer: [500000],
     minReceivedRatio: 0.9,
-  }, { ...options, viewers: 1 }), /minimum received/);
+  }, options.stages[0], options), /minimum received/);
 });
 
 test('assertLoadSummary rejects missing receivedPerViewer entries', () => {
@@ -122,7 +122,7 @@ test('assertLoadSummary rejects missing receivedPerViewer entries', () => {
     viewers: 2,
     receivedPerViewer: [600000],
     minReceivedRatio: 0.9,
-  }, options), /receivedPerViewer length/);
+  }, options.stages[0], options), /receivedPerViewer length/);
 });
 
 test('buildGateResult reports last passed and failed stage names', () => {

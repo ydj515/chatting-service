@@ -1,35 +1,28 @@
 #!/usr/bin/env node
 import { spawn } from 'node:child_process';
 import {
-  assertLoadSummary,
-  assertPrometheusSnapshot,
   buildLoadChatArgs,
   parsePhase8HotRoomGateArgs,
   prometheusQueryNumber,
   prometheusQueries,
 } from './lib/phase8HotRoomReleaseGatePlan.mjs';
+import { runReleaseGate } from './lib/phase8HotRoomReleaseGateRunner.mjs';
 
 async function main() {
   const options = parsePhase8HotRoomGateArgs(process.argv.slice(2));
-  const loadSummary = await runLoadChat(options);
-  assertLoadSummary(loadSummary, options);
-  const prometheusSnapshot = await readPrometheusSnapshot(options.prometheusUrl);
-  assertPrometheusSnapshot(prometheusSnapshot, options);
+  const result = await runReleaseGate(options, {
+    runLoadChat,
+    readPrometheusSnapshot,
+  });
 
-  console.log(JSON.stringify({
-    ok: true,
-    loadSummary,
-    prometheusSnapshot,
-    thresholds: {
-      minStreamShardCount: options.minStreamShardCount,
-      maxFanoutP95Ms: options.maxFanoutP95Ms,
-      maxStreamGroupLagEntries: options.maxStreamGroupLagEntries,
-    },
-  }, null, 2));
+  console.log(JSON.stringify(result, null, 2));
+  if (!result.ok) {
+    process.exitCode = 1;
+  }
 }
 
-async function runLoadChat(options) {
-  const args = buildLoadChatArgs(options);
+async function runLoadChat(stage, options) {
+  const args = buildLoadChatArgs(options, stage);
   const output = await runProcess(process.execPath, args);
   return JSON.parse(output);
 }
@@ -49,7 +42,9 @@ function runProcess(command, args) {
     child.on('error', reject);
     child.on('close', (code) => {
       if (code !== 0) {
-        reject(new Error(`${command} ${args.join(' ')} failed with code ${code}: ${stderr.trim()}`));
+        const error = new Error(`${command} ${args.join(' ')} failed with code ${code}`);
+        error.stderr = stderr.trim();
+        reject(error);
         return;
       }
       resolve(stdout.trim());

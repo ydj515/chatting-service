@@ -129,23 +129,23 @@ export function buildLoadChatArgs(options, stage = options.stages?.[0] ?? option
   ];
 }
 
-export function assertLoadSummary(summary, options) {
+export function assertLoadSummary(summary, stage, options) {
   if (summary?.ok !== true) {
     throw new Error('load summary did not report ok=true');
   }
-  const expectedSent = options.messagesPerSec * options.durationSeconds;
+  const expectedSent = stage.messagesPerSec * stage.durationSeconds;
   if (summary.sent < expectedSent) {
     throw new Error(`load summary sent ${summary.sent}; expected at least ${expectedSent}`);
   }
-  if (summary.viewers !== options.viewers) {
-    throw new Error(`load summary viewers ${summary.viewers}; expected ${options.viewers}`);
+  if (summary.viewers !== stage.viewers) {
+    throw new Error(`load summary viewers ${summary.viewers}; expected ${stage.viewers}`);
   }
   if (!Array.isArray(summary.receivedPerViewer)) {
     throw new Error('load summary receivedPerViewer must be an array');
   }
-  if (summary.receivedPerViewer.length !== options.viewers) {
+  if (summary.receivedPerViewer.length !== stage.viewers) {
     throw new Error(
-      `load summary receivedPerViewer length ${summary.receivedPerViewer.length}; expected ${options.viewers}`,
+      `load summary receivedPerViewer length ${summary.receivedPerViewer.length}; expected ${stage.viewers}`,
     );
   }
   const minimumReceived = Math.ceil(summary.sent * options.minReceivedRatio);
