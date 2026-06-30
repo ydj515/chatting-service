@@ -12,11 +12,12 @@ class BoundedOutboundSessionQueue(
 ) {
     private val maxPendingMessages = maxPendingMessages.coerceAtLeast(1)
     private val lock = Any()
-    private val pendingMessages = ArrayDeque<String>()
+    private val priorityMessages = ArrayDeque<String>()
+    private val normalMessages = ArrayDeque<String>()
     private var sending = false
     private var closed = false
 
-    fun enqueue(message: String): Boolean {
+    fun enqueue(message: String, priority: Boolean = false): Boolean {
         var shouldStartDrain = false
         var overflowed = false
 
@@ -25,12 +26,26 @@ class BoundedOutboundSessionQueue(
                 return false
             }
 
-            if (pendingMessages.size >= maxPendingMessages) {
-                pendingMessages.clear()
+            if (priority) {
+                if (pendingSizeLocked() >= maxPendingMessages) {
+                    if (normalMessages.isNotEmpty()) {
+                        normalMessages.removeLast()
+                    } else {
+                        priorityMessages.removeLast()
+                    }
+                }
+                priorityMessages.addLast(message)
+                if (!sending) {
+                    sending = true
+                    shouldStartDrain = true
+                }
+            } else if (pendingSizeLocked() >= maxPendingMessages) {
+                priorityMessages.clear()
+                normalMessages.clear()
                 closed = true
                 overflowed = true
             } else {
-                pendingMessages.addLast(message)
+                normalMessages.addLast(message)
                 if (!sending) {
                     sending = true
                     shouldStartDrain = true
@@ -52,7 +67,7 @@ class BoundedOutboundSessionQueue(
 
     fun pendingSize(): Int {
         return synchronized(lock) {
-            pendingMessages.size
+            pendingSizeLocked()
         }
     }
 
@@ -81,7 +96,7 @@ class BoundedOutboundSessionQueue(
                 sending = false
                 null
             } else {
-                val next = pendingMessages.pollFirst()
+                val next = priorityMessages.pollFirst() ?: normalMessages.pollFirst()
                 if (next == null) {
                     sending = false
                 }
@@ -92,9 +107,14 @@ class BoundedOutboundSessionQueue(
 
     fun close() {
         synchronized(lock) {
-            pendingMessages.clear()
+            priorityMessages.clear()
+            normalMessages.clear()
             closed = true
             sending = false
         }
+    }
+
+    private fun pendingSizeLocked(): Int {
+        return priorityMessages.size + normalMessages.size
     }
 }

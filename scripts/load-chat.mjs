@@ -1,17 +1,28 @@
 #!/usr/bin/env node
 import crypto from 'node:crypto';
+import { spawn } from 'node:child_process';
 import fs from 'node:fs/promises';
 import net from 'node:net';
 import tls from 'node:tls';
 import { URL } from 'node:url';
 import {
-  assertMinimumReceived,
+  assertMinimumAcceptedMessages,
+  assertMinimumReceivedCounts,
   assertRoomSeqOrder,
+  acceptedClientMessageIdFromRawFrame,
+  buildRoomShardSeedCommand,
   buildLoadUsername,
+  countChatMessagesInRawFrame,
+  createSenderAckTracker,
+  createViewerMessageCollector,
   flattenChatMessages,
+  formatLoadStepError,
   parseLoadChatArgs,
   readJsonResponse,
+  redactSensitiveUrl,
+  senderIndexForAttempt,
   summarizeTakeoverDelivery,
+  writeSocketBuffer,
 } from './lib/loadChatPlan.mjs';
 import { RawWebSocketFrameDecoder } from './lib/rawWebSocketFrameDecoder.mjs';
 
@@ -21,44 +32,58 @@ const timeoutMs = Number(process.env.CHAT_LOAD_TIMEOUT_MS ?? 15000);
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-async function requestJson(path, options = {}) {
+async function withLoadStep(context, operation) {
+  try {
+    return await operation();
+  } catch (error) {
+    throw new Error(formatLoadStepError({ ...context, cause: error }), { cause: error });
+  }
+}
+
+async function requestJson(path, options = {}, context = {}) {
   const base = new URL(httpBaseUrl);
   const basePath = base.pathname.endsWith('/') ? base.pathname : `${base.pathname}/`;
   const normalizedPath = path.startsWith('/') ? path.slice(1) : path;
   const url = new URL(`${basePath}${normalizedPath}`, base.origin);
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(options.headers ?? {}),
-    },
+  return withLoadStep({
+    method: options.method ?? 'GET',
+    url,
+    ...context,
+  }, async () => {
+    const response = await fetch(url, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(options.headers ?? {}),
+      },
+    });
+    return readJsonResponse(response, { method: options.method ?? 'GET', url });
   });
-  return readJsonResponse(response, { method: options.method ?? 'GET', url });
 }
 
-async function registerUser(prefix) {
+async function registerUser(prefix, context = {}) {
   const suffix = `${Date.now().toString(36)}${Math.floor(Math.random() * 100000).toString(36)}`;
   const username = buildLoadUsername(prefix, suffix);
   const password = 'password';
   const user = await requestJson('/users/register', {
     method: 'POST',
     body: JSON.stringify({ username, password, displayName: username }),
-  });
+  }, context);
   return { ...user, password };
 }
 
-async function loginUser(user) {
+async function loginUser(user, context = {}) {
   return requestJson('/users/login', {
     method: 'POST',
     body: JSON.stringify({ username: user.username, password: user.password }),
-  });
+  }, context);
 }
 
 function authorizationHeaders(login) {
   return { Authorization: `${login.tokenType} ${login.sessionToken}` };
 }
 
-async function createRoom(namePrefix, login) {
+async function createRoom(namePrefix, login, context = {}) {
   return requestJson('/chat-rooms', {
     method: 'POST',
     headers: authorizationHeaders(login),
@@ -69,29 +94,110 @@ async function createRoom(namePrefix, login) {
       imageUrl: null,
       maxMembers: 20000,
     }),
-  });
+  }, context);
 }
 
-async function issueWebSocketTicket(login) {
+async function issueWebSocketTicket(login, context = {}) {
   return requestJson('/ws-tickets', {
     method: 'POST',
     headers: authorizationHeaders(login),
-  });
+  }, context);
 }
 
-async function connectSession(login, onJson) {
-  const ticket = await issueWebSocketTicket(login);
+async function connectSession(login, onJson, context = {}) {
+  const ticket = await issueWebSocketTicket(login, { ...context, step: 'issue-ticket' });
   const url = new URL(wsBaseUrl);
   url.searchParams.set('ticket', ticket.ticket);
   const ws = new RawWebSocket(url.toString(), onJson);
-  await ws.connect();
+  await withLoadStep({
+    ...context,
+    step: context.step === 'connect-sender' ? 'connect-sender' : 'websocket-handshake',
+    method: 'GET',
+    url,
+  }, () => ws.connect());
   return ws;
 }
 
+async function seedRoomShards(room, options) {
+  if (!options.seedRoomShards) {
+    return;
+  }
+  const seedTarget = new URL('postgres://room_storage_configs');
+  await withLoadStep({
+    label: options.label,
+    step: 'seed-room-shards',
+    method: 'SQL',
+    url: seedTarget,
+  }, async () => {
+    const { command, args } = buildRoomShardSeedCommand({
+      roomId: room.id,
+      shardCount: options.seedRoomShards,
+    });
+    await runCommand(command, args);
+  });
+}
+
+async function createSenderLogins(room, primarySenderLogin, options) {
+  const senderLogins = [primarySenderLogin];
+  for (let index = 1; index < options.senders; index += 1) {
+    const context = { label: options.label };
+    const sender = await registerUser(`load_sender_${index}`, { ...context, step: 'register-sender' });
+    const login = await loginUser(sender, { ...context, step: 'login-sender' });
+    await requestJson(`/chat-rooms/${room.id}/members`, {
+      method: 'POST',
+      headers: authorizationHeaders(login),
+    }, { ...context, step: 'join-sender' });
+    senderLogins.push(login);
+  }
+  return senderLogins;
+}
+
+function runCommand(command, args) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, { stdio: ['ignore', 'ignore', 'pipe'] });
+    let stderr = '';
+    child.stderr.on('data', (chunk) => {
+      stderr += chunk.toString('utf8');
+    });
+    child.on('error', reject);
+    child.on('close', (code) => {
+      if (code !== 0) {
+        reject(new Error(`${command} ${args.join(' ')} failed with code ${code}: ${stderr.trim()}`));
+        return;
+      }
+      resolve();
+    });
+  });
+}
+
+async function connectSenderSessions(senderLogins, senderAckTracker, options) {
+  const senderSessions = [];
+  for (const login of senderLogins) {
+    senderSessions.push(await connectSession(login, {
+      onText: (rawMessage) => {
+        const clientMessageId = acceptedClientMessageIdFromRawFrame(rawMessage);
+        if (clientMessageId) {
+          senderAckTracker.recordAccepted(clientMessageId);
+        }
+      },
+    }, {
+      label: options.label,
+      step: 'connect-sender',
+    }));
+  }
+  return senderSessions;
+}
+
 class RawWebSocket {
-  constructor(url, onJson = () => {}) {
+  constructor(url, handlers = {}) {
     this.url = new URL(url);
-    this.onJson = onJson;
+    if (typeof handlers === 'function') {
+      this.onJson = handlers;
+      this.onText = null;
+    } else {
+      this.onJson = handlers.onJson ?? (() => {});
+      this.onText = handlers.onText ?? null;
+    }
     this.socket = null;
     this.decoder = new RawWebSocketFrameDecoder({
       onText: (text) => this.handleText(text),
@@ -157,6 +263,14 @@ class RawWebSocket {
   }
 
   handleText(rawMessage) {
+    if (this.onText) {
+      try {
+        this.onText(rawMessage);
+      } catch {
+        // Ignore frame-level load collection errors.
+      }
+      return;
+    }
     try {
       this.onJson(JSON.parse(rawMessage));
     } catch {
@@ -165,7 +279,7 @@ class RawWebSocket {
   }
 
   sendJson(payload) {
-    this.writeFrame(0x1, Buffer.from(JSON.stringify(payload)));
+    return this.writeFrame(0x1, Buffer.from(JSON.stringify(payload)));
   }
 
   writeFrame(opcode, payload) {
@@ -186,7 +300,9 @@ class RawWebSocket {
       header.writeBigUInt64BE(BigInt(length), 2);
     }
     const maskedPayload = Buffer.from(payload.map((byte, index) => byte ^ mask[index % 4]));
-    this.socket.write(Buffer.concat([header, mask, maskedPayload]));
+    return writeSocketBuffer(this.socket, Buffer.concat([header, mask, maskedPayload]), {
+      timeoutMillis: timeoutMs,
+    });
   }
 
   close() {
@@ -196,21 +312,16 @@ class RawWebSocket {
   }
 }
 
-function redactSensitiveUrl(value) {
-  const url = new URL(value.toString());
-  for (const name of ['ticket', 'token']) {
-    if (url.searchParams.has(name)) {
-      url.searchParams.set(name, '[redacted]');
-    }
-  }
-  return url.toString();
-}
-
 async function main() {
   const options = parseLoadChatArgs(process.argv.slice(2));
-  const sender = await registerUser('load_sender');
-  const senderLogin = await loginUser(sender);
-  const room = await createRoom(`load-${options.room}`, senderLogin);
+  const sender = await registerUser('load_sender', { label: options.label, step: 'register-sender' });
+  const senderLogin = await loginUser(sender, { label: options.label, step: 'login-sender' });
+  const room = await createRoom(`load-${options.room}`, senderLogin, {
+    label: options.label,
+    step: 'create-room',
+  });
+  await seedRoomShards(room, options);
+  const senderLogins = await createSenderLogins(room, senderLogin, options);
   if (options.metadataFile) {
     await fs.writeFile(
       options.metadataFile,
@@ -218,53 +329,82 @@ async function main() {
       'utf8',
     );
   }
-  const receivedByViewer = new Map();
+  const retainMessages = options.summaryMode === 'messages'
+    || options.assertRoomSeqOrder
+    || options.takeoverDeliverySummary;
+  const collector = createViewerMessageCollector({ retainMessages });
   const viewers = [];
 
   for (let index = 0; index < options.viewers; index += 1) {
-    const user = await registerUser(`load_viewer_${index}`);
-    const login = await loginUser(user);
+    const context = { label: options.label, viewerIndex: index };
+    const user = await registerUser(`load_viewer_${index}`, { ...context, step: 'register-viewer' });
+    const login = await loginUser(user, { ...context, step: 'login-viewer' });
     await requestJson(`/chat-rooms/${room.id}/members`, {
       method: 'POST',
       headers: authorizationHeaders(login),
-    });
-    receivedByViewer.set(user.id, []);
-    viewers.push(await connectSession(login, (frame) => {
-      const messages = flattenChatMessages(frame).filter((message) => message.chatRoomId === room.id);
-      if (messages.length > 0) {
-        receivedByViewer.get(user.id).push(...messages);
-      }
-    }));
+    }, { ...context, step: 'join-room' });
+    collector.addViewer(user.id);
+    if (retainMessages) {
+      viewers.push(await connectSession(login, (frame) => {
+        const messages = flattenChatMessages(frame).filter((message) => message.chatRoomId === room.id);
+        if (messages.length > 0) {
+          collector.record(user.id, messages);
+        }
+      }, context));
+    } else {
+      viewers.push(await connectSession(login, {
+        onText: (rawMessage) => {
+          collector.recordCount(user.id, countChatMessagesInRawFrame(rawMessage));
+        },
+      }, context));
+    }
   }
 
-  const senderWs = await connectSession(senderLogin);
+  const senderAckTracker = createSenderAckTracker();
+  const senderSessions = await connectSenderSessions(senderLogins, senderAckTracker, options);
   await sleep(1000);
 
   const totalMessages = options.messagesPerSec * options.durationSeconds;
   const tickMillis = 100;
   const messagesPerTick = Math.max(1, Math.round(options.messagesPerSec * tickMillis / 1000));
-  let sent = 0;
+  let attempted = 0;
   const startedAt = Date.now();
 
-  while (sent < totalMessages) {
+  while (attempted < totalMessages) {
     const tickStart = Date.now();
-    for (let index = 0; index < messagesPerTick && sent < totalMessages; index += 1) {
-      sent += 1;
-      senderWs.sendJson({
+    for (let index = 0; index < messagesPerTick && attempted < totalMessages; index += 1) {
+      attempted += 1;
+      const clientMessageId = `load-${startedAt}-${attempted}`;
+      senderAckTracker.recordAttempt(clientMessageId);
+      const senderWs = senderSessions[senderIndexForAttempt(attempted, senderSessions.length)];
+      const flush = senderWs.sendJson({
         type: 'SEND_MESSAGE',
         chatRoomId: room.id,
         messageType: 'TEXT',
-        content: `load-message-${sent}`,
-        clientMessageId: `load-${startedAt}-${sent}`,
+        content: `load-message-${attempted}`,
+        clientMessageId,
       });
+      if (flush) {
+        await flush;
+      }
+      senderAckTracker.recordFlush();
     }
     const elapsed = Date.now() - tickStart;
     await sleep(Math.max(0, tickMillis - elapsed));
   }
+  const sendElapsedMillis = Date.now() - startedAt;
+  const maxSendElapsedMillis = options.durationSeconds * 1000 + options.maxSendOverrunMillis;
+  if (sendElapsedMillis > maxSendElapsedMillis) {
+    throw new Error(`send window elapsed ${sendElapsedMillis}ms; expected at most ${maxSendElapsedMillis}ms`);
+  }
 
   await sleep(options.drainWaitSeconds * 1000);
-  const receivedSamples = [...receivedByViewer.values()];
-  assertMinimumReceived(receivedSamples, sent, options.minReceivedRatio);
+  const receivedCounts = collector.receivedCounts();
+  const senderStats = senderAckTracker.snapshot();
+  assertMinimumAcceptedMessages(senderStats, totalMessages, options.minAcceptedRatio);
+  const receivedBaseline = options.minAcceptedRatio > 0 ? senderStats.accepted : attempted;
+  assertMinimumReceivedCounts(receivedCounts, receivedBaseline, options.minReceivedRatio);
+  const receivedSamples = collector.receivedSamples();
 
   if (options.assertRoomSeqOrder) {
     for (const messages of receivedSamples) {
@@ -272,23 +412,34 @@ async function main() {
     }
   }
 
-  senderWs.close();
+  senderSessions.forEach((senderSession) => senderSession.close());
   viewers.forEach((viewer) => viewer.close());
   const takeoverDelivery = options.takeoverDeliverySummary
     ? summarizeTakeoverDelivery(receivedSamples, {
-      sent,
+      sent: receivedBaseline,
       minReceivedRatio: options.minReceivedRatio,
     })
     : null;
   const summary = {
     ok: true,
     roomId: room.id,
-    sent,
+    sent: attempted,
+    sender: {
+      targetMessages: totalMessages,
+      connections: senderSessions.length,
+      ...senderStats,
+      sendElapsedMillis,
+      maxSendElapsedMillis,
+      maxSendOverrunMillis: options.maxSendOverrunMillis,
+      minAcceptedRatio: options.minAcceptedRatio,
+    },
     viewers: options.viewers,
-    receivedPerViewer: receivedSamples.map((messages) => messages.length),
+    receivedPerViewer: receivedCounts,
     minReceivedRatio: options.minReceivedRatio,
     assertedRoomSeqOrder: options.assertRoomSeqOrder,
     takeoverDeliverySummary: options.takeoverDeliverySummary,
+    summaryMode: options.summaryMode,
+    sampleSummary: collector.sampleSummary(),
     ...(takeoverDelivery ? { takeoverDelivery } : {}),
   };
   console.log(JSON.stringify(summary, null, 2));

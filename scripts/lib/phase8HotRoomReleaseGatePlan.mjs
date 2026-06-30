@@ -7,22 +7,49 @@ export const prometheusQueries = {
     'max(chat_redis_stream_group_lag{stream_shard!="unknown"})',
 };
 
+const DEFAULT_STAGE_VIEWERS = [1000, 3000, 5000, 7000, 10000];
+
+export function stageName(viewers) {
+  return viewers % 1000 === 0 ? `${viewers / 1000}k` : String(viewers);
+}
+
+export function buildStageOptions(viewers, { messagesPerSec = viewers, durationSeconds = 60 } = {}) {
+  return {
+    name: stageName(viewers),
+    viewers,
+    messagesPerSec,
+    durationSeconds,
+  };
+}
+
 export function parsePhase8HotRoomGateArgs(argv, env = process.env) {
   const options = {
+    mode: 'staged',
     room: 'hot',
-    viewers: 10000,
-    messagesPerSec: 10000,
+    stages: DEFAULT_STAGE_VIEWERS.map((viewers) => buildStageOptions(viewers)),
     durationSeconds: 60,
     minReceivedRatio: 0.9,
+    minAcceptedRatio: 0.99,
+    senderCount: 16,
+    maxSendOverrunMillis: 1000,
     minStreamShardCount: 16,
     maxFanoutP95Ms: 500,
     maxStreamGroupLagEntries: 1000,
     prometheusUrl: env.CHAT_PROMETHEUS_URL ?? 'http://localhost:9090',
     loadScript: 'scripts/load-chat.mjs',
   };
+  let singleStage = false;
+  let explicitViewers = null;
+  let explicitMessagesPerSec = null;
+  let explicitStages = null;
 
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
+    if (arg === '--single-stage') {
+      singleStage = true;
+      continue;
+    }
+
     const value = argv[index + 1];
     if (value === undefined) {
       throw new Error(`Missing value for ${arg}`);
@@ -31,14 +58,22 @@ export function parsePhase8HotRoomGateArgs(argv, env = process.env) {
 
     if (arg === '--room') {
       options.room = value;
+    } else if (arg === '--stages') {
+      explicitStages = parseStageList(value, arg);
     } else if (arg === '--viewers') {
-      options.viewers = positiveInteger(value, arg);
+      explicitViewers = positiveInteger(value, arg);
     } else if (arg === '--messages-per-sec') {
-      options.messagesPerSec = positiveInteger(value, arg);
+      explicitMessagesPerSec = positiveInteger(value, arg);
     } else if (arg === '--duration') {
       options.durationSeconds = positiveInteger(value, arg);
     } else if (arg === '--min-received-ratio') {
       options.minReceivedRatio = ratio(value, arg);
+    } else if (arg === '--min-accepted-ratio') {
+      options.minAcceptedRatio = ratio(value, arg);
+    } else if (arg === '--senders') {
+      options.senderCount = positiveInteger(value, arg);
+    } else if (arg === '--max-send-overrun-ms') {
+      options.maxSendOverrunMillis = positiveInteger(value, arg);
     } else if (arg === '--min-stream-shards') {
       options.minStreamShardCount = positiveInteger(value, arg);
     } else if (arg === '--max-fanout-p95-ms') {
@@ -54,40 +89,98 @@ export function parsePhase8HotRoomGateArgs(argv, env = process.env) {
     }
   }
 
+  if (explicitStages && singleStage) {
+    throw new Error('--stages cannot be used with --single-stage');
+  }
+  if (!singleStage && explicitViewers !== null) {
+    throw new Error('--viewers requires --single-stage');
+  }
+  if (!singleStage && explicitMessagesPerSec !== null) {
+    throw new Error('--messages-per-sec requires --single-stage');
+  }
+
+  if (singleStage) {
+    const viewers = explicitViewers ?? 10000;
+    options.mode = 'single-stage';
+    options.stages = [
+      buildStageOptions(viewers, {
+        messagesPerSec: explicitMessagesPerSec ?? viewers,
+        durationSeconds: options.durationSeconds,
+      }),
+    ];
+  } else if (explicitStages) {
+    options.stages = explicitStages.map((viewers) => buildStageOptions(viewers, {
+      durationSeconds: options.durationSeconds,
+    }));
+  } else {
+    options.stages = DEFAULT_STAGE_VIEWERS.map((viewers) => buildStageOptions(viewers, {
+      durationSeconds: options.durationSeconds,
+    }));
+  }
+
+  const compatibilityStage = options.stages[0];
+  options.viewers = compatibilityStage.viewers;
+  options.messagesPerSec = compatibilityStage.messagesPerSec;
+
   return options;
 }
 
-export function buildLoadChatArgs(options) {
-  return [
+export function buildLoadChatArgs(options, stage = options.stages?.[0] ?? options) {
+  const args = [
     options.loadScript,
     '--room', options.room,
-    '--viewers', String(options.viewers),
-    '--messages-per-sec', String(options.messagesPerSec),
-    '--duration', String(options.durationSeconds),
+    '--viewers', String(stage.viewers),
+    '--messages-per-sec', String(stage.messagesPerSec),
+    '--duration', String(stage.durationSeconds),
     '--min-received-ratio', String(options.minReceivedRatio),
+    '--min-accepted-ratio', String(options.minAcceptedRatio),
+    '--senders', String(options.senderCount),
+    '--max-send-overrun-ms', String(options.maxSendOverrunMillis),
+    '--summary-mode', 'counts',
+    '--label', stage.name,
   ];
+  if (options.minStreamShardCount > 1) {
+    args.push('--seed-room-shards', String(options.minStreamShardCount));
+  }
+  return args;
 }
 
-export function assertLoadSummary(summary, options) {
+export function assertLoadSummary(summary, stage, options) {
   if (summary?.ok !== true) {
     throw new Error('load summary did not report ok=true');
   }
-  const expectedSent = options.messagesPerSec * options.durationSeconds;
+  const expectedSent = stage.messagesPerSec * stage.durationSeconds;
   if (summary.sent < expectedSent) {
     throw new Error(`load summary sent ${summary.sent}; expected at least ${expectedSent}`);
   }
-  if (summary.viewers !== options.viewers) {
-    throw new Error(`load summary viewers ${summary.viewers}; expected ${options.viewers}`);
+  const accepted = summary.sender?.accepted;
+  if (!Number.isInteger(accepted) || accepted < 0) {
+    throw new Error('load summary sender.accepted must be a non-negative integer');
+  }
+  const minimumAccepted = Math.ceil(expectedSent * options.minAcceptedRatio);
+  if (accepted < minimumAccepted) {
+    throw new Error(`load summary accepted ${accepted}; minimum accepted is ${minimumAccepted}`);
+  }
+  const sendElapsedMillis = summary.sender?.sendElapsedMillis;
+  if (!Number.isFinite(sendElapsedMillis) || sendElapsedMillis < 0) {
+    throw new Error('load summary sender.sendElapsedMillis must be a non-negative number');
+  }
+  const maxSendElapsedMillis = stage.durationSeconds * 1000 + options.maxSendOverrunMillis;
+  if (sendElapsedMillis > maxSendElapsedMillis) {
+    throw new Error(`load summary send window elapsed ${sendElapsedMillis}ms; maximum is ${maxSendElapsedMillis}ms`);
+  }
+  if (summary.viewers !== stage.viewers) {
+    throw new Error(`load summary viewers ${summary.viewers}; expected ${stage.viewers}`);
   }
   if (!Array.isArray(summary.receivedPerViewer)) {
     throw new Error('load summary receivedPerViewer must be an array');
   }
-  if (summary.receivedPerViewer.length !== options.viewers) {
+  if (summary.receivedPerViewer.length !== stage.viewers) {
     throw new Error(
-      `load summary receivedPerViewer length ${summary.receivedPerViewer.length}; expected ${options.viewers}`,
+      `load summary receivedPerViewer length ${summary.receivedPerViewer.length}; expected ${stage.viewers}`,
     );
   }
-  const minimumReceived = Math.ceil(summary.sent * options.minReceivedRatio);
+  const minimumReceived = Math.ceil(accepted * options.minReceivedRatio);
   for (const [index, received] of summary.receivedPerViewer.entries()) {
     if (received < minimumReceived) {
       throw new Error(`viewer ${index} received ${received}; minimum received is ${minimumReceived}`);
@@ -112,6 +205,70 @@ export function assertPrometheusSnapshot(snapshot, options) {
   }
 }
 
+export function buildStageSuccess(stage, loadSummary, prometheusSnapshot) {
+  return {
+    name: stage.name,
+    ok: true,
+    options: {
+      viewers: stage.viewers,
+      messagesPerSec: stage.messagesPerSec,
+      durationSeconds: stage.durationSeconds,
+    },
+    loadSummary,
+    prometheusSnapshot,
+  };
+}
+
+export function buildStageFailure(stage, error) {
+  return {
+    name: stage.name,
+    ok: false,
+    options: {
+      viewers: stage.viewers,
+      messagesPerSec: stage.messagesPerSec,
+      durationSeconds: stage.durationSeconds,
+    },
+    error: {
+      stage: stage.name,
+      message: error.message,
+      ...(error.stderr ? { stderr: error.stderr } : {}),
+    },
+  };
+}
+
+export function gateThresholds(options) {
+  return {
+    minStreamShardCount: options.minStreamShardCount,
+    minReceivedRatio: options.minReceivedRatio,
+    minAcceptedRatio: options.minAcceptedRatio,
+    senderCount: options.senderCount,
+    durationSeconds: options.durationSeconds,
+    maxSendOverrunMillis: options.maxSendOverrunMillis,
+    maxFanoutP95Ms: options.maxFanoutP95Ms,
+    maxStreamGroupLagEntries: options.maxStreamGroupLagEntries,
+  };
+}
+
+export function buildGateResult(options, stageResults) {
+  const failed = stageResults.find((stage) => stage.ok === false) ?? null;
+  const passed = stageResults.filter((stage) => stage.ok === true);
+  return {
+    ok: failed === null,
+    mode: options.mode,
+    lastPassedStage: passed.length > 0 ? passed[passed.length - 1].name : null,
+    failedStage: failed?.name ?? null,
+    stages: stageResults,
+    thresholds: gateThresholds(options),
+  };
+}
+
+export function buildFailedGateResult(options, stage, error, previousStageResults) {
+  return buildGateResult(options, [
+    ...previousStageResults,
+    buildStageFailure(stage, error),
+  ]);
+}
+
 export function prometheusQueryNumber(body, query) {
   const result = body.data?.result?.[0]?.value?.[1];
   if (result === undefined) {
@@ -128,6 +285,14 @@ function positiveInteger(value, name) {
   const parsed = Number(value);
   if (!Number.isInteger(parsed) || parsed <= 0) {
     throw new Error(`${name} must be a positive integer`);
+  }
+  return parsed;
+}
+
+function parseStageList(value, name) {
+  const parsed = value.split(',').map((entry) => positiveInteger(entry.trim(), name));
+  if (parsed.length === 0) {
+    throw new Error(`${name} must include at least one stage`);
   }
   return parsed;
 }

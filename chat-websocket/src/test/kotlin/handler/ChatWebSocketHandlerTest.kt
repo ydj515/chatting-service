@@ -103,6 +103,7 @@ class ChatWebSocketHandlerTest {
             .single { it.method.name == "sendTextToSession" }
         val payload = outboundInvocation.arguments[1] as String
         assertSame(session, outboundInvocation.arguments[0])
+        assertTrue(outboundInvocation.arguments[2] as Boolean)
         assertTrue(payload.contains("\"type\":\"MESSAGE_ACCEPTED\""), payload)
         assertTrue(mockingDetails(session).invocations.none { it.method.name == "sendMessage" })
     }
@@ -155,6 +156,7 @@ class ChatWebSocketHandlerTest {
             .single { it.method.name == "sendTextToSession" }
         val payload = outboundInvocation.arguments[1] as String
         assertSame(session, outboundInvocation.arguments[0])
+        assertTrue(outboundInvocation.arguments[2] as Boolean)
         assertTrue(payload.contains("\"type\":\"ERROR\""), payload)
         assertTrue(payload.contains("\"code\":\"MESSAGE_ADMISSION_REJECTED\""), payload)
         assertTrue(payload.contains("\"message\":\"slow mode active\""), payload)
@@ -209,6 +211,7 @@ class ChatWebSocketHandlerTest {
             .single { it.method.name == "sendTextToSession" }
         val payload = outboundInvocation.arguments[1] as String
         assertSame(session, outboundInvocation.arguments[0])
+        assertTrue(outboundInvocation.arguments[2] as Boolean)
         assertTrue(payload.contains("\"type\":\"ERROR\""), payload)
         assertTrue(payload.contains("\"code\":\"MESSAGE_MODERATION_REJECTED\""), payload)
         assertTrue(payload.contains("\"message\":\"message blocked by moderation policy\""), payload)

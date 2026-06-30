@@ -133,7 +133,7 @@ class ChatWebSocketHandler(
                 code = errorCode,
             )
             val json = writeWebSocketMessage(error)
-            if (!sessionManager.sendTextToSession(session, json)) {
+            if (!sessionManager.sendTextToSession(session, json, priority = true)) {
                 logger.warn("Failed to enqueue error message for session ${session.id}")
             }
         } catch (e: Exception) {
@@ -213,7 +213,7 @@ class ChatWebSocketHandler(
                 timestamp = message.createdAt,
             )
             val json = writeWebSocketMessage(accepted)
-            if (!sessionManager.sendTextToSession(session, json)) {
+            if (!sessionManager.sendTextToSession(session, json, priority = true)) {
                 logger.warn("Failed to enqueue accepted message for session ${session.id}")
             }
         } catch (e: Exception) {

@@ -4,6 +4,7 @@ import { test } from 'node:test';
 
 const compose = readFileSync(new URL('../../docker-compose.yml', import.meta.url), 'utf8');
 const envExample = readFileSync(new URL('../../.env.example', import.meta.url), 'utf8');
+const nginxMainConfig = readFileSync(new URL('../../infra/nginx/nginx.main.conf.template', import.meta.url), 'utf8');
 
 function serviceBlock(serviceName) {
   const start = compose.indexOf(`  ${serviceName}:`);
@@ -66,6 +67,60 @@ test('compose passes websocket heartbeat settings to app containers', () => {
     compose,
     /CHAT_WEBSOCKET_GATEWAY_HEARTBEAT_TIMEOUT_MILLIS: \${CHAT_WEBSOCKET_GATEWAY_HEARTBEAT_TIMEOUT_MILLIS:-90000}/,
   );
+});
+
+test('compose passes websocket outbound budget settings to app containers', () => {
+  assert.match(
+    compose,
+    /CHAT_WEBSOCKET_GATEWAY_OUTBOUND_QUEUE_MAX_PENDING_MESSAGES: \${CHAT_WEBSOCKET_GATEWAY_OUTBOUND_QUEUE_MAX_PENDING_MESSAGES:-1024}/,
+  );
+  assert.match(
+    compose,
+    /CHAT_WEBSOCKET_GATEWAY_OUTBOUND_EXECUTOR_THREADS: \${CHAT_WEBSOCKET_GATEWAY_OUTBOUND_EXECUTOR_THREADS:-128}/,
+  );
+  assert.match(
+    compose,
+    /CHAT_WEBSOCKET_GATEWAY_OUTBOUND_SEND_TIME_LIMIT_MILLIS: \${CHAT_WEBSOCKET_GATEWAY_OUTBOUND_SEND_TIME_LIMIT_MILLIS:-30000}/,
+  );
+  assert.match(
+    compose,
+    /CHAT_WEBSOCKET_GATEWAY_OUTBOUND_SEND_BUFFER_SIZE_LIMIT_BYTES: \${CHAT_WEBSOCKET_GATEWAY_OUTBOUND_SEND_BUFFER_SIZE_LIMIT_BYTES:-4194304}/,
+  );
+  assert.match(envExample, /^CHAT_WEBSOCKET_GATEWAY_OUTBOUND_QUEUE_MAX_PENDING_MESSAGES=1024$/m);
+  assert.match(envExample, /^CHAT_WEBSOCKET_GATEWAY_OUTBOUND_EXECUTOR_THREADS=128$/m);
+  assert.match(envExample, /^CHAT_WEBSOCKET_GATEWAY_OUTBOUND_SEND_TIME_LIMIT_MILLIS=30000$/m);
+  assert.match(envExample, /^CHAT_WEBSOCKET_GATEWAY_OUTBOUND_SEND_BUFFER_SIZE_LIMIT_BYTES=4194304$/m);
+});
+
+test('nginx main config exposes worker connection budget through envsubst', () => {
+  assert.match(nginxMainConfig, /worker_processes \$\{NGINX_WORKER_PROCESSES\};/);
+  assert.match(nginxMainConfig, /worker_rlimit_nofile \$\{NGINX_WORKER_RLIMIT_NOFILE\};/);
+  assert.match(nginxMainConfig, /worker_connections \$\{NGINX_WORKER_CONNECTIONS\};/);
+  assert.match(nginxMainConfig, /include \/etc\/nginx\/conf\.d\/\*\.conf;/);
+});
+
+test('compose gives nginx nofile and worker connection budget for staged gate', () => {
+  const nginx = serviceBlock('nginx');
+
+  assert.match(nginx, /NGINX_WORKER_PROCESSES: \$\{NGINX_WORKER_PROCESSES:-auto\}/);
+  assert.match(nginx, /NGINX_WORKER_CONNECTIONS: \$\{NGINX_WORKER_CONNECTIONS:-20000\}/);
+  assert.match(nginx, /NGINX_WORKER_RLIMIT_NOFILE: \$\{NGINX_WORKER_RLIMIT_NOFILE:-65535\}/);
+  assert.match(
+    nginx,
+    /\.\/infra\/nginx\/nginx\.main\.conf\.template:\/etc\/nginx\/nginx\.conf\.template:ro/,
+  );
+  assert.match(
+    nginx,
+    /envsubst '\$\$NGINX_WORKER_PROCESSES \$\$NGINX_WORKER_CONNECTIONS \$\$NGINX_WORKER_RLIMIT_NOFILE' < \/etc\/nginx\/nginx\.conf\.template > \/etc\/nginx\/nginx\.conf/,
+  );
+  assert.match(
+    nginx,
+    /envsubst '\$\$CHAT_BACKEND_PORT' < \/etc\/nginx\/templates\/default\.conf\.template > \/etc\/nginx\/conf\.d\/default\.conf/,
+  );
+  assert.match(nginx, /ulimits:/);
+  assert.match(nginx, /nofile:/);
+  assert.match(nginx, /soft: \$\{NGINX_NOFILE_SOFT:-65535\}/);
+  assert.match(nginx, /hard: \$\{NGINX_NOFILE_HARD:-65535\}/);
 });
 
 test('.env.example does not override cluster defaults with stale worker or Redis profiles', () => {
