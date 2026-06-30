@@ -7,11 +7,26 @@ export const prometheusQueries = {
     'max(chat_redis_stream_group_lag{stream_shard!="unknown"})',
 };
 
+const DEFAULT_STAGE_VIEWERS = [1000, 3000, 5000, 7000, 10000];
+
+export function stageName(viewers) {
+  return viewers % 1000 === 0 ? `${viewers / 1000}k` : String(viewers);
+}
+
+export function buildStageOptions(viewers, { messagesPerSec = viewers, durationSeconds = 60 } = {}) {
+  return {
+    name: stageName(viewers),
+    viewers,
+    messagesPerSec,
+    durationSeconds,
+  };
+}
+
 export function parsePhase8HotRoomGateArgs(argv, env = process.env) {
   const options = {
+    mode: 'staged',
     room: 'hot',
-    viewers: 10000,
-    messagesPerSec: 10000,
+    stages: DEFAULT_STAGE_VIEWERS.map((viewers) => buildStageOptions(viewers)),
     durationSeconds: 60,
     minReceivedRatio: 0.9,
     minStreamShardCount: 16,
@@ -20,9 +35,18 @@ export function parsePhase8HotRoomGateArgs(argv, env = process.env) {
     prometheusUrl: env.CHAT_PROMETHEUS_URL ?? 'http://localhost:9090',
     loadScript: 'scripts/load-chat.mjs',
   };
+  let singleStage = false;
+  let explicitViewers = null;
+  let explicitMessagesPerSec = null;
+  let explicitStages = null;
 
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
+    if (arg === '--single-stage') {
+      singleStage = true;
+      continue;
+    }
+
     const value = argv[index + 1];
     if (value === undefined) {
       throw new Error(`Missing value for ${arg}`);
@@ -31,10 +55,12 @@ export function parsePhase8HotRoomGateArgs(argv, env = process.env) {
 
     if (arg === '--room') {
       options.room = value;
+    } else if (arg === '--stages') {
+      explicitStages = parseStageList(value, arg);
     } else if (arg === '--viewers') {
-      options.viewers = positiveInteger(value, arg);
+      explicitViewers = positiveInteger(value, arg);
     } else if (arg === '--messages-per-sec') {
-      options.messagesPerSec = positiveInteger(value, arg);
+      explicitMessagesPerSec = positiveInteger(value, arg);
     } else if (arg === '--duration') {
       options.durationSeconds = positiveInteger(value, arg);
     } else if (arg === '--min-received-ratio') {
@@ -54,17 +80,52 @@ export function parsePhase8HotRoomGateArgs(argv, env = process.env) {
     }
   }
 
+  if (explicitStages && singleStage) {
+    throw new Error('--stages cannot be used with --single-stage');
+  }
+  if (!singleStage && explicitViewers !== null) {
+    throw new Error('--viewers requires --single-stage');
+  }
+  if (!singleStage && explicitMessagesPerSec !== null) {
+    throw new Error('--messages-per-sec requires --single-stage');
+  }
+
+  if (singleStage) {
+    const viewers = explicitViewers ?? 10000;
+    options.mode = 'single-stage';
+    options.stages = [
+      buildStageOptions(viewers, {
+        messagesPerSec: explicitMessagesPerSec ?? viewers,
+        durationSeconds: options.durationSeconds,
+      }),
+    ];
+  } else if (explicitStages) {
+    options.stages = explicitStages.map((viewers) => buildStageOptions(viewers, {
+      durationSeconds: options.durationSeconds,
+    }));
+  } else {
+    options.stages = DEFAULT_STAGE_VIEWERS.map((viewers) => buildStageOptions(viewers, {
+      durationSeconds: options.durationSeconds,
+    }));
+  }
+
+  const compatibilityStage = options.stages[0];
+  options.viewers = compatibilityStage.viewers;
+  options.messagesPerSec = compatibilityStage.messagesPerSec;
+
   return options;
 }
 
-export function buildLoadChatArgs(options) {
+export function buildLoadChatArgs(options, stage = options.stages?.[0] ?? options) {
   return [
     options.loadScript,
     '--room', options.room,
-    '--viewers', String(options.viewers),
-    '--messages-per-sec', String(options.messagesPerSec),
-    '--duration', String(options.durationSeconds),
+    '--viewers', String(stage.viewers),
+    '--messages-per-sec', String(stage.messagesPerSec),
+    '--duration', String(stage.durationSeconds),
     '--min-received-ratio', String(options.minReceivedRatio),
+    '--summary-mode', 'counts',
+    '--label', stage.name,
   ];
 }
 
@@ -128,6 +189,14 @@ function positiveInteger(value, name) {
   const parsed = Number(value);
   if (!Number.isInteger(parsed) || parsed <= 0) {
     throw new Error(`${name} must be a positive integer`);
+  }
+  return parsed;
+}
+
+function parseStageList(value, name) {
+  const parsed = value.split(',').map((entry) => positiveInteger(entry.trim(), name));
+  if (parsed.length === 0) {
+    throw new Error(`${name} must include at least one stage`);
   }
   return parsed;
 }
