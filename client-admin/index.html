@@ -8,16 +8,14 @@
     <meta name="description" content="분산 채팅 시스템 React 관리자 클라이언트" />
     <title>Chat Admin</title>
     <script>
-      // 테마 초기화 — 플래시 방지를 위해 앱 렌더 전에 dark 클래스를 설정
+      // 테마 초기화 — 플래시 방지를 위해 앱 렌더 전에 data-theme를 설정
       (function () {
         try {
           var t = localStorage.getItem('admin_theme');
-          if (!t) {
+          if (t !== 'light' && t !== 'dark') {
             t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
           }
-          if (t === 'dark') {
-            document.documentElement.classList.add('dark');
-          }
+          document.documentElement.setAttribute('data-theme', t);
         } catch (e) {
           // localStorage 비활성 환경은 무시
         }

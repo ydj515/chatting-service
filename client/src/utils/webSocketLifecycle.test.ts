@@ -1,6 +1,6 @@
-import test from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
-import { nextReconnectDelayMs, shouldIgnoreWebSocketEvent } from './webSocketLifecycle.ts';
+import { nextReconnectDelayMs, shouldIgnoreWebSocketEvent } from '@/utils/webSocketLifecycle.ts';
 
 test('현재 소켓이 아닌 이전 소켓 이벤트는 무시한다', () => {
   const currentSocket = {};

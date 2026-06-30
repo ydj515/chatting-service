@@ -1,4 +1,4 @@
-import type { AdminState, SearchMode } from '../types/index';
+import type { AdminState, SearchMode } from '@/types/index.ts';
 
 // localStorage.getItem/setItem만 사용하므로 테스트에서 in-memory 스텁으로 대체 가능
 export interface AdminStorage {

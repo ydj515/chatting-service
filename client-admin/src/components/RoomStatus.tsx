@@ -1,5 +1,5 @@
 import React from 'react';
-import type { AdminRoomStatus } from '../types/index';
+import type { AdminRoomStatus } from '@/types/index.ts';
 
 interface RoomStatusProps {
   status: AdminRoomStatus | null;
@@ -19,15 +19,15 @@ const RoomStatus: React.FC<RoomStatusProps> = ({ status }) => {
     : [];
 
   return (
-    <section className="panel">
-      <div className="panel-header">
-        <h2>Room Status</h2>
+    <section className="bg-background border border-border rounded-lg shadow-md overflow-hidden">
+      <div className="flex items-center justify-between gap-3 px-4 py-3.5 border-b border-border bg-gray-100">
+        <h2 className="m-0 text-base font-semibold text-text-primary">Room Status</h2>
       </div>
-      <div className="metrics">
+      <div className="grid grid-cols-2 min-[720px]:grid-cols-6 gap-px bg-border-light">
         {metrics.map(([label, value]) => (
-          <div className="metric" key={label}>
-            <span>{label}</span>
-            <strong>{value}</strong>
+          <div className="grid gap-1 p-3.5 bg-background" key={label}>
+            <span className="text-text-secondary text-xs tracking-wide">{label}</span>
+            <strong className="text-lg font-bold tabular-nums text-text-primary">{value}</strong>
           </div>
         ))}
       </div>

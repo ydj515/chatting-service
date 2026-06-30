@@ -1,5 +1,50 @@
+import React from 'react';
+
 // 어드민 검색 방식
 export type SearchMode = 'FTS' | 'CONTAINS';
+
+// 공통 컴포넌트 Props
+export interface BaseComponentProps {
+  className?: string;
+  children?: React.ReactNode;
+}
+
+// 버튼 Props (client UI 컴포넌트 체계와 동일)
+export interface ButtonProps extends BaseComponentProps {
+  variant?: 'primary' | 'secondary' | 'ghost' | 'danger';
+  size?: 'sm' | 'md' | 'lg';
+  disabled?: boolean;
+  loading?: boolean;
+  onClick?: () => void;
+  type?: 'button' | 'submit' | 'reset';
+}
+
+// 입력 Props (datetime-local 등 어드민 전용 타입 포함)
+export interface InputProps extends BaseComponentProps {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  disabled?: boolean;
+  error?: string;
+  type?: 'text' | 'password' | 'search' | 'number' | 'datetime-local';
+  inputMode?: 'text' | 'numeric';
+  autoComplete?: string;
+  maxLength?: number;
+  autoFocus?: boolean;
+}
+
+// 셀렉트 Props
+export interface SelectOption {
+  value: string;
+  label: string;
+}
+
+export interface SelectProps extends BaseComponentProps {
+  value: string;
+  onChange: (value: string) => void;
+  options: SelectOption[];
+  disabled?: boolean;
+}
 
 // 어드민 화면에서 관리하는 입력 상태(폼 + localStorage 동기화 대상)
 export interface AdminState {
