@@ -154,7 +154,7 @@ async function createSenderLogins(room, primarySenderLogin, options) {
 
 function runCommand(command, args) {
   return new Promise((resolve, reject) => {
-    const child = spawn(command, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawn(command, args, { stdio: ['ignore', 'ignore', 'pipe'] });
     let stderr = '';
     child.stderr.on('data', (chunk) => {
       stderr += chunk.toString('utf8');
@@ -300,7 +300,9 @@ class RawWebSocket {
       header.writeBigUInt64BE(BigInt(length), 2);
     }
     const maskedPayload = Buffer.from(payload.map((byte, index) => byte ^ mask[index % 4]));
-    return writeSocketBuffer(this.socket, Buffer.concat([header, mask, maskedPayload]));
+    return writeSocketBuffer(this.socket, Buffer.concat([header, mask, maskedPayload]), {
+      timeoutMillis: timeoutMs,
+    });
   }
 
   close() {
@@ -348,13 +350,13 @@ async function main() {
         if (messages.length > 0) {
           collector.record(user.id, messages);
         }
-      }));
+      }, context));
     } else {
       viewers.push(await connectSession(login, {
         onText: (rawMessage) => {
           collector.recordCount(user.id, countChatMessagesInRawFrame(rawMessage));
         },
-      }));
+      }, context));
     }
   }
 
@@ -390,6 +392,11 @@ async function main() {
     const elapsed = Date.now() - tickStart;
     await sleep(Math.max(0, tickMillis - elapsed));
   }
+  const sendElapsedMillis = Date.now() - startedAt;
+  const maxSendElapsedMillis = options.durationSeconds * 1000 + options.maxSendOverrunMillis;
+  if (sendElapsedMillis > maxSendElapsedMillis) {
+    throw new Error(`send window elapsed ${sendElapsedMillis}ms; expected at most ${maxSendElapsedMillis}ms`);
+  }
 
   await sleep(options.drainWaitSeconds * 1000);
   const receivedCounts = collector.receivedCounts();
@@ -421,6 +428,9 @@ async function main() {
       targetMessages: totalMessages,
       connections: senderSessions.length,
       ...senderStats,
+      sendElapsedMillis,
+      maxSendElapsedMillis,
+      maxSendOverrunMillis: options.maxSendOverrunMillis,
       minAcceptedRatio: options.minAcceptedRatio,
     },
     viewers: options.viewers,

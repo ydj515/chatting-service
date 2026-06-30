@@ -35,6 +35,8 @@
 
 아래 값은 대화 시점의 로컬 재실행 관찰값이다. 정식 장기 보존 artifact로 고정된 값은 아니므로, 다음 재현에서는 stdout JSON과 stderr를 별도 artifact로 남겨야 한다.
 
+`latest fast runner`는 이 PR 브랜치의 `scripts/load-chat.mjs` count-only summary 경로에서 `1000 viewers`, `1000 messages/sec`, `60s`, `16 senders`, hot room shard seed 조건으로 실행한 baseline을 뜻한다.
+
 | 조건 | 관찰 결과 | 해석 |
 | --- | ---: | --- |
 | 초기 `1k` 실행 | viewer 0이 `10839/60000` 수준만 수신 | full fanout 조건에서 명백히 목표 미달 |
@@ -44,7 +46,7 @@
 | `1 viewer` + `16` senders | `58788/60000` 수준 | viewer fanout 부하가 줄면 sender accepted가 크게 회복됨 |
 | outbound budget 확대 | `18392/60000` 수준 | queue/thread/buffer 확대만으로 안정 개선 안 됨 |
 | ACK priority 적용 후 | `14882/60000` 수준 | ACK 우선순위만으로는 병목이 풀리지 않음 |
-| latest fast runner 관찰 | `21690/60000` 수준 | 최신 경로에서도 full fanout 조건은 목표 미달 |
+| `latest fast runner` baseline | `21690/60000` 수준 | 이 PR의 count-only/ACK tracking 경로에서도 full fanout 조건은 목표 미달 |
 
 ### 현재까지의 중요한 신호
 

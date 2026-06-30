@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
+import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import {
   assertMinimumAcceptedMessages,
@@ -21,6 +22,8 @@ import {
   summarizeTakeoverDelivery,
   writeSocketBuffer,
 } from './loadChatPlan.mjs';
+
+const loadChatScript = readFileSync(new URL('../load-chat.mjs', import.meta.url), 'utf8');
 
 test('parseLoadChatArgs maps Phase 6 load-chat options', () => {
   const options = parseLoadChatArgs([
@@ -56,6 +59,7 @@ test('parseLoadChatArgs maps Phase 6 load-chat options', () => {
     seedRoomShards: null,
     minAcceptedRatio: 0,
     senders: 1,
+    maxSendOverrunMillis: 1000,
   });
 });
 
@@ -91,6 +95,12 @@ test('parseLoadChatArgs supports multiple sender sessions', () => {
   assert.equal(options.senders, 16);
 });
 
+test('parseLoadChatArgs supports max send window overrun', () => {
+  const options = parseLoadChatArgs(['--max-send-overrun-ms', '250']);
+
+  assert.equal(options.maxSendOverrunMillis, 250);
+});
+
 test('parseLoadChatArgs defaults to message retention for compatibility', () => {
   const options = parseLoadChatArgs([]);
 
@@ -99,6 +109,7 @@ test('parseLoadChatArgs defaults to message retention for compatibility', () => 
   assert.equal(options.seedRoomShards, null);
   assert.equal(options.minAcceptedRatio, 0);
   assert.equal(options.senders, 1);
+  assert.equal(options.maxSendOverrunMillis, 1000);
 });
 
 test('assertRoomSeqOrder rejects a live feed inversion', () => {
@@ -287,6 +298,24 @@ test('writeSocketBuffer returns without a promise when socket flushes immediatel
   assert.equal(writeSocketBuffer(socket, Buffer.from('payload')), undefined);
 });
 
+test('writeSocketBuffer rejects when a backpressured socket never drains', async () => {
+  const socket = new EventEmitter();
+  socket.destroyed = false;
+  socket.write = () => false;
+
+  const outcome = await Promise.race([
+    writeSocketBuffer(socket, Buffer.from('payload'), { timeoutMillis: 1 }).then(
+      () => 'resolved',
+      (error) => error.message,
+    ),
+    new Promise((resolve) => {
+      setTimeout(() => resolve('pending'), 20);
+    }),
+  ]);
+
+  assert.match(outcome, /WebSocket socket did not drain within 1ms/);
+});
+
 test('createViewerMessageCollector can count without retaining every message', () => {
   const collector = createViewerMessageCollector({ retainMessages: false, sampleLimit: 2 });
 
@@ -337,6 +366,20 @@ test('formatLoadStepError includes label viewer step method and redacted URL', (
   assert.doesNotMatch(error, /secret/);
 });
 
+test('formatLoadStepError redacts sensitive query values inside cause messages', () => {
+  const error = formatLoadStepError({
+    label: '1k',
+    step: 'websocket-handshake',
+    method: 'GET',
+    url: 'ws://localhost/api/ws/chat',
+    cause: new Error('failed ws://localhost/api/ws/chat?ticket=secret-ticket&token=secret-token'),
+  });
+
+  assert.match(error, /ticket=\[redacted\]/);
+  assert.match(error, /token=\[redacted\]/);
+  assert.doesNotMatch(error, /secret-ticket|secret-token/);
+});
+
 test('formatLoadStepError formats sender steps without viewer index', () => {
   const error = formatLoadStepError({
     label: '1k',
@@ -347,6 +390,18 @@ test('formatLoadStepError formats sender steps without viewer index', () => {
   });
 
   assert.equal(error, '[1k] create-room POST http://localhost/api/chat-rooms failed: HTTP 502 bad gateway');
+});
+
+test('load-chat passes viewer context into both websocket connect paths', () => {
+  const viewerLoopStart = loadChatScript.indexOf('for (let index = 0; index < options.viewers; index += 1)');
+  const viewerLoopEnd = loadChatScript.indexOf('const senderAckTracker');
+  const viewerLoop = loadChatScript.slice(viewerLoopStart, viewerLoopEnd);
+
+  assert.equal((viewerLoop.match(/\}, context\)\)/g) ?? []).length, 2);
+});
+
+test('load-chat ignores unused child process stdout', () => {
+  assert.match(loadChatScript, /spawn\(command, args, \{ stdio: \['ignore', 'ignore', 'pipe'\] \}\)/);
 });
 
 test('buildRoomShardSeedCommand targets room_storage_configs through compose postgres', () => {

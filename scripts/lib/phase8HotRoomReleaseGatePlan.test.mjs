@@ -30,6 +30,7 @@ test('parsePhase8HotRoomGateArgs defaults to staged 1k 3k 5k 7k 10k gate', () =>
   assert.equal(options.minReceivedRatio, 0.9);
   assert.equal(options.minAcceptedRatio, 0.99);
   assert.equal(options.senderCount, 16);
+  assert.equal(options.maxSendOverrunMillis, 1000);
   assert.equal(options.minStreamShardCount, 16);
   assert.equal(options.maxFanoutP95Ms, 500);
   assert.equal(options.maxStreamGroupLagEntries, 1000);
@@ -88,6 +89,7 @@ test('buildLoadChatArgs includes staged release gate load arguments', () => {
     '--min-received-ratio', '0.9',
     '--min-accepted-ratio', '0.99',
     '--senders', '16',
+    '--max-send-overrun-ms', '1000',
     '--summary-mode', 'counts',
     '--label', '1k',
     '--seed-room-shards', '16',
@@ -102,6 +104,7 @@ test('assertLoadSummary accepts a successful load summary', () => {
     sent: 600000,
     sender: {
       accepted: 600000,
+      sendElapsedMillis: 60000,
     },
     viewers: 2,
     receivedPerViewer: [600000, 590000],
@@ -117,6 +120,7 @@ test('assertLoadSummary rejects insufficient delivery', () => {
     sent: 600000,
     sender: {
       accepted: 600000,
+      sendElapsedMillis: 60000,
     },
     viewers: 1,
     receivedPerViewer: [500000],
@@ -137,6 +141,7 @@ test('assertLoadSummary rejects insufficient sender acceptance', () => {
     sent: 60000,
     sender: {
       accepted: 59000,
+      sendElapsedMillis: 60000,
     },
     viewers: 1,
     receivedPerViewer: [59000],
@@ -152,11 +157,33 @@ test('assertLoadSummary rejects missing receivedPerViewer entries', () => {
     sent: 600000,
     sender: {
       accepted: 600000,
+      sendElapsedMillis: 60000,
     },
     viewers: 2,
     receivedPerViewer: [600000],
     minReceivedRatio: 0.9,
   }, options.stages[0], options), /receivedPerViewer length/);
+});
+
+test('assertLoadSummary rejects a stretched sender window', () => {
+  const options = parsePhase8HotRoomGateArgs([
+    '--single-stage',
+    '--viewers', '1',
+    '--messages-per-sec', '1000',
+    '--duration', '60',
+    '--max-send-overrun-ms', '1000',
+  ]);
+
+  assert.throws(() => assertLoadSummary({
+    ok: true,
+    sent: 60000,
+    sender: {
+      accepted: 60000,
+      sendElapsedMillis: 62001,
+    },
+    viewers: 1,
+    receivedPerViewer: [60000],
+  }, options.stages[0], options), /send window elapsed/);
 });
 
 test('buildGateResult reports last passed and failed stage names', () => {
@@ -186,6 +213,9 @@ test('buildGateResult reports all stages passed', () => {
   assert.equal(result.lastPassedStage, '5k');
   assert.equal(result.failedStage, null);
   assert.equal(result.thresholds.maxFanoutP95Ms, 500);
+  assert.equal(result.thresholds.minReceivedRatio, 0.9);
+  assert.equal(result.thresholds.durationSeconds, 60);
+  assert.equal(result.thresholds.maxSendOverrunMillis, 1000);
 });
 
 test('buildFailedGateResult creates JSON-safe error objects with stderr', () => {

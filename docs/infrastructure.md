@@ -144,7 +144,7 @@ staged release gate는 다음 명령으로 실행한다.
 node scripts/phase8-hot-room-release-gate.mjs
 ```
 
-이 명령은 `1k`, `3k`, `5k`, `7k`, `10k` stage를 fail-fast로 실행한다. 각 stage는 viewer 수와 messages/sec를 같은 값으로 두고 60초 동안 부하를 만든 뒤, Prometheus에서 fanout p95, stream shard 관측 수, Redis Streams group lag를 조회해 threshold를 넘으면 실패한다. 실패하면 이후 stage는 실행하지 않고 JSON artifact에 `lastPassedStage`, `failedStage`, stage별 load summary, Prometheus snapshot, load runner stderr를 남긴다.
+이 명령은 `1k`, `3k`, `5k`, `7k`, `10k` stage를 fail-fast로 실행한다. 각 stage는 viewer 수와 messages/sec를 같은 값으로 두고 60초 동안 부하를 만든 뒤, load summary에서 `minAcceptedRatio`, `minReceivedRatio`, send window를 검증하고 Prometheus에서 fanout p95, stream shard 관측 수, Redis Streams group lag를 조회해 threshold를 넘으면 실패한다. 실패하면 이후 stage는 실행하지 않고 JSON artifact에 `lastPassedStage`, `failedStage`, stage별 load summary, Prometheus snapshot, load runner stderr를 남긴다.
 
 custom stage는 다음처럼 지정한다.
 
@@ -158,7 +158,7 @@ node scripts/phase8-hot-room-release-gate.mjs --stages 1000,2000,4000,8000,10000
 node scripts/phase8-hot-room-release-gate.mjs --single-stage --viewers 10000 --messages-per-sec 10000
 ```
 
-10,000 viewer stage는 같은 client IP에서 WebSocket ticket을 대량 발급하므로, backend를 시작하기 전에 `CHAT_AUTH_WEB_SOCKET_TICKET_RATE_LIMIT_PER_IP`를 최대 viewer 수 이상으로 올리거나 부하 발생 IP를 분산해야 한다. nginx staged gate 예산은 `NGINX_WORKER_CONNECTIONS`, `NGINX_NOFILE_SOFT`, `NGINX_NOFILE_HARD`로 조정한다.
+10,000 viewer stage는 같은 client IP에서 WebSocket ticket을 대량 발급하므로, backend를 시작하기 전에 `CHAT_AUTH_WEB_SOCKET_TICKET_RATE_LIMIT_PER_IP`를 최대 viewer 수 이상으로 올리거나 부하 발생 IP를 분산해야 한다. nginx staged gate 예산은 `NGINX_WORKER_PROCESSES`, `NGINX_WORKER_CONNECTIONS`, `NGINX_WORKER_RLIMIT_NOFILE`, `NGINX_NOFILE_SOFT`, `NGINX_NOFILE_HARD`로 조정한다.
 
 ## 로드 밸런싱
 

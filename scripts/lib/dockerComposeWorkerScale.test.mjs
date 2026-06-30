@@ -94,6 +94,7 @@ test('compose passes websocket outbound budget settings to app containers', () =
 
 test('nginx main config exposes worker connection budget through envsubst', () => {
   assert.match(nginxMainConfig, /worker_processes \$\{NGINX_WORKER_PROCESSES\};/);
+  assert.match(nginxMainConfig, /worker_rlimit_nofile \$\{NGINX_WORKER_RLIMIT_NOFILE\};/);
   assert.match(nginxMainConfig, /worker_connections \$\{NGINX_WORKER_CONNECTIONS\};/);
   assert.match(nginxMainConfig, /include \/etc\/nginx\/conf\.d\/\*\.conf;/);
 });
@@ -103,9 +104,18 @@ test('compose gives nginx nofile and worker connection budget for staged gate', 
 
   assert.match(nginx, /NGINX_WORKER_PROCESSES: \$\{NGINX_WORKER_PROCESSES:-auto\}/);
   assert.match(nginx, /NGINX_WORKER_CONNECTIONS: \$\{NGINX_WORKER_CONNECTIONS:-20000\}/);
+  assert.match(nginx, /NGINX_WORKER_RLIMIT_NOFILE: \$\{NGINX_WORKER_RLIMIT_NOFILE:-65535\}/);
   assert.match(
     nginx,
     /\.\/infra\/nginx\/nginx\.main\.conf\.template:\/etc\/nginx\/nginx\.conf\.template:ro/,
+  );
+  assert.match(
+    nginx,
+    /envsubst '\$\$NGINX_WORKER_PROCESSES \$\$NGINX_WORKER_CONNECTIONS \$\$NGINX_WORKER_RLIMIT_NOFILE' < \/etc\/nginx\/nginx\.conf\.template > \/etc\/nginx\/nginx\.conf/,
+  );
+  assert.match(
+    nginx,
+    /envsubst '\$\$CHAT_BACKEND_PORT' < \/etc\/nginx\/templates\/default\.conf\.template > \/etc\/nginx\/conf\.d\/default\.conf/,
   );
   assert.match(nginx, /ulimits:/);
   assert.match(nginx, /nofile:/);

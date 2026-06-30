@@ -14,6 +14,7 @@ export function parseLoadChatArgs(argv) {
     seedRoomShards: null,
     minAcceptedRatio: 0,
     senders: 1,
+    maxSendOverrunMillis: 1000,
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -60,6 +61,8 @@ export function parseLoadChatArgs(argv) {
       options.minAcceptedRatio = ratio(value, arg);
     } else if (arg === '--senders') {
       options.senders = positiveInteger(value, arg);
+    } else if (arg === '--max-send-overrun-ms') {
+      options.maxSendOverrunMillis = positiveInteger(value, arg);
     } else {
       throw new Error(`Unknown argument: ${arg}`);
     }
@@ -235,7 +238,7 @@ export function createSenderAckTracker() {
   };
 }
 
-export function writeSocketBuffer(socket, buffer) {
+export function writeSocketBuffer(socket, buffer, { timeoutMillis = 30_000 } = {}) {
   if (!socket || socket.destroyed) {
     return Promise.reject(new Error('WebSocket socket is closed'));
   }
@@ -250,7 +253,11 @@ export function writeSocketBuffer(socket, buffer) {
 
   return new Promise((resolve, reject) => {
     let settled = false;
+    let timer;
     const cleanup = () => {
+      if (timer) {
+        clearTimeout(timer);
+      }
       socket.off?.('drain', onDrain);
       socket.off?.('error', onError);
       socket.off?.('close', onClose);
@@ -266,6 +273,11 @@ export function writeSocketBuffer(socket, buffer) {
     const onDrain = () => finish(resolve);
     const onError = (error) => finish(reject, error);
     const onClose = () => finish(reject, new Error('WebSocket socket closed before drain'));
+    timer = setTimeout(
+      () => finish(reject, new Error(`WebSocket socket did not drain within ${timeoutMillis}ms`)),
+      timeoutMillis,
+    );
+    timer.unref?.();
 
     socket.once('drain', onDrain);
     socket.once('error', onError);
@@ -307,10 +319,15 @@ export function redactSensitiveUrl(value) {
   return url.toString();
 }
 
+export function redactSensitiveText(value) {
+  return String(value).replace(/([?&](?:ticket|token)=)[^&\s#]*/gi, '$1[redacted]');
+}
+
 export function formatLoadStepError({ label, viewerIndex, step, method, url, cause }) {
   const prefix = label ? `[${label}] ` : '';
   const actor = viewerIndex === undefined ? '' : `viewer ${viewerIndex} `;
-  return `${prefix}${actor}${step} ${method} ${redactSensitiveUrl(url)} failed: ${cause.message}`;
+  const causeMessage = redactSensitiveText(cause?.message ?? cause);
+  return `${prefix}${actor}${step} ${method} ${redactSensitiveUrl(url)} failed: ${causeMessage}`;
 }
 
 export function buildRoomShardSeedSql({ roomId, shardCount }) {

@@ -31,6 +31,7 @@ export function parsePhase8HotRoomGateArgs(argv, env = process.env) {
     minReceivedRatio: 0.9,
     minAcceptedRatio: 0.99,
     senderCount: 16,
+    maxSendOverrunMillis: 1000,
     minStreamShardCount: 16,
     maxFanoutP95Ms: 500,
     maxStreamGroupLagEntries: 1000,
@@ -71,6 +72,8 @@ export function parsePhase8HotRoomGateArgs(argv, env = process.env) {
       options.minAcceptedRatio = ratio(value, arg);
     } else if (arg === '--senders') {
       options.senderCount = positiveInteger(value, arg);
+    } else if (arg === '--max-send-overrun-ms') {
+      options.maxSendOverrunMillis = positiveInteger(value, arg);
     } else if (arg === '--min-stream-shards') {
       options.minStreamShardCount = positiveInteger(value, arg);
     } else if (arg === '--max-fanout-p95-ms') {
@@ -132,6 +135,7 @@ export function buildLoadChatArgs(options, stage = options.stages?.[0] ?? option
     '--min-received-ratio', String(options.minReceivedRatio),
     '--min-accepted-ratio', String(options.minAcceptedRatio),
     '--senders', String(options.senderCount),
+    '--max-send-overrun-ms', String(options.maxSendOverrunMillis),
     '--summary-mode', 'counts',
     '--label', stage.name,
   ];
@@ -156,6 +160,14 @@ export function assertLoadSummary(summary, stage, options) {
   const minimumAccepted = Math.ceil(expectedSent * options.minAcceptedRatio);
   if (accepted < minimumAccepted) {
     throw new Error(`load summary accepted ${accepted}; minimum accepted is ${minimumAccepted}`);
+  }
+  const sendElapsedMillis = summary.sender?.sendElapsedMillis;
+  if (!Number.isFinite(sendElapsedMillis) || sendElapsedMillis < 0) {
+    throw new Error('load summary sender.sendElapsedMillis must be a non-negative number');
+  }
+  const maxSendElapsedMillis = stage.durationSeconds * 1000 + options.maxSendOverrunMillis;
+  if (sendElapsedMillis > maxSendElapsedMillis) {
+    throw new Error(`load summary send window elapsed ${sendElapsedMillis}ms; maximum is ${maxSendElapsedMillis}ms`);
   }
   if (summary.viewers !== stage.viewers) {
     throw new Error(`load summary viewers ${summary.viewers}; expected ${stage.viewers}`);
@@ -227,8 +239,11 @@ export function buildStageFailure(stage, error) {
 export function gateThresholds(options) {
   return {
     minStreamShardCount: options.minStreamShardCount,
+    minReceivedRatio: options.minReceivedRatio,
     minAcceptedRatio: options.minAcceptedRatio,
     senderCount: options.senderCount,
+    durationSeconds: options.durationSeconds,
+    maxSendOverrunMillis: options.maxSendOverrunMillis,
     maxFanoutP95Ms: options.maxFanoutP95Ms,
     maxStreamGroupLagEntries: options.maxStreamGroupLagEntries,
   };

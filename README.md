@@ -103,7 +103,7 @@ CHAT_PROMETHEUS_URL=http://localhost:9090 node scripts/phase8-hot-room-release-g
 
 기본 gate는 `1k -> 3k -> 5k -> 7k -> 10k` 순서로 실행하며, 어느 단계까지 통과했는지 JSON으로 출력합니다. 병목 구간을 다르게 좁히려면 `--stages 1000,2000,4000,8000,10000`처럼 stage 목록을 지정합니다. 기존 10k 단일 실행은 `--single-stage --viewers 10000 --messages-per-sec 10000`로 실행합니다.
 
-10,000 viewer stage를 실행할 때는 backend 시작 전 `CHAT_AUTH_WEB_SOCKET_TICKET_RATE_LIMIT_PER_IP`를 최대 viewer 수 이상으로 설정해야 합니다. nginx staged gate 예산은 `NGINX_WORKER_CONNECTIONS`, `NGINX_NOFILE_SOFT`, `NGINX_NOFILE_HARD`로 조정합니다.
+10,000 viewer stage를 실행할 때는 backend 시작 전 `CHAT_AUTH_WEB_SOCKET_TICKET_RATE_LIMIT_PER_IP`를 최대 viewer 수 이상으로 설정해야 합니다. nginx staged gate 예산은 `NGINX_WORKER_PROCESSES`, `NGINX_WORKER_CONNECTIONS`, `NGINX_WORKER_RLIMIT_NOFILE`, `NGINX_NOFILE_SOFT`, `NGINX_NOFILE_HARD`로 조정합니다.
 
 Phase 8.5 moderation smoke:
 
