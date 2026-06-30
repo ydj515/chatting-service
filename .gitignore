@@ -29,9 +29,6 @@ out/
 .settings/
 bin/
 
-# VS Code
-.vscode/
-
 # Spring Boot
 spring-output/
 
