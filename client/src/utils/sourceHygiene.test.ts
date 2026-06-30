@@ -164,3 +164,30 @@ test('클라이언트는 Zustand와 TanStack Query 경계를 사용한다', () =
   assert.match(chatPage, /useChatStore/);
   assert.match(chatPage, /useServerHealth/);
 });
+
+test('채팅 페이지는 API 토큰 동기화 전 인증 화면을 노출하지 않는다', () => {
+  const chatPage = fileText(join(clientRoot, 'src/pages/ChatPage.tsx'));
+
+  assert.match(chatPage, /isApiSessionReady/);
+  assert.match(chatPage, /setSyncedSessionToken/);
+  assert.match(chatPage, /!apiSessionReady/);
+  assert.match(chatPage, /<LoadingScreen\s*\/>/);
+});
+
+test('채팅 창은 stale query 스냅샷으로 실시간 메시지를 덮어쓰지 않는다', () => {
+  const chatWindow = fileText(join(clientRoot, 'src/components/ChatWindow.tsx'));
+
+  assert.match(chatWindow, /useQueryClient/);
+  assert.match(chatWindow, /staleTime:\s*Infinity/);
+  assert.match(chatWindow, /setQueryData/);
+  assert.match(chatWindow, /mergeMessages/);
+  assert.doesNotMatch(chatWindow, /setMessages\(messagesQuery\.data\)/);
+});
+
+test('서버 헬스 훅은 재조회 실패 횟수까지 상태 계산에 반영한다', () => {
+  const useServerHealth = fileText(join(clientRoot, 'src/hooks/useServerHealth.ts'));
+
+  assert.match(useServerHealth, /deriveServerHealthState/);
+  assert.match(useServerHealth, /failureCount/);
+  assert.match(useServerHealth, /isRefetchError/);
+});

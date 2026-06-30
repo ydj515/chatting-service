@@ -1,6 +1,11 @@
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
-import { applyWebSocketMessageEvent, boundedLiveFeedMessages, messageRenderKey } from '@/utils/messageEvents.ts';
+import {
+  applyWebSocketMessageEvent,
+  boundedLiveFeedMessages,
+  mergeMessages,
+  messageRenderKey,
+} from '@/utils/messageEvents.ts';
 import type { Message, WebSocketMessage } from '@/types/index.ts';
 
 const existingMessage = (overrides: Partial<Message> = {}): Message => ({
@@ -123,6 +128,34 @@ test('CHAT_MESSAGE_BATCH는 현재 방 메시지만 병합한다', () => {
 
   assert.equal(next.length, 2);
   assert.deepEqual(next.map((message) => message.messageId), ['msg-1', 'msg-2']);
+});
+
+test('query 스냅샷 병합은 이미 도착한 실시간 메시지를 보존한다', () => {
+  const cachedSnapshot = [
+    existingMessage({
+      id: 1,
+      messageId: 'msg-1',
+      content: 'from-cache',
+      roomSeq: 1,
+      sequenceNumber: 1,
+    }),
+  ];
+  const liveMessages = [
+    existingMessage({
+      id: 2,
+      messageId: 'msg-2',
+      content: 'from-websocket',
+      roomSeq: 2,
+      sequenceNumber: 2,
+    }),
+  ];
+
+  const merged = mergeMessages(cachedSnapshot, liveMessages);
+
+  assert.deepEqual(
+    merged.map((message) => message.messageId),
+    ['msg-1', 'msg-2'],
+  );
 });
 
 test('렌더 key는 실시간 fanout id가 같아도 messageId를 우선 사용한다', () => {

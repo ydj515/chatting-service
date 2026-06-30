@@ -1,8 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 import { appConfig } from '@/config/appConfig.ts';
 import { healthApi } from '@/services/api.ts';
+import { deriveServerHealthState, type ServerStatus } from '@/utils/serverHealth.ts';
 
-export type ServerStatus = 'checking' | 'online' | 'offline';
+export type { ServerStatus };
 
 export function useServerHealth() {
   const query = useQuery({
@@ -18,15 +19,11 @@ export function useServerHealth() {
     },
   });
 
-  const serverStatus: ServerStatus = query.isPending
-    ? 'checking'
-    : query.isError
-      ? 'offline'
-      : 'online';
-
-  return {
-    serverStatus,
-    errorUpdatedAt: query.errorUpdatedAt,
+  return deriveServerHealthState({
+    isPending: query.isPending,
     isError: query.isError,
-  };
+    isRefetchError: query.isRefetchError,
+    failureCount: query.failureCount,
+    errorUpdatedAt: query.errorUpdatedAt,
+  });
 }

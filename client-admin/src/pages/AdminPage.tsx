@@ -14,12 +14,7 @@ import MessageTable from '@/components/MessageTable.tsx';
 import RoomStatus from '@/components/RoomStatus.tsx';
 import Layout from '@/components/layout/Layout.tsx';
 import { useAdminStore } from '@/stores/adminStore.ts';
-
-const numberOrNull = (value: string): number | null => {
-  if (value.trim() === '') return null;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : null;
-};
+import { isValidRoomId, numberOrNull } from '@/utils/adminValidation.ts';
 
 interface RefreshVariables {
   baseUrl: string;
@@ -191,7 +186,7 @@ function AdminPage() {
   const handleRefresh = (event: React.FormEvent) => {
     event.preventDefault();
     const { baseUrl: effectiveBaseUrl, roomId: effectiveRoomId } = persistState(localStorage);
-    if (numberOrNull(effectiveRoomId) === null) {
+    if (!isValidRoomId(effectiveRoomId)) {
       showNotice('Room ID는 숫자여야 합니다.', true);
       return;
     }
@@ -223,12 +218,18 @@ function AdminPage() {
 
   const handleHistoryNext = () => {
     if (!historyCursor) return;
+    const effectiveRoomId = roomId.trim() || '1';
+    if (!isValidRoomId(effectiveRoomId)) {
+      showNotice('Room ID는 숫자여야 합니다.', true);
+      return;
+    }
     historyNextMutation.mutate({
       baseUrl,
       token,
-      roomId,
+      roomId: effectiveRoomId,
       filters: {
         ...buildFilters(),
+        roomId: numberOrNull(effectiveRoomId),
         cursor: historyCursor,
       },
     });

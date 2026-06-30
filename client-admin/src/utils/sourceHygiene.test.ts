@@ -165,3 +165,18 @@ test('관리자는 Zustand와 TanStack Query 경계를 사용한다', () => {
   assert.match(adminPage, /useAdminStore/);
   assert.match(adminPage, /useMutation/);
 });
+
+test('관리자 히스토리 다음 페이지 요청도 roomId 숫자 검증을 적용한다', () => {
+  const adminPage = fileText(join(adminRoot, 'src/pages/AdminPage.tsx'));
+
+  assert.match(adminPage, /isValidRoomId/);
+  assert.match(adminPage, /handleHistoryNext[\s\S]*Room ID는 숫자여야 합니다\./);
+  assert.match(adminPage, /handleHistoryNext[\s\S]*historyNextMutation\.mutate/);
+});
+
+test('관리자 store는 상태 영속화 예외를 persistState 경계에서 방어한다', () => {
+  const adminStore = fileText(join(adminRoot, 'src/stores/adminStore.ts'));
+
+  assert.match(adminStore, /try\s*\{[\s\S]*saveAdminState/);
+  assert.match(adminStore, /catch\s*\{/);
+});

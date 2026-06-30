@@ -115,14 +115,18 @@ export const useAdminStore = create<AdminStore>((set, get) => ({
       baseUrl: normalizedBaseUrl,
       roomId: normalizedRoomId,
     });
-    saveAdminState(storage, {
-      baseUrl: normalizedBaseUrl,
-      token: state.token,
-      roomId: normalizedRoomId,
-      searchMode: state.searchMode,
-      historyCursor: null,
-      searchCursor: null,
-    });
+    try {
+      saveAdminState(storage, {
+        baseUrl: normalizedBaseUrl,
+        token: state.token,
+        roomId: normalizedRoomId,
+        searchMode: state.searchMode,
+        historyCursor: null,
+        searchCursor: null,
+      });
+    } catch {
+      // storage 비활성 환경은 정규화된 메모리 상태만 유지한다.
+    }
     return { baseUrl: normalizedBaseUrl, roomId: normalizedRoomId };
   },
   showNotice: (message, isError = false) => {

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import type { ChatRoom, LoginResponse, Notification } from '@/types/index.ts';
 import Layout from '@/components/layout/Layout.tsx';
 import AuthGate from '@/components/AuthGate.tsx';
@@ -8,6 +8,7 @@ import { setSessionToken as setApiSessionToken } from '@/services/api.ts';
 import { appConfig } from '@/config/appConfig.ts';
 import { useServerHealth } from '@/hooks/useServerHealth.ts';
 import { useChatStore } from '@/stores/chatStore.ts';
+import { isApiSessionReady } from '@/utils/authSession.ts';
 
 function ChatPage() {
   const currentUser = useChatStore((state) => state.currentUser);
@@ -24,6 +25,7 @@ function ChatPage() {
   const removeNotification = useChatStore((state) => state.removeNotification);
   const setLastErrorTime = useChatStore((state) => state.setLastErrorTime);
   const { serverStatus, isError: healthCheckFailed, errorUpdatedAt } = useServerHealth();
+  const [syncedSessionToken, setSyncedSessionToken] = useState<string | null>(null);
 
   useEffect(() => {
     hydrateAuth(localStorage);
@@ -31,7 +33,10 @@ function ChatPage() {
 
   useEffect(() => {
     setApiSessionToken(sessionToken);
+    setSyncedSessionToken(sessionToken);
   }, [sessionToken]);
+
+  const apiSessionReady = isApiSessionReady(currentUser, sessionToken, syncedSessionToken);
 
   const enqueueNotification = useCallback(
     (notification: Notification) => {
@@ -98,6 +103,8 @@ function ChatPage() {
 
   const handleLogin = useCallback(
     (response: LoginResponse) => {
+      setApiSessionToken(response.sessionToken);
+      setSyncedSessionToken(response.sessionToken);
       login(response, localStorage);
       handleSuccess(`${response.user.displayName}님, 환영합니다!`);
     },
@@ -105,6 +112,8 @@ function ChatPage() {
   );
 
   const handleLogout = useCallback(() => {
+    setApiSessionToken(null);
+    setSyncedSessionToken(null);
     logout(localStorage);
     handleSuccess('로그아웃되었습니다.');
   }, [handleSuccess, logout]);
@@ -116,7 +125,7 @@ function ChatPage() {
     [selectChatRoom],
   );
 
-  if (isInitializing) {
+  if (isInitializing || !apiSessionReady) {
     return <LoadingScreen />;
   }
 

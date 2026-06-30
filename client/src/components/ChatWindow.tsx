@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChatRoom, Message, User, WebSocketMessage } from '@/types/index.ts';
 import { messageApi } from '@/services/api.ts';
 import { useWebSocket } from '@/hooks/useWebSocket.ts';
@@ -7,6 +7,7 @@ import {
   applyWebSocketMessageEvent,
   boundedLiveFeedMessages,
   createClientMessageId,
+  mergeMessages,
   messageRenderKey,
 } from '@/utils/messageEvents.ts';
 import { Copy, Check } from 'lucide-react';
@@ -33,6 +34,8 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<number>();
   const copyResetRef = useRef<number>();
+  const queryClient = useQueryClient();
+  const messagesQueryKey = useMemo(() => ['messages', chatRoom.id] as const, [chatRoom.id]);
 
   // 채팅방 ID 복사 — 클립보드에 쓰고 토스트 + 아이콘을 잠시 체크로 전환
   const handleCopyRoomId = async () => {
@@ -84,11 +87,12 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   });
 
   const messagesQuery = useQuery({
-    queryKey: ['messages', chatRoom.id],
+    queryKey: messagesQueryKey,
     queryFn: async () => {
       const response = await messageApi.getMessages(chatRoom.id, 0, 50);
       return boundedLiveFeedMessages(response.content);
     },
+    staleTime: Infinity,
   });
   
   // WebSocket 메시지 도착 시 처리
@@ -110,8 +114,14 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
       return;
     }
 
-    setMessages((prev) => applyWebSocketMessageEvent(prev, lastMessage, chatRoom.id));
-  }, [lastMessage, chatRoom.id, currentUser.id, onError]);
+    setMessages((prev) => {
+      const nextMessages = applyWebSocketMessageEvent(prev, lastMessage, chatRoom.id);
+      if (nextMessages !== prev) {
+        queryClient.setQueryData<Message[]>(messagesQueryKey, nextMessages);
+      }
+      return nextMessages;
+    });
+  }, [lastMessage, chatRoom.id, currentUser.id, messagesQueryKey, onError, queryClient]);
 
   // 메시지 전송
   const handleSendMessage = async (e: React.FormEvent) => {
@@ -170,7 +180,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   // 채팅방 변경 시 Query 결과를 실시간 메시지 상태의 초기값으로 사용
   useEffect(() => {
     if (messagesQuery.data) {
-      setMessages(messagesQuery.data);
+      setMessages((prev) => mergeMessages(messagesQuery.data, prev));
     }
   }, [messagesQuery.data]);
 
