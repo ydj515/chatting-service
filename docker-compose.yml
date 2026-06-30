@@ -589,7 +589,7 @@ services:
 
   # Prometheus (metric 수집)
   prometheus:
-    image: ${PROMETHEUS_IMAGE:-prom/prometheus:v2.53.0}
+    image: ${PROMETHEUS_IMAGE:-prom/prometheus:v2.54.1}
     profiles: [ "cluster" ]
     container_name: chat-prometheus
     volumes:
