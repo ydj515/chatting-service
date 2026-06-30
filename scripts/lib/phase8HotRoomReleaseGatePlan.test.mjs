@@ -3,8 +3,12 @@ import assert from 'node:assert/strict';
 import {
   assertLoadSummary,
   assertPrometheusSnapshot,
+  buildFailedGateResult,
+  buildGateResult,
   buildLoadChatArgs,
+  buildStageFailure,
   buildStageOptions,
+  buildStageSuccess,
   prometheusQueryNumber,
   parsePhase8HotRoomGateArgs,
   prometheusQueries,
@@ -119,6 +123,47 @@ test('assertLoadSummary rejects missing receivedPerViewer entries', () => {
     receivedPerViewer: [600000],
     minReceivedRatio: 0.9,
   }, options), /receivedPerViewer length/);
+});
+
+test('buildGateResult reports last passed and failed stage names', () => {
+  const options = parsePhase8HotRoomGateArgs([]);
+  const result = buildGateResult(options, [
+    buildStageSuccess(options.stages[0], { ok: true }, { fanoutP95Seconds: 0.1 }),
+    buildStageSuccess(options.stages[1], { ok: true }, { fanoutP95Seconds: 0.2 }),
+    buildStageFailure(options.stages[2], new Error('load runner failed')),
+  ]);
+
+  assert.equal(result.ok, false);
+  assert.equal(result.mode, 'staged');
+  assert.equal(result.lastPassedStage, '3k');
+  assert.equal(result.failedStage, '5k');
+  assert.equal(result.stages.length, 3);
+  assert.equal(result.stages[2].error.message, 'load runner failed');
+});
+
+test('buildGateResult reports all stages passed', () => {
+  const options = parsePhase8HotRoomGateArgs(['--stages', '1000,5000']);
+  const result = buildGateResult(options, [
+    buildStageSuccess(options.stages[0], { ok: true }, { fanoutP95Seconds: 0.1 }),
+    buildStageSuccess(options.stages[1], { ok: true }, { fanoutP95Seconds: 0.2 }),
+  ]);
+
+  assert.equal(result.ok, true);
+  assert.equal(result.lastPassedStage, '5k');
+  assert.equal(result.failedStage, null);
+  assert.equal(result.thresholds.maxFanoutP95Ms, 500);
+});
+
+test('buildFailedGateResult creates JSON-safe error objects with stderr', () => {
+  const options = parsePhase8HotRoomGateArgs([]);
+  const error = new Error('load runner failed');
+  error.stderr = 'viewer 5104 issue-ticket POST http://localhost/api/ws-tickets failed: fetch failed';
+
+  const result = buildFailedGateResult(options, options.stages[0], error, []);
+
+  assert.equal(result.ok, false);
+  assert.equal(result.failedStage, '1k');
+  assert.match(result.stages[0].error.stderr, /viewer 5104/);
 });
 
 test('assertPrometheusSnapshot accepts fanout latency and shard distribution within thresholds', () => {

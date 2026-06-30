@@ -173,6 +173,65 @@ export function assertPrometheusSnapshot(snapshot, options) {
   }
 }
 
+export function buildStageSuccess(stage, loadSummary, prometheusSnapshot) {
+  return {
+    name: stage.name,
+    ok: true,
+    options: {
+      viewers: stage.viewers,
+      messagesPerSec: stage.messagesPerSec,
+      durationSeconds: stage.durationSeconds,
+    },
+    loadSummary,
+    prometheusSnapshot,
+  };
+}
+
+export function buildStageFailure(stage, error) {
+  return {
+    name: stage.name,
+    ok: false,
+    options: {
+      viewers: stage.viewers,
+      messagesPerSec: stage.messagesPerSec,
+      durationSeconds: stage.durationSeconds,
+    },
+    error: {
+      stage: stage.name,
+      message: error.message,
+      ...(error.stderr ? { stderr: error.stderr } : {}),
+    },
+  };
+}
+
+export function gateThresholds(options) {
+  return {
+    minStreamShardCount: options.minStreamShardCount,
+    maxFanoutP95Ms: options.maxFanoutP95Ms,
+    maxStreamGroupLagEntries: options.maxStreamGroupLagEntries,
+  };
+}
+
+export function buildGateResult(options, stageResults) {
+  const failed = stageResults.find((stage) => stage.ok === false) ?? null;
+  const passed = stageResults.filter((stage) => stage.ok === true);
+  return {
+    ok: failed === null,
+    mode: options.mode,
+    lastPassedStage: passed.length > 0 ? passed[passed.length - 1].name : null,
+    failedStage: failed?.name ?? null,
+    stages: stageResults,
+    thresholds: gateThresholds(options),
+  };
+}
+
+export function buildFailedGateResult(options, stage, error, previousStageResults) {
+  return buildGateResult(options, [
+    ...previousStageResults,
+    buildStageFailure(stage, error),
+  ]);
+}
+
 export function prometheusQueryNumber(body, query) {
   const result = body.data?.result?.[0]?.value?.[1];
   if (result === undefined) {
