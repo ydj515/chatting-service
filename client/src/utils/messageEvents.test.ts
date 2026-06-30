@@ -1,7 +1,7 @@
-import test from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
-import { applyWebSocketMessageEvent, boundedLiveFeedMessages, messageRenderKey } from './messageEvents.ts';
-import type { Message, WebSocketMessage } from '../types/index.ts';
+import { applyWebSocketMessageEvent, boundedLiveFeedMessages, messageRenderKey } from '@/utils/messageEvents.ts';
+import type { Message, WebSocketMessage } from '@/types/index.ts';
 
 const existingMessage = (overrides: Partial<Message> = {}): Message => ({
   id: 1,

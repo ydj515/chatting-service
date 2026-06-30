@@ -14,8 +14,8 @@ import {
   SearchQuery,
   UserSettings,
   WebSocketTicketResponse,
-} from '../types';
-import { appConfig } from '../config/appConfig.ts';
+} from '@/types/index.ts';
+import { appConfig } from '@/config/appConfig.ts';
 
 let sessionToken: string | null = null;
 

@@ -1,4 +1,4 @@
-import { buildWebSocketTicketUrl } from '../utils/webSocketTicket.ts';
+import { buildWebSocketTicketUrl } from '@/utils/webSocketTicket.ts';
 
 const DEFAULT_API_BASE_PATH = '/api';
 const DEFAULT_WS_PATH = '/api/ws/chat';

@@ -1,5 +1,5 @@
 import React from 'react';
-import { ButtonProps } from '../../types/index';
+import { ButtonProps } from '@/types/index.ts';
 
 // variant별 Tailwind 클래스 매핑
 const variantClasses: Record<string, string> = {

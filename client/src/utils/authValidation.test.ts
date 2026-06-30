@@ -1,10 +1,10 @@
-import test from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import {
   getAuthErrorMessage,
   getAuthFieldPlaceholder,
   validateAuthForm,
-} from './authValidation.ts';
+} from '@/utils/authValidation.ts';
 
 test('회원가입 필드 placeholder가 서버 validation 제약을 보여준다', () => {
   assert.equal(getAuthFieldPlaceholder('username'), '사용자명 (3-20자)');

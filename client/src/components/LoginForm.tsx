@@ -1,14 +1,15 @@
 import React, { useState } from 'react';
-import { LoginRequest, LoginResponse, RegisterRequest } from '../types/index';
-import { userApi } from '../services/api.ts';
+import { useMutation } from '@tanstack/react-query';
+import { LoginRequest, LoginResponse, RegisterRequest } from '@/types/index.ts';
+import { userApi } from '@/services/api.ts';
 import {
   AUTH_FIELD_LIMITS,
   getAuthErrorMessage,
   getAuthFieldPlaceholder,
   validateAuthForm,
-} from '../utils/authValidation.ts';
-import Button from './ui/Button.tsx';
-import Input from './ui/Input.tsx';
+} from '@/utils/authValidation.ts';
+import Button from '@/components/ui/Button.tsx';
+import Input from '@/components/ui/Input.tsx';
 import { MessageCircle, UserPlus, LogIn, Lock, User as UserIcon } from 'lucide-react';
 
 interface LoginFormProps {
@@ -18,11 +19,39 @@ interface LoginFormProps {
 
 const LoginForm: React.FC<LoginFormProps> = ({ onLogin, onError }) => {
   const [isLogin, setIsLogin] = useState(true);
-  const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     username: '',
     password: '',
     displayName: '',
+  });
+
+  const authMutation = useMutation({
+    mutationFn: async () => {
+      if (isLogin) {
+        const loginData: LoginRequest = {
+          username: formData.username.trim(),
+          password: formData.password,
+        };
+        return userApi.login(loginData);
+      }
+
+      const registerData: RegisterRequest = {
+        username: formData.username.trim(),
+        password: formData.password,
+        displayName: formData.displayName.trim(),
+      };
+
+      await userApi.register(registerData);
+      return userApi.login({
+        username: registerData.username,
+        password: registerData.password,
+      });
+    },
+    onSuccess: onLogin,
+    onError: (error) => {
+      console.error('Authentication error:', error);
+      onError(getAuthErrorMessage(error));
+    },
   });
 
   const handleInputChange = (field: string, value: string) => {
@@ -46,38 +75,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLogin, onError }) => {
     e.preventDefault();
     
     if (!validateForm()) return;
-    
-    setLoading(true);
-    
-    try {
-      if (isLogin) {
-        const loginData: LoginRequest = {
-          username: formData.username.trim(),
-          password: formData.password,
-        };
-        
-        const response = await userApi.login(loginData);
-        onLogin(response);
-      } else {
-        const registerData: RegisterRequest = {
-          username: formData.username.trim(),
-          password: formData.password,
-          displayName: formData.displayName.trim(),
-        };
-        
-        await userApi.register(registerData);
-        const response = await userApi.login({
-          username: registerData.username,
-          password: registerData.password,
-        });
-        onLogin(response);
-      }
-    } catch (error: any) {
-      console.error('Authentication error:', error);
-      onError(getAuthErrorMessage(error));
-    } finally {
-      setLoading(false);
-    }
+    authMutation.mutate();
   };
 
   const toggleMode = () => {
@@ -159,7 +157,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLogin, onError }) => {
           type="submit"
           variant="primary"
           size="lg"
-          loading={loading}
+          loading={authMutation.isPending}
           className="mt-4"
         >
           {isLogin ? (

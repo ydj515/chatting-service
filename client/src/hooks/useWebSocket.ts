@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { WebSocketMessage } from '../types';
-import { appConfig, buildWebSocketUrl } from '../config/appConfig.ts';
-import { webSocketTicketApi } from '../services/api.ts';
-import { nextReconnectDelayMs, shouldIgnoreWebSocketEvent } from '../utils/webSocketLifecycle.ts';
+import { WebSocketMessage } from '@/types/index.ts';
+import { appConfig, buildWebSocketUrl } from '@/config/appConfig.ts';
+import { webSocketTicketApi } from '@/services/api.ts';
+import { nextReconnectDelayMs, shouldIgnoreWebSocketEvent } from '@/utils/webSocketLifecycle.ts';
 
 interface UseWebSocketProps {
   sessionToken: string;

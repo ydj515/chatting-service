@@ -1,13 +1,14 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { ChatRoom, Message, User, WebSocketMessage } from '../types/index';
-import { messageApi } from '../services/api.ts';
-import { useWebSocket } from '../hooks/useWebSocket.ts';
+import React, { useState, useEffect, useRef } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { ChatRoom, Message, User, WebSocketMessage } from '@/types/index.ts';
+import { messageApi } from '@/services/api.ts';
+import { useWebSocket } from '@/hooks/useWebSocket.ts';
 import {
   applyWebSocketMessageEvent,
   boundedLiveFeedMessages,
   createClientMessageId,
   messageRenderKey,
-} from '../utils/messageEvents.ts';
+} from '@/utils/messageEvents.ts';
 import { Copy, Check } from 'lucide-react';
 
 interface ChatWindowProps {
@@ -27,7 +28,6 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
 }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [messageInput, setMessageInput] = useState('');
-  const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [copied, setCopied] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -82,6 +82,14 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
     onDisconnect: () => console.log('🔌 WebSocket 연결 해제됨'),
     onError: (error) => console.error('🔌 WebSocket 에러:', error),
   });
+
+  const messagesQuery = useQuery({
+    queryKey: ['messages', chatRoom.id],
+    queryFn: async () => {
+      const response = await messageApi.getMessages(chatRoom.id, 0, 50);
+      return boundedLiveFeedMessages(response.content);
+    },
+  });
   
   // WebSocket 메시지 도착 시 처리
   useEffect(() => {
@@ -104,19 +112,6 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
 
     setMessages((prev) => applyWebSocketMessageEvent(prev, lastMessage, chatRoom.id));
   }, [lastMessage, chatRoom.id, currentUser.id, onError]);
-
-  // 메시지 목록 로드
-  const loadMessages = useCallback(async () => {
-    setIsLoadingMessages(true);
-    try {
-      const response = await messageApi.getMessages(chatRoom.id, 0, 50);
-      setMessages(boundedLiveFeedMessages(response.content));
-    } catch (error: any) {
-      onError(error.response?.data?.message || '메시지를 불러올 수 없습니다.');
-    } finally {
-      setIsLoadingMessages(false);
-    }
-  }, [chatRoom.id, currentUser.id, onError]);
 
   // 메시지 전송
   const handleSendMessage = async (e: React.FormEvent) => {
@@ -172,10 +167,19 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
     }, 3000);
   };
 
-  // 채팅방 변경 시 메시지 로드
+  // 채팅방 변경 시 Query 결과를 실시간 메시지 상태의 초기값으로 사용
   useEffect(() => {
-    loadMessages();
-  }, [chatRoom.id, loadMessages]);
+    if (messagesQuery.data) {
+      setMessages(messagesQuery.data);
+    }
+  }, [messagesQuery.data]);
+
+  useEffect(() => {
+    if (messagesQuery.isError) {
+      const error = messagesQuery.error as any;
+      onError(error.response?.data?.message || '메시지를 불러올 수 없습니다.');
+    }
+  }, [messagesQuery.error, messagesQuery.isError, onError]);
 
   // 새 메시지 시 스크롤
   useEffect(() => {
@@ -233,7 +237,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
 
       {/* 메시지 영역 */}
       <div className="flex-1 overflow-auto p-4 flex flex-col gap-3">
-        {isLoadingMessages ? (
+        {messagesQuery.isLoading ? (
           <div className="text-center p-8 text-text-secondary">
             메시지를 불러오는 중...
           </div>

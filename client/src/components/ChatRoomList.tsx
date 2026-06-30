@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { User, ChatRoom, CreateChatRoomRequest } from '../types/index';
-import { chatRoomApi } from '../services/api.ts';
-import Button from './ui/Button.tsx';
-import Input from './ui/Input.tsx';
+import React, { useEffect, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { User, ChatRoom, CreateChatRoomRequest } from '@/types/index.ts';
+import { chatRoomApi } from '@/services/api.ts';
+import Button from '@/components/ui/Button.tsx';
+import Input from '@/components/ui/Input.tsx';
 import { 
   Plus, 
   Search, 
@@ -28,11 +29,9 @@ const ChatRoomList: React.FC<ChatRoomListProps> = ({
   onChatRoomSelect,
   onError,
 }) => {
-  const [chatRooms, setChatRooms] = useState<ChatRoom[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [createLoading, setCreateLoading] = useState(false);
   const [newRoomData, setNewRoomData] = useState<CreateChatRoomRequest>({
     name: '',
     description: '',
@@ -41,47 +40,43 @@ const ChatRoomList: React.FC<ChatRoomListProps> = ({
   });
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [joinRoomId, setJoinRoomId] = useState('');
-  const [joinLoading, setJoinLoading] = useState(false);
 
-  const loadChatRooms = useCallback(async () => {
-    try {
-      setLoading(true);
-      const response = await chatRoomApi.getChatRooms();
-      setChatRooms(response.content);
-    } catch (error: any) {
-      console.error('Failed to load chat rooms:', error);
-      onError('채팅방 목록을 불러오는데 실패했습니다');
-    } finally {
-      setLoading(false);
-    }
-  }, [currentUser.id, onError]);
+  const chatRoomsQuery = useQuery({
+    queryKey: ['chat-rooms', currentUser.id],
+    queryFn: () => chatRoomApi.getChatRooms(),
+  });
 
+  const createRoomMutation = useMutation({
+    mutationFn: (request: CreateChatRoomRequest) => chatRoomApi.create(request),
+    onSuccess: (newRoom) => {
+      queryClient.invalidateQueries({ queryKey: ['chat-rooms'] });
+      setShowCreateModal(false);
+      setNewRoomData({
+        name: '',
+        description: '',
+        type: 'GROUP',
+        maxMembers: 3,
+      });
+      onChatRoomSelect(newRoom);
+    },
+    onError: (error) => {
+      console.error('Failed to create chat room:', error);
+      onError('채팅방 생성에 실패했습니다');
+    },
+  });
 
-
-  // 채팅방 참여
-  const handleJoinRoom = async () => {
-    if (!joinRoomId.trim()) {
-      onError('채팅방 ID를 입력해주세요');
-      return;
-    }
-
-    try {
-      setJoinLoading(true);
-      const roomId = parseInt(joinRoomId);
-      if (isNaN(roomId)) {
-        onError('올바른 채팅방 ID를 입력해주세요');
-        return;
-      }
-
+  const joinRoomMutation = useMutation({
+    mutationFn: async (roomId: number) => {
       await chatRoomApi.join(roomId);
-      await loadChatRooms(); // 채팅방 목록 새로고침
+      return chatRoomApi.getChatRoom(roomId);
+    },
+    onSuccess: (joinedRoom) => {
+      queryClient.invalidateQueries({ queryKey: ['chat-rooms'] });
       setShowJoinModal(false);
       setJoinRoomId('');
-      
-      // 참여한 채팅방 선택
-      const joinedRoom = await chatRoomApi.getChatRoom(roomId);
       onChatRoomSelect(joinedRoom);
-    } catch (error: any) {
+    },
+    onError: (error: any) => {
       console.error('Failed to join chat room:', error);
       if (error.response?.status === 404) {
         onError('채팅방을 찾을 수 없습니다');
@@ -92,14 +87,31 @@ const ChatRoomList: React.FC<ChatRoomListProps> = ({
       } else {
         onError('채팅방 참여에 실패했습니다');
       }
-    } finally {
-      setJoinLoading(false);
+    },
+  });
+
+  // 채팅방 참여
+  const handleJoinRoom = async () => {
+    if (!joinRoomId.trim()) {
+      onError('채팅방 ID를 입력해주세요');
+      return;
     }
+
+    const roomId = parseInt(joinRoomId);
+    if (isNaN(roomId)) {
+      onError('올바른 채팅방 ID를 입력해주세요');
+      return;
+    }
+
+    joinRoomMutation.mutate(roomId);
   };
 
   useEffect(() => {
-    loadChatRooms();
-  }, [loadChatRooms]);
+    if (chatRoomsQuery.isError) {
+      console.error('Failed to load chat rooms:', chatRoomsQuery.error);
+      onError('채팅방 목록을 불러오는데 실패했습니다');
+    }
+  }, [chatRoomsQuery.error, chatRoomsQuery.isError, onError]);
 
   const handleCreateRoom = async () => {
     if (!newRoomData.name.trim()) {
@@ -107,26 +119,10 @@ const ChatRoomList: React.FC<ChatRoomListProps> = ({
       return;
     }
 
-    try {
-      setCreateLoading(true);
-      const newRoom = await chatRoomApi.create(newRoomData);
-      setChatRooms(prev => [newRoom, ...prev]);
-      setShowCreateModal(false);
-      setNewRoomData({
-        name: '',
-        description: '',
-        type: 'GROUP',
-        maxMembers: 3,
-      });
-      onChatRoomSelect(newRoom);
-    } catch (error: any) {
-      console.error('Failed to create chat room:', error);
-      onError('채팅방 생성에 실패했습니다');
-    } finally {
-      setCreateLoading(false);
-    }
+    createRoomMutation.mutate(newRoomData);
   };
 
+  const chatRooms = chatRoomsQuery.data?.content ?? [];
   const filteredChatRooms = chatRooms.filter(room =>
     room.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     room.description?.toLowerCase().includes(searchQuery.toLowerCase())
@@ -225,7 +221,7 @@ const ChatRoomList: React.FC<ChatRoomListProps> = ({
 
       {/* Room List */}
       <div className="flex-1 overflow-y-auto p-1">
-        {loading ? (
+        {chatRoomsQuery.isLoading ? (
           <div className="p-8 text-center text-text-secondary">
             <div className="animate-pulse-slow">채팅방을 불러오는 중...</div>
           </div>
@@ -321,7 +317,7 @@ const ChatRoomList: React.FC<ChatRoomListProps> = ({
                 <Button
                   variant="primary"
                   size="md"
-                  loading={createLoading}
+                  loading={createRoomMutation.isPending}
                   onClick={handleCreateRoom}
                   className="flex-1"
                 >
@@ -379,7 +375,7 @@ const ChatRoomList: React.FC<ChatRoomListProps> = ({
                 <Button
                   variant="primary"
                   size="md"
-                  loading={joinLoading}
+                  loading={joinRoomMutation.isPending}
                   onClick={handleJoinRoom}
                   className="flex-1"
                 >

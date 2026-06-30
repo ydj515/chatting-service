@@ -1,4 +1,4 @@
-import type { Message, WebSocketMessage } from '../types/index.ts';
+import type { Message, WebSocketMessage } from '@/types/index.ts';
 
 const DEFAULT_LIVE_FEED_MAX_MESSAGES = 1000;
 const DEFAULT_LIVE_FEED_MAX_AGE_SECONDS = 60;
