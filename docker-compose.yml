@@ -668,8 +668,15 @@ services:
     environment:
       TZ: ${TZ:-Asia/Seoul}
       CHAT_BACKEND_PORT: ${SERVER_PORT:-8080}
+      NGINX_WORKER_PROCESSES: ${NGINX_WORKER_PROCESSES:-auto}
+      NGINX_WORKER_CONNECTIONS: ${NGINX_WORKER_CONNECTIONS:-20000}
     volumes:
+      - ./infra/nginx/nginx.main.conf.template:/etc/nginx/nginx.conf.template:ro
       - ./infra/nginx/nginx.conf:/etc/nginx/templates/default.conf.template:ro
+    command:
+      - /bin/sh
+      - -c
+      - envsubst '$$NGINX_WORKER_PROCESSES $$NGINX_WORKER_CONNECTIONS' < /etc/nginx/nginx.conf.template > /etc/nginx/nginx.conf && envsubst '$$CHAT_BACKEND_PORT' < /etc/nginx/templates/default.conf.template > /etc/nginx/conf.d/default.conf && exec nginx -g 'daemon off;'
     ports:
       - "${NGINX_HTTP_PORT:-80}:80"
     depends_on:
@@ -683,6 +690,10 @@ services:
       interval: ${NGINX_HEALTHCHECK_INTERVAL:-30s}
       timeout: ${NGINX_HEALTHCHECK_TIMEOUT:-10s}
       retries: ${NGINX_HEALTHCHECK_RETRIES:-3}
+    ulimits:
+      nofile:
+        soft: ${NGINX_NOFILE_SOFT:-65535}
+        hard: ${NGINX_NOFILE_HARD:-65535}
     networks:
       - chat-network
 

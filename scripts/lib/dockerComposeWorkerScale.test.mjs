@@ -4,6 +4,7 @@ import { test } from 'node:test';
 
 const compose = readFileSync(new URL('../../docker-compose.yml', import.meta.url), 'utf8');
 const envExample = readFileSync(new URL('../../.env.example', import.meta.url), 'utf8');
+const nginxMainConfig = readFileSync(new URL('../../infra/nginx/nginx.main.conf.template', import.meta.url), 'utf8');
 
 function serviceBlock(serviceName) {
   const start = compose.indexOf(`  ${serviceName}:`);
@@ -66,6 +67,27 @@ test('compose passes websocket heartbeat settings to app containers', () => {
     compose,
     /CHAT_WEBSOCKET_GATEWAY_HEARTBEAT_TIMEOUT_MILLIS: \${CHAT_WEBSOCKET_GATEWAY_HEARTBEAT_TIMEOUT_MILLIS:-90000}/,
   );
+});
+
+test('nginx main config exposes worker connection budget through envsubst', () => {
+  assert.match(nginxMainConfig, /worker_processes \$\{NGINX_WORKER_PROCESSES\};/);
+  assert.match(nginxMainConfig, /worker_connections \$\{NGINX_WORKER_CONNECTIONS\};/);
+  assert.match(nginxMainConfig, /include \/etc\/nginx\/conf\.d\/\*\.conf;/);
+});
+
+test('compose gives nginx nofile and worker connection budget for staged gate', () => {
+  const nginx = serviceBlock('nginx');
+
+  assert.match(nginx, /NGINX_WORKER_PROCESSES: \$\{NGINX_WORKER_PROCESSES:-auto\}/);
+  assert.match(nginx, /NGINX_WORKER_CONNECTIONS: \$\{NGINX_WORKER_CONNECTIONS:-20000\}/);
+  assert.match(
+    nginx,
+    /\.\/infra\/nginx\/nginx\.main\.conf\.template:\/etc\/nginx\/nginx\.conf\.template:ro/,
+  );
+  assert.match(nginx, /ulimits:/);
+  assert.match(nginx, /nofile:/);
+  assert.match(nginx, /soft: \$\{NGINX_NOFILE_SOFT:-65535\}/);
+  assert.match(nginx, /hard: \$\{NGINX_NOFILE_HARD:-65535\}/);
 });
 
 test('.env.example does not override cluster defaults with stale worker or Redis profiles', () => {
