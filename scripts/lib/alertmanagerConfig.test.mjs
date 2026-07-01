@@ -3,7 +3,9 @@ import { existsSync, readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import {
   ALERTMANAGER_CONFIG,
+  renderAlertmanagerConfigForPagerDutyMode,
   renderAlertmanagerConfig,
+  resolvePagerDutyRouteReceiver,
 } from './alertmanagerConfig.mjs';
 
 test('alertmanager routes warning alerts to Slack and paging alerts to PagerDuty', () => {
@@ -19,11 +21,11 @@ test('alertmanager routes warning alerts to Slack and paging alerts to PagerDuty
     })),
     [
       {
-        receiver: 'pagerduty-critical',
+        receiver: '${ALERTMANAGER_PAGERDUTY_RECEIVER}',
         matchers: ['release_blocking="true"'],
       },
       {
-        receiver: 'pagerduty-critical',
+        receiver: '${ALERTMANAGER_PAGERDUTY_RECEIVER}',
         matchers: ['severity="critical"'],
       },
       {
@@ -32,6 +34,27 @@ test('alertmanager routes warning alerts to Slack and paging alerts to PagerDuty
       },
     ],
   );
+});
+
+test('alertmanager PagerDuty route receiver is templated for enable and disable modes', () => {
+  const rendered = renderAlertmanagerConfig();
+
+  assert.match(rendered, /receiver: "\$\{ALERTMANAGER_PAGERDUTY_RECEIVER\}"/);
+  assert.match(rendered, /name: "pagerduty-critical"/);
+  assert.match(rendered, /name: "slack-warning"/);
+});
+
+test('alertmanager config renders concrete PagerDuty on and off receivers for smoke validation', () => {
+  assert.equal(resolvePagerDutyRouteReceiver(true), 'pagerduty-critical');
+  assert.equal(resolvePagerDutyRouteReceiver(false), 'slack-warning');
+
+  const pagerDutyOnConfig = renderAlertmanagerConfigForPagerDutyMode({ pagerDutyEnabled: true });
+  assert.doesNotMatch(pagerDutyOnConfig, /\$\{ALERTMANAGER_PAGERDUTY_RECEIVER\}/);
+  assert.match(pagerDutyOnConfig, /receiver: "pagerduty-critical"\n      matchers:\n        - "severity=\\"critical\\""/);
+
+  const pagerDutyOffConfig = renderAlertmanagerConfigForPagerDutyMode({ pagerDutyEnabled: false });
+  assert.doesNotMatch(pagerDutyOffConfig, /\$\{ALERTMANAGER_PAGERDUTY_RECEIVER\}/);
+  assert.match(pagerDutyOffConfig, /receiver: "slack-warning"\n      matchers:\n        - "severity=\\"critical\\""/);
 });
 
 test('alertmanager receivers use file-based secrets instead of checked-in secret values', () => {
@@ -91,6 +114,11 @@ test('compose starts alertmanager with file-backed Slack and PagerDuty secrets',
   );
 
   assert.match(file, /alertmanager:\n[\s\S]*image: \$\{ALERTMANAGER_IMAGE:-prom\/alertmanager:v0\.27\.0\}/);
+  assert.match(file, /ALERTMANAGER_PAGERDUTY_ENABLED: \$\{ALERTMANAGER_PAGERDUTY_ENABLED:-true\}/);
+  assert.match(file, /\.\/infra\/alertmanager\/alertmanager-entrypoint\.sh:\/usr\/local\/bin\/alertmanager-entrypoint\.sh:ro/);
+  assert.match(file, /\/bin\/sh/);
+  assert.match(file, /\/usr\/local\/bin\/alertmanager-entrypoint\.sh/);
+  assert.match(file, /--config\.file=\/tmp\/alertmanager\/alertmanager\.yml/);
   assert.doesNotMatch(file, /--config\.expand-env/);
   assert.match(file, /source: alertmanager_slack_webhook_url/);
   assert.match(file, /source: alertmanager_pagerduty_routing_key/);
@@ -98,6 +126,21 @@ test('compose starts alertmanager with file-backed Slack and PagerDuty secrets',
   assert.match(file, /file: \$\{ALERTMANAGER_PAGERDUTY_ROUTING_KEY_FILE:-\.\/infra\/alertmanager\/secrets\/alertmanager_pagerduty_routing_key_sample\}/);
   assert.match(file, /\.\/infra\/alertmanager\/alertmanager\.yml:\/etc\/alertmanager\/alertmanager\.yml:ro/);
   assert.match(file, /alertmanager_data:/);
+});
+
+test('alertmanager entrypoint maps PagerDuty enabled flag to the route receiver', () => {
+  const entrypoint = new URL('../../infra/alertmanager/alertmanager-entrypoint.sh', import.meta.url);
+
+  assert.equal(existsSync(entrypoint), true);
+
+  const file = existsSync(entrypoint) ? readFileSync(entrypoint, 'utf8') : '';
+
+  assert.match(file, /ALERTMANAGER_PAGERDUTY_ENABLED/);
+  assert.match(file, /ALERTMANAGER_PAGERDUTY_RECEIVER=pagerduty-critical/);
+  assert.match(file, /ALERTMANAGER_PAGERDUTY_RECEIVER=slack-warning/);
+  assert.match(file, /rendered_config=\/tmp\/alertmanager\/alertmanager\.yml/);
+  assert.match(file, /sed "s\|\\\$\{ALERTMANAGER_PAGERDUTY_RECEIVER\}\|\$\{ALERTMANAGER_PAGERDUTY_RECEIVER\}\|g"/);
+  assert.match(file, /exec \/bin\/alertmanager/);
 });
 
 test('alertmanager secret samples are tracked while real secret file names are ignored', () => {
@@ -131,6 +174,7 @@ test('readme documents required Alertmanager secret setup', () => {
   assert.match(readme, /sample secret/);
   assert.match(readme, /ALERTMANAGER_SLACK_WEBHOOK_URL_FILE/);
   assert.match(readme, /ALERTMANAGER_PAGERDUTY_ROUTING_KEY_FILE/);
+  assert.match(readme, /ALERTMANAGER_PAGERDUTY_ENABLED/);
   assert.match(readme, /\[PagerDuty Events API v2 Integration Key 발급 절차\]\(docs\/pagerduty_events_api_v2_integration_key\.md\)/);
   assert.doesNotMatch(readme, /Add integration/);
 });
@@ -144,6 +188,10 @@ test('alertmanager on-call docs link to the PagerDuty Events API v2 key issuance
   assert.match(docs, /PagerDuty Events API v2 Integration Key/);
   assert.match(docs, /\[PagerDuty Events API v2 Integration Key 발급 절차\]\(\.\/pagerduty_events_api_v2_integration_key\.md\)/);
   assert.match(docs, /routing_key_file/);
+  assert.match(docs, /ALERTMANAGER_PAGERDUTY_ENABLED/);
+  assert.match(docs, /PagerDuty를 끄면 critical/);
+  assert.match(docs, /for receiver in pagerduty-critical slack-warning/);
+  assert.match(docs, /amtool[\s\S]*check-config/);
   assert.doesNotMatch(docs, /### PagerDuty key 발급 절차/);
 });
 

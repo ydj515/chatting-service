@@ -2,6 +2,10 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import {
+  renderAlertmanagerConfigForPagerDutyMode,
+  resolvePagerDutyRouteReceiver,
+} from './alertmanagerConfig.mjs';
+import {
   ALERTMANAGER_SMOKE_ALERT_RULES,
   renderAlertmanagerSmokeRules,
 } from './alertmanagerSmokeRules.mjs';
@@ -35,6 +39,26 @@ test('alertmanager smoke rules define one Slack warning and one PagerDuty critic
       },
     ],
   );
+});
+
+test('alertmanager smoke verification covers PagerDuty on and off routing modes', () => {
+  const criticalSmokeRule = ALERTMANAGER_SMOKE_ALERT_RULES.find((rule) =>
+    rule.alert === 'AlertmanagerSmokeCritical'
+  );
+
+  assert.equal(criticalSmokeRule.labels.severity, 'critical');
+  assert.equal(criticalSmokeRule.labels.release_blocking, 'true');
+
+  assert.equal(resolvePagerDutyRouteReceiver(true), 'pagerduty-critical');
+  assert.equal(resolvePagerDutyRouteReceiver(false), 'slack-warning');
+
+  const enabledConfig = renderAlertmanagerConfigForPagerDutyMode({ pagerDutyEnabled: true });
+  assert.match(enabledConfig, /receiver: "pagerduty-critical"\n      matchers:\n        - "release_blocking=\\"true\\""/);
+  assert.match(enabledConfig, /receiver: "pagerduty-critical"\n      matchers:\n        - "severity=\\"critical\\""/);
+
+  const disabledConfig = renderAlertmanagerConfigForPagerDutyMode({ pagerDutyEnabled: false });
+  assert.match(disabledConfig, /receiver: "slack-warning"\n      matchers:\n        - "release_blocking=\\"true\\""/);
+  assert.match(disabledConfig, /receiver: "slack-warning"\n      matchers:\n        - "severity=\\"critical\\""/);
 });
 
 test('alertmanager smoke rule file stays in sync with renderer', () => {

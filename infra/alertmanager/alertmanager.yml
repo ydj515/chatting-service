@@ -12,12 +12,12 @@ route:
   group_interval: "5m"
   repeat_interval: "4h"
   routes:
-    - receiver: "pagerduty-critical"
+    - receiver: "${ALERTMANAGER_PAGERDUTY_RECEIVER}"
       matchers:
         - "release_blocking=\"true\""
       group_wait: "10s"
       repeat_interval: "30m"
-    - receiver: "pagerduty-critical"
+    - receiver: "${ALERTMANAGER_PAGERDUTY_RECEIVER}"
       matchers:
         - "severity=\"critical\""
       group_wait: "10s"

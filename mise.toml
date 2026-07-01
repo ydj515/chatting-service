@@ -214,6 +214,10 @@ run = "node scripts/verify-chat.mjs"
 description = "실행 중인 관리자 API의 moderation 인증과 rule 생성 흐름을 검증한다."
 run = "node scripts/verify-moderation.mjs"
 
+[tasks."verify:alertmanager-pagerduty-off-smoke"]
+description = "PagerDuty를 끄고 critical smoke alert가 Slack으로 fallback delivery되는지 선택 실행 검증한다."
+run = "node scripts/alertmanager-pagerduty-off-smoke.mjs --execute"
+
 # ---------- ops ----------
 
 [tasks.ps]
