@@ -10,6 +10,7 @@
 - `routing_key_file`에는 PagerDuty Events API v2 Integration Key가 필요하다.
 - PagerDuty REST API token, Prometheus URL, Email integration 주소는 이 값이 아니다.
 - 발급받은 값은 `infra/alertmanager/secrets/alertmanager_pagerduty_routing_key` 또는 `ALERTMANAGER_PAGERDUTY_ROUTING_KEY_FILE`로 지정한 파일에 저장한다.
+- `ALERTMANAGER_PAGERDUTY_ENABLED=false`이면 key 파일이 있어도 critical alert는 PagerDuty로 가지 않고 Slack receiver로 fallback 전송된다.
 
 ### 목표
 
@@ -45,6 +46,8 @@ ALERTMANAGER_PAGERDUTY_ROUTING_KEY_FILE=.secrets/alertmanager_pagerduty_routing_
 docker compose --profile cluster up -d alertmanager prometheus
 ```
 
+PagerDuty delivery를 검증하거나 운영 호출을 켜려면 `ALERTMANAGER_PAGERDUTY_ENABLED=true`를 사용한다. 임시로 PagerDuty 호출만 끄고 critical alert를 Slack으로 받으려면 `ALERTMANAGER_PAGERDUTY_ENABLED=false`를 지정한다.
+
 ## 3. Integration Type 선택 기준
 
 | PagerDuty Integration Type | Alertmanager 설정         | 이 repo와 일치 |
@@ -63,12 +66,17 @@ docker compose --profile cluster up -d alertmanager prometheus
 tmpdir=$(mktemp -d)
 cp infra/alertmanager/secrets/alertmanager_slack_webhook_url_sample "$tmpdir/alertmanager_slack_webhook_url"
 cp infra/alertmanager/secrets/alertmanager_pagerduty_routing_key "$tmpdir/alertmanager_pagerduty_routing_key"
+ALERTMANAGER_PAGERDUTY_RECEIVER=pagerduty-critical
+sed "s|\${ALERTMANAGER_PAGERDUTY_RECEIVER}|${ALERTMANAGER_PAGERDUTY_RECEIVER}|g" \
+  infra/alertmanager/alertmanager.yml > "$tmpdir/alertmanager.yml"
 
 docker run --rm \
-  -v "$PWD/infra/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro" \
+  -v "$tmpdir/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro" \
   -v "$tmpdir:/run/secrets:ro" \
   --entrypoint /bin/amtool \
   prom/alertmanager:v0.27.0 check-config /etc/alertmanager/alertmanager.yml
+
+rm -rf "$tmpdir"
 ```
 
 실제 delivery smoke:

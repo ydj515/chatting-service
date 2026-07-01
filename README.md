@@ -57,6 +57,8 @@ mise run dev:api    # 작업 중인 앱 하나만 (인프라 자동 기동). web
 
 Alertmanager는 fresh checkout에서도 cluster가 기동되도록 기본값으로 tracked sample secret을 읽습니다. 실제 Slack/PagerDuty delivery를 확인하려면 로컬 secret 파일을 생성하고, 해당 파일 경로를 `ALERTMANAGER_SLACK_WEBHOOK_URL_FILE`, `ALERTMANAGER_PAGERDUTY_ROUTING_KEY_FILE`로 지정해야 합니다. 실제 값 파일은 `.gitignore` 처리되어 Git에 올라가지 않습니다.
 
+PagerDuty 호출은 `ALERTMANAGER_PAGERDUTY_ENABLED`로 토글합니다. 기본값은 `true`라서 현재처럼 `critical` 또는 `release_blocking="true"` alert가 PagerDuty로 전달됩니다. `false`로 설정하면 PagerDuty 호출을 하지 않고 같은 alert를 Slack receiver로 fallback 전송합니다.
+
 ```bash
 cp infra/alertmanager/secrets/alertmanager_slack_webhook_url_sample \
   infra/alertmanager/secrets/alertmanager_slack_webhook_url

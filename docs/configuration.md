@@ -156,6 +156,7 @@ Redis Cluster node의 host port는 `127.0.0.1`에만 bind한다. Cluster discove
 | `CHAT_ROOM_POLICY_TRAFFIC_COUNTER_TTL_SECONDS` | `120` | room traffic second counter TTL |
 | `CHAT_PROMETHEUS_URL` | `http://localhost:9090` | `scripts/phase8-hot-room-release-gate.mjs`가 release gate metric을 조회하는 Prometheus base URL |
 | `ALERTMANAGER_PORT` | `9093` | Compose cluster Alertmanager host bind port. 기본값은 `127.0.0.1:9093` |
+| `ALERTMANAGER_PAGERDUTY_ENABLED` | `true` | `true`이면 critical/release-blocking alert를 PagerDuty receiver로 전송. `false`이면 PagerDuty 호출을 끄고 같은 alert를 Slack receiver로 fallback 전송 |
 | `ALERTMANAGER_SLACK_WEBHOOK_URL_FILE` | `./infra/alertmanager/secrets/alertmanager_slack_webhook_url_sample` | Slack-compatible webhook URL을 담은 secret 파일 경로. 기본값은 fresh checkout 기동용 sample이며, 실제 delivery smoke에서는 `.gitignore` 처리된 실제 값 파일로 override |
 | `ALERTMANAGER_PAGERDUTY_ROUTING_KEY_FILE` | `./infra/alertmanager/secrets/alertmanager_pagerduty_routing_key_sample` | PagerDuty routing key를 담은 secret 파일 경로. 기본값은 fresh checkout 기동용 sample이며, 실제 delivery smoke에서는 `.gitignore` 처리된 실제 값 파일로 override |
 | `PROMETHEUS_ALERT_SMOKE_PORT` | `9094` | `alert-smoke` profile의 synthetic alert 전용 Prometheus host bind port |

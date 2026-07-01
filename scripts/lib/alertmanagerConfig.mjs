@@ -1,3 +1,7 @@
+export const ALERTMANAGER_PAGERDUTY_ROUTE_RECEIVER_TEMPLATE = '${ALERTMANAGER_PAGERDUTY_RECEIVER}';
+export const ALERTMANAGER_PAGERDUTY_ENABLED_RECEIVER = 'pagerduty-critical';
+export const ALERTMANAGER_PAGERDUTY_DISABLED_RECEIVER = 'slack-warning';
+
 export const ALERTMANAGER_CONFIG = {
   global: {
     resolve_timeout: '5m',
@@ -10,13 +14,13 @@ export const ALERTMANAGER_CONFIG = {
     repeat_interval: '4h',
     routes: [
       {
-        receiver: 'pagerduty-critical',
+        receiver: ALERTMANAGER_PAGERDUTY_ROUTE_RECEIVER_TEMPLATE,
         matchers: ['release_blocking="true"'],
         group_wait: '10s',
         repeat_interval: '30m',
       },
       {
-        receiver: 'pagerduty-critical',
+        receiver: ALERTMANAGER_PAGERDUTY_ROUTE_RECEIVER_TEMPLATE,
         matchers: ['severity="critical"'],
         group_wait: '10s',
         repeat_interval: '30m',
@@ -67,6 +71,23 @@ export function renderAlertmanagerConfig({
   config = ALERTMANAGER_CONFIG,
 } = {}) {
   return `${renderYaml(config)}\n`;
+}
+
+export function resolvePagerDutyRouteReceiver(pagerDutyEnabled = true) {
+  return pagerDutyEnabled
+    ? ALERTMANAGER_PAGERDUTY_ENABLED_RECEIVER
+    : ALERTMANAGER_PAGERDUTY_DISABLED_RECEIVER;
+}
+
+export function renderAlertmanagerConfigForPagerDutyMode({
+  config = ALERTMANAGER_CONFIG,
+  pagerDutyEnabled = true,
+} = {}) {
+  return renderAlertmanagerConfig({ config })
+    .replaceAll(
+      ALERTMANAGER_PAGERDUTY_ROUTE_RECEIVER_TEMPLATE,
+      resolvePagerDutyRouteReceiver(pagerDutyEnabled),
+    );
 }
 
 function renderYaml(value, indent = 0) {

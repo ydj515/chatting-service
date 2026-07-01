@@ -609,11 +609,17 @@ services:
     image: ${ALERTMANAGER_IMAGE:-prom/alertmanager:v0.27.0}
     profiles: [ "cluster", "alert-smoke" ]
     container_name: chat-alertmanager
+    entrypoint:
+      - /bin/sh
+      - /usr/local/bin/alertmanager-entrypoint.sh
     command:
-      - "--config.file=/etc/alertmanager/alertmanager.yml"
+      - "--config.file=/tmp/alertmanager/alertmanager.yml"
       - "--storage.path=/alertmanager"
+    environment:
+      ALERTMANAGER_PAGERDUTY_ENABLED: ${ALERTMANAGER_PAGERDUTY_ENABLED:-true}
     volumes:
       - ./infra/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - ./infra/alertmanager/alertmanager-entrypoint.sh:/usr/local/bin/alertmanager-entrypoint.sh:ro
       - alertmanager_data:/alertmanager
     secrets:
       - source: alertmanager_slack_webhook_url
