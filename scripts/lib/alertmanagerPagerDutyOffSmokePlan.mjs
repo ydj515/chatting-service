@@ -5,6 +5,7 @@ export const DEFAULT_PROMETHEUS_ALERT_SMOKE_PORT = '9094';
 export const DEFAULT_SLACK_WEBHOOK_URL_FILE = './infra/alertmanager/secrets/alertmanager_slack_webhook_url_sample';
 export const DEFAULT_PAGERDUTY_ROUTING_KEY_FILE = './infra/alertmanager/secrets/alertmanager_pagerduty_routing_key_sample';
 
+const DEFAULT_CHAT_ADMIN_TOKEN = 'alert-smoke-unused-admin-token';
 const DEFAULT_TIMEOUT_MS = 120000;
 const DEFAULT_POLL_INTERVAL_MS = 3000;
 const DEFAULT_DELIVERY_WAIT_MS = 45000;
@@ -21,6 +22,7 @@ export function parsePagerDutyOffSmokeArgs(args, env = {}) {
       ?? `http://localhost:${env.PROMETHEUS_ALERT_SMOKE_PORT ?? DEFAULT_PROMETHEUS_ALERT_SMOKE_PORT}`,
     alertmanagerUrl: env.CHAT_ALERTMANAGER_URL
       ?? `http://localhost:${env.ALERTMANAGER_PORT ?? DEFAULT_ALERTMANAGER_PORT}`,
+    chatAdminToken: nonEmptyStringFromEnv(env.CHAT_ADMIN_TOKEN, DEFAULT_CHAT_ADMIN_TOKEN),
     timeoutMs: numberFromEnv(env.ALERTMANAGER_SMOKE_TIMEOUT_MS, DEFAULT_TIMEOUT_MS),
     pollIntervalMs: numberFromEnv(env.ALERTMANAGER_SMOKE_POLL_INTERVAL_MS, DEFAULT_POLL_INTERVAL_MS),
     deliveryWaitMs: numberFromEnv(env.ALERTMANAGER_SMOKE_DELIVERY_WAIT_MS, DEFAULT_DELIVERY_WAIT_MS),
@@ -81,11 +83,18 @@ export function parsePagerDutyOffSmokeArgs(args, env = {}) {
 }
 
 export function buildPagerDutyOffSmokePlan(options) {
+  const composeEnv = {
+    ALERTMANAGER_PAGERDUTY_ENABLED: 'false',
+    ALERTMANAGER_SLACK_WEBHOOK_URL_FILE: options.slackWebhookUrlFile,
+    ALERTMANAGER_PAGERDUTY_ROUTING_KEY_FILE: options.pagerDutyRoutingKeyFile,
+    CHAT_ADMIN_TOKEN: options.chatAdminToken,
+  };
+
   return {
-    env: {
-      ALERTMANAGER_PAGERDUTY_ENABLED: 'false',
-      ALERTMANAGER_SLACK_WEBHOOK_URL_FILE: options.slackWebhookUrlFile,
-      ALERTMANAGER_PAGERDUTY_ROUTING_KEY_FILE: options.pagerDutyRoutingKeyFile,
+    env: composeEnv,
+    restoreEnv: {
+      ...composeEnv,
+      ALERTMANAGER_PAGERDUTY_ENABLED: 'true',
     },
     startCommand: [
       'docker',
@@ -100,6 +109,7 @@ export function buildPagerDutyOffSmokePlan(options) {
     cleanupCommands: [
       ['docker', 'compose', '--profile', 'alert-smoke', 'stop', 'prometheus-alert-smoke'],
       ['docker', 'compose', '--profile', 'alert-smoke', 'rm', '-f', 'prometheus-alert-smoke'],
+      ['docker', 'compose', '--profile', 'alert-smoke', 'up', '-d', 'alertmanager'],
     ],
   };
 }
@@ -124,56 +134,75 @@ export async function runPagerDutyOffSmoke(options, deps = {}) {
   const fetchJson = deps.fetchJson ?? fetchJsonWithTimeout;
   const sleep = deps.sleep ?? sleepMillis;
   const commandEnv = { ...process.env, ...plan.env };
+  const restoreCommandEnv = { ...process.env, ...plan.restoreEnv };
 
   await runCommand(plan.startCommand[0], plan.startCommand.slice(1), { env: commandEnv });
-  await waitForPrometheusSmokeAlerts(options, fetchJson, sleep);
-  await waitForAlertmanagerCriticalSmoke(options, fetchJson, sleep);
-  await sleep(options.deliveryWaitMs);
+  let primaryError;
 
-  const [slackNotificationFailures, pagerDutyNotificationFailures] = await Promise.all([
-    queryPrometheusNumber(
-      options.prometheusAlertSmokeUrl,
-      'increase(alertmanager_notification_requests_failed_total{integration="slack"}[5m])',
-      fetchJson,
-    ),
-    queryPrometheusNumber(
-      options.prometheusAlertSmokeUrl,
-      'increase(alertmanager_notification_requests_failed_total{integration="pagerduty"}[5m])',
-      fetchJson,
-    ),
-  ]);
+  try {
+    await waitForPrometheusSmokeAlerts(options, fetchJson, sleep);
+    await waitForAlertmanagerCriticalSmoke(options, fetchJson, sleep);
+    await sleep(options.deliveryWaitMs);
 
-  if (slackNotificationFailures > 0) {
-    throw new Error(`Slack notification failures observed during PagerDuty-off smoke: ${slackNotificationFailures}`);
-  }
+    const [slackNotificationFailures, pagerDutyNotificationFailures] = await Promise.all([
+      queryPrometheusNumber(
+        options.prometheusAlertSmokeUrl,
+        'increase(alertmanager_notification_requests_failed_total{integration="slack"}[5m])',
+        fetchJson,
+      ),
+      queryPrometheusNumber(
+        options.prometheusAlertSmokeUrl,
+        'increase(alertmanager_notification_requests_failed_total{integration="pagerduty"}[5m])',
+        fetchJson,
+      ),
+    ]);
 
-  if (options.cleanup) {
-    for (const cleanupCommand of plan.cleanupCommands) {
-      await runCommand(cleanupCommand[0], cleanupCommand.slice(1), { env: commandEnv });
+    if (slackNotificationFailures > 0) {
+      throw new Error(`Slack notification failures observed during PagerDuty-off smoke: ${slackNotificationFailures}`);
+    }
+
+    if (pagerDutyNotificationFailures > 0) {
+      throw new Error(`PagerDuty notification failures observed during PagerDuty-off smoke: ${pagerDutyNotificationFailures}`);
+    }
+
+    return {
+      ok: true,
+      execute: true,
+      pagerDutyEnabled: false,
+      cleanup: options.cleanup,
+      prometheusAlertSmokeUrl: options.prometheusAlertSmokeUrl,
+      alertmanagerUrl: options.alertmanagerUrl,
+      notificationFailures: {
+        slack: slackNotificationFailures,
+        pagerduty: pagerDutyNotificationFailures,
+      },
+      checked: [
+        'pagerduty-off-routing',
+        'prometheus-smoke-warning-firing',
+        'prometheus-smoke-critical-firing',
+        'alertmanager-critical-smoke-active',
+        'slack-delivery-wait',
+        'slack-notification-failure-metric',
+        'pagerduty-notification-failure-metric',
+      ],
+      manualVerification: 'Confirm AlertmanagerSmokeCritical arrived in the configured Slack channel.',
+    };
+  } catch (error) {
+    primaryError = error;
+    throw error;
+  } finally {
+    if (options.cleanup) {
+      try {
+        await runCleanupCommands(plan, runCommand, commandEnv, restoreCommandEnv);
+      } catch (cleanupError) {
+        if (primaryError) {
+          primaryError.cleanupError = cleanupError;
+        } else {
+          throw cleanupError;
+        }
+      }
     }
   }
-
-  return {
-    ok: true,
-    execute: true,
-    pagerDutyEnabled: false,
-    cleanup: options.cleanup,
-    prometheusAlertSmokeUrl: options.prometheusAlertSmokeUrl,
-    alertmanagerUrl: options.alertmanagerUrl,
-    notificationFailures: {
-      slack: slackNotificationFailures,
-      pagerduty: pagerDutyNotificationFailures,
-    },
-    checked: [
-      'pagerduty-off-routing',
-      'prometheus-smoke-warning-firing',
-      'prometheus-smoke-critical-firing',
-      'alertmanager-critical-smoke-active',
-      'slack-delivery-wait',
-      'slack-notification-failure-metric',
-    ],
-    manualVerification: 'Confirm AlertmanagerSmokeCritical arrived in the configured Slack channel.',
-  };
 }
 
 async function assertRealSlackSecret(options, deps) {
@@ -221,20 +250,25 @@ async function waitForAlertmanagerCriticalSmoke(options, fetchJson, sleep) {
     return Array.isArray(alerts) && alerts.some((alert) =>
       alert.labels?.alertname === 'AlertmanagerSmokeCritical'
         && alert.labels?.severity === 'critical'
-        && (alert.status?.state === 'active' || alert.status?.state === 'suppressed')
+        && alert.status?.state === 'active'
     );
   }, 'Alertmanager did not receive AlertmanagerSmokeCritical before timeout.');
 }
 
 async function waitUntil(options, sleep, predicate, timeoutMessage) {
   const deadline = Date.now() + options.timeoutMs;
+  let lastError;
   while (Date.now() <= deadline) {
-    if (await predicate()) {
-      return;
+    try {
+      if (await predicate()) {
+        return;
+      }
+    } catch (error) {
+      lastError = error;
     }
     await sleep(options.pollIntervalMs);
   }
-  throw new Error(timeoutMessage);
+  throw new Error(formatTimeoutMessage(timeoutMessage, lastError));
 }
 
 async function queryPrometheusNumber(prometheusUrl, query, fetchJson) {
@@ -256,11 +290,29 @@ function sumPrometheusVector(result) {
 
 async function fetchJsonWithTimeout(url) {
   const response = await fetch(url, { signal: AbortSignal.timeout(10000) });
-  const body = await response.json();
   if (!response.ok) {
-    throw new Error(`GET ${url} failed with ${response.status}: ${JSON.stringify(body)}`);
+    const body = await response.text();
+    throw new Error(`GET ${url} failed with ${response.status}: ${body}`);
   }
-  return body;
+  return response.json();
+}
+
+async function runCleanupCommands(plan, runCommand, commandEnv, restoreCommandEnv) {
+  for (const cleanupCommand of plan.cleanupCommands) {
+    const env = restoresAlertmanager(cleanupCommand) ? restoreCommandEnv : commandEnv;
+    await runCommand(cleanupCommand[0], cleanupCommand.slice(1), { env });
+  }
+}
+
+function restoresAlertmanager(command) {
+  return command.at(-1) === 'alertmanager' && command.includes('up');
+}
+
+function formatTimeoutMessage(timeoutMessage, lastError) {
+  if (!lastError) {
+    return timeoutMessage;
+  }
+  return `${timeoutMessage} Last error: ${lastError.message}`;
 }
 
 function runProcess(command, args, { env }) {
@@ -299,6 +351,10 @@ function sleepMillis(millis) {
 
 function numberFromEnv(value, fallback) {
   return value === undefined ? fallback : parsePositiveInteger(value, 'environment value');
+}
+
+function nonEmptyStringFromEnv(value, fallback) {
+  return value === undefined || value === '' ? fallback : value;
 }
 
 function parsePositiveInteger(value, name) {
