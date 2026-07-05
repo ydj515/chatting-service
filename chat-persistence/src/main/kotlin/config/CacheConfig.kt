@@ -30,7 +30,6 @@ class CacheConfig(
 
         return RedisCacheManager.builder(connectionFactory)
             .cacheDefaults(configuration)
-            .withCacheConfiguration("users", configuration.entryTtl(cacheProperties.usersTtl))
             .withCacheConfiguration("chatRooms", configuration.entryTtl(cacheProperties.chatRoomsTtl))
             .withCacheConfiguration("chatRoomMembers", configuration.entryTtl(cacheProperties.chatRoomMembersTtl))
             .withCacheConfiguration("messages", configuration.entryTtl(cacheProperties.messagesTtl))

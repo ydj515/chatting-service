@@ -259,7 +259,6 @@ chat:
       default-direction: ${CHAT_MESSAGE_PAGINATION_DEFAULT_DIRECTION:BEFORE}
   cache:
     default-ttl: ${CHAT_CACHE_DEFAULT_TTL:30m}
-    users-ttl: ${CHAT_CACHE_USERS_TTL:1h}
     chat-rooms-ttl: ${CHAT_CACHE_CHAT_ROOMS_TTL:15m}
     chat-room-members-ttl: ${CHAT_CACHE_CHAT_ROOM_MEMBERS_TTL:10m}
     messages-ttl: ${CHAT_CACHE_MESSAGES_TTL:5m}
