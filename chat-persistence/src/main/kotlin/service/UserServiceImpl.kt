@@ -85,7 +85,8 @@ class UserServiceImpl(
         val now = LocalDateTime.now()
         userRepository.updateLastSeenAt(userId, now)
 
-        return userToDto(user.copy(lastSeenAt = now))
+        // 엔티티는 더 이상 data class 가 아니므로 값 객체인 DTO 에서 copy 한다.
+        return userToDto(user).copy(lastSeenAt = now)
     }
 
     private fun hashPassword(password: String): String {

@@ -1,6 +1,7 @@
 package com.chat.domain.model
 
 import jakarta.persistence.*
+import org.hibernate.Hibernate
 import org.springframework.data.annotation.CreatedDate
 import org.springframework.data.jpa.domain.support.AuditingEntityListener
 import java.time.LocalDateTime
@@ -23,7 +24,7 @@ import java.time.LocalDateTime
     ]
 )
 @EntityListeners(AuditingEntityListener::class)
-data class Message(
+class Message(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     val id: Long = 0,
@@ -76,7 +77,18 @@ data class Message(
 
     @Column
     val editedAt: LocalDateTime? = null
-)
+) {
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other == null || Hibernate.getClass(this) != Hibernate.getClass(other)) return false
+        other as Message
+        return id != 0L && id == other.id
+    }
+
+    override fun hashCode(): Int = Hibernate.getClass(this).hashCode()
+
+    override fun toString(): String = "Message(id=$id, messageId=$messageId, roomSeq=$roomSeq)"
+}
 
 enum class MessageType {
     TEXT,
