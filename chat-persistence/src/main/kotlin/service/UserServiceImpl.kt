@@ -67,12 +67,14 @@ class UserServiceImpl(
         sessionTokenService.revokeToken(sessionToken)
     }
 
+    @Transactional(readOnly = true)
     override fun getUserById(userId: Long): UserDto {
         val user = userRepository.findById(userId)
             .orElseThrow { ResourceNotFoundException("사용자를 찾을 수 없습니다: $userId") }
         return userToDto(user)
     }
 
+    @Transactional(readOnly = true)
     override fun searchUsers(
         query: String,
         pageable: Pageable,

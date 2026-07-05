@@ -147,6 +147,7 @@ class ChatServiceImpl(
         return chatRoomToDto(savedRoom)
     }
 
+    @Transactional(readOnly = true)
     @Cacheable(value = ["chatRooms"], key = "#roomId")
     override fun getChatRoom(roomId: Long): ChatRoomDto {
         val chatRoom = chatRoomRepository.findById(roomId)
@@ -154,6 +155,7 @@ class ChatServiceImpl(
         return chatRoomToDto(chatRoom)
     }
 
+    @Transactional(readOnly = true)
     override fun getChatRooms(
         userId: Long,
         pageable: Pageable,
@@ -162,6 +164,7 @@ class ChatServiceImpl(
             .map { chatRoomToDto(it) }
     }
 
+    @Transactional(readOnly = true)
     override fun searchChatRooms(
         query: String,
         userId: Long,
@@ -217,6 +220,7 @@ class ChatServiceImpl(
         publishMembershipChangedAfterCommit(userId, roomId, RedisMessageBroker.MembershipAction.LEAVE)
     }
 
+    @Transactional(readOnly = true)
     @Cacheable(value = ["chatRoomMembers"], key = "#roomId")
     override fun getChatRoomMembers(roomId: Long): List<ChatRoomMemberDto> {
         return chatRoomMemberRepository.findByChatRoomIdAndIsActiveTrue(roomId)
@@ -224,6 +228,7 @@ class ChatServiceImpl(
     }
 
 
+    @Transactional(readOnly = true)
     override fun getMessages(
         roomId: Long,
         userId: Long,
@@ -236,6 +241,7 @@ class ChatServiceImpl(
         return messageReadPort.findPageByRoom(roomId, pageable)
     }
 
+    @Transactional(readOnly = true)
     override fun getMessagesByCursor(
         request: MessagePageRequest,
         userId: Long,
@@ -313,6 +319,7 @@ class ChatServiceImpl(
         )
     }
 
+    @Transactional(readOnly = true)
     override fun getMessagesGap(
         roomId: Long,
         userId: Long,
