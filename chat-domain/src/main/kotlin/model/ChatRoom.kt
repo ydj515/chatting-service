@@ -2,6 +2,7 @@ package com.chat.domain.model
 
 import jakarta.persistence.*
 import jakarta.validation.constraints.NotBlank
+import org.hibernate.Hibernate
 import org.springframework.data.annotation.CreatedDate
 import org.springframework.data.annotation.LastModifiedDate
 import org.springframework.data.jpa.domain.support.AuditingEntityListener
@@ -17,7 +18,7 @@ import java.time.LocalDateTime
     ]
 )
 @EntityListeners(AuditingEntityListener::class)
-data class ChatRoom(
+class ChatRoom(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     val id: Long = 0,
@@ -53,7 +54,18 @@ data class ChatRoom(
     @LastModifiedDate
     @Column(nullable = false)
     var updatedAt: LocalDateTime = LocalDateTime.now()
-)
+) {
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other == null || Hibernate.getClass(this) != Hibernate.getClass(other)) return false
+        other as ChatRoom
+        return id != 0L && id == other.id
+    }
+
+    override fun hashCode(): Int = Hibernate.getClass(this).hashCode()
+
+    override fun toString(): String = "ChatRoom(id=$id, name=$name, type=$type)"
+}
 
 enum class ChatRoomType {
     DIRECT,     // 1:1 채팅

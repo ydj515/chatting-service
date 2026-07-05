@@ -51,7 +51,25 @@ class AdminChatServiceImplTest {
             AdminRoomPolicyUpdateRequest::class.java,
         )
 
-        assertNotNull(method.getAnnotation(Transactional::class.java))
+        // 트랜잭션 경계는 클래스 레벨 @Transactional 로 관리하므로 메서드/클래스 어느 쪽이든 적용되면 된다.
+        assertTransactional(method)
+    }
+
+    @Test
+    fun `message export 생성은 export job 저장과 audit log를 하나의 transaction으로 묶는다`() {
+        val method = AdminChatServiceImpl::class.java.getMethod(
+            "createMessageExport",
+            String::class.java,
+            AdminExportMessagesRequest::class.java,
+        )
+
+        assertTransactional(method)
+    }
+
+    private fun assertTransactional(method: java.lang.reflect.Method) {
+        val transactional = method.getAnnotation(Transactional::class.java)
+            ?: AdminChatServiceImpl::class.java.getAnnotation(Transactional::class.java)
+        assertNotNull(transactional)
     }
 
     @Test

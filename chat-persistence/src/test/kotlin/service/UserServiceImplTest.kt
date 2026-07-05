@@ -5,6 +5,7 @@ import com.chat.domain.dto.LoginRequest
 import com.chat.domain.dto.ModerationScopeType
 import com.chat.domain.dto.SessionToken
 import com.chat.domain.dto.UserSanctionType
+import com.chat.domain.exception.ResourceConflictException
 import com.chat.domain.model.User
 import com.chat.domain.service.SessionTokenService
 import com.chat.persistence.repository.UserRepository
@@ -35,7 +36,7 @@ class UserServiceImplTest {
         `when`(userRepository.existsByUsername("tester")).thenReturn(true)
         val userService = UserServiceImpl(userRepository, sessionTokenService, userSanctionRepository, clock)
 
-        val exception = assertThrows(IllegalStateException::class.java) {
+        val exception = assertThrows(ResourceConflictException::class.java) {
             userService.createUser(
                 CreateUserRequest(
                     username = "tester",

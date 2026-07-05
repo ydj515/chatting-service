@@ -1,6 +1,9 @@
 package com.chat.persistence.service
 
 import com.chat.domain.dto.*
+import com.chat.domain.exception.ForbiddenOperationException
+import com.chat.domain.exception.ResourceConflictException
+import com.chat.domain.exception.ResourceNotFoundException
 import com.chat.domain.model.*
 import com.chat.domain.service.ChatService
 import com.chat.persistence.repository.*
@@ -19,12 +22,6 @@ import java.security.SecureRandom
 import java.time.Instant
 import java.time.ZoneOffset
 import java.util.Base64
-
-/*
-    @CacheEvit
-    @Cacheable
-    @Caching
- */
 
 @Service
 @Transactional
@@ -50,7 +47,8 @@ class ChatServiceImpl(
     private val secureRandom = SecureRandom()
 
 
-    @Cacheable(value = ["chatRooms"], key = "#chatRoom.id")
+    // private + 자기호출(self-invocation) 이라 프록시를 거치지 않는다.
+    // 캐시는 프록시를 타는 공개 메서드(getChatRoom 등)에서만 적용한다.
     private fun chatRoomToDto(chatRoom: ChatRoom): ChatRoomDto {
         val memberCount = chatRoomMemberRepository.countActiveMembersInRoom(chatRoom.id).toInt()
         val lastMessage = messageReadPort.findLatestMessage(chatRoom.id)
@@ -104,7 +102,7 @@ class ChatServiceImpl(
         )
     }
 
-    @Cacheable(value = ["users"], key = "#user.id")
+    // 위와 동일한 이유로 캐시 애노테이션을 두지 않는다.
     private fun userToDto(user: User): UserDto {
         return UserDto(
             id = user.id,
@@ -124,7 +122,7 @@ class ChatServiceImpl(
         createdBy: Long,
     ): ChatRoomDto {
         val creator = userRepository.findById(createdBy)
-            .orElseThrow { IllegalArgumentException("사용자를 찾을 수 없습니다: $createdBy") }
+            .orElseThrow { ResourceNotFoundException("사용자를 찾을 수 없습니다: $createdBy") }
 
         val chatRoom = ChatRoom(
             name = request.name,
@@ -149,13 +147,15 @@ class ChatServiceImpl(
         return chatRoomToDto(savedRoom)
     }
 
+    @Transactional(readOnly = true)
     @Cacheable(value = ["chatRooms"], key = "#roomId")
     override fun getChatRoom(roomId: Long): ChatRoomDto {
         val chatRoom = chatRoomRepository.findById(roomId)
-            .orElseThrow { IllegalArgumentException("채팅방을 찾을 수 없습니다: $roomId") }
+            .orElseThrow { ResourceNotFoundException("채팅방을 찾을 수 없습니다: $roomId") }
         return chatRoomToDto(chatRoom)
     }
 
+    @Transactional(readOnly = true)
     override fun getChatRooms(
         userId: Long,
         pageable: Pageable,
@@ -164,6 +164,7 @@ class ChatServiceImpl(
             .map { chatRoomToDto(it) }
     }
 
+    @Transactional(readOnly = true)
     override fun searchChatRooms(
         query: String,
         userId: Long,
@@ -184,21 +185,16 @@ class ChatServiceImpl(
     override fun joinChatRoom(roomId: Long, userId: Long) {
         // 채팅방 확인
         val chatRoom = chatRoomRepository.findById(roomId)
-            .orElseThrow { IllegalArgumentException("채팅방을 찾을 수 없습니다: $roomId") }
+            .orElseThrow { ResourceNotFoundException("채팅방을 찾을 수 없습니다: $roomId") }
 
         // 사용자 확인
         val user = userRepository.findById(userId)
-            .orElseThrow { IllegalArgumentException("사용자를 찾을 수 없습니다: $userId") }
+            .orElseThrow { ResourceNotFoundException("사용자를 찾을 수 없습니다: $userId") }
 
         // 이미 참여중인지 확인
         if (chatRoomMemberRepository.existsByChatRoomIdAndUserIdAndIsActiveTrue(roomId, userId)) {
-            throw IllegalStateException("이미 참여한 채팅방입니다")
+            throw ResourceConflictException("이미 참여한 채팅방입니다")
         }
-
-//        val currentMemberCount = chatRoomMemberRepository.countActiveMembersInRoom(roomId)
-//        if (currentMemberCount >= chatRoom.maxMembers) {
-//            throw IllegalStateException("채팅방이 가득 찼습니다")
-//        }
 
         val member = ChatRoomMember(
             chatRoom = chatRoom,
@@ -219,6 +215,7 @@ class ChatServiceImpl(
         publishMembershipChangedAfterCommit(userId, roomId, RedisMessageBroker.MembershipAction.LEAVE)
     }
 
+    @Transactional(readOnly = true)
     @Cacheable(value = ["chatRoomMembers"], key = "#roomId")
     override fun getChatRoomMembers(roomId: Long): List<ChatRoomMemberDto> {
         return chatRoomMemberRepository.findByChatRoomIdAndIsActiveTrue(roomId)
@@ -226,18 +223,20 @@ class ChatServiceImpl(
     }
 
 
+    @Transactional(readOnly = true)
     override fun getMessages(
         roomId: Long,
         userId: Long,
         pageable: Pageable,
     ): Page<MessageDto> {
         if (!chatRoomMemberRepository.existsByChatRoomIdAndUserIdAndIsActiveTrue(roomId, userId)) {
-            throw IllegalArgumentException("채팅방 멤버가 아닙니다")
+            throw ForbiddenOperationException("채팅방 멤버가 아닙니다")
         }
 
         return messageReadPort.findPageByRoom(roomId, pageable)
     }
 
+    @Transactional(readOnly = true)
     override fun getMessagesByCursor(
         request: MessagePageRequest,
         userId: Long,
@@ -258,7 +257,7 @@ class ChatServiceImpl(
          */
 
         if (!chatRoomMemberRepository.existsByChatRoomIdAndUserIdAndIsActiveTrue(request.chatRoomId, userId)) {
-            throw IllegalArgumentException("채팅방 멤버가 아닙니다")
+            throw ForbiddenOperationException("채팅방 멤버가 아닙니다")
         }
 
         val cursor = request.effectiveCursor() // effective roomSeq cursor
@@ -315,6 +314,7 @@ class ChatServiceImpl(
         )
     }
 
+    @Transactional(readOnly = true)
     override fun getMessagesGap(
         roomId: Long,
         userId: Long,
@@ -322,7 +322,7 @@ class ChatServiceImpl(
         limit: Int,
     ): List<MessageDto> {
         if (!chatRoomMemberRepository.existsByChatRoomIdAndUserIdAndIsActiveTrue(roomId, userId)) {
-            throw IllegalArgumentException("채팅방 멤버가 아닙니다")
+            throw ForbiddenOperationException("채팅방 멤버가 아닙니다")
         }
 
         return messageReadPort.findGapMessages(roomId, afterSeq, limit)
@@ -334,13 +334,13 @@ class ChatServiceImpl(
     ): MessageDto {
         val requestedClientMessageId = normalizeClientMessageId(request.clientMessageId)
         val chatRoom = chatRoomRepository.findById(request.chatRoomId)
-            .orElseThrow { IllegalArgumentException("채팅방을 찾을 수 없습니다: ${request.chatRoomId}") }
+            .orElseThrow { ResourceNotFoundException("채팅방을 찾을 수 없습니다: ${request.chatRoomId}") }
 
         val sender = userRepository.findById(senderId)
-            .orElseThrow { IllegalArgumentException("사용자를 찾을 수 없습니다: $senderId") }
+            .orElseThrow { ResourceNotFoundException("사용자를 찾을 수 없습니다: $senderId") }
 
         val member = chatRoomMemberRepository.findByChatRoomIdAndUserIdAndIsActiveTrue(request.chatRoomId, senderId)
-            .orElseThrow { IllegalArgumentException("채팅방에 참여하지 않은 사용자입니다.") }
+            .orElseThrow { ForbiddenOperationException("채팅방에 참여하지 않은 사용자입니다.") }
 
         if (requestedClientMessageId != null) {
             val existingMessage = messageReadPort.findByClientMessageId(
@@ -361,7 +361,7 @@ class ChatServiceImpl(
             roomId = request.chatRoomId,
             senderId = senderId,
             content = request.content,
-            messageType = request.type ?: MessageType.TEXT,
+            messageType = request.type,
         )
         messageAdmissionPolicyService.requireAllowed(
             roomId = request.chatRoomId,
@@ -379,7 +379,7 @@ class ChatServiceImpl(
             messageId = messageId,
             clientMessageId = clientMessageId,
             content = request.content,
-            type = request.type ?: MessageType.TEXT,
+            type = request.type,
             chatRoom = chatRoom,
             sender = sender,
             sequenceNumber = roomSeq,
@@ -419,26 +419,6 @@ class ChatServiceImpl(
             writeShard = message.writeShard,
             fanoutShard = message.fanoutShard,
             createdAt = message.createdAt,
-        )
-    }
-
-    private fun messageToChatMessage(message: Message): ChatMessage {
-        val roomSeq = if (message.roomSeq > 0) message.roomSeq else message.sequenceNumber
-        return ChatMessage(
-            id = message.id,
-            messageId = message.messageId ?: legacyMessageId(message.id),
-            clientMessageId = message.clientMessageId,
-            content = message.content ?: "",
-            messageType = message.type,
-            chatRoomId = message.chatRoom.id,
-            senderId = message.sender.id,
-            senderName = message.sender.displayName,
-            sequenceNumber = message.sequenceNumber,
-            roomSeq = roomSeq,
-            streamShard = message.streamShard,
-            writeShard = message.writeShard,
-            fanoutShard = message.fanoutShard,
-            timestamp = message.createdAt
         )
     }
 

@@ -1,7 +1,10 @@
 package com.chat.api.controller
 
+import com.chat.domain.exception.ForbiddenOperationException
 import com.chat.domain.exception.MessageAdmissionRejectedException
 import com.chat.domain.exception.MessageModerationRejectedException
+import com.chat.domain.exception.ResourceConflictException
+import com.chat.domain.exception.ResourceNotFoundException
 import com.fasterxml.jackson.annotation.JsonInclude
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.validation.ConstraintViolationException
@@ -74,6 +77,42 @@ class GlobalExceptionHandler {
         return buildResponse(
             status = HttpStatus.CONFLICT,
             message = exception.message ?: "요청 상태가 현재 리소스 상태와 충돌합니다.",
+            path = request.requestURI,
+        )
+    }
+
+    @ExceptionHandler(ResourceNotFoundException::class)
+    fun handleResourceNotFoundException(
+        exception: ResourceNotFoundException,
+        request: HttpServletRequest,
+    ): ResponseEntity<ApiErrorResponse> {
+        return buildResponse(
+            status = HttpStatus.NOT_FOUND,
+            message = exception.message ?: "요청한 리소스를 찾을 수 없습니다.",
+            path = request.requestURI,
+        )
+    }
+
+    @ExceptionHandler(ResourceConflictException::class)
+    fun handleResourceConflictException(
+        exception: ResourceConflictException,
+        request: HttpServletRequest,
+    ): ResponseEntity<ApiErrorResponse> {
+        return buildResponse(
+            status = HttpStatus.CONFLICT,
+            message = exception.message ?: "요청 상태가 현재 리소스 상태와 충돌합니다.",
+            path = request.requestURI,
+        )
+    }
+
+    @ExceptionHandler(ForbiddenOperationException::class)
+    fun handleForbiddenOperationException(
+        exception: ForbiddenOperationException,
+        request: HttpServletRequest,
+    ): ResponseEntity<ApiErrorResponse> {
+        return buildResponse(
+            status = HttpStatus.FORBIDDEN,
+            message = exception.message ?: "해당 작업을 수행할 권한이 없습니다.",
             path = request.requestURI,
         )
     }

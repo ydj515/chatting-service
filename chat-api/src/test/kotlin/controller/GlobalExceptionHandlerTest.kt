@@ -1,8 +1,11 @@
 package com.chat.api.controller
 
 import com.chat.domain.dto.CreateUserRequest
+import com.chat.domain.exception.ForbiddenOperationException
 import com.chat.domain.exception.MessageAdmissionRejectedException
 import com.chat.domain.exception.MessageModerationRejectedException
+import com.chat.domain.exception.ResourceConflictException
+import com.chat.domain.exception.ResourceNotFoundException
 import jakarta.validation.Valid
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -80,6 +83,42 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    fun `ResourceNotFoundException은 404 응답으로 변환한다`() {
+        mockMvc.get("/test/not-found")
+            .andExpect {
+                status { isNotFound() }
+                jsonPath("$.status") { value(404) }
+                jsonPath("$.error") { value("NOT_FOUND") }
+                jsonPath("$.message") { value("채팅방을 찾을 수 없습니다: 1") }
+                jsonPath("$.path") { value("/test/not-found") }
+            }
+    }
+
+    @Test
+    fun `ResourceConflictException은 409 응답으로 변환한다`() {
+        mockMvc.get("/test/resource-conflict")
+            .andExpect {
+                status { isConflict() }
+                jsonPath("$.status") { value(409) }
+                jsonPath("$.error") { value("CONFLICT") }
+                jsonPath("$.message") { value("이미 존재하는 사용자명입니다: tester") }
+                jsonPath("$.path") { value("/test/resource-conflict") }
+            }
+    }
+
+    @Test
+    fun `ForbiddenOperationException은 403 응답으로 변환한다`() {
+        mockMvc.get("/test/forbidden")
+            .andExpect {
+                status { isForbidden() }
+                jsonPath("$.status") { value(403) }
+                jsonPath("$.error") { value("FORBIDDEN") }
+                jsonPath("$.message") { value("채팅방 멤버가 아닙니다") }
+                jsonPath("$.path") { value("/test/forbidden") }
+            }
+    }
+
+    @Test
     fun `메시지 수락 정책 거부는 429 응답으로 변환한다`() {
         mockMvc.get("/test/message-admission-rejected")
             .andExpect {
@@ -128,6 +167,21 @@ class GlobalExceptionHandlerTest {
         @GetMapping("/test/conflict")
         fun conflict(): String {
             throw IllegalStateException("이미 참여한 채팅방입니다")
+        }
+
+        @GetMapping("/test/not-found")
+        fun notFound(): String {
+            throw ResourceNotFoundException("채팅방을 찾을 수 없습니다: 1")
+        }
+
+        @GetMapping("/test/resource-conflict")
+        fun resourceConflict(): String {
+            throw ResourceConflictException("이미 존재하는 사용자명입니다: tester")
+        }
+
+        @GetMapping("/test/forbidden")
+        fun forbidden(): String {
+            throw ForbiddenOperationException("채팅방 멤버가 아닙니다")
         }
 
         @GetMapping("/test/message-admission-rejected")
