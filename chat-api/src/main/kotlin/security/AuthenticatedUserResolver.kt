@@ -1,5 +1,6 @@
 package com.chat.api.security
 
+import com.chat.domain.exception.UnauthenticatedException
 import com.chat.domain.service.SessionTokenService
 import org.springframework.core.MethodParameter
 import org.springframework.http.HttpHeaders
@@ -34,7 +35,7 @@ class AuthenticatedUserResolver(
 
     private fun authenticateUserId(token: String): Long {
         return sessionTokenService.authenticate(token)?.userId
-            ?: throw IllegalArgumentException("유효하지 않은 인증 토큰입니다.")
+            ?: throw UnauthenticatedException("유효하지 않은 인증 토큰입니다.")
     }
 
     private fun resolveBearerToken(authorizationHeader: String?): String {
@@ -43,7 +44,7 @@ class AuthenticatedUserResolver(
             ?.substring(BEARER_PREFIX.length)
             ?.trim()
             ?.takeIf { it.isNotBlank() }
-            ?: throw IllegalArgumentException("인증 토큰이 필요합니다.")
+            ?: throw UnauthenticatedException("인증 토큰이 필요합니다.")
     }
 
     private fun supportsCurrentUserId(parameter: MethodParameter): Boolean {

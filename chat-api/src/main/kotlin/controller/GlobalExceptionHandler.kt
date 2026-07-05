@@ -5,6 +5,7 @@ import com.chat.domain.exception.MessageAdmissionRejectedException
 import com.chat.domain.exception.MessageModerationRejectedException
 import com.chat.domain.exception.ResourceConflictException
 import com.chat.domain.exception.ResourceNotFoundException
+import com.chat.domain.exception.UnauthenticatedException
 import com.fasterxml.jackson.annotation.JsonInclude
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.validation.ConstraintViolationException
@@ -65,6 +66,18 @@ class GlobalExceptionHandler {
         return buildResponse(
             status = HttpStatus.BAD_REQUEST,
             message = exception.message ?: "잘못된 요청입니다.",
+            path = request.requestURI,
+        )
+    }
+
+    @ExceptionHandler(UnauthenticatedException::class)
+    fun handleUnauthenticatedException(
+        exception: UnauthenticatedException,
+        request: HttpServletRequest,
+    ): ResponseEntity<ApiErrorResponse> {
+        return buildResponse(
+            status = HttpStatus.UNAUTHORIZED,
+            message = exception.message ?: "인증이 필요합니다.",
             path = request.requestURI,
         )
     }

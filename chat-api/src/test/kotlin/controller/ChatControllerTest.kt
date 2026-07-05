@@ -1,7 +1,7 @@
 package com.chat.api.controller
 
 import com.chat.api.config.MessagePaginationProperties
-import com.chat.api.security.CurrentUserId
+import com.chat.api.security.FixedCurrentAuthenticationResolver
 import com.chat.domain.dto.ChatRoomDto
 import com.chat.domain.dto.ChatRoomMemberDto
 import com.chat.domain.dto.CreateChatRoomRequest
@@ -15,16 +15,11 @@ import com.chat.domain.service.ChatService
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import org.springframework.core.MethodParameter
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.setup.MockMvcBuilders
-import org.springframework.web.bind.support.WebDataBinderFactory
-import org.springframework.web.context.request.NativeWebRequest
-import org.springframework.web.method.support.HandlerMethodArgumentResolver
-import org.springframework.web.method.support.ModelAndViewContainer
 import java.time.Instant
 
 class ChatControllerTest {
@@ -47,7 +42,7 @@ class ChatControllerTest {
                 ),
             )
             .setControllerAdvice(GlobalExceptionHandler())
-            .setCustomArgumentResolvers(FixedCurrentUserIdResolver(42L))
+            .setCustomArgumentResolvers(FixedCurrentAuthenticationResolver(userId = 42L))
             .build()
     }
 
@@ -167,23 +162,6 @@ class ChatControllerTest {
 
         override fun getMessages(roomId: Long, userId: Long, pageable: Pageable): Page<MessageDto> {
             throw UnsupportedOperationException()
-        }
-    }
-
-    private class FixedCurrentUserIdResolver(
-        private val userId: Long,
-    ) : HandlerMethodArgumentResolver {
-        override fun supportsParameter(parameter: MethodParameter): Boolean {
-            return parameter.hasParameterAnnotation(CurrentUserId::class.java)
-        }
-
-        override fun resolveArgument(
-            parameter: MethodParameter,
-            mavContainer: ModelAndViewContainer?,
-            webRequest: NativeWebRequest,
-            binderFactory: WebDataBinderFactory?,
-        ): Any {
-            return userId
         }
     }
 }

@@ -18,13 +18,16 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentCaptor
 import org.mockito.ArgumentMatchers.any
+import org.mockito.ArgumentMatchers.eq
 import org.mockito.Mockito.mock
+import org.mockito.Mockito.never
 import org.mockito.Mockito.times
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.verifyNoInteractions
 import org.mockito.Mockito.`when`
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder
 import org.springframework.security.crypto.password.PasswordEncoder
+import java.security.MessageDigest
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDateTime
@@ -133,6 +136,57 @@ class UserServiceImplTest {
     }
 
     @Test
+    fun `로그인은 기존 SHA-256 hash 사용자를 인증한 뒤 BCrypt hash로 마이그레이션한다`() {
+        val userRepository = mock(UserRepository::class.java)
+        val sessionTokenService = mock(SessionTokenService::class.java)
+        val userSanctionRepository = mock(UserSanctionJdbcRepository::class.java)
+        val expiresAt = LocalDateTime.parse("2026-06-12T12:30:00")
+        val user = User(
+            id = 7L,
+            username = "tester",
+            password = legacySha256("password"),
+            displayName = "테스터",
+            createdAt = LocalDateTime.parse("2026-06-12T12:00:00"),
+            updatedAt = LocalDateTime.parse("2026-06-12T12:00:00"),
+        )
+        `when`(userRepository.findByUsername("tester")).thenReturn(user)
+        `when`(userSanctionRepository.activeGlobalSanctionsForUser(7L)).thenReturn(emptyList())
+        `when`(sessionTokenService.issueToken(7L)).thenReturn(SessionToken("session-token-7", expiresAt))
+        val userService = userService(userRepository, sessionTokenService, userSanctionRepository)
+
+        val response = userService.login(LoginRequest(username = "tester", password = "password"))
+
+        val passwordCaptor = ArgumentCaptor.forClass(String::class.java)
+        verify(userRepository).updatePassword(eq(7L), passwordCaptor.capture() ?: "")
+        assertTrue(passwordEncoder.matches("password", passwordCaptor.value))
+        assertEquals("session-token-7", response.sessionToken)
+    }
+
+    @Test
+    fun `BCrypt hash 로그인은 72 bytes 초과 입력을 비밀번호 불일치로 거부한다`() {
+        val userRepository = mock(UserRepository::class.java)
+        val sessionTokenService = mock(SessionTokenService::class.java)
+        val userSanctionRepository = mock(UserSanctionJdbcRepository::class.java)
+        val user = User(
+            id = 7L,
+            username = "tester",
+            password = passwordEncoder.encode("a".repeat(72)),
+            displayName = "테스터",
+            createdAt = LocalDateTime.parse("2026-06-12T12:00:00"),
+            updatedAt = LocalDateTime.parse("2026-06-12T12:00:00"),
+        )
+        `when`(userRepository.findByUsername("tester")).thenReturn(user)
+        val userService = userService(userRepository, sessionTokenService, userSanctionRepository)
+
+        assertThrows(IllegalArgumentException::class.java) {
+            userService.login(LoginRequest(username = "tester", password = "a".repeat(73)))
+        }
+
+        verify(userSanctionRepository, never()).activeGlobalSanctionsForUser(7L)
+        verifyNoInteractions(sessionTokenService)
+    }
+
+    @Test
     fun `logout은 session token revoke를 요청한다`() {
         val userRepository = mock(UserRepository::class.java)
         val sessionTokenService = mock(SessionTokenService::class.java)
@@ -183,6 +237,11 @@ class UserServiceImplTest {
             clock = clock,
             passwordEncoder = passwordEncoder,
         )
+    }
+
+    private fun legacySha256(password: String): String {
+        val bytes = MessageDigest.getInstance("SHA-256").digest(password.toByteArray())
+        return bytes.joinToString("") { "%02x".format(it) }
     }
 
     private fun globalSuspend(): UserSanctionRecord {

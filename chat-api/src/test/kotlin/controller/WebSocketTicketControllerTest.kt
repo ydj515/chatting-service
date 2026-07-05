@@ -1,6 +1,6 @@
 package com.chat.api.controller
 
-import com.chat.api.security.CurrentUserId
+import com.chat.api.security.FixedCurrentAuthenticationResolver
 import com.chat.domain.dto.WebSocketTicketResponse
 import com.chat.domain.service.WebSocketTicketService
 import org.junit.jupiter.api.BeforeEach
@@ -11,15 +11,10 @@ import org.mockito.Mockito.`when`
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.SerializationFeature
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
-import org.springframework.core.MethodParameter
 import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.post
 import org.springframework.test.web.servlet.setup.MockMvcBuilders
-import org.springframework.web.bind.support.WebDataBinderFactory
-import org.springframework.web.context.request.NativeWebRequest
-import org.springframework.web.method.support.HandlerMethodArgumentResolver
-import org.springframework.web.method.support.ModelAndViewContainer
 import java.time.LocalDateTime
 
 class WebSocketTicketControllerTest {
@@ -37,7 +32,7 @@ class WebSocketTicketControllerTest {
                 ),
             )
             .setControllerAdvice(GlobalExceptionHandler())
-            .setCustomArgumentResolvers(FixedCurrentUserIdResolver(42L))
+            .setCustomArgumentResolvers(FixedCurrentAuthenticationResolver(userId = 42L))
             .setMessageConverters(
                 MappingJackson2HttpMessageConverter(
                     ObjectMapper()
@@ -85,22 +80,5 @@ class WebSocketTicketControllerTest {
             .andExpect {
                 status { isTooManyRequests() }
             }
-    }
-
-    private class FixedCurrentUserIdResolver(
-        private val userId: Long,
-    ) : HandlerMethodArgumentResolver {
-        override fun supportsParameter(parameter: MethodParameter): Boolean {
-            return parameter.hasParameterAnnotation(CurrentUserId::class.java)
-        }
-
-        override fun resolveArgument(
-            parameter: MethodParameter,
-            mavContainer: ModelAndViewContainer?,
-            webRequest: NativeWebRequest,
-            binderFactory: WebDataBinderFactory?,
-        ): Any {
-            return userId
-        }
     }
 }

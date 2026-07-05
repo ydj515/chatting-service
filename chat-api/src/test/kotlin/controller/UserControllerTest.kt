@@ -1,7 +1,6 @@
 package com.chat.api.controller
 
-import com.chat.api.security.CurrentSessionToken
-import com.chat.api.security.CurrentUserId
+import com.chat.api.security.FixedCurrentAuthenticationResolver
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.SerializationFeature
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
@@ -14,7 +13,6 @@ import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import org.springframework.core.MethodParameter
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter
@@ -22,10 +20,6 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
 import org.springframework.test.web.servlet.setup.MockMvcBuilders
-import org.springframework.web.bind.support.WebDataBinderFactory
-import org.springframework.web.context.request.NativeWebRequest
-import org.springframework.web.method.support.HandlerMethodArgumentResolver
-import org.springframework.web.method.support.ModelAndViewContainer
 import java.time.LocalDateTime
 
 class UserControllerTest {
@@ -104,29 +98,6 @@ class UserControllerTest {
 
         override fun updateLastSeen(userId: Long): UserDto {
             throw UnsupportedOperationException()
-        }
-    }
-
-    private class FixedCurrentAuthenticationResolver(
-        private val userId: Long,
-        private val sessionToken: String,
-    ) : HandlerMethodArgumentResolver {
-        override fun supportsParameter(parameter: MethodParameter): Boolean {
-            return parameter.hasParameterAnnotation(CurrentUserId::class.java) ||
-                parameter.hasParameterAnnotation(CurrentSessionToken::class.java)
-        }
-
-        override fun resolveArgument(
-            parameter: MethodParameter,
-            mavContainer: ModelAndViewContainer?,
-            webRequest: NativeWebRequest,
-            binderFactory: WebDataBinderFactory?,
-        ): Any {
-            return when {
-                parameter.hasParameterAnnotation(CurrentUserId::class.java) -> userId
-                parameter.hasParameterAnnotation(CurrentSessionToken::class.java) -> sessionToken
-                else -> throw IllegalArgumentException("지원하지 않는 인증 파라미터입니다.")
-            }
         }
     }
 

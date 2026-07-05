@@ -54,21 +54,21 @@ class AuthenticatedUserResolverTest {
     }
 
     @Test
-    fun `CurrentUserId parameter는 token이 없으면 400으로 응답한다`() {
+    fun `CurrentUserId parameter는 token이 없으면 401로 응답한다`() {
         mockMvc.get("/test/current-user").andExpect {
-            status { isBadRequest() }
+            status { isUnauthorized() }
             jsonPath("$.message") { value("인증 토큰이 필요합니다.") }
         }
     }
 
     @Test
-    fun `CurrentUserId parameter는 Authorization token이 유효하지 않으면 400으로 응답한다`() {
+    fun `CurrentUserId parameter는 Authorization token이 유효하지 않으면 401로 응답한다`() {
         `when`(sessionTokenService.authenticate("bad-token")).thenReturn(null)
 
         mockMvc.get("/test/current-user") {
             header(HttpHeaders.AUTHORIZATION, "Bearer bad-token")
         }.andExpect {
-            status { isBadRequest() }
+            status { isUnauthorized() }
             jsonPath("$.message") { value("유효하지 않은 인증 토큰입니다.") }
         }
     }
@@ -86,11 +86,11 @@ class AuthenticatedUserResolverTest {
     }
 
     @Test
-    fun `CurrentSessionToken parameter는 bearer token이 아니면 400으로 응답한다`() {
+    fun `CurrentSessionToken parameter는 bearer token이 아니면 401로 응답한다`() {
         mockMvc.post("/test/current-session-token") {
             header(HttpHeaders.AUTHORIZATION, "Basic logout-token")
         }.andExpect {
-            status { isBadRequest() }
+            status { isUnauthorized() }
             jsonPath("$.message") { value("인증 토큰이 필요합니다.") }
         }
     }

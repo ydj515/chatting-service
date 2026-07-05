@@ -19,6 +19,10 @@ interface UserRepository : JpaRepository<User, Long> {
     @Query("UPDATE User u SET u.lastSeenAt = :lastSeenAt WHERE u.id = :userId")
     fun updateLastSeenAt(userId: Long, lastSeenAt: LocalDateTime)
 
+    @Modifying
+    @Query("UPDATE User u SET u.password = :password WHERE u.id = :userId")
+    fun updatePassword(userId: Long, password: String): Int
+
     @Query("SELECT u FROM User u WHERE " +
             "LOWER(u.username) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
             "LOWER(u.displayName) LIKE LOWER(CONCAT('%', :query, '%'))")

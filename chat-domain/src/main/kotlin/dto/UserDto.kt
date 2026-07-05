@@ -1,5 +1,6 @@
 package com.chat.domain.dto
 
+import com.chat.domain.validation.Utf8ByteSize
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Size
 import java.time.LocalDateTime
@@ -49,6 +50,7 @@ data class CreateUserRequest(
 
     @field:NotBlank(message = "비밀번호는 필수입니다")
     @field:Size(min = 3, message = "비밀번호는 최소 3자 이상이어야 합니다")
+    @field:Utf8ByteSize(max = 72, message = "비밀번호는 UTF-8 기준 72바이트 이하여야 합니다")
     val password: String,
 
     @field:NotBlank(message = "표시 이름은 필수입니다")
@@ -61,5 +63,6 @@ data class LoginRequest(
     val username: String,
 
     @field:NotBlank(message = "비밀번호는 필수입니다")
+    @field:Utf8ByteSize(max = 72, message = "비밀번호는 UTF-8 기준 72바이트 이하여야 합니다")
     val password: String
 )
