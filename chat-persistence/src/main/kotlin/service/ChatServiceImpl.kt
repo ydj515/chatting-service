@@ -20,12 +20,6 @@ import java.time.Instant
 import java.time.ZoneOffset
 import java.util.Base64
 
-/*
-    @CacheEvit
-    @Cacheable
-    @Caching
- */
-
 @Service
 @Transactional
 class ChatServiceImpl(
@@ -50,7 +44,8 @@ class ChatServiceImpl(
     private val secureRandom = SecureRandom()
 
 
-    @Cacheable(value = ["chatRooms"], key = "#chatRoom.id")
+    // private + 자기호출(self-invocation) 이라 프록시를 거치지 않는다.
+    // 캐시는 프록시를 타는 공개 메서드(getChatRoom 등)에서만 적용한다.
     private fun chatRoomToDto(chatRoom: ChatRoom): ChatRoomDto {
         val memberCount = chatRoomMemberRepository.countActiveMembersInRoom(chatRoom.id).toInt()
         val lastMessage = messageReadPort.findLatestMessage(chatRoom.id)
@@ -104,7 +99,7 @@ class ChatServiceImpl(
         )
     }
 
-    @Cacheable(value = ["users"], key = "#user.id")
+    // 위와 동일한 이유로 캐시 애노테이션을 두지 않는다.
     private fun userToDto(user: User): UserDto {
         return UserDto(
             id = user.id,
