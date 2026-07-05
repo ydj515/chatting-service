@@ -71,13 +71,8 @@ paths:
       summary: Get current user
       tags:
         - Users
-      parameters:
-        - name: userId
-          in: query
-          required: true
-          schema:
-            type: integer
-            example: 1
+      security:
+        - bearerAuth: []
       responses:
         '200':
           description: Current user details
@@ -85,6 +80,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UserDto'
+        '401':
+          description: Authentication token is required or invalid
 
   /users/search:
     get:
@@ -613,6 +610,8 @@ components:
           example: "johndoe123"
         password:
           type: string
+          maxLength: 72
+          description: Password must be at most 72 UTF-8 bytes for BCrypt compatibility.
           example: "securePassword!12"
         displayName:
           type: string
@@ -629,6 +628,8 @@ components:
           example: "johndoe123"
         password:
           type: string
+          maxLength: 72
+          description: Password must be at most 72 UTF-8 bytes for BCrypt compatibility.
           example: "securePassword!12"
 
     LoginResponse:

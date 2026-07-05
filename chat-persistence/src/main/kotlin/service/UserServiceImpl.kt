@@ -14,9 +14,11 @@ import com.chat.persistence.repository.UserRepository
 import com.chat.persistence.repository.UserSanctionJdbcRepository
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
+import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.security.MessageDigest
+import java.nio.charset.StandardCharsets
 import java.time.Clock
 import java.time.LocalDateTime
 
@@ -28,6 +30,7 @@ class UserServiceImpl(
     private val sessionTokenService: SessionTokenService,
     private val userSanctionRepository: UserSanctionJdbcRepository,
     private val clock: Clock,
+    private val passwordEncoder: PasswordEncoder,
 ) : UserService {
     override fun createUser(request: CreateUserRequest): UserDto {
         // 이미 존재하는 사용자인지 확인
@@ -37,7 +40,7 @@ class UserServiceImpl(
 
         val user = User(
             username = request.username,
-            password = hashPassword(request.password),
+            password = encodeBcryptPassword(request.password),
             displayName = request.displayName
         )
 
@@ -49,11 +52,16 @@ class UserServiceImpl(
         val user = userRepository.findByUsername(request.username)
             ?: throw IllegalArgumentException("사용자를 찾을 수 없거나 비밀번호가 일치하지 않습니다.")
 
-        if (user.password != hashPassword(request.password)) {
+        val verification = verifyPassword(request.password, user.password)
+        if (!verification.matched) {
             throw IllegalArgumentException("사용자를 찾을 수 없거나 비밀번호가 일치하지 않습니다.")
         }
 
         requireNotSuspended(user.id)
+
+        if (verification.requiresRehash) {
+            userRepository.updatePassword(user.id, encodeBcryptPassword(request.password))
+        }
 
         val sessionToken = sessionTokenService.issueToken(user.id)
         return LoginResponse(
@@ -93,9 +101,54 @@ class UserServiceImpl(
         return userToDto(user).copy(lastSeenAt = now)
     }
 
-    private fun hashPassword(password: String): String {
-        val bytes = MessageDigest.getInstance("SHA-256").digest(password.toByteArray())
+    private fun encodeBcryptPassword(password: String): String {
+        requireBcryptCompatiblePassword(password)
+        return passwordEncoder.encode(password)
+    }
+
+    private fun verifyPassword(password: String, storedPassword: String): PasswordVerification {
+        if (isLegacySha256Hash(storedPassword)) {
+            return PasswordVerification(
+                matched = legacySha256Matches(password, storedPassword),
+                requiresRehash = isBcryptCompatiblePassword(password),
+            )
+        }
+
+        if (!isBcryptCompatiblePassword(password)) {
+            return PasswordVerification(matched = false, requiresRehash = false)
+        }
+
+        return PasswordVerification(
+            matched = passwordEncoder.matches(password, storedPassword),
+            requiresRehash = false,
+        )
+    }
+
+    private fun legacySha256Matches(password: String, storedPassword: String): Boolean {
+        val expected = legacySha256(password)
+        return MessageDigest.isEqual(
+            expected.toByteArray(StandardCharsets.UTF_8),
+            storedPassword.toByteArray(StandardCharsets.UTF_8),
+        )
+    }
+
+    private fun legacySha256(password: String): String {
+        val bytes = MessageDigest.getInstance("SHA-256").digest(password.toByteArray(StandardCharsets.UTF_8))
         return bytes.joinToString("") { "%02x".format(it) }
+    }
+
+    private fun requireBcryptCompatiblePassword(password: String) {
+        if (!isBcryptCompatiblePassword(password)) {
+            throw IllegalArgumentException("비밀번호는 UTF-8 기준 72바이트 이하여야 합니다.")
+        }
+    }
+
+    private fun isBcryptCompatiblePassword(password: String): Boolean {
+        return password.toByteArray(StandardCharsets.UTF_8).size <= BCRYPT_MAX_PASSWORD_BYTES
+    }
+
+    private fun isLegacySha256Hash(password: String): Boolean {
+        return LEGACY_SHA256_PATTERN.matches(password)
     }
 
     private fun requireNotSuspended(userId: Long) {
@@ -126,3 +179,11 @@ class UserServiceImpl(
     }
 
 }
+
+private data class PasswordVerification(
+    val matched: Boolean,
+    val requiresRehash: Boolean,
+)
+
+private const val BCRYPT_MAX_PASSWORD_BYTES = 72
+private val LEGACY_SHA256_PATTERN = Regex("^[0-9a-f]{64}$")

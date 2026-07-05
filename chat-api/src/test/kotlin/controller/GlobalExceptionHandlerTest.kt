@@ -1,6 +1,7 @@
 package com.chat.api.controller
 
 import com.chat.domain.dto.CreateUserRequest
+import com.chat.domain.dto.LoginRequest
 import com.chat.domain.exception.ForbiddenOperationException
 import com.chat.domain.exception.MessageAdmissionRejectedException
 import com.chat.domain.exception.MessageModerationRejectedException
@@ -54,6 +55,41 @@ class GlobalExceptionHandlerTest {
                 jsonPath("$.errors[?(@.field == 'username' && @.message == '사용자명은 3-20자 사이여야 합니다')]") { exists() }
                 jsonPath("$.errors[?(@.field == 'password' && @.message == '비밀번호는 최소 3자 이상이어야 합니다')]") { exists() }
                 jsonPath("$.errors[?(@.field == 'displayName' && @.message == '표시 이름은 필수입니다')]") { exists() }
+            }
+    }
+
+    @Test
+    fun `회원가입 비밀번호는 BCrypt 한계인 72 UTF-8 bytes를 초과할 수 없다`() {
+        mockMvc.post("/test/users") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """
+                {
+                  "username": "tester",
+                  "password": "${"a".repeat(73)}",
+                  "displayName": "테스터"
+                }
+            """.trimIndent()
+        }
+            .andExpect {
+                status { isBadRequest() }
+                jsonPath("$.errors[?(@.field == 'password' && @.message == '비밀번호는 UTF-8 기준 72바이트 이하여야 합니다')]") { exists() }
+            }
+    }
+
+    @Test
+    fun `로그인 비밀번호도 BCrypt 한계인 72 UTF-8 bytes를 초과할 수 없다`() {
+        mockMvc.post("/test/login") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """
+                {
+                  "username": "tester",
+                  "password": "${"한".repeat(25)}"
+                }
+            """.trimIndent()
+        }
+            .andExpect {
+                status { isBadRequest() }
+                jsonPath("$.errors[?(@.field == 'password' && @.message == '비밀번호는 UTF-8 기준 72바이트 이하여야 합니다')]") { exists() }
             }
     }
 
@@ -158,6 +194,9 @@ class GlobalExceptionHandlerTest {
     private class TestErrorController {
         @PostMapping("/test/users")
         fun createUser(@Valid @RequestBody request: CreateUserRequest): CreateUserRequest = request
+
+        @PostMapping("/test/login")
+        fun login(@Valid @RequestBody request: LoginRequest): LoginRequest = request
 
         @GetMapping("/test/bad-request")
         fun badRequest(): String {

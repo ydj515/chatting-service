@@ -32,3 +32,13 @@ test('public numeric cursor deprecation policy defines migration window and prec
   assert.match(migrationPolicy, /legacy numeric cursor remains accepted/);
   assert.match(migrationPolicy, /Rollback/);
 });
+
+test('/users/me requires bearer auth and no longer accepts explicit userId query parameter', () => {
+  const path = openapi.slice(
+    openapi.indexOf('  /users/me:'),
+    openapi.indexOf('  /users/search:'),
+  );
+
+  assert.match(path, /security:\n\s+- bearerAuth: \[\]/);
+  assert.doesNotMatch(path, /name: userId/);
+});

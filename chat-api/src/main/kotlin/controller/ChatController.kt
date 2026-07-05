@@ -1,14 +1,13 @@
 package com.chat.api.controller
 
 import com.chat.api.config.MessagePaginationProperties
-import com.chat.api.security.AuthenticatedUserResolver
+import com.chat.api.security.CurrentUserId
 import com.chat.domain.dto.*
 import com.chat.domain.service.ChatService
 import jakarta.validation.Valid
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.data.web.PageableDefault
-import org.springframework.http.HttpHeaders
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 
@@ -17,15 +16,13 @@ import org.springframework.web.bind.annotation.*
 class ChatController(
     private val chatService: ChatService,
     private val messagePaginationProperties: MessagePaginationProperties,
-    private val authenticatedUserResolver: AuthenticatedUserResolver,
 ) {
 
     @PostMapping
     fun createChatRoom(
-        @RequestHeader(HttpHeaders.AUTHORIZATION, required = false) authorization: String?,
+        @CurrentUserId userId: Long,
         @Valid @RequestBody request: CreateChatRoomRequest,
     ): ResponseEntity<ChatRoomDto> {
-        val userId = authenticatedUserResolver.resolveRequired(authorization)
         val chatRoom = chatService.createChatRoom(request, userId)
         return ResponseEntity.ok(chatRoom)
     }
@@ -38,30 +35,27 @@ class ChatController(
 
     @GetMapping
     fun getChatRooms(
-        @RequestHeader(HttpHeaders.AUTHORIZATION, required = false) authorization: String?,
+        @CurrentUserId authenticatedUserId: Long,
         @PageableDefault(size = 20) pageable: Pageable,
     ): ResponseEntity<Page<ChatRoomDto>> {
-        val authenticatedUserId = authenticatedUserResolver.resolveRequired(authorization)
         val chatRooms = chatService.getChatRooms(authenticatedUserId, pageable)
         return ResponseEntity.ok(chatRooms)
     }
 
     @PostMapping("/{id}/members")
     fun joinChatRoom(
-        @RequestHeader(HttpHeaders.AUTHORIZATION, required = false) authorization: String?,
+        @CurrentUserId userId: Long,
         @PathVariable id: Long,
     ): ResponseEntity<Void> {
-        val userId = authenticatedUserResolver.resolveRequired(authorization)
         chatService.joinChatRoom(id, userId)
         return ResponseEntity.ok().build()
     }
 
     @DeleteMapping("/{id}/members/me")
     fun leaveChatRoom(
-        @RequestHeader(HttpHeaders.AUTHORIZATION, required = false) authorization: String?,
+        @CurrentUserId authenticatedUserId: Long,
         @PathVariable id: Long,
     ): ResponseEntity<Void> {
-        val authenticatedUserId = authenticatedUserResolver.resolveRequired(authorization)
         chatService.leaveChatRoom(id, authenticatedUserId)
         return ResponseEntity.ok().build()
     }
@@ -75,11 +69,10 @@ class ChatController(
     // 메시지 조회만 제공 (히스토리 조회용)
     @GetMapping("/{id}/messages")
     fun getMessages(
-        @RequestHeader(HttpHeaders.AUTHORIZATION, required = false) authorization: String?,
+        @CurrentUserId authenticatedUserId: Long,
         @PathVariable id: Long,
         @PageableDefault(size = 50) pageable: Pageable,
     ): ResponseEntity<Page<MessageDto>> {
-        val authenticatedUserId = authenticatedUserResolver.resolveRequired(authorization)
         val messages = chatService.getMessages(id, authenticatedUserId, pageable)
         return ResponseEntity.ok(messages)
     }
@@ -89,7 +82,7 @@ class ChatController(
      */
     @GetMapping("/{id}/messages/cursor")
     fun getMessagesByCursor(
-        @RequestHeader(HttpHeaders.AUTHORIZATION, required = false) authorization: String?,
+        @CurrentUserId authenticatedUserId: Long,
         @PathVariable id: Long,
         @RequestParam(required = false) cursor: Long?,
         @RequestParam(required = false) cursorToken: String?,
@@ -103,19 +96,17 @@ class ChatController(
             limit = boundedMessageLimit(limit),
             direction = direction ?: messagePaginationProperties.defaultDirection,
         )
-        val authenticatedUserId = authenticatedUserResolver.resolveRequired(authorization)
         val response = chatService.getMessagesByCursor(request, authenticatedUserId)
         return ResponseEntity.ok(response)
     }
 
     @GetMapping("/{id}/messages/gap")
     fun getMessagesGap(
-        @RequestHeader(HttpHeaders.AUTHORIZATION, required = false) authorization: String?,
+        @CurrentUserId authenticatedUserId: Long,
         @PathVariable id: Long,
         @RequestParam afterSeq: Long,
         @RequestParam(required = false) limit: Int?,
     ): ResponseEntity<List<MessageDto>> {
-        val authenticatedUserId = authenticatedUserResolver.resolveRequired(authorization)
         val boundedLimit = boundedMessageLimit(limit)
         val messages = chatService.getMessagesGap(
             roomId = id,
@@ -128,10 +119,9 @@ class ChatController(
 
     @GetMapping("/search")
     fun searchChatRooms(
-        @RequestHeader(HttpHeaders.AUTHORIZATION, required = false) authorization: String?,
+        @CurrentUserId authenticatedUserId: Long,
         @RequestParam(required = false, defaultValue = "") q: String,
     ): ResponseEntity<List<ChatRoomDto>> {
-        val authenticatedUserId = authenticatedUserResolver.resolveRequired(authorization)
         val chatRooms = chatService.searchChatRooms(q, authenticatedUserId)
         return ResponseEntity.ok(chatRooms)
     }
