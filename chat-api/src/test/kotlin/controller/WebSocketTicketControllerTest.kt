@@ -1,8 +1,7 @@
 package com.chat.api.controller
 
-import com.chat.api.security.AuthenticatedUserResolver
+import com.chat.api.security.CurrentUserId
 import com.chat.domain.dto.WebSocketTicketResponse
-import com.chat.domain.service.SessionTokenService
 import com.chat.domain.service.WebSocketTicketService
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -12,31 +11,33 @@ import org.mockito.Mockito.`when`
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.SerializationFeature
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
-import org.springframework.http.HttpHeaders
+import org.springframework.core.MethodParameter
 import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.post
 import org.springframework.test.web.servlet.setup.MockMvcBuilders
+import org.springframework.web.bind.support.WebDataBinderFactory
+import org.springframework.web.context.request.NativeWebRequest
+import org.springframework.web.method.support.HandlerMethodArgumentResolver
+import org.springframework.web.method.support.ModelAndViewContainer
 import java.time.LocalDateTime
 
 class WebSocketTicketControllerTest {
 
     private lateinit var mockMvc: MockMvc
     private lateinit var ticketService: WebSocketTicketService
-    private lateinit var sessionTokenService: SessionTokenService
 
     @BeforeEach
     fun setUp() {
         ticketService = mock(WebSocketTicketService::class.java)
-        sessionTokenService = mock(SessionTokenService::class.java)
         mockMvc = MockMvcBuilders
             .standaloneSetup(
                 WebSocketTicketController(
-                    authenticatedUserResolver = AuthenticatedUserResolver(sessionTokenService),
                     webSocketTicketService = ticketService,
                 ),
             )
             .setControllerAdvice(GlobalExceptionHandler())
+            .setCustomArgumentResolvers(FixedCurrentUserIdResolver(42L))
             .setMessageConverters(
                 MappingJackson2HttpMessageConverter(
                     ObjectMapper()
@@ -49,12 +50,6 @@ class WebSocketTicketControllerTest {
 
     @Test
     fun `인증된 사용자는 WebSocket one-time ticket을 발급받는다`() {
-        `when`(sessionTokenService.authenticate("session-token")).thenReturn(
-            com.chat.domain.dto.AuthenticatedSession(
-                userId = 42L,
-                expiresAt = LocalDateTime.parse("2026-06-13T00:30:00"),
-            ),
-        )
         `when`(ticketService.issueTicket(42L, "127.0.0.1")).thenReturn(
             WebSocketTicketResponse(
                 ticket = "ticket-value",
@@ -63,7 +58,6 @@ class WebSocketTicketControllerTest {
         )
 
         mockMvc.post("/ws-tickets") {
-            header(HttpHeaders.AUTHORIZATION, "Bearer session-token")
             with { request ->
                 request.remoteAddr = "127.0.0.1"
                 request
@@ -80,16 +74,9 @@ class WebSocketTicketControllerTest {
 
     @Test
     fun `ticket 발급 rate limit 초과는 429로 응답한다`() {
-        `when`(sessionTokenService.authenticate("session-token")).thenReturn(
-            com.chat.domain.dto.AuthenticatedSession(
-                userId = 42L,
-                expiresAt = LocalDateTime.parse("2026-06-13T00:30:00"),
-            ),
-        )
         `when`(ticketService.issueTicket(42L, "127.0.0.1")).thenReturn(null)
 
         mockMvc.post("/ws-tickets") {
-            header(HttpHeaders.AUTHORIZATION, "Bearer session-token")
             with { request ->
                 request.remoteAddr = "127.0.0.1"
                 request
@@ -98,5 +85,22 @@ class WebSocketTicketControllerTest {
             .andExpect {
                 status { isTooManyRequests() }
             }
+    }
+
+    private class FixedCurrentUserIdResolver(
+        private val userId: Long,
+    ) : HandlerMethodArgumentResolver {
+        override fun supportsParameter(parameter: MethodParameter): Boolean {
+            return parameter.hasParameterAnnotation(CurrentUserId::class.java)
+        }
+
+        override fun resolveArgument(
+            parameter: MethodParameter,
+            mavContainer: ModelAndViewContainer?,
+            webRequest: NativeWebRequest,
+            binderFactory: WebDataBinderFactory?,
+        ): Any {
+            return userId
+        }
     }
 }

@@ -22,6 +22,7 @@ spring-boot-starter-data-redis = { group = "org.springframework.boot", name = "s
 spring-boot-starter-cache = { group = "org.springframework.boot", name = "spring-boot-starter-cache" }
 spring-boot-starter-websocket = { group = "org.springframework.boot", name = "spring-boot-starter-websocket" }
 spring-boot-starter-test = { group = "org.springframework.boot", name = "spring-boot-starter-test" }
+spring-security-crypto = { group = "org.springframework.security", name = "spring-security-crypto" }
 
 # Spring Data / Commons
 spring-data-commons = { group = "org.springframework.data", name = "spring-data-commons" }

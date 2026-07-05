@@ -22,6 +22,7 @@ dependencies {
     implementation(libs.spring.boot.starter.data.redis)
     implementation(libs.spring.boot.starter.cache)
     implementation(libs.spring.boot.starter.validation)
+    implementation(libs.spring.security.crypto)
 
     // WebSocket (WebSocketSessionManager에서 사용)
     implementation(libs.spring.boot.starter.websocket)

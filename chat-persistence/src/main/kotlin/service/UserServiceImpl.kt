@@ -14,9 +14,9 @@ import com.chat.persistence.repository.UserRepository
 import com.chat.persistence.repository.UserSanctionJdbcRepository
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
+import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
-import java.security.MessageDigest
 import java.time.Clock
 import java.time.LocalDateTime
 
@@ -28,6 +28,7 @@ class UserServiceImpl(
     private val sessionTokenService: SessionTokenService,
     private val userSanctionRepository: UserSanctionJdbcRepository,
     private val clock: Clock,
+    private val passwordEncoder: PasswordEncoder,
 ) : UserService {
     override fun createUser(request: CreateUserRequest): UserDto {
         // 이미 존재하는 사용자인지 확인
@@ -37,7 +38,7 @@ class UserServiceImpl(
 
         val user = User(
             username = request.username,
-            password = hashPassword(request.password),
+            password = passwordEncoder.encode(request.password),
             displayName = request.displayName
         )
 
@@ -49,7 +50,7 @@ class UserServiceImpl(
         val user = userRepository.findByUsername(request.username)
             ?: throw IllegalArgumentException("사용자를 찾을 수 없거나 비밀번호가 일치하지 않습니다.")
 
-        if (user.password != hashPassword(request.password)) {
+        if (!passwordEncoder.matches(request.password, user.password)) {
             throw IllegalArgumentException("사용자를 찾을 수 없거나 비밀번호가 일치하지 않습니다.")
         }
 
@@ -91,11 +92,6 @@ class UserServiceImpl(
 
         // 엔티티는 더 이상 data class 가 아니므로 값 객체인 DTO 에서 copy 한다.
         return userToDto(user).copy(lastSeenAt = now)
-    }
-
-    private fun hashPassword(password: String): String {
-        val bytes = MessageDigest.getInstance("SHA-256").digest(password.toByteArray())
-        return bytes.joinToString("") { "%02x".format(it) }
     }
 
     private fun requireNotSuspended(userId: Long) {

@@ -12,13 +12,19 @@ import com.chat.persistence.repository.UserRepository
 import com.chat.persistence.repository.UserSanctionJdbcRepository
 import com.chat.persistence.repository.UserSanctionRecord
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Assertions.assertThrows
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import org.mockito.ArgumentCaptor
+import org.mockito.ArgumentMatchers.any
 import org.mockito.Mockito.mock
+import org.mockito.Mockito.times
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.verifyNoInteractions
 import org.mockito.Mockito.`when`
-import java.security.MessageDigest
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder
+import org.springframework.security.crypto.password.PasswordEncoder
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDateTime
@@ -27,6 +33,7 @@ import java.time.ZoneOffset
 class UserServiceImplTest {
 
     private val clock = Clock.fixed(Instant.parse("2026-06-27T00:00:00Z"), ZoneOffset.UTC)
+    private val passwordEncoder: PasswordEncoder = BCryptPasswordEncoder(4)
 
     @Test
     fun `이미 존재하는 사용자명은 상태 충돌 예외로 처리한다`() {
@@ -34,7 +41,7 @@ class UserServiceImplTest {
         val sessionTokenService = mock(SessionTokenService::class.java)
         val userSanctionRepository = mock(UserSanctionJdbcRepository::class.java)
         `when`(userRepository.existsByUsername("tester")).thenReturn(true)
-        val userService = UserServiceImpl(userRepository, sessionTokenService, userSanctionRepository, clock)
+        val userService = userService(userRepository, sessionTokenService, userSanctionRepository)
 
         val exception = assertThrows(ResourceConflictException::class.java) {
             userService.createUser(
@@ -50,6 +57,55 @@ class UserServiceImplTest {
     }
 
     @Test
+    fun `사용자 생성은 plain SHA-256이 아닌 salted BCrypt hash를 저장한다`() {
+        val userRepository = mock(UserRepository::class.java)
+        val sessionTokenService = mock(SessionTokenService::class.java)
+        val userSanctionRepository = mock(UserSanctionJdbcRepository::class.java)
+        `when`(userRepository.existsByUsername("tester")).thenReturn(false)
+        `when`(userRepository.save(any(User::class.java))).thenAnswer { invocation -> invocation.arguments[0] as User }
+        val userService = userService(userRepository, sessionTokenService, userSanctionRepository)
+
+        userService.createUser(
+            CreateUserRequest(
+                username = "tester",
+                password = "password",
+                displayName = "테스터",
+            )
+        )
+
+        val captor = ArgumentCaptor.forClass(User::class.java)
+        verify(userRepository).save(captor.capture())
+        val savedPassword = captor.value.password
+        assertNotEquals("password", savedPassword)
+        assertNotEquals(
+            "5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8",
+            savedPassword,
+        )
+        assertTrue(savedPassword.startsWith("\$2"))
+        assertTrue(passwordEncoder.matches("password", savedPassword))
+    }
+
+    @Test
+    fun `같은 비밀번호로 만든 계정도 서로 다른 BCrypt hash를 저장한다`() {
+        val userRepository = mock(UserRepository::class.java)
+        val sessionTokenService = mock(SessionTokenService::class.java)
+        val userSanctionRepository = mock(UserSanctionJdbcRepository::class.java)
+        `when`(userRepository.existsByUsername("tester1")).thenReturn(false)
+        `when`(userRepository.existsByUsername("tester2")).thenReturn(false)
+        `when`(userRepository.save(any(User::class.java))).thenAnswer { invocation -> invocation.arguments[0] as User }
+        val userService = userService(userRepository, sessionTokenService, userSanctionRepository)
+
+        userService.createUser(CreateUserRequest("tester1", "same-password", "테스터1"))
+        userService.createUser(CreateUserRequest("tester2", "same-password", "테스터2"))
+
+        val captor = ArgumentCaptor.forClass(User::class.java)
+        verify(userRepository, times(2)).save(captor.capture())
+        val savedPasswords = captor.allValues.map { it.password }
+        assertNotEquals(savedPasswords[0], savedPasswords[1])
+        assertTrue(savedPasswords.all { passwordEncoder.matches("same-password", it) })
+    }
+
+    @Test
     fun `로그인은 사용자 정보와 세션 토큰을 함께 반환한다`() {
         val userRepository = mock(UserRepository::class.java)
         val sessionTokenService = mock(SessionTokenService::class.java)
@@ -58,7 +114,7 @@ class UserServiceImplTest {
         val user = User(
             id = 7L,
             username = "tester",
-            password = hashPassword("password"),
+            password = passwordEncoder.encode("password"),
             displayName = "테스터",
             createdAt = LocalDateTime.parse("2026-06-12T12:00:00"),
             updatedAt = LocalDateTime.parse("2026-06-12T12:00:00"),
@@ -66,7 +122,7 @@ class UserServiceImplTest {
         `when`(userRepository.findByUsername("tester")).thenReturn(user)
         `when`(userSanctionRepository.activeGlobalSanctionsForUser(7L)).thenReturn(emptyList())
         `when`(sessionTokenService.issueToken(7L)).thenReturn(SessionToken("session-token-7", expiresAt))
-        val userService = UserServiceImpl(userRepository, sessionTokenService, userSanctionRepository, clock)
+        val userService = userService(userRepository, sessionTokenService, userSanctionRepository)
 
         val response = userService.login(LoginRequest(username = "tester", password = "password"))
 
@@ -81,7 +137,7 @@ class UserServiceImplTest {
         val userRepository = mock(UserRepository::class.java)
         val sessionTokenService = mock(SessionTokenService::class.java)
         val userSanctionRepository = mock(UserSanctionJdbcRepository::class.java)
-        val userService = UserServiceImpl(userRepository, sessionTokenService, userSanctionRepository, clock)
+        val userService = userService(userRepository, sessionTokenService, userSanctionRepository)
 
         userService.logout("session-token")
 
@@ -96,7 +152,7 @@ class UserServiceImplTest {
         val user = User(
             id = 7L,
             username = "tester",
-            password = hashPassword("password"),
+            password = passwordEncoder.encode("password"),
             displayName = "테스터",
             createdAt = LocalDateTime.parse("2026-06-12T12:00:00"),
             updatedAt = LocalDateTime.parse("2026-06-12T12:00:00"),
@@ -105,7 +161,7 @@ class UserServiceImplTest {
         `when`(userSanctionRepository.activeGlobalSanctionsForUser(7L)).thenReturn(
             listOf(globalSuspend()),
         )
-        val userService = UserServiceImpl(userRepository, sessionTokenService, userSanctionRepository, clock)
+        val userService = userService(userRepository, sessionTokenService, userSanctionRepository)
 
         val exception = assertThrows(IllegalStateException::class.java) {
             userService.login(LoginRequest(username = "tester", password = "password"))
@@ -115,9 +171,18 @@ class UserServiceImplTest {
         verifyNoInteractions(sessionTokenService)
     }
 
-    private fun hashPassword(password: String): String {
-        val bytes = MessageDigest.getInstance("SHA-256").digest(password.toByteArray())
-        return bytes.joinToString("") { "%02x".format(it) }
+    private fun userService(
+        userRepository: UserRepository,
+        sessionTokenService: SessionTokenService,
+        userSanctionRepository: UserSanctionJdbcRepository,
+    ): UserServiceImpl {
+        return UserServiceImpl(
+            userRepository = userRepository,
+            sessionTokenService = sessionTokenService,
+            userSanctionRepository = userSanctionRepository,
+            clock = clock,
+            passwordEncoder = passwordEncoder,
+        )
     }
 
     private fun globalSuspend(): UserSanctionRecord {
