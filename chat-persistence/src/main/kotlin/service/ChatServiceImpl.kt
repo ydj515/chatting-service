@@ -196,11 +196,6 @@ class ChatServiceImpl(
             throw ResourceConflictException("이미 참여한 채팅방입니다")
         }
 
-//        val currentMemberCount = chatRoomMemberRepository.countActiveMembersInRoom(roomId)
-//        if (currentMemberCount >= chatRoom.maxMembers) {
-//            throw IllegalStateException("채팅방이 가득 찼습니다")
-//        }
-
         val member = ChatRoomMember(
             chatRoom = chatRoom,
             user = user,
@@ -366,7 +361,7 @@ class ChatServiceImpl(
             roomId = request.chatRoomId,
             senderId = senderId,
             content = request.content,
-            messageType = request.type ?: MessageType.TEXT,
+            messageType = request.type,
         )
         messageAdmissionPolicyService.requireAllowed(
             roomId = request.chatRoomId,
@@ -384,7 +379,7 @@ class ChatServiceImpl(
             messageId = messageId,
             clientMessageId = clientMessageId,
             content = request.content,
-            type = request.type ?: MessageType.TEXT,
+            type = request.type,
             chatRoom = chatRoom,
             sender = sender,
             sequenceNumber = roomSeq,
@@ -424,26 +419,6 @@ class ChatServiceImpl(
             writeShard = message.writeShard,
             fanoutShard = message.fanoutShard,
             createdAt = message.createdAt,
-        )
-    }
-
-    private fun messageToChatMessage(message: Message): ChatMessage {
-        val roomSeq = if (message.roomSeq > 0) message.roomSeq else message.sequenceNumber
-        return ChatMessage(
-            id = message.id,
-            messageId = message.messageId ?: legacyMessageId(message.id),
-            clientMessageId = message.clientMessageId,
-            content = message.content ?: "",
-            messageType = message.type,
-            chatRoomId = message.chatRoom.id,
-            senderId = message.sender.id,
-            senderName = message.sender.displayName,
-            sequenceNumber = message.sequenceNumber,
-            roomSeq = roomSeq,
-            streamShard = message.streamShard,
-            writeShard = message.writeShard,
-            fanoutShard = message.fanoutShard,
-            timestamp = message.createdAt
         )
     }
 
