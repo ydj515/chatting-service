@@ -1,6 +1,7 @@
 package com.chat.persistence.repository
 
 import com.chat.domain.model.ChatRoomMember
+import org.springframework.data.jpa.repository.EntityGraph
 import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.CrudRepository
@@ -9,6 +10,8 @@ import java.util.Optional
 
 @Repository
 interface ChatRoomMemberRepository : CrudRepository<ChatRoomMember, Long> {
+    // memberToDto 에서 member.user 에 접근하므로 User 를 함께 fetch 해 N+1 을 방지한다.
+    @EntityGraph(attributePaths = ["user"])
     fun findByChatRoomIdAndIsActiveTrue(chatRoomId: Long): List<ChatRoomMember>
 
     fun findByChatRoomIdAndUserIdAndIsActiveTrue(chatRoomId: Long, userId: Long): Optional<ChatRoomMember>
