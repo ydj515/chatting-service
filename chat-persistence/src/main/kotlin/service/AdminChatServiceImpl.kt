@@ -27,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional
 import kotlin.system.measureNanoTime
 
 @Service
+@Transactional // 모든 admin 작업이 감사 로그(audit) 쓰기를 동반하므로 클래스 레벨로 트랜잭션 경계를 둔다.
 class AdminChatServiceImpl(
     private val messageRepository: AdminMessageRepository,
     private val auditLogRepository: AdminAuditLogRepository,
@@ -110,7 +111,6 @@ class AdminChatServiceImpl(
         return status
     }
 
-    @Transactional
     @CacheEvict(value = ["roomAdmissionPolicies"], key = "#roomId")
     override fun updateRoomPolicy(
         actor: String,
