@@ -1,6 +1,9 @@
 package com.chat.persistence.service
 
 import com.chat.domain.dto.*
+import com.chat.domain.exception.ForbiddenOperationException
+import com.chat.domain.exception.ResourceConflictException
+import com.chat.domain.exception.ResourceNotFoundException
 import com.chat.domain.model.*
 import com.chat.domain.service.ChatService
 import com.chat.persistence.repository.*
@@ -119,7 +122,7 @@ class ChatServiceImpl(
         createdBy: Long,
     ): ChatRoomDto {
         val creator = userRepository.findById(createdBy)
-            .orElseThrow { IllegalArgumentException("사용자를 찾을 수 없습니다: $createdBy") }
+            .orElseThrow { ResourceNotFoundException("사용자를 찾을 수 없습니다: $createdBy") }
 
         val chatRoom = ChatRoom(
             name = request.name,
@@ -147,7 +150,7 @@ class ChatServiceImpl(
     @Cacheable(value = ["chatRooms"], key = "#roomId")
     override fun getChatRoom(roomId: Long): ChatRoomDto {
         val chatRoom = chatRoomRepository.findById(roomId)
-            .orElseThrow { IllegalArgumentException("채팅방을 찾을 수 없습니다: $roomId") }
+            .orElseThrow { ResourceNotFoundException("채팅방을 찾을 수 없습니다: $roomId") }
         return chatRoomToDto(chatRoom)
     }
 
@@ -179,15 +182,15 @@ class ChatServiceImpl(
     override fun joinChatRoom(roomId: Long, userId: Long) {
         // 채팅방 확인
         val chatRoom = chatRoomRepository.findById(roomId)
-            .orElseThrow { IllegalArgumentException("채팅방을 찾을 수 없습니다: $roomId") }
+            .orElseThrow { ResourceNotFoundException("채팅방을 찾을 수 없습니다: $roomId") }
 
         // 사용자 확인
         val user = userRepository.findById(userId)
-            .orElseThrow { IllegalArgumentException("사용자를 찾을 수 없습니다: $userId") }
+            .orElseThrow { ResourceNotFoundException("사용자를 찾을 수 없습니다: $userId") }
 
         // 이미 참여중인지 확인
         if (chatRoomMemberRepository.existsByChatRoomIdAndUserIdAndIsActiveTrue(roomId, userId)) {
-            throw IllegalStateException("이미 참여한 채팅방입니다")
+            throw ResourceConflictException("이미 참여한 채팅방입니다")
         }
 
 //        val currentMemberCount = chatRoomMemberRepository.countActiveMembersInRoom(roomId)
@@ -227,7 +230,7 @@ class ChatServiceImpl(
         pageable: Pageable,
     ): Page<MessageDto> {
         if (!chatRoomMemberRepository.existsByChatRoomIdAndUserIdAndIsActiveTrue(roomId, userId)) {
-            throw IllegalArgumentException("채팅방 멤버가 아닙니다")
+            throw ForbiddenOperationException("채팅방 멤버가 아닙니다")
         }
 
         return messageReadPort.findPageByRoom(roomId, pageable)
@@ -253,7 +256,7 @@ class ChatServiceImpl(
          */
 
         if (!chatRoomMemberRepository.existsByChatRoomIdAndUserIdAndIsActiveTrue(request.chatRoomId, userId)) {
-            throw IllegalArgumentException("채팅방 멤버가 아닙니다")
+            throw ForbiddenOperationException("채팅방 멤버가 아닙니다")
         }
 
         val cursor = request.effectiveCursor() // effective roomSeq cursor
@@ -317,7 +320,7 @@ class ChatServiceImpl(
         limit: Int,
     ): List<MessageDto> {
         if (!chatRoomMemberRepository.existsByChatRoomIdAndUserIdAndIsActiveTrue(roomId, userId)) {
-            throw IllegalArgumentException("채팅방 멤버가 아닙니다")
+            throw ForbiddenOperationException("채팅방 멤버가 아닙니다")
         }
 
         return messageReadPort.findGapMessages(roomId, afterSeq, limit)
@@ -329,13 +332,13 @@ class ChatServiceImpl(
     ): MessageDto {
         val requestedClientMessageId = normalizeClientMessageId(request.clientMessageId)
         val chatRoom = chatRoomRepository.findById(request.chatRoomId)
-            .orElseThrow { IllegalArgumentException("채팅방을 찾을 수 없습니다: ${request.chatRoomId}") }
+            .orElseThrow { ResourceNotFoundException("채팅방을 찾을 수 없습니다: ${request.chatRoomId}") }
 
         val sender = userRepository.findById(senderId)
-            .orElseThrow { IllegalArgumentException("사용자를 찾을 수 없습니다: $senderId") }
+            .orElseThrow { ResourceNotFoundException("사용자를 찾을 수 없습니다: $senderId") }
 
         val member = chatRoomMemberRepository.findByChatRoomIdAndUserIdAndIsActiveTrue(request.chatRoomId, senderId)
-            .orElseThrow { IllegalArgumentException("채팅방에 참여하지 않은 사용자입니다.") }
+            .orElseThrow { ForbiddenOperationException("채팅방에 참여하지 않은 사용자입니다.") }
 
         if (requestedClientMessageId != null) {
             val existingMessage = messageReadPort.findByClientMessageId(

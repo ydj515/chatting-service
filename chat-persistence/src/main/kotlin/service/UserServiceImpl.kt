@@ -5,6 +5,8 @@ import com.chat.domain.dto.LoginRequest
 import com.chat.domain.dto.LoginResponse
 import com.chat.domain.dto.UserDto
 import com.chat.domain.dto.UserSanctionType
+import com.chat.domain.exception.ResourceConflictException
+import com.chat.domain.exception.ResourceNotFoundException
 import com.chat.domain.model.User
 import com.chat.domain.service.SessionTokenService
 import com.chat.domain.service.UserService
@@ -30,7 +32,7 @@ class UserServiceImpl(
     override fun createUser(request: CreateUserRequest): UserDto {
         // 이미 존재하는 사용자인지 확인
         if (userRepository.existsByUsername(request.username)) {
-            throw IllegalStateException("이미 존재하는 사용자명입니다: ${request.username}")
+            throw ResourceConflictException("이미 존재하는 사용자명입니다: ${request.username}")
         }
 
         val user = User(
@@ -67,7 +69,7 @@ class UserServiceImpl(
 
     override fun getUserById(userId: Long): UserDto {
         val user = userRepository.findById(userId)
-            .orElseThrow { IllegalArgumentException("사용자를 찾을 수 없습니다: $userId") }
+            .orElseThrow { ResourceNotFoundException("사용자를 찾을 수 없습니다: $userId") }
         return userToDto(user)
     }
 
@@ -80,7 +82,7 @@ class UserServiceImpl(
 
     override fun updateLastSeen(userId: Long): UserDto {
         val user = userRepository.findById(userId)
-            .orElseThrow { IllegalArgumentException("사용자를 찾을 수 없습니다: $userId") }
+            .orElseThrow { ResourceNotFoundException("사용자를 찾을 수 없습니다: $userId") }
 
         val now = LocalDateTime.now()
         userRepository.updateLastSeenAt(userId, now)
