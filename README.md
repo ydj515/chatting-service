@@ -154,9 +154,9 @@ Streams 추가를 함께 처리합니다. 같은 키의 재전송에는 최초 �
 중복 키와 스트림은 같은 room hash tag를 사용하므로 Redis Cluster에서도 같은 슬롯에서 처리합니다.
 동시 요청이 순번을 먼저 발급받은 경우 사용하지 않은 순번이 남을 수 있습니다.
 
-DB에 저장되지 않은 수락 결과는 만료시키지 않습니다. writer가 DB 저장 성공을 확인한 뒤
+처리 중인 수락 결과는 만료시키지 않습니다. writer가 DB 저장 또는 DLQ 격리 성공을 확인한 뒤
 ACK 전에 24시간 TTL을 설정하고, 이후 재전송은 primary DB의 기존 메시지 조회로 처리합니다.
-장기 pending/DLQ 메시지의 수락 키는 유지되므로 backlog와 Redis 메모리를 함께 관리해야 합니다.
+장기 pending 메시지의 수락 키는 유지되므로 backlog와 Redis 메모리를 함께 관리해야 합니다.
 보장은 Redis의 기존 내구성·보존 정책을 전제로 합니다.
 
 전환 시 writer를 먼저 배포하고, 기존 gateway의 신규 수락을 중단한 뒤 기존 Streams backlog를
@@ -235,3 +235,16 @@ Baseline은 CI에서 생성하지 않습니다. 기존 항목을 수정하면 �
 ```bash
 ./gradlew detektBaseline detektBaselineMain detektBaselineTest
 ```
+
+### Stream admission and acceptance retention
+
+Stream capacity now rejects new messages instead of trimming unread or pending entries.
+At capacity, only the prefix acknowledged by every existing consumer group is reclaimed,
+and the configured writer and fanout groups must both exist. HTTP returns 429; WebSocket
+returns MESSAGE_ADMISSION_REJECTED. Retry with the same clientMessageId after workers catch up.
+Gateway and worker consumer-group names must match. Deploy all gateways together; old gateways
+can still trim pending entries. Existing orphaned acceptance keys from earlier trimming require
+operator reconciliation against the primary database and retained payloads before rollout.
+Pending acceptance payloads remain durable; DB persistence or successful writer DLQ quarantine
+starts a 24-hour retention period. After DLQ retention expires, retrying the client ID can create
+a new submission; DLQ replay must preserve the original message identity.

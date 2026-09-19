@@ -86,8 +86,8 @@
 | `CHAT_REDIS_STREAMS_KNOWN_STREAMS_KEY` | `chat:stream:rooms` | worker가 poll할 stream key index set |
 | `CHAT_REDIS_STREAMS_DEAD_LETTER_STREAM_KEY_PREFIX` | `chat:stream:dlq:` | worker consumer group별 dead letter stream key prefix |
 | `CHAT_REDIS_STREAMS_SHARD_COUNT` | `1` | room stream shard 개수 |
-| `CHAT_REDIS_STREAMS_MAX_LEN` | `1000000` | Redis Streams `XADD MAXLEN` entry 상한. `0` 이하이면 bounded append를 비활성화 |
-| `CHAT_REDIS_STREAMS_MAX_LEN_APPROXIMATE` | `true` | Redis Streams `MAXLEN ~` approximate trim 사용 여부. `false`이면 exact trim을 사용 |
+| `CHAT_REDIS_STREAMS_MAX_LEN` | `1000000` | Redis Streams 접수 entry 상한. writer·fanout 및 추가 소비자 모두 ACK한 prefix만 회수하고, 공간이 없으면 새 접수를 거절한다. `0` 이하이면 상한 비활성화 |
+| `CHAT_REDIS_STREAMS_MAX_LEN_APPROXIMATE` | `true` | 하위 호환용 설정. 안전한 ACK 기준 정리는 항상 exact 방식이며 이 값은 더 이상 사용하지 않는다 |
 | `CHAT_REDIS_ADMISSION_KEY_PREFIX` | `chat:admission:room:` | 메시지 수락 rate limit/slow mode Redis key prefix. 실제 key는 Redis Cluster hash tag를 포함해 `<prefix>{roomId}:...` 형태 |
 | `CHAT_REDIS_ADMISSION_RATE_LIMIT_WINDOW_TTL` | `2s` | 초당 rate limit bucket key 정리 TTL. 고정 1초 bucket을 다음 초 이후까지 보존하기 위한 값 |
 | `CHAT_AUTH_SESSION_SECRET` | 필수 | 모든 실행 환경에서 최소 32바이트의 독립적인 HMAC 서명 키. 미설정, 공백, 기존 개발 기본값은 시작 시 거부 |

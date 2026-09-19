@@ -79,20 +79,55 @@ class RedisMessageStreamProducerTest {
     }
 
     @Test
-    fun `stream maxlen supports exact approximate and unbounded modes`() {
-        for ((maxLen, approximate) in listOf(2L to false, 2L to true, 0L to false)) {
-            Fixture(maxLen, approximate).use { fixture ->
-                val producer = fixture.producer()
-                repeat(10) { index -> producer.append(envelope().copy(messageId = "msg-$index", clientMessageId = "client-$index")) }
-                val count = fixture.recordCount()
-                if (maxLen == 0L) {
-                    assertEquals(10L, count)
-                } else if (!approximate) {
-                    assertEquals(2L, count)
-                } else {
-                    assertTrue(count in 2L..10L)
-                }
+    fun `bounded streams reject without losing unread or pending records and recover after both ACKs`() {
+        Fixture(1).use { f ->
+            val producer = f.producer()
+            val original = producer.append(envelope())
+            val next = envelope().copy(messageId = "msg-2", clientMessageId = "client-2")
+            assertThrows(com.chat.domain.exception.MessageAdmissionRejectedException::class.java) { producer.append(next) }
+            assertNull(producer.findAccepted(42, 7, "client-2"))
+            assertEquals(original, producer.append(original))
+            val stream = f.resolver.roomStreamKey(42, 0)
+            val ops = f.redis.opsForStream<String, String>()
+            for (group in listOf("message-writer", "fanout")) {
+                ops.createGroup(stream, org.springframework.data.redis.connection.stream.ReadOffset.from("0-0"), group)
+                val records = requireNotNull(
+                    ops.read(
+                        org.springframework.data.redis.connection.stream.Consumer.from(group, "test"),
+                        org.springframework.data.redis.connection.stream.StreamReadOptions.empty(),
+                        org.springframework.data.redis.connection.stream.StreamOffset.create(stream, org.springframework.data.redis.connection.stream.ReadOffset.lastConsumed()),
+                    ),
+                )
+                assertThrows(com.chat.domain.exception.MessageAdmissionRejectedException::class.java) { producer.append(next) }
+                if (group == "message-writer") f.acceptance.markPersisted(original)
+                ops.acknowledge(stream, group, records.single().id)
             }
+            // An additional consumer also protects its unread and pending entries.
+            ops.createGroup(stream, org.springframework.data.redis.connection.stream.ReadOffset.from("0-0"), "observer")
+            assertThrows(com.chat.domain.exception.MessageAdmissionRejectedException::class.java) { producer.append(next) }
+            val observed = requireNotNull(
+                ops.read(
+                    org.springframework.data.redis.connection.stream.Consumer.from("observer", "test"),
+                    org.springframework.data.redis.connection.stream.StreamReadOptions.empty(),
+                    org.springframework.data.redis.connection.stream.StreamOffset.create(stream, org.springframework.data.redis.connection.stream.ReadOffset.lastConsumed()),
+                ),
+            )
+            assertThrows(com.chat.domain.exception.MessageAdmissionRejectedException::class.java) { producer.append(next) }
+            ops.acknowledge(stream, "observer", observed.single().id)
+            assertEquals(next, producer.append(next))
+            assertEquals(1L, f.recordCount())
+            assertEquals(original, producer.findAccepted(42, 7, "client-1"))
+            assertTrue(f.redis.getExpire(f.acceptance.acceptanceKey(original)) > 0)
+        }
+    }
+
+    @Test
+    fun `unbounded mode preserves every record and writer DLQ starts retention`() {
+        Fixture().use { f ->
+            repeat(10) { index -> f.producer().append(envelope().copy(messageId = "msg-$index", clientMessageId = "client-$index")) }
+            assertEquals(10L, f.recordCount())
+            f.acceptance.markDeadLettered(requireNotNull(f.producer().findAccepted(42, 7, "client-1")))
+            assertTrue(f.redis.getExpire(f.acceptance.acceptanceKey(envelope())) > 0)
         }
     }
 

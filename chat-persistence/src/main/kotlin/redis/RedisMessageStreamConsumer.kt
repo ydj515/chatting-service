@@ -157,10 +157,12 @@ class RedisMessageStreamConsumer(
             FIELD_REASON to reason,
             FIELD_PAYLOAD to objectMapper.writeValueAsString(record.envelope),
         )
-        redisTemplate.opsForStream<String, String>().add(
-            keyResolver.deadLetterStreamKey(consumerGroup),
-            fields,
-        )
+        checkNotNull(
+            redisTemplate.opsForStream<String, String>().add(
+                keyResolver.deadLetterStreamKey(consumerGroup),
+                fields,
+            ),
+        ) { "Dead letter append returned null" }
     }
 
     private fun decodeRecord(record: MapRecord<String, String, String>, consumerGroup: String, deliveryCount: Long): MessageStreamRecord? {

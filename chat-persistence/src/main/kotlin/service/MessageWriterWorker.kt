@@ -74,6 +74,7 @@ class MessageWriterWorker(
         val reason = throwable.message ?: throwable.javaClass.simpleName
         if (record.deliveryCount >= workerProperties.writer.maxDeliveryCount) {
             messageStreamConsumer.sendToDeadLetter(record, consumerGroup, reason)
+            acceptance.markDeadLettered(record.envelope)
             messageStreamMetrics.recordDeadLetter(consumerGroup, record.envelope.streamShard)
             messageStreamConsumer.acknowledge(
                 streamKey = record.streamKey,
