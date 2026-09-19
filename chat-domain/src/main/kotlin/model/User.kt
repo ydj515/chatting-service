@@ -15,36 +15,27 @@ class User(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     val id: Long = 0,
-
     @Column(unique = true, nullable = false, length = 50)
     @NotBlank
     val username: String,
-
     @Column(nullable = false, length = 255)
     val password: String,
-
     @Column(nullable = false, length = 100)
     val displayName: String,
-
     @Column(length = 500)
     val profileImageUrl: String? = null,
-
     @Column(length = 50)
     val status: String? = null,
-
     @Column(nullable = false)
     val isActive: Boolean = true,
-
     @Column
     val lastSeenAt: LocalDateTime? = null,
-
     @CreatedDate
     @Column(nullable = false, updatable = false)
     var createdAt: LocalDateTime = LocalDateTime.now(),
-
     @LastModifiedDate
     @Column(nullable = false)
-    var updatedAt: LocalDateTime = LocalDateTime.now()
+    var updatedAt: LocalDateTime = LocalDateTime.now(),
 ) {
     // JPA 엔티티는 식별자(id) 기반 동등성을 사용한다.
     // 프록시/실제 인스턴스를 함께 비교하기 위해 Hibernate.getClass 로 실제 타입을 판별한다.

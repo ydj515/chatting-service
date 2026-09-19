@@ -14,7 +14,6 @@ import java.time.LocalDateTime
 import java.util.stream.Stream
 
 class MessageWriterWorkerTest {
-
     @Test
     fun `writer worker는 stream record를 write port 요청으로 변환하고 저장 성공 시 ack한다`() {
         val consumer = FakeMessageStreamConsumer(
@@ -109,7 +108,7 @@ class MessageWriterWorkerTest {
             claimedRecords = listOf(streamRecord(recordId = "1749790000000-3", deliveryCount = 5)),
         )
         val writePort = FakeMessageWritePort {
-            throw IllegalStateException("missing user")
+            error("missing user")
         }
         val worker = workerFixture(consumer, writePort)
 
@@ -129,9 +128,7 @@ class MessageWriterWorkerTest {
         )
         val consumer = FakeMessageStreamConsumer(records = records)
         val writePort = FakeMessageWritePort { requests ->
-            if (requests.size > 1) {
-                throw IllegalStateException("batch failed after partial write")
-            }
+            check(requests.size <= 1) { "batch failed after partial write" }
 
             when (requests.single().messageId) {
                 "msg-1" -> MessageWriteResult(
@@ -139,7 +136,7 @@ class MessageWriterWorkerTest {
                         MessageWriteOutcome(request = request, written = false)
                     },
                 )
-                "msg-2" -> throw IllegalStateException("missing user")
+                "msg-2" -> error("missing user")
                 else -> MessageWriteResult(
                     outcomes = requests.map { request ->
                         MessageWriteOutcome(request = request, written = true)
@@ -203,8 +200,8 @@ class MessageWriterWorkerTest {
         consumer: MessageStreamConsumer,
         writePort: MessageWritePort,
         messageStreamMetrics: MessageStreamMetrics = MessageStreamMetrics.Noop,
-    ): MessageWriterWorker {
-        return MessageWriterWorker(
+    ): MessageWriterWorker =
+        MessageWriterWorker(
             messageStreamConsumer = consumer,
             messageWritePort = writePort,
             workerProperties = ChatWorkerProperties(
@@ -219,14 +216,13 @@ class MessageWriterWorkerTest {
             ),
             messageStreamMetrics = messageStreamMetrics,
         )
-    }
 
     private fun streamRecord(
         recordId: String = "1749790000000-0",
         deliveryCount: Long = 1,
         messageId: String = "msg-1",
-    ): MessageStreamRecord {
-        return MessageStreamRecord(
+    ): MessageStreamRecord =
+        MessageStreamRecord(
             streamKey = "chat:stream:room:10:shard:0",
             recordId = recordId,
             envelope = MessageStreamEnvelope(
@@ -246,7 +242,6 @@ class MessageWriterWorkerTest {
             ),
             deliveryCount = deliveryCount,
         )
-    }
 
     private class FakeMessageWritePort(
         private val handler: (List<MessageWriteRequest>) -> MessageWriteResult = { requests ->
@@ -275,9 +270,7 @@ class MessageWriterWorkerTest {
         val acked = mutableListOf<String>()
         val deadLetters = mutableListOf<String>()
 
-        override fun listStreamKeys(): Set<String> {
-            return (records + claimedRecords).mapTo(sortedSetOf()) { it.streamKey }
-        }
+        override fun listStreamKeys(): Set<String> = (records + claimedRecords).mapTo(sortedSetOf()) { it.streamKey }
 
         override fun ensureConsumerGroup(streamKey: String, consumerGroup: String) {
             ensuredGroups += "$streamKey:$consumerGroup"
@@ -317,15 +310,20 @@ class MessageWriterWorkerTest {
         }
     }
 
-    private fun meterRegistryProvider(meterRegistry: MeterRegistry): ObjectProvider<MeterRegistry> {
-        return object : ObjectProvider<MeterRegistry> {
+    private fun meterRegistryProvider(meterRegistry: MeterRegistry): ObjectProvider<MeterRegistry> =
+        object : ObjectProvider<MeterRegistry> {
             override fun getObject(): MeterRegistry = meterRegistry
+
             override fun getObject(vararg args: Any?): MeterRegistry = meterRegistry
+
             override fun getIfAvailable(): MeterRegistry = meterRegistry
+
             override fun getIfUnique(): MeterRegistry = meterRegistry
+
             override fun iterator(): MutableIterator<MeterRegistry> = mutableListOf(meterRegistry).iterator()
+
             override fun stream(): Stream<MeterRegistry> = Stream.of(meterRegistry)
+
             override fun orderedStream(): Stream<MeterRegistry> = Stream.of(meterRegistry)
         }
-    }
 }

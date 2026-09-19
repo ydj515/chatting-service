@@ -9,12 +9,12 @@ import com.chat.domain.dto.AdminMessageCursor
 import com.chat.domain.dto.AdminMessageCursorCodec
 import com.chat.domain.dto.AdminMessageDto
 import com.chat.domain.dto.AdminMessageHistoryRequest
+import com.chat.domain.dto.AdminMessagePageResponse
 import com.chat.domain.dto.AdminMessageSearchCursor
 import com.chat.domain.dto.AdminMessageSearchCursorCodec
-import com.chat.domain.dto.AdminMessagePageResponse
+import com.chat.domain.dto.AdminMessageSearchMode
 import com.chat.domain.dto.AdminMessageSearchRequest
 import com.chat.domain.dto.AdminMessageSearchResponse
-import com.chat.domain.dto.AdminMessageSearchMode
 import com.chat.domain.dto.AdminRoomPolicyUpdateRequest
 import com.chat.domain.dto.AdminRoomStatusDto
 import com.chat.domain.model.MessageType
@@ -32,7 +32,6 @@ import java.time.Instant
 import java.time.LocalDateTime
 
 class AdminChatControllerTest {
-
     private lateinit var mockMvc: MockMvc
     private lateinit var service: RecordingAdminChatService
 
@@ -194,14 +193,15 @@ class AdminChatControllerTest {
         mockMvc.post("/admin/exports/messages") {
             header("X-Admin-Token", "local-admin-token")
             contentType = MediaType.APPLICATION_JSON
-            content = """
+            content =
+                """
                 {
                   "roomId": 10,
                   "from": "2026-06-14T00:00:00",
                   "to": "2026-06-15T00:00:00",
                   "query": "hello"
                 }
-            """.trimIndent()
+                """.trimIndent()
         }
             .andExpect {
                 status { isAccepted() }
@@ -218,13 +218,14 @@ class AdminChatControllerTest {
         mockMvc.post("/admin/exports/messages") {
             header("X-Admin-Token", "local-admin-token")
             contentType = MediaType.APPLICATION_JSON
-            content = """
+            content =
+                """
                 {
                   "from": "2026-06-14T00:00:00",
                   "to": "2026-06-15T00:00:00",
                   "query": "   "
                 }
-            """.trimIndent()
+                """.trimIndent()
         }
             .andExpect {
                 status { isBadRequest() }
@@ -283,7 +284,8 @@ class AdminChatControllerTest {
         mockMvc.patch("/admin/rooms/10/policy") {
             header("X-Admin-Token", "local-admin-token")
             contentType = MediaType.APPLICATION_JSON
-            content = """
+            content =
+                """
                 {
                   "heatLevel": "VERY_HOT",
                   "liveFeedMaxMessages": 500,
@@ -292,7 +294,7 @@ class AdminChatControllerTest {
                   "userRateLimitPerSecond": 2,
                   "slowModeSeconds": 5
                 }
-            """.trimIndent()
+                """.trimIndent()
         }
             .andExpect {
                 status { isOk() }
@@ -322,13 +324,14 @@ class AdminChatControllerTest {
         mockMvc.patch("/admin/rooms/10/policy") {
             header("X-Admin-Token", "local-admin-token")
             contentType = MediaType.APPLICATION_JSON
-            content = """
+            content =
+                """
                 {
                   "clearRateLimit": true,
                   "clearUserRateLimit": true,
                   "clearSlowMode": true
                 }
-            """.trimIndent()
+                """.trimIndent()
         }
             .andExpect {
                 status { isOk() }
@@ -349,12 +352,13 @@ class AdminChatControllerTest {
         mockMvc.patch("/admin/rooms/10/policy") {
             header("X-Admin-Token", "local-admin-token")
             contentType = MediaType.APPLICATION_JSON
-            content = """
+            content =
+                """
                 {
                   "rateLimitPerSecond": 100,
                   "clearRateLimit": true
                 }
-            """.trimIndent()
+                """.trimIndent()
         }
             .andExpect {
                 status { isBadRequest() }
@@ -487,8 +491,8 @@ class AdminChatControllerTest {
             )
         }
 
-        private fun message(): AdminMessageDto {
-            return AdminMessageDto(
+        private fun message(): AdminMessageDto =
+            AdminMessageDto(
                 messageId = "msg-1",
                 clientMessageId = "client-1",
                 roomId = 10L,
@@ -502,6 +506,5 @@ class AdminChatControllerTest {
                 isDeleted = false,
                 createdAt = Instant.parse("2026-06-14T00:00:00Z"),
             )
-        }
     }
 }

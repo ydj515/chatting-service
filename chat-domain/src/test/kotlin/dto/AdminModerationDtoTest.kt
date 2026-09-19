@@ -6,7 +6,6 @@ import org.junit.jupiter.api.Test
 import java.time.Instant
 
 class AdminModerationDtoTest {
-
     @Test
     fun `moderation rule 생성 요청은 contains reject를 기본값으로 사용한다`() {
         val request = AdminCreateModerationRuleRequest(

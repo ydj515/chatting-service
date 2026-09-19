@@ -12,15 +12,12 @@ class MessageStreamKeyResolver(
         val streamShard: Int,
     )
 
-    fun roomStreamKey(roomId: Long, streamShard: Int): String {
-        return "${redisProperties.streams.roomStreamKeyPrefix}{$roomId}:shard:$streamShard"
-    }
+    fun roomStreamKey(roomId: Long, streamShard: Int): String = "${redisProperties.streams.roomStreamKeyPrefix}{$roomId}:shard:$streamShard"
 
     fun knownStreamsKey(): String = redisProperties.streams.knownStreamsKey
 
-    fun deadLetterStreamKey(consumerGroup: String): String {
-        return "${redisProperties.streams.deadLetterStreamKeyPrefix}$consumerGroup"
-    }
+    fun deadLetterStreamKey(consumerGroup: String): String =
+        "${redisProperties.streams.deadLetterStreamKeyPrefix}$consumerGroup"
 
     fun streamReadGroupKey(streamKey: String): String {
         if (streamKey.startsWith(redisProperties.streams.roomStreamKeyPrefix)) {

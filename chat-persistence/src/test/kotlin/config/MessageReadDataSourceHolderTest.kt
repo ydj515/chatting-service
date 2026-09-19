@@ -5,7 +5,6 @@ import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
 
 class MessageReadDataSourceHolderTest {
-
     @Test
     fun `read datasource가 활성화된 bean은 url을 요구한다`() {
         val exception = assertThrows(IllegalArgumentException::class.java) {

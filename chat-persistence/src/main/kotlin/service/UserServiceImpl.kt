@@ -17,11 +17,10 @@ import org.springframework.data.domain.Pageable
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
-import java.security.MessageDigest
 import java.nio.charset.StandardCharsets
+import java.security.MessageDigest
 import java.time.Clock
 import java.time.LocalDateTime
-
 
 @Service
 @Transactional
@@ -41,7 +40,7 @@ class UserServiceImpl(
         val user = User(
             username = request.username,
             password = encodeBcryptPassword(request.password),
-            displayName = request.displayName
+            displayName = request.displayName,
         )
 
         val savedUser = userRepository.save(user)
@@ -53,9 +52,7 @@ class UserServiceImpl(
             ?: throw IllegalArgumentException("사용자를 찾을 수 없거나 비밀번호가 일치하지 않습니다.")
 
         val verification = verifyPassword(request.password, user.password)
-        if (!verification.matched) {
-            throw IllegalArgumentException("사용자를 찾을 수 없거나 비밀번호가 일치하지 않습니다.")
-        }
+        require(verification.matched) { "사용자를 찾을 수 없거나 비밀번호가 일치하지 않습니다." }
 
         requireNotSuspended(user.id)
 
@@ -86,9 +83,7 @@ class UserServiceImpl(
     override fun searchUsers(
         query: String,
         pageable: Pageable,
-    ): Page<UserDto> {
-        return userRepository.searchUsers(query, pageable).map { userToDto(it) }
-    }
+    ): Page<UserDto> = userRepository.searchUsers(query, pageable).map { userToDto(it) }
 
     override fun updateLastSeen(userId: Long): UserDto {
         val user = userRepository.findById(userId)
@@ -138,18 +133,13 @@ class UserServiceImpl(
     }
 
     private fun requireBcryptCompatiblePassword(password: String) {
-        if (!isBcryptCompatiblePassword(password)) {
-            throw IllegalArgumentException("비밀번호는 UTF-8 기준 72바이트 이하여야 합니다.")
-        }
+        require(isBcryptCompatiblePassword(password)) { "비밀번호는 UTF-8 기준 72바이트 이하여야 합니다." }
     }
 
-    private fun isBcryptCompatiblePassword(password: String): Boolean {
-        return password.toByteArray(StandardCharsets.UTF_8).size <= BCRYPT_MAX_PASSWORD_BYTES
-    }
+    private fun isBcryptCompatiblePassword(password: String): Boolean =
+        password.toByteArray(StandardCharsets.UTF_8).size <= BCRYPT_MAX_PASSWORD_BYTES
 
-    private fun isLegacySha256Hash(password: String): Boolean {
-        return LEGACY_SHA256_PATTERN.matches(password)
-    }
+    private fun isLegacySha256Hash(password: String): Boolean = LEGACY_SHA256_PATTERN.matches(password)
 
     private fun requireNotSuspended(userId: Long) {
         val now = clock.instant()
@@ -158,13 +148,11 @@ class UserServiceImpl(
                 sanction.type == UserSanctionType.SUSPEND &&
                     (sanction.expiresAt == null || sanction.expiresAt.isAfter(now))
             }
-        if (suspended) {
-            throw IllegalStateException("정지된 사용자는 로그인할 수 없습니다.")
-        }
+        check(!suspended) { "정지된 사용자는 로그인할 수 없습니다." }
     }
 
-    private fun userToDto(user: User): UserDto {
-        return UserDto(
+    private fun userToDto(user: User): UserDto =
+        UserDto(
             id = user.id,
             username = user.username,
             // 이거는 구현이 안되어 있다.
@@ -174,10 +162,8 @@ class UserServiceImpl(
             status = user.status,
             isActive = user.isActive,
             lastSeenAt = user.lastSeenAt,
-            createdAt = user.createdAt
+            createdAt = user.createdAt,
         )
-    }
-
 }
 
 private data class PasswordVerification(

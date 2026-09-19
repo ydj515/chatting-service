@@ -20,43 +20,34 @@ import org.springframework.stereotype.Service
 class JpaMessageReadAdapter(
     private val messageRepository: MessageRepository,
 ) : MessageReadPort {
-
-    override fun findPageByRoom(roomId: Long, pageable: Pageable): Page<MessageDto> {
-        return messageRepository.findByChatRoomId(roomId, pageable)
+    override fun findPageByRoom(roomId: Long, pageable: Pageable): Page<MessageDto> =
+        messageRepository.findByChatRoomId(roomId, pageable)
             .map { it.toDto() }
-    }
 
-    override fun findLatestMessages(roomId: Long, limit: Int): List<MessageDto> {
-        return messageRepository.findLatestMessages(roomId, PageRequest.of(0, limit))
+    override fun findLatestMessages(roomId: Long, limit: Int): List<MessageDto> =
+        messageRepository.findLatestMessages(roomId, PageRequest.of(0, limit))
             .map { it.toDto() }
-    }
 
-    override fun findMessagesBefore(roomId: Long, cursor: Long, limit: Int): List<MessageDto> {
-        return messageRepository.findMessagesBefore(roomId, cursor, PageRequest.of(0, limit))
+    override fun findMessagesBefore(roomId: Long, cursor: Long, limit: Int): List<MessageDto> =
+        messageRepository.findMessagesBefore(roomId, cursor, PageRequest.of(0, limit))
             .map { it.toDto() }
-    }
 
-    override fun findMessagesAfter(roomId: Long, cursor: Long, limit: Int): List<MessageDto> {
-        return messageRepository.findMessagesAfter(roomId, cursor, PageRequest.of(0, limit))
+    override fun findMessagesAfter(roomId: Long, cursor: Long, limit: Int): List<MessageDto> =
+        messageRepository.findMessagesAfter(roomId, cursor, PageRequest.of(0, limit))
             .map { it.toDto() }
-    }
 
-    override fun findGapMessages(roomId: Long, afterSeq: Long, limit: Int): List<MessageDto> {
-        return messageRepository.findMessagesAfter(roomId, afterSeq, PageRequest.of(0, limit))
+    override fun findGapMessages(roomId: Long, afterSeq: Long, limit: Int): List<MessageDto> =
+        messageRepository.findMessagesAfter(roomId, afterSeq, PageRequest.of(0, limit))
             .map { it.toDto() }
-    }
 
-    override fun findLatestMessage(roomId: Long): MessageDto? {
-        return messageRepository.findLatestMessage(roomId)?.toDto()
-    }
+    override fun findLatestMessage(roomId: Long): MessageDto? = messageRepository.findLatestMessage(roomId)?.toDto()
 
-    override fun findByClientMessageId(roomId: Long, senderId: Long, clientMessageId: String): MessageDto? {
-        return messageRepository.findByChatRoomIdAndSenderIdAndClientMessageId(
+    override fun findByClientMessageId(roomId: Long, senderId: Long, clientMessageId: String): MessageDto? =
+        messageRepository.findByChatRoomIdAndSenderIdAndClientMessageId(
             chatRoomId = roomId,
             senderId = senderId,
             clientMessageId = clientMessageId,
         ).orElse(null)?.toDto()
-    }
 
     private fun Message.toDto(): MessageDto {
         val roomSeq = if (roomSeq > 0) roomSeq else sequenceNumber

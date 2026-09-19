@@ -1,8 +1,7 @@
 <?xml version="1.0" ?>
 <SmellBaseline>
-  <ManuallySuppressedIssues/>
+  <ManuallySuppressedIssues />
   <CurrentIssues>
-    <ID>InvalidPackageDeclaration:ChatApplication.kt$package com.chat.application</ID>
     <ID>SpreadOperator:ChatApplication.kt$(*args)</ID>
   </CurrentIssues>
 </SmellBaseline>

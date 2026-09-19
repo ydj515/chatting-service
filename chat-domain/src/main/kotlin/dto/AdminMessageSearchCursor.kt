@@ -34,13 +34,9 @@ object AdminMessageCursorCodec {
         return try {
             val payload = decodeText(normalized)
             val parts = payload.split(SEPARATOR)
-            if (parts.size != EXPECTED_PARTS || parts[0] != VERSION) {
-                throw IllegalArgumentException(INVALID_CURSOR_MESSAGE)
-            }
+            require(parts.size == EXPECTED_PARTS && parts[0] == VERSION) { INVALID_CURSOR_MESSAGE }
             val messageId = decodeText(parts[3])
-            if (messageId.isBlank()) {
-                throw IllegalArgumentException(INVALID_CURSOR_MESSAGE)
-            }
+            require(messageId.isNotBlank()) { INVALID_CURSOR_MESSAGE }
             AdminMessageCursor(
                 createdAt = Instant.parse(parts[1]),
                 roomSeq = parts[2].toLong(),
@@ -51,13 +47,9 @@ object AdminMessageCursorCodec {
         }
     }
 
-    private fun encodeText(value: String): String {
-        return encoder.encodeToString(value.toByteArray(StandardCharsets.UTF_8))
-    }
+    private fun encodeText(value: String): String = encoder.encodeToString(value.toByteArray(StandardCharsets.UTF_8))
 
-    private fun decodeText(value: String): String {
-        return String(decoder.decode(value), StandardCharsets.UTF_8)
-    }
+    private fun decodeText(value: String): String = String(decoder.decode(value), StandardCharsets.UTF_8)
 
     private const val VERSION = "v1"
     private const val SEPARATOR = "\t"
@@ -66,25 +58,18 @@ object AdminMessageCursorCodec {
 }
 
 object AdminMessageSearchCursorCodec {
-    fun encode(cursor: AdminMessageSearchCursor): String {
-        return AdminMessageCursorCodec.encode(cursor)
-    }
+    fun encode(cursor: AdminMessageSearchCursor): String = AdminMessageCursorCodec.encode(cursor)
 
-    fun decode(value: String?): AdminMessageSearchCursor? {
-        return AdminMessageCursorCodec.decode(value)
-    }
+    fun decode(value: String?): AdminMessageSearchCursor? = AdminMessageCursorCodec.decode(value)
 }
 
 object MessageHistoryCursorCodec {
-    fun encode(cursor: MessageHistoryCursor): String {
-        return AdminMessageCursorCodec.encode(cursor)
-    }
+    fun encode(cursor: MessageHistoryCursor): String = AdminMessageCursorCodec.encode(cursor)
 
-    fun decode(value: String?): MessageHistoryCursor? {
-        return try {
+    fun decode(value: String?): MessageHistoryCursor? =
+        try {
             AdminMessageCursorCodec.decode(value)
         } catch (e: IllegalArgumentException) {
             throw IllegalArgumentException("Invalid message history cursor", e)
         }
-    }
 }

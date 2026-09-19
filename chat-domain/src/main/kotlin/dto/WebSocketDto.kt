@@ -18,13 +18,13 @@ import java.time.LocalDateTime
 @JsonTypeInfo(
     use = JsonTypeInfo.Id.NAME,
     include = JsonTypeInfo.As.PROPERTY,
-    property = "type"
+    property = "type",
 )
 @JsonSubTypes(
     JsonSubTypes.Type(value = ChatMessage::class, name = "CHAT_MESSAGE"),
     JsonSubTypes.Type(value = ChatMessageBatch::class, name = "CHAT_MESSAGE_BATCH"),
     JsonSubTypes.Type(value = MessageAccepted::class, name = "MESSAGE_ACCEPTED"),
-    JsonSubTypes.Type(value = ErrorMessage::class, name = "ERROR")
+    JsonSubTypes.Type(value = ErrorMessage::class, name = "ERROR"),
 )
 sealed class WebSocketMessage {
     abstract val chatRoomId: Long?
@@ -46,13 +46,13 @@ data class ChatMessage(
     val writeShard: Int,
     val fanoutShard: Int,
     override val chatRoomId: Long,
-    override val timestamp: LocalDateTime = LocalDateTime.now()
+    override val timestamp: LocalDateTime = LocalDateTime.now(),
 ) : WebSocketMessage()
 
 data class ChatMessageBatch(
     val messages: List<ChatMessage>,
     override val chatRoomId: Long?,
-    override val timestamp: LocalDateTime = LocalDateTime.now()
+    override val timestamp: LocalDateTime = LocalDateTime.now(),
 ) : WebSocketMessage()
 
 data class MessageAccepted(
@@ -63,12 +63,12 @@ data class MessageAccepted(
     val roomSeq: Long,
     val sequenceNumber: Long,
     override val chatRoomId: Long,
-    override val timestamp: LocalDateTime = LocalDateTime.now()
+    override val timestamp: LocalDateTime = LocalDateTime.now(),
 ) : WebSocketMessage()
 
 data class ErrorMessage(
     val message: String,
     val code: String? = null,
     override val chatRoomId: Long?,
-    override val timestamp: LocalDateTime = LocalDateTime.now()
+    override val timestamp: LocalDateTime = LocalDateTime.now(),
 ) : WebSocketMessage()

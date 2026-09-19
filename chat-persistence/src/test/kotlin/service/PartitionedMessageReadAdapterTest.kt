@@ -12,7 +12,6 @@ import org.springframework.data.domain.PageRequest
 import java.time.LocalDateTime
 
 class PartitionedMessageReadAdapterTest {
-
     @Test
     fun `partitioned read adapter는 canonical record를 MessageDto로 변환한다`() {
         val repository = mock(PartitionedMessageReadRepository::class.java)
@@ -54,8 +53,8 @@ class PartitionedMessageReadAdapterTest {
         assertEquals(123L, message?.roomSeq)
     }
 
-    private fun record(): CanonicalMessageRecord {
-        return CanonicalMessageRecord(
+    private fun record(): CanonicalMessageRecord =
+        CanonicalMessageRecord(
             messageId = "msg-123",
             clientMessageId = "client-123",
             roomId = 10L,
@@ -76,5 +75,4 @@ class PartitionedMessageReadAdapterTest {
             isDeleted = false,
             createdAt = LocalDateTime.parse("2026-06-13T12:00:00"),
         )
-    }
 }

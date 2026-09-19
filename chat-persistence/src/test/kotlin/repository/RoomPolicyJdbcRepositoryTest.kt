@@ -12,7 +12,6 @@ import org.springframework.cache.annotation.Caching
 import org.springframework.jdbc.core.JdbcTemplate
 
 class RoomPolicyJdbcRepositoryTest {
-
     @Test
     fun `automatic heat policy는 primary jdbcTemplate로 room_storage_configs를 upsert한다`() {
         val jdbcTemplate = mock(JdbcTemplate::class.java)

@@ -10,21 +10,19 @@ class FixedCurrentAuthenticationResolver(
     private val userId: Long = 42L,
     private val sessionToken: String = "resolved-token",
 ) : HandlerMethodArgumentResolver {
-    override fun supportsParameter(parameter: MethodParameter): Boolean {
-        return parameter.hasParameterAnnotation(CurrentUserId::class.java) ||
+    override fun supportsParameter(parameter: MethodParameter): Boolean =
+        parameter.hasParameterAnnotation(CurrentUserId::class.java) ||
             parameter.hasParameterAnnotation(CurrentSessionToken::class.java)
-    }
 
     override fun resolveArgument(
         parameter: MethodParameter,
         mavContainer: ModelAndViewContainer?,
         webRequest: NativeWebRequest,
         binderFactory: WebDataBinderFactory?,
-    ): Any {
-        return when {
+    ): Any =
+        when {
             parameter.hasParameterAnnotation(CurrentUserId::class.java) -> userId
             parameter.hasParameterAnnotation(CurrentSessionToken::class.java) -> sessionToken
             else -> throw IllegalArgumentException("지원하지 않는 인증 파라미터입니다.")
         }
-    }
 }

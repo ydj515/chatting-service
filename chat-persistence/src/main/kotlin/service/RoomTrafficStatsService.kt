@@ -10,19 +10,22 @@ import kotlin.math.ceil
 
 interface RoomTrafficStatsService {
     fun recordAccepted(roomId: Long)
+
     fun activeRoomIds(): Set<Long>
+
     fun snapshot(roomId: Long): RoomTrafficSnapshot
 
     object Noop : RoomTrafficStatsService {
         override fun recordAccepted(roomId: Long) = Unit
+
         override fun activeRoomIds(): Set<Long> = emptySet()
-        override fun snapshot(roomId: Long): RoomTrafficSnapshot {
-            return RoomTrafficSnapshot(
+
+        override fun snapshot(roomId: Long): RoomTrafficSnapshot =
+            RoomTrafficSnapshot(
                 roomId = roomId,
                 roomMessagesPerSecond = 0,
                 roomMessagesP95PerSecond = 0,
             )
-        }
     }
 }
 
@@ -32,7 +35,6 @@ class RedisRoomTrafficStatsService(
     private val properties: ChatRoomPolicyProperties,
     private val clock: Clock,
 ) : RoomTrafficStatsService {
-
     private val logger = LoggerFactory.getLogger(javaClass)
 
     override fun recordAccepted(roomId: Long) {
@@ -102,9 +104,7 @@ class RedisRoomTrafficStatsService(
         return sorted[index]
     }
 
-    private fun trafficCounterKey(roomId: Long, epochSecond: Long): String {
-        return "${properties.trafficKeyPrefix}{$roomId}:sec:$epochSecond"
-    }
+    private fun trafficCounterKey(roomId: Long, epochSecond: Long): String = "${properties.trafficKeyPrefix}{$roomId}:sec:$epochSecond"
 
     private fun nowEpochSecond(): Long = clock.instant().epochSecond
 

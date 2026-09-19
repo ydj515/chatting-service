@@ -7,19 +7,18 @@ import com.chat.persistence.repository.UserSanctionJdbcRepository
 import com.chat.persistence.repository.UserSanctionRecord
 import io.micrometer.core.instrument.MeterRegistry
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
-import org.springframework.beans.factory.ObjectProvider
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.`when`
+import org.springframework.beans.factory.ObjectProvider
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
 import java.util.stream.Stream
 
 class UserSanctionServiceTest {
-
     @Test
     fun `mute 제재가 있으면 메시지 전송을 거부한다`() {
         val repository = mock(UserSanctionJdbcRepository::class.java)
@@ -137,8 +136,8 @@ class UserSanctionServiceTest {
         expiresAt: Instant? = null,
         scopeType: ModerationScopeType = ModerationScopeType.ROOM,
         roomId: Long? = 10L,
-    ): UserSanctionRecord {
-        return UserSanctionRecord(
+    ): UserSanctionRecord =
+        UserSanctionRecord(
             id = 1L,
             scopeType = scopeType,
             roomId = roomId,
@@ -152,17 +151,21 @@ class UserSanctionServiceTest {
             revokedBy = null,
             revokedAt = null,
         )
-    }
 
-    private fun meterRegistryProvider(meterRegistry: MeterRegistry): ObjectProvider<MeterRegistry> {
-        return object : ObjectProvider<MeterRegistry> {
+    private fun meterRegistryProvider(meterRegistry: MeterRegistry): ObjectProvider<MeterRegistry> =
+        object : ObjectProvider<MeterRegistry> {
             override fun getObject(): MeterRegistry = meterRegistry
+
             override fun getObject(vararg args: Any?): MeterRegistry = meterRegistry
+
             override fun getIfAvailable(): MeterRegistry = meterRegistry
+
             override fun getIfUnique(): MeterRegistry = meterRegistry
+
             override fun iterator(): MutableIterator<MeterRegistry> = mutableListOf(meterRegistry).iterator()
+
             override fun stream(): Stream<MeterRegistry> = Stream.of(meterRegistry)
+
             override fun orderedStream(): Stream<MeterRegistry> = Stream.of(meterRegistry)
         }
-    }
 }

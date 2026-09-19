@@ -7,13 +7,12 @@ import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentCaptor
 import org.mockito.Mockito.mock
-import org.mockito.Mockito.verifyNoInteractions
 import org.mockito.Mockito.verify
+import org.mockito.Mockito.verifyNoInteractions
 import org.mockito.Mockito.`when`
 import java.time.LocalDateTime
 
 class PartitionedMessageWriteAdapterTest {
-
     @Test
     fun `partitioned adapter는 repository insert 결과를 write outcomes로 변환한다`() {
         val repository = mock(PartitionedMessageRepository::class.java)
@@ -71,8 +70,8 @@ class PartitionedMessageWriteAdapterTest {
         assertEquals(5, insertedRequest.fanoutShard)
     }
 
-    private fun writeRequest(messageId: String): MessageWriteRequest {
-        return MessageWriteRequest(
+    private fun writeRequest(messageId: String): MessageWriteRequest =
+        MessageWriteRequest(
             messageId = messageId,
             clientMessageId = "client-1",
             chatRoomId = 10L,
@@ -86,12 +85,10 @@ class PartitionedMessageWriteAdapterTest {
             fanoutShard = 2,
             createdAt = LocalDateTime.parse("2026-06-13T12:00:00"),
         )
-    }
 
     @Suppress("UNCHECKED_CAST")
-    private fun requestListCaptor(): ArgumentCaptor<List<MessageWriteRequest>> {
-        return ArgumentCaptor.forClass(List::class.java) as ArgumentCaptor<List<MessageWriteRequest>>
-    }
+    private fun requestListCaptor(): ArgumentCaptor<List<MessageWriteRequest>> =
+        ArgumentCaptor.forClass(List::class.java) as ArgumentCaptor<List<MessageWriteRequest>>
 
     private fun anyRequestList(): List<MessageWriteRequest> {
         org.mockito.ArgumentMatchers.anyList<MessageWriteRequest>()

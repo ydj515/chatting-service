@@ -24,7 +24,5 @@ class Utf8ByteSizeValidator : ConstraintValidator<Utf8ByteSize, CharSequence> {
         maxBytes = constraintAnnotation.max
     }
 
-    override fun isValid(value: CharSequence?, context: ConstraintValidatorContext): Boolean {
-        return value == null || value.toString().toByteArray(Charsets.UTF_8).size <= maxBytes
-    }
+    override fun isValid(value: CharSequence?, context: ConstraintValidatorContext): Boolean = value == null || value.toString().toByteArray(Charsets.UTF_8).size <= maxBytes
 }

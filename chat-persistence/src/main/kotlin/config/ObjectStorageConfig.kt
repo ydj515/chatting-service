@@ -49,14 +49,12 @@ class ObjectStorageConfig {
         s3Client: S3Client,
         s3Presigner: S3Presigner,
         properties: ChatObjectStorageProperties,
-    ): ObjectStoragePort {
-        return S3ObjectStorageAdapter(s3Client, s3Presigner, properties)
-    }
+    ): ObjectStoragePort = S3ObjectStorageAdapter(s3Client, s3Presigner, properties)
 
     @Bean
     @ConditionalOnMissingBean(ObjectStoragePort::class)
-    fun disabledObjectStoragePort(): ObjectStoragePort {
-        return object : ObjectStoragePort {
+    fun disabledObjectStoragePort(): ObjectStoragePort =
+        object : ObjectStoragePort {
             override fun uploadFile(request: ObjectUploadRequest): ObjectUploadResult {
                 error("Object Storage is disabled")
             }
@@ -68,17 +66,14 @@ class ObjectStorageConfig {
                 error("Object Storage is disabled")
             }
         }
-    }
 
-    private fun credentials(properties: ChatObjectStorageProperties): StaticCredentialsProvider {
-        return StaticCredentialsProvider.create(
+    private fun credentials(properties: ChatObjectStorageProperties): StaticCredentialsProvider =
+        StaticCredentialsProvider.create(
             AwsBasicCredentials.create(properties.accessKey, properties.secretKey),
         )
-    }
 
-    private fun s3Configuration(properties: ChatObjectStorageProperties): S3Configuration {
-        return S3Configuration.builder()
+    private fun s3Configuration(properties: ChatObjectStorageProperties): S3Configuration =
+        S3Configuration.builder()
             .pathStyleAccessEnabled(properties.pathStyleAccess)
             .build()
-    }
 }

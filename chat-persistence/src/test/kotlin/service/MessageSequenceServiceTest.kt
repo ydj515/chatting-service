@@ -13,7 +13,6 @@ import org.springframework.data.redis.core.ValueOperations
 import java.time.Duration
 
 class MessageSequenceServiceTest {
-
     @Test
     fun `시퀀스 키 prefix와 TTL은 첫 메시지에 설정값을 사용한다`() {
         val redisTemplate = redisTemplate()

@@ -20,7 +20,6 @@ import java.time.Instant
 import java.util.stream.Stream
 
 class MessageModerationServiceTest {
-
     @Test
     fun `global contains rule과 매칭되면 moderation rejected 예외와 metric을 남긴다`() {
         val repository = mock(ModerationRuleJdbcRepository::class.java)
@@ -107,8 +106,8 @@ class MessageModerationServiceTest {
         scopeType: ModerationScopeType,
         roomId: Long?,
         pattern: String,
-    ): ModerationRuleRecord {
-        return ModerationRuleRecord(
+    ): ModerationRuleRecord =
+        ModerationRuleRecord(
             id = 1L,
             scopeType = scopeType,
             roomId = roomId,
@@ -121,17 +120,21 @@ class MessageModerationServiceTest {
             createdAt = Instant.parse("2026-06-26T00:00:00Z"),
             updatedAt = Instant.parse("2026-06-26T00:00:00Z"),
         )
-    }
 
-    private fun meterRegistryProvider(meterRegistry: MeterRegistry): ObjectProvider<MeterRegistry> {
-        return object : ObjectProvider<MeterRegistry> {
+    private fun meterRegistryProvider(meterRegistry: MeterRegistry): ObjectProvider<MeterRegistry> =
+        object : ObjectProvider<MeterRegistry> {
             override fun getObject(): MeterRegistry = meterRegistry
+
             override fun getObject(vararg args: Any?): MeterRegistry = meterRegistry
+
             override fun getIfAvailable(): MeterRegistry = meterRegistry
+
             override fun getIfUnique(): MeterRegistry = meterRegistry
+
             override fun iterator(): MutableIterator<MeterRegistry> = mutableListOf(meterRegistry).iterator()
+
             override fun stream(): Stream<MeterRegistry> = Stream.of(meterRegistry)
+
             override fun orderedStream(): Stream<MeterRegistry> = Stream.of(meterRegistry)
         }
-    }
 }

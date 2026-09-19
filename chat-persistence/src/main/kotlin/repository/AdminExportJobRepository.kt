@@ -72,8 +72,8 @@ class AdminExportJobRepository(
         )
     }
 
-    fun claimNextPending(workerId: String): AdminExportJobRecord? {
-        return try {
+    fun claimNextPending(workerId: String): AdminExportJobRecord? =
+        try {
             jdbcTemplate.queryForObject(
                 """
                 UPDATE admin_message_export_jobs
@@ -104,10 +104,9 @@ class AdminExportJobRepository(
         } catch (e: EmptyResultDataAccessException) {
             null
         }
-    }
 
-    fun findById(jobId: String): AdminExportJobStatusRecord? {
-        return try {
+    fun findById(jobId: String): AdminExportJobStatusRecord? =
+        try {
             jdbcTemplate.queryForObject(
                 """
                 SELECT
@@ -129,7 +128,6 @@ class AdminExportJobRepository(
         } catch (e: EmptyResultDataAccessException) {
             null
         }
-    }
 
     fun updateCheckpoint(
         jobId: String,
@@ -192,9 +190,7 @@ class AdminExportJobRepository(
     }
 
     private fun requireRunningTransition(updatedRows: Int, jobId: String) {
-        if (updatedRows != 1) {
-            throw IllegalStateException("Admin export job $jobId is not RUNNING or does not exist")
-        }
+        check(updatedRows == 1) { "Admin export job $jobId is not RUNNING or does not exist" }
     }
 
     private companion object {

@@ -34,7 +34,6 @@ import java.time.LocalDateTime
 import java.time.ZoneOffset
 
 class UserServiceImplTest {
-
     private val clock = Clock.fixed(Instant.parse("2026-06-27T00:00:00Z"), ZoneOffset.UTC)
     private val passwordEncoder: PasswordEncoder = BCryptPasswordEncoder(4)
 
@@ -52,7 +51,7 @@ class UserServiceImplTest {
                     username = "tester",
                     password = "abc",
                     displayName = "테스터",
-                )
+                ),
             )
         }
 
@@ -73,7 +72,7 @@ class UserServiceImplTest {
                 username = "tester",
                 password = "password",
                 displayName = "테스터",
-            )
+            ),
         )
 
         val captor = ArgumentCaptor.forClass(User::class.java)
@@ -157,7 +156,7 @@ class UserServiceImplTest {
         val response = userService.login(LoginRequest(username = "tester", password = "password"))
 
         val passwordCaptor = ArgumentCaptor.forClass(String::class.java)
-        verify(userRepository).updatePassword(eq(7L), passwordCaptor.capture() ?: "")
+        verify(userRepository).updatePassword(eq(7L), passwordCaptor.capture().orEmpty())
         assertTrue(passwordEncoder.matches("password", passwordCaptor.value))
         assertEquals("session-token-7", response.sessionToken)
     }
@@ -229,23 +228,22 @@ class UserServiceImplTest {
         userRepository: UserRepository,
         sessionTokenService: SessionTokenService,
         userSanctionRepository: UserSanctionJdbcRepository,
-    ): UserServiceImpl {
-        return UserServiceImpl(
+    ): UserServiceImpl =
+        UserServiceImpl(
             userRepository = userRepository,
             sessionTokenService = sessionTokenService,
             userSanctionRepository = userSanctionRepository,
             clock = clock,
             passwordEncoder = passwordEncoder,
         )
-    }
 
     private fun legacySha256(password: String): String {
         val bytes = MessageDigest.getInstance("SHA-256").digest(password.toByteArray())
         return bytes.joinToString("") { "%02x".format(it) }
     }
 
-    private fun globalSuspend(): UserSanctionRecord {
-        return UserSanctionRecord(
+    private fun globalSuspend(): UserSanctionRecord =
+        UserSanctionRecord(
             id = 1L,
             scopeType = ModerationScopeType.GLOBAL,
             roomId = null,
@@ -259,5 +257,4 @@ class UserServiceImplTest {
             revokedBy = null,
             revokedAt = null,
         )
-    }
 }

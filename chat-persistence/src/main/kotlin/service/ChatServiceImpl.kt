@@ -6,10 +6,10 @@ import com.chat.domain.exception.ResourceConflictException
 import com.chat.domain.exception.ResourceNotFoundException
 import com.chat.domain.model.*
 import com.chat.domain.service.ChatService
-import com.chat.persistence.repository.*
 import com.chat.persistence.redis.MessageStreamEnvelope
 import com.chat.persistence.redis.MessageStreamProducer
 import com.chat.persistence.redis.RedisMessageBroker
+import com.chat.persistence.repository.*
 import org.slf4j.LoggerFactory
 import org.springframework.cache.annotation.*
 import org.springframework.data.domain.Page
@@ -42,10 +42,8 @@ class ChatServiceImpl(
     private val messageModerationPolicyService: MessageModerationPolicyService,
     private val userSanctionPolicyService: UserSanctionPolicyService,
 ) : ChatService {
-
     private val logger = LoggerFactory.getLogger(ChatServiceImpl::class.java)
     private val secureRandom = SecureRandom()
-
 
     // private + 자기호출(self-invocation) 이라 프록시를 거치지 않는다.
     // 캐시는 프록시를 타는 공개 메서드(getChatRoom 등)에서만 적용한다.
@@ -64,7 +62,7 @@ class ChatServiceImpl(
             memberCount = memberCount,
             createdBy = userToDto(chatRoom.createdBy),
             createdAt = chatRoom.createdAt,
-            lastMessage = lastMessage
+            lastMessage = lastMessage,
         )
     }
 
@@ -90,21 +88,20 @@ class ChatServiceImpl(
         )
     }
 
-    private fun memberToDto(member: ChatRoomMember): ChatRoomMemberDto {
-        return ChatRoomMemberDto(
+    private fun memberToDto(member: ChatRoomMember): ChatRoomMemberDto =
+        ChatRoomMemberDto(
             id = member.id,
             user = userToDto(member.user),
             role = member.role,
             isActive = member.isActive,
             lastReadMessageId = member.lastReadMessageId,
             joinedAt = member.joinedAt,
-            leftAt = member.leftAt
+            leftAt = member.leftAt,
         )
-    }
 
     // 위와 동일한 이유로 캐시 애노테이션을 두지 않는다.
-    private fun userToDto(user: User): UserDto {
-        return UserDto(
+    private fun userToDto(user: User): UserDto =
+        UserDto(
             id = user.id,
             username = user.username,
             displayName = user.displayName,
@@ -112,9 +109,8 @@ class ChatServiceImpl(
             status = user.status,
             isActive = user.isActive,
             lastSeenAt = user.lastSeenAt,
-            createdAt = user.createdAt
+            createdAt = user.createdAt,
         )
-    }
 
     @CacheEvict(value = ["chatRooms"], allEntries = true)
     override fun createChatRoom(
@@ -130,7 +126,7 @@ class ChatServiceImpl(
             type = request.type,
             imageUrl = request.imageUrl,
             maxMembers = request.maxMembers,
-            createdBy = creator
+            createdBy = creator,
         )
 
         val savedRoom = chatRoomRepository.save(chatRoom)
@@ -138,7 +134,7 @@ class ChatServiceImpl(
         val ownerMember = ChatRoomMember(
             chatRoom = savedRoom,
             user = creator,
-            role = MemberRole.OWNER
+            role = MemberRole.OWNER,
         )
         chatRoomMemberRepository.save(ownerMember)
 
@@ -159,10 +155,9 @@ class ChatServiceImpl(
     override fun getChatRooms(
         userId: Long,
         pageable: Pageable,
-    ): Page<ChatRoomDto> {
-        return chatRoomRepository.findUserChatRooms(userId, pageable)
+    ): Page<ChatRoomDto> =
+        chatRoomRepository.findUserChatRooms(userId, pageable)
             .map { chatRoomToDto(it) }
-    }
 
     @Transactional(readOnly = true)
     override fun searchChatRooms(
@@ -178,10 +173,12 @@ class ChatServiceImpl(
         return chatRooms.map { chatRoomToDto(it) }
     }
 
-    @Caching(evict = [
-        CacheEvict(value = ["chatRoomMembers"], key = "#roomId"),
-        CacheEvict(value = ["chatRooms"], key = "#roomId")
-    ])
+    @Caching(
+        evict = [
+            CacheEvict(value = ["chatRoomMembers"], key = "#roomId"),
+            CacheEvict(value = ["chatRooms"], key = "#roomId"),
+        ],
+    )
     override fun joinChatRoom(roomId: Long, userId: Long) {
         // 채팅방 확인
         val chatRoom = chatRoomRepository.findById(roomId)
@@ -199,17 +196,19 @@ class ChatServiceImpl(
         val member = ChatRoomMember(
             chatRoom = chatRoom,
             user = user,
-            role = MemberRole.MEMBER
+            role = MemberRole.MEMBER,
         )
         chatRoomMemberRepository.save(member)
 
         publishMembershipChangedAfterCommit(userId, roomId, RedisMessageBroker.MembershipAction.JOIN)
     }
 
-    @Caching(evict = [
-        CacheEvict(value = ["chatRoomMembers"], key = "#roomId"),
-        CacheEvict(value = ["chatRooms"], key = "#roomId")
-    ])
+    @Caching(
+        evict = [
+            CacheEvict(value = ["chatRoomMembers"], key = "#roomId"),
+            CacheEvict(value = ["chatRooms"], key = "#roomId"),
+        ],
+    )
     override fun leaveChatRoom(roomId: Long, userId: Long) {
         chatRoomMemberRepository.leaveChatRoom(roomId, userId)
         publishMembershipChangedAfterCommit(userId, roomId, RedisMessageBroker.MembershipAction.LEAVE)
@@ -217,11 +216,9 @@ class ChatServiceImpl(
 
     @Transactional(readOnly = true)
     @Cacheable(value = ["chatRoomMembers"], key = "#roomId")
-    override fun getChatRoomMembers(roomId: Long): List<ChatRoomMemberDto> {
-        return chatRoomMemberRepository.findByChatRoomIdAndIsActiveTrue(roomId)
+    override fun getChatRoomMembers(roomId: Long): List<ChatRoomMemberDto> =
+        chatRoomMemberRepository.findByChatRoomIdAndIsActiveTrue(roomId)
             .map { memberToDto(it) }
-    }
-
 
     @Transactional(readOnly = true)
     override fun getMessages(
@@ -241,7 +238,6 @@ class ChatServiceImpl(
         request: MessagePageRequest,
         userId: Long,
     ): MessagePageResponse {
-
         /*
             SELECT *
             FROM chat_room_member
@@ -295,7 +291,7 @@ class ChatServiceImpl(
             prevCursor = prevCursor,
             prevCursorToken = prevCursorToken,
             hasNext = hasNext,
-            hasPrev = hasPrev
+            hasPrev = hasPrev,
         )
     }
 
@@ -304,15 +300,14 @@ class ChatServiceImpl(
         return tokenCursor?.roomSeq ?: cursor
     }
 
-    private fun MessageDto.toHistoryCursorToken(): String {
-        return MessageHistoryCursorCodec.encode(
+    private fun MessageDto.toHistoryCursorToken(): String =
+        MessageHistoryCursorCodec.encode(
             MessageHistoryCursor(
                 createdAt = createdAt.atOffset(ZoneOffset.UTC).toInstant(),
                 roomSeq = roomSeq,
                 messageId = messageId,
             ),
         )
-    }
 
     @Transactional(readOnly = true)
     override fun getMessagesGap(
@@ -422,9 +417,10 @@ class ChatServiceImpl(
         )
     }
 
-    private fun normalizeClientMessageId(clientMessageId: String?): String? {
-        return clientMessageId?.trim()?.takeIf { it.isNotEmpty() }
-    }
+    private fun normalizeClientMessageId(clientMessageId: String?): String? =
+        clientMessageId?.trim()?.takeIf {
+            it.isNotEmpty()
+        }
 
     private fun generateMessageId(): String {
         val timestamp = Instant.now().toEpochMilli().toString(36).padStart(9, '0')
@@ -436,17 +432,13 @@ class ChatServiceImpl(
 
     private fun legacyMessageId(id: Long): String = "legacy:$id"
 
-    private fun streamShard(roomSeq: Long, shardCount: Int): Int {
-        return Math.floorMod(roomSeq - 1, shardCount.coerceAtLeast(1).toLong()).toInt()
-    }
+    private fun streamShard(roomSeq: Long, shardCount: Int): Int = Math.floorMod(roomSeq - 1, shardCount.coerceAtLeast(1).toLong()).toInt()
 
     private fun writeShard(messageId: String, shardCount: Int): Int = shard(messageId, shardCount)
 
     private fun fanoutShard(streamShard: Int): Int = streamShard
 
-    private fun shard(value: String, shardCount: Int): Int {
-        return Math.floorMod(value.hashCode(), shardCount.coerceAtLeast(1))
-    }
+    private fun shard(value: String, shardCount: Int): Int = Math.floorMod(value.hashCode(), shardCount.coerceAtLeast(1))
 
     private fun publishMembershipChangedAfterCommit(
         userId: Long,

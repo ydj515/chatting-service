@@ -26,7 +26,6 @@ import java.time.LocalDateTime
 import java.util.stream.Stream
 
 class WebSocketSessionManagerMetricsTest {
-
     @Test
     fun `local delivery counter and connection gauge reflect gateway activity`() {
         val registry = SimpleMeterRegistry()
@@ -99,15 +98,20 @@ class WebSocketSessionManagerMetricsTest {
         )
     }
 
-    private fun provider(meterRegistry: MeterRegistry): ObjectProvider<MeterRegistry> {
-        return object : ObjectProvider<MeterRegistry> {
+    private fun provider(meterRegistry: MeterRegistry): ObjectProvider<MeterRegistry> =
+        object : ObjectProvider<MeterRegistry> {
             override fun getObject(): MeterRegistry = meterRegistry
+
             override fun getObject(vararg args: Any?): MeterRegistry = meterRegistry
+
             override fun getIfAvailable(): MeterRegistry = meterRegistry
+
             override fun getIfUnique(): MeterRegistry = meterRegistry
+
             override fun iterator(): MutableIterator<MeterRegistry> = mutableListOf(meterRegistry).iterator()
+
             override fun stream(): Stream<MeterRegistry> = Stream.of(meterRegistry)
+
             override fun orderedStream(): Stream<MeterRegistry> = Stream.of(meterRegistry)
         }
-    }
 }

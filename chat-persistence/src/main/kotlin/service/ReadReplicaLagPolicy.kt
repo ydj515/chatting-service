@@ -37,7 +37,8 @@ class ReadReplicaLagPolicy(
     }
 
     private companion object {
-        val REPLICA_LAG_MILLIS_SQL = """
+        val REPLICA_LAG_MILLIS_SQL =
+            """
             SELECT CASE
                 WHEN pg_is_in_recovery()
                 THEN CASE
@@ -46,6 +47,6 @@ class ReadReplicaLagPolicy(
                 END
                 ELSE 0
             END
-        """.trimIndent()
+            """.trimIndent()
     }
 }

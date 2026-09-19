@@ -88,8 +88,8 @@ class S3ObjectStorageAdapterTest {
     private fun adapter(
         s3Client: S3Client,
         presigner: S3Presigner,
-    ): S3ObjectStorageAdapter {
-        return S3ObjectStorageAdapter(
+    ): S3ObjectStorageAdapter =
+        S3ObjectStorageAdapter(
             s3Client = s3Client,
             presigner = presigner,
             properties = ChatObjectStorageProperties(
@@ -97,5 +97,4 @@ class S3ObjectStorageAdapterTest {
             ),
             clock = Clock.fixed(Instant.parse("2026-06-26T00:00:00Z"), ZoneOffset.UTC),
         )
-    }
 }

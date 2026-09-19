@@ -12,15 +12,14 @@ import org.mockito.ArgumentMatchers.eq
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
-import org.springframework.jdbc.core.RowMapper
 import org.springframework.jdbc.core.JdbcTemplate
+import org.springframework.jdbc.core.RowMapper
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneOffset
 
 class AdminExportJobRepositoryTest {
-
     @Test
     fun `export job insert는 actor와 request json을 바인딩하고 pending job을 반환한다`() {
         val jdbcTemplate = mock(JdbcTemplate::class.java)

@@ -25,7 +25,6 @@ class MessageModerationService(
     private val moderationRuleRepository: ModerationRuleJdbcRepository,
     private val meterRegistryProvider: ObjectProvider<MeterRegistry>? = null,
 ) : MessageModerationPolicyService {
-
     override fun requireAllowed(roomId: Long, senderId: Long, content: String?, messageType: MessageType) {
         if (content.isNullOrBlank()) {
             return

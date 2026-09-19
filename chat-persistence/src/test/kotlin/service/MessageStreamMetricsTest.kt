@@ -8,7 +8,6 @@ import org.springframework.beans.factory.ObjectProvider
 import java.util.stream.Stream
 
 class MessageStreamMetricsTest {
-
     @Test
     fun `stream metrics records append latency with bounded stream shard and outcome tags`() {
         val meterRegistry = SimpleMeterRegistry()
@@ -81,15 +80,20 @@ class MessageStreamMetricsTest {
         assertEquals(4.0, counter?.count())
     }
 
-    private fun meterRegistryProvider(meterRegistry: MeterRegistry): ObjectProvider<MeterRegistry> {
-        return object : ObjectProvider<MeterRegistry> {
+    private fun meterRegistryProvider(meterRegistry: MeterRegistry): ObjectProvider<MeterRegistry> =
+        object : ObjectProvider<MeterRegistry> {
             override fun getObject(): MeterRegistry = meterRegistry
+
             override fun getObject(vararg args: Any?): MeterRegistry = meterRegistry
+
             override fun getIfAvailable(): MeterRegistry = meterRegistry
+
             override fun getIfUnique(): MeterRegistry = meterRegistry
+
             override fun iterator(): MutableIterator<MeterRegistry> = mutableListOf(meterRegistry).iterator()
+
             override fun stream(): Stream<MeterRegistry> = Stream.of(meterRegistry)
+
             override fun orderedStream(): Stream<MeterRegistry> = Stream.of(meterRegistry)
         }
-    }
 }

@@ -29,7 +29,6 @@ class RoomSeqGapAuditRepository(
     @Qualifier("messageReadJdbcTemplate")
     private val messageReadJdbcTemplate: JdbcTemplate,
 ) {
-
     fun auditSince(cutoff: Instant): RoomSeqGapAuditSummary {
         val cutoffTimestamp = Timestamp.from(cutoff)
         return try {
@@ -56,7 +55,8 @@ class RoomSeqGapAuditRepository(
             )
         }
 
-        val AUDIT_SQL = """
+        val AUDIT_SQL =
+            """
             WITH recent_rooms AS (
                 SELECT DISTINCT room_id
                 FROM chat_messages
@@ -125,6 +125,6 @@ class RoomSeqGapAuditRepository(
                 scanned.scanned_room_count
             FROM gap_summary
             CROSS JOIN scanned
-        """.trimIndent()
+            """.trimIndent()
     }
 }

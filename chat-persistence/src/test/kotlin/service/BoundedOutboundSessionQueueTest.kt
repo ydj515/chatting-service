@@ -6,7 +6,6 @@ import org.junit.jupiter.api.Test
 import java.util.concurrent.Executor
 
 class BoundedOutboundSessionQueueTest {
-
     @Test
     fun `priority enqueue makes room by dropping newest normal payload and drains first`() {
         val scheduled = mutableListOf<Runnable>()

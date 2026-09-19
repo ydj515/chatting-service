@@ -19,7 +19,6 @@ import org.springframework.data.redis.serializer.StringRedisSerializer
 class CacheConfig(
     private val cacheProperties: ChatCacheProperties,
 ) {
-
     @Bean
     fun cacheManager(connectionFactory: RedisConnectionFactory): CacheManager {
         val configuration = RedisCacheConfiguration.defaultCacheConfig()

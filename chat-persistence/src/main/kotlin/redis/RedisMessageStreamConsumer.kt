@@ -1,7 +1,7 @@
 package com.chat.persistence.redis
 
-import com.fasterxml.jackson.databind.ObjectMapper
 import com.chat.persistence.service.MessageStreamMetrics
+import com.fasterxml.jackson.databind.ObjectMapper
 import io.lettuce.core.RedisBusyException
 import org.springframework.data.domain.Range
 import org.springframework.data.redis.connection.stream.Consumer
@@ -23,9 +23,8 @@ class RedisMessageStreamConsumer(
 ) : MessageStreamConsumer {
     private val ensuredConsumerGroups = ConcurrentHashMap.newKeySet<String>()
 
-    override fun listStreamKeys(): Set<String> {
-        return redisTemplate.opsForSet().members(keyResolver.knownStreamsKey()) ?: emptySet()
-    }
+    override fun listStreamKeys(): Set<String> =
+        redisTemplate.opsForSet().members(keyResolver.knownStreamsKey()).orEmpty()
 
     override fun ensureConsumerGroup(streamKey: String, consumerGroup: String) {
         val cacheKey = "$streamKey:$consumerGroup"
@@ -83,7 +82,7 @@ class RedisMessageStreamConsumer(
             Consumer.from(consumerGroup, consumerName),
             StreamReadOptions.empty().count(count),
             *offsets,
-        ) ?: emptyList()
+        ).orEmpty()
 
         val mappedRecords = records.mapNotNull { record ->
             val payload = record.value[FIELD_PAYLOAD] ?: return@mapNotNull null
@@ -96,6 +95,8 @@ class RedisMessageStreamConsumer(
         return mappedRecords
     }
 
+    // Redis pipelines/transactions and test doubles can return null despite the Java platform type.
+    @Suppress("UnnecessarySafeCall")
     override fun claimPending(
         consumerGroup: String,
         consumerName: String,
@@ -110,7 +111,7 @@ class RedisMessageStreamConsumer(
         return streamKeys.flatMap { streamKey ->
             val pendingMessages = redisTemplate.opsForStream<String, String>()
                 .pending(streamKey, consumerGroup, Range.unbounded<String>(), count)
-            val pendingList = pendingMessages?.toList() ?: emptyList()
+            val pendingList = pendingMessages?.toList().orEmpty()
             messageStreamMetrics.recordConsumerRecords(
                 consumerGroup = consumerGroup,
                 source = SOURCE_PENDING_SCANNED,

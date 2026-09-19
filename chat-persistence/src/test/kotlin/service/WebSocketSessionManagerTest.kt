@@ -29,7 +29,6 @@ import org.springframework.web.socket.WebSocketSession
 import java.time.LocalDateTime
 
 class WebSocketSessionManagerTest {
-
     @Test
     fun `원격 JOIN membership event는 열린 local session을 방 인덱스에 추가한다`() {
         val chatRoomMemberRepository = mock(ChatRoomMemberRepository::class.java)
@@ -72,7 +71,7 @@ class WebSocketSessionManagerTest {
                 fanoutShard = 0,
                 chatRoomId = 10L,
                 timestamp = LocalDateTime.parse("2026-06-12T12:00:01"),
-            )
+            ),
         )
 
         verify(session).sendMessage(any(TextMessage::class.java))
@@ -110,7 +109,7 @@ class WebSocketSessionManagerTest {
                 fanoutShard = 0,
                 chatRoomId = 10L,
                 timestamp = LocalDateTime.parse("2026-06-12T12:00:00"),
-            )
+            ),
         )
 
         verify(sessionInRoom).sendMessage(any(TextMessage::class.java))
@@ -143,9 +142,8 @@ class WebSocketSessionManagerTest {
     }
 
     @Suppress("UNCHECKED_CAST")
-    private fun sessionManager(chatRoomMemberRepository: ChatRoomMemberRepository): WebSocketSessionManager {
-        return sessionManagerFixture(chatRoomMemberRepository).manager
-    }
+    private fun sessionManager(chatRoomMemberRepository: ChatRoomMemberRepository): WebSocketSessionManager =
+        sessionManagerFixture(chatRoomMemberRepository).manager
 
     @Suppress("UNCHECKED_CAST")
     private fun sessionManagerFixture(chatRoomMemberRepository: ChatRoomMemberRepository): SessionManagerFixture {

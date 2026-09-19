@@ -72,11 +72,18 @@ subprojects {
     }
     extensions.configure<DetektExtension> {
         buildUponDefaultConfig = true
-        config.setFrom(rootProject.files("config/detekt/detekt.yml"))
+        val packageConfig = rootProject.file("config/detekt/packages/${project.name}.yml")
+        config.setFrom(
+            listOf(packageConfig, rootProject.file("config/detekt/detekt.yml")).filter { it.exists() },
+        )
         baseline = rootProject.file("config/detekt/baseline-${project.name}.xml")
         source.setFrom(files("src/main/kotlin", "src/test/kotlin"))
     }
+    tasks.named("check") {
+        dependsOn("detektMain", "detektTest")
+    }
     tasks.withType<Detekt>().configureEach {
+        jvmTarget = "21"
         reports {
             html.required.set(true)
             xml.required.set(true)
@@ -87,8 +94,8 @@ subprojects {
 
 val verifyDetekt by tasks.registering {
     group = "verification"
-    description = "Checks Kotlin defects and complexity in all modules."
-    dependsOn(subprojects.map { "${it.path}:detekt" })
+    description = "Checks Kotlin defects and complexity with type resolution in all modules."
+    dependsOn(subprojects.flatMap { listOf("${it.path}:detektMain", "${it.path}:detektTest") })
 }
 
 val verifyKotlinFormat by tasks.registering {
@@ -99,7 +106,7 @@ val verifyKotlinFormat by tasks.registering {
 
 val verifyKotlinQuality by tasks.registering {
     group = "verification"
-    description = "Checks Kotlin code quality and formatting without running tests."
+    description = "Checks typed Kotlin code quality and formatting without running tests."
     dependsOn(verifyDetekt, verifyKotlinFormat)
 }
 

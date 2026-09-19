@@ -17,10 +17,9 @@ class AdminTokenVerifier(
         return properties.actor
     }
 
-    private fun constantTimeEquals(actual: String, expected: String): Boolean {
-        return MessageDigest.isEqual(
+    private fun constantTimeEquals(actual: String, expected: String): Boolean =
+        MessageDigest.isEqual(
             actual.toByteArray(Charsets.UTF_8),
             expected.toByteArray(Charsets.UTF_8),
         )
-    }
 }

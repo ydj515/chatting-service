@@ -47,10 +47,9 @@ class S3ObjectStorageAdapter(
         )
     }
 
-    private fun normalizeObjectKey(objectKey: String): String {
-        return objectKey.trim().trimStart('/').also {
+    private fun normalizeObjectKey(objectKey: String): String =
+        objectKey.trim().trimStart('/').also {
             require(it.isNotBlank()) { "objectKey must not be blank" }
             require(!it.contains("..")) { "objectKey must not contain relative path segments" }
         }
-    }
 }

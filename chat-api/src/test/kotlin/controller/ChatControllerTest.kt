@@ -5,9 +5,9 @@ import com.chat.api.security.FixedCurrentAuthenticationResolver
 import com.chat.domain.dto.ChatRoomDto
 import com.chat.domain.dto.ChatRoomMemberDto
 import com.chat.domain.dto.CreateChatRoomRequest
+import com.chat.domain.dto.MessageDto
 import com.chat.domain.dto.MessageHistoryCursor
 import com.chat.domain.dto.MessageHistoryCursorCodec
-import com.chat.domain.dto.MessageDto
 import com.chat.domain.dto.MessagePageRequest
 import com.chat.domain.dto.MessagePageResponse
 import com.chat.domain.dto.SendMessageRequest
@@ -23,7 +23,6 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders
 import java.time.Instant
 
 class ChatControllerTest {
-
     private lateinit var mockMvc: MockMvc
     private lateinit var chatService: RecordingChatService
 
@@ -38,7 +37,7 @@ class ChatControllerTest {
                     messagePaginationProperties = MessagePaginationProperties(
                         defaultLimit = 50,
                         maxLimit = 100,
-                    )
+                    ),
                 ),
             )
             .setControllerAdvice(GlobalExceptionHandler())
@@ -128,40 +127,22 @@ class ChatControllerTest {
             return emptyList()
         }
 
-        override fun createChatRoom(request: CreateChatRoomRequest, createdBy: Long): ChatRoomDto {
-            throw UnsupportedOperationException()
-        }
+        override fun createChatRoom(request: CreateChatRoomRequest, createdBy: Long): ChatRoomDto = throw UnsupportedOperationException()
 
-        override fun getChatRoom(roomId: Long): ChatRoomDto {
-            throw UnsupportedOperationException()
-        }
+        override fun getChatRoom(roomId: Long): ChatRoomDto = throw UnsupportedOperationException()
 
-        override fun getChatRooms(userId: Long, pageable: Pageable): Page<ChatRoomDto> {
-            throw UnsupportedOperationException()
-        }
+        override fun getChatRooms(userId: Long, pageable: Pageable): Page<ChatRoomDto> = throw UnsupportedOperationException()
 
-        override fun searchChatRooms(query: String, userId: Long): List<ChatRoomDto> {
-            throw UnsupportedOperationException()
-        }
+        override fun searchChatRooms(query: String, userId: Long): List<ChatRoomDto> = throw UnsupportedOperationException()
 
-        override fun joinChatRoom(roomId: Long, userId: Long) {
-            throw UnsupportedOperationException()
-        }
+        override fun joinChatRoom(roomId: Long, userId: Long): Unit = throw UnsupportedOperationException()
 
-        override fun leaveChatRoom(roomId: Long, userId: Long) {
-            throw UnsupportedOperationException()
-        }
+        override fun leaveChatRoom(roomId: Long, userId: Long): Unit = throw UnsupportedOperationException()
 
-        override fun getChatRoomMembers(roomId: Long): List<ChatRoomMemberDto> {
-            throw UnsupportedOperationException()
-        }
+        override fun getChatRoomMembers(roomId: Long): List<ChatRoomMemberDto> = throw UnsupportedOperationException()
 
-        override fun sendMessage(request: SendMessageRequest, senderId: Long): MessageDto {
-            throw UnsupportedOperationException()
-        }
+        override fun sendMessage(request: SendMessageRequest, senderId: Long): MessageDto = throw UnsupportedOperationException()
 
-        override fun getMessages(roomId: Long, userId: Long, pageable: Pageable): Page<MessageDto> {
-            throw UnsupportedOperationException()
-        }
+        override fun getMessages(roomId: Long, userId: Long, pageable: Pageable): Page<MessageDto> = throw UnsupportedOperationException()
     }
 }

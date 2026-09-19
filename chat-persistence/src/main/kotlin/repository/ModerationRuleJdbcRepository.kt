@@ -49,8 +49,8 @@ class ModerationRuleJdbcRepository(
     private val jdbcTemplate: JdbcTemplate,
 ) {
     @Cacheable(value = ["moderationRules"], key = "#roomId")
-    fun activeRulesForRoom(roomId: Long): List<ModerationRuleRecord> {
-        return jdbcTemplate.query(
+    fun activeRulesForRoom(roomId: Long): List<ModerationRuleRecord> =
+        jdbcTemplate.query(
             """
             SELECT id, scope_type, room_id, pattern, match_type, action, reason, enabled, created_by, created_at, updated_at
             FROM moderation_rules
@@ -64,7 +64,6 @@ class ModerationRuleJdbcRepository(
             ROW_MAPPER,
             roomId,
         )
-    }
 
     fun listRules(roomId: Long?, enabled: Boolean?): List<ModerationRuleRecord> {
         val conditions = mutableListOf<String>()
@@ -91,8 +90,8 @@ class ModerationRuleJdbcRepository(
         )
     }
 
-    fun create(actor: String, request: AdminCreateModerationRuleRequest): ModerationRuleRecord {
-        return jdbcTemplate.queryForObject(
+    fun create(actor: String, request: AdminCreateModerationRuleRequest): ModerationRuleRecord =
+        jdbcTemplate.queryForObject(
             """
             INSERT INTO moderation_rules (scope_type, room_id, pattern, match_type, action, reason, created_by)
             VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -107,7 +106,6 @@ class ModerationRuleJdbcRepository(
             request.reason,
             actor,
         ) ?: error("failed to create moderation rule")
-    }
 
     fun update(ruleId: Long, request: AdminUpdateModerationRuleRequest): ModerationRuleRecord {
         // queryForObject는 0행일 때 EmptyResultDataAccessException을 던지므로(null 반환 아님)
@@ -134,9 +132,7 @@ class ModerationRuleJdbcRepository(
         } ?: error("moderation rule not found: $ruleId")
     }
 
-    fun disable(ruleId: Long): ModerationRuleRecord {
-        return update(ruleId, AdminUpdateModerationRuleRequest(enabled = false))
-    }
+    fun disable(ruleId: Long): ModerationRuleRecord = update(ruleId, AdminUpdateModerationRuleRequest(enabled = false))
 
     private companion object {
         val ROW_MAPPER = RowMapper { rs: ResultSet, _: Int ->

@@ -153,10 +153,12 @@ docs/                          # 상세 문서
 Kotlin 2.0.21과 호환되는 Detekt 1.23.8, ktlint Gradle 플러그인 13.1.0,
 ktlint 엔진 1.5.0을 버전 카탈로그에서 관리합니다.
 Java 소스가 없으므로 스타일 검사는 ktlint가 담당합니다.
+줄 길이 제한과 대입문·인자 목록·함수 선언·메서드 체인 등의 강제 줄바꿈은 비활성화합니다.
+직접 작성한 줄바꿈은 유지하고, 들여쓰기·공백·import 등의 기본 스타일만 자동 정리합니다.
 
 ```bash
 ./gradlew verifyKotlinQuality  # Detekt + ktlint, 테스트/외부 인프라 불필요
-./gradlew verifyDetekt        # main/test Kotlin 결함·복잡도 검사
+./gradlew verifyDetekt        # main/test Kotlin 타입 해석 기반 결함·복잡도 검사
 ./gradlew verifyKotlinFormat  # Kotlin 소스 및 Gradle Kotlin DSL 스타일 검사
 ./gradlew formatKotlin        # 전체 Kotlin 소스 및 빌드 스크립트 자동 포맷 (파일 변경)
 ./gradlew check               # 모든 모듈의 테스트 및 정적 검사
@@ -167,16 +169,26 @@ Java 소스가 없으므로 스타일 검사는 ktlint가 담당합니다.
 리포트는 각 모듈의 `build/reports/detekt`, `build/reports/ktlint`에 생성합니다.
 루트 빌드 스크립트의 ktlint 리포트는 루트 `build/reports/ktlint`에 생성합니다.
 
-기존 소스를 일괄 수정하지 않도록 도입 시점의 위반을 모듈별
-`config/detekt/baseline-*.xml`, `config/ktlint/baseline-*.xml`에 기록했습니다.
-기록되지 않은 위반은 실패합니다. 기존 부채는 baseline에 남아 있으므로 별도 정리가 필요합니다.
-ktlint baseline은 파일·규칙 단위 예외여서 같은 파일의 같은 규칙에 대한 신규 위반도
-가려질 수 있습니다. 파일을 정리할 때 해당 baseline 항목도 함께 제거하세요.
-Detekt의 기본 검사는 타입 해석 없이 실행하며, 타입 정보가 필요한 규칙은 별도 검사가 필요합니다.
+초기 baseline 정리 후 ktlint 위반은 0건이며, 모든 ktlint baseline은 비어 있습니다.
+Detekt baseline은 286건에서 72건으로 줄였습니다. 남은 항목은 긴 인자 목록과 서비스 복잡도,
+Java vararg 연동, 예외 처리 정책 등 별도 검토가 필요한 기존 부채입니다.
+기록되지 않은 위반은 빌드를 실패시킵니다. ktlint baseline은 파일·규칙 단위로 위반을
+숨길 수 있으므로 새 예외를 일괄 추가하지 않습니다.
 
-Baseline 갱신은 검토한 기존 위반을 수용할 때만 수행하며 CI에서 자동 생성하지 않습니다.
-전체 재생성은 신규 결함까지 숨길 수 있으므로 XML 변경 내용을 반드시 검토합니다.
+`verifyDetekt`는 모든 모듈의 `detektMain`, `detektTest`를 실행해 타입 정보까지 검사합니다.
+컴파일 및 의존성 해석은 필요하지만 테스트를 실행하거나 외부 인프라에 접속하지 않습니다.
+모듈별 `check`에도 타입 해석 검사를 연결했습니다. 기본 `detekt` 검사도 유지합니다.
+
+`config/detekt/packages/*.yml`은 기존 소스 경로에서 생략한 모듈 패키지 접두사만 정의합니다.
+Mockito 매처·캡처 호출의 반환값 무시와 `lateinit` 주입 필드는 도구 설정에서 허용하며,
+그 밖의 반환값 무시나 재할당 가능한 변수 검사는 유지합니다.
+Redis/JDBC의 nullable Java API 대응은 해당 함수의 사유가 있는 제한적 suppression으로 유지합니다.
+
+Baseline은 CI에서 생성하지 않습니다. 기존 항목을 수정하면 해당 XML 항목도 제거합니다.
+재생성이 필요한 경우 기본 검사와 타입 해석 검사의 결과를 함께 검토해야 합니다.
+아래 명령은 source set별 baseline도 생성하므로, 결과를 검토해 모듈 baseline에 통합하고
+중복된 source set 파일이 별도 예외로 남지 않도록 정리해야 합니다.
 
 ```bash
-./gradlew detektBaseline ktlintGenerateBaseline
+./gradlew detektBaseline detektBaselineMain detektBaselineTest
 ```

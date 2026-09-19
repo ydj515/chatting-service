@@ -16,7 +16,6 @@ import java.sql.Timestamp
 import java.time.Instant
 
 class RoomSeqGapAuditRepositoryTest {
-
     @Test
     fun `auditSince는 chat_messages room_seq gap aggregate를 조회한다`() {
         val jdbcTemplate = mock(JdbcTemplate::class.java)
@@ -145,9 +144,8 @@ class RoomSeqGapAuditRepositoryTest {
     }
 
     @Suppress("UNCHECKED_CAST")
-    private fun summaryRowMapperCaptor(): ArgumentCaptor<RowMapper<RoomSeqGapAuditSummary>> {
-        return ArgumentCaptor.forClass(RowMapper::class.java) as ArgumentCaptor<RowMapper<RoomSeqGapAuditSummary>>
-    }
+    private fun summaryRowMapperCaptor(): ArgumentCaptor<RowMapper<RoomSeqGapAuditSummary>> =
+        ArgumentCaptor.forClass(RowMapper::class.java) as ArgumentCaptor<RowMapper<RoomSeqGapAuditSummary>>
 
     private fun anyString(): String {
         org.mockito.ArgumentMatchers.anyString()

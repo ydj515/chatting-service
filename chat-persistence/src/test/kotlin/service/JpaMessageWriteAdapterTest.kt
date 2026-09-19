@@ -21,7 +21,6 @@ import java.time.LocalDateTime
 import java.util.Optional
 
 class JpaMessageWriteAdapterTest {
-
     @Test
     fun `jpa adapter는 신규 메시지를 compatibility table에 batch 저장한다`() {
         val fixture = adapterFixture()
@@ -31,7 +30,7 @@ class JpaMessageWriteAdapterTest {
                 10L,
                 7L,
                 "client-1",
-            )
+            ),
         ).thenReturn(Optional.empty())
         `when`(fixture.chatRoomRepository.getReferenceById(10L)).thenReturn(fixture.chatRoom)
         `when`(fixture.userRepository.getReferenceById(7L)).thenReturn(fixture.sender)
@@ -88,7 +87,7 @@ class JpaMessageWriteAdapterTest {
                 10L,
                 7L,
                 "client-1",
-            )
+            ),
         ).thenReturn(Optional.empty())
         `when`(fixture.chatRoomRepository.getReferenceById(10L)).thenReturn(fixture.chatRoom)
         `when`(fixture.userRepository.getReferenceById(7L)).thenReturn(fixture.sender)
@@ -139,8 +138,8 @@ class JpaMessageWriteAdapterTest {
         )
     }
 
-    private fun writeRequest(): MessageWriteRequest {
-        return MessageWriteRequest(
+    private fun writeRequest(): MessageWriteRequest =
+        MessageWriteRequest(
             messageId = "msg-1",
             clientMessageId = "client-1",
             chatRoomId = 10L,
@@ -154,10 +153,9 @@ class JpaMessageWriteAdapterTest {
             fanoutShard = 2,
             createdAt = LocalDateTime.parse("2026-06-13T12:00:00"),
         )
-    }
 
-    private fun existingMessage(fixture: Fixture): Message {
-        return Message(
+    private fun existingMessage(fixture: Fixture): Message =
+        Message(
             id = 101L,
             messageId = "msg-1",
             clientMessageId = "client-1",
@@ -168,12 +166,10 @@ class JpaMessageWriteAdapterTest {
             sequenceNumber = 11L,
             roomSeq = 11L,
         )
-    }
 
     @Suppress("UNCHECKED_CAST")
-    private fun messageListCaptor(): ArgumentCaptor<List<Message>> {
-        return ArgumentCaptor.forClass(List::class.java) as ArgumentCaptor<List<Message>>
-    }
+    private fun messageListCaptor(): ArgumentCaptor<List<Message>> =
+        ArgumentCaptor.forClass(List::class.java) as ArgumentCaptor<List<Message>>
 
     private fun anyMessageList(): List<Message> {
         anyList<Message>()

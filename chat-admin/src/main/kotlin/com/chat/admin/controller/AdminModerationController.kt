@@ -26,7 +26,6 @@ class AdminModerationController(
     private val adminTokenVerifier: AdminTokenVerifier,
     private val adminModerationService: AdminModerationService,
 ) {
-
     @GetMapping("/rules")
     fun listRules(
         @RequestHeader(ADMIN_TOKEN_HEADER, required = false) adminToken: String?,
@@ -99,11 +98,10 @@ class AdminModerationController(
     }
 
     @ExceptionHandler(IllegalArgumentException::class)
-    fun handleIllegalArgumentException(exception: IllegalArgumentException): ResponseEntity<Map<String, String>> {
-        return ResponseEntity
+    fun handleIllegalArgumentException(exception: IllegalArgumentException): ResponseEntity<Map<String, String>> =
+        ResponseEntity
             .status(HttpStatus.BAD_REQUEST)
             .body(mapOf("message" to (exception.message ?: "잘못된 요청입니다.")))
-    }
 
     private companion object {
         const val ADMIN_TOKEN_HEADER = "X-Admin-Token"

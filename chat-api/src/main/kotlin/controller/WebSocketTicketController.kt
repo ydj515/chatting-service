@@ -13,7 +13,6 @@ import org.springframework.web.bind.annotation.RestController
 class WebSocketTicketController(
     private val webSocketTicketService: WebSocketTicketService,
 ) {
-
     @PostMapping("/ws-tickets")
     fun issueTicket(
         @CurrentUserId userId: Long,
@@ -25,14 +24,13 @@ class WebSocketTicketController(
         return ResponseEntity.ok(ticket)
     }
 
-    private fun clientIp(request: HttpServletRequest): String? {
-        return request.getHeader(X_FORWARDED_FOR)
+    private fun clientIp(request: HttpServletRequest): String? =
+        request.getHeader(X_FORWARDED_FOR)
             ?.split(',')
             ?.firstOrNull()
             ?.trim()
             ?.takeIf { it.isNotBlank() }
             ?: request.remoteAddr?.takeIf { it.isNotBlank() }
-    }
 
     private companion object {
         const val X_FORWARDED_FOR = "X-Forwarded-For"

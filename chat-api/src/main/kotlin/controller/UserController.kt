@@ -14,9 +14,8 @@ import org.springframework.web.bind.annotation.*
 @RestController
 @RequestMapping("/users")
 class UserController(
-    private val userService: UserService
+    private val userService: UserService,
 ) {
-
     @PostMapping("/register")
     fun register(@Valid @RequestBody request: CreateUserRequest): ResponseEntity<UserDto> {
         val user = userService.createUser(request)
@@ -30,7 +29,7 @@ class UserController(
     }
 
     @PostMapping("/logout")
-    fun logout(@CurrentSessionToken sessionToken: String): ResponseEntity<Void> {
+    fun logout(@CurrentSessionToken sessionToken: String): ResponseEntity<Unit> {
         userService.logout(sessionToken)
         return ResponseEntity.noContent().build()
     }
@@ -50,7 +49,7 @@ class UserController(
     @GetMapping("/search")
     fun searchUsers(
         @RequestParam username: String,
-        @PageableDefault(size = 10) pageable: Pageable
+        @PageableDefault(size = 10) pageable: Pageable,
     ): ResponseEntity<Page<UserDto>> {
         val users = userService.searchUsers(username, pageable)
         return ResponseEntity.ok(users)

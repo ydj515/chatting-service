@@ -6,7 +6,6 @@ import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Test
 
 class MessageStreamKeyResolverTest {
-
     @Test
     fun `roomStreamKey는 같은 방의 sharded stream key를 같은 Redis Cluster slot에 두기 위해 hash tag를 포함한다`() {
         val resolver = MessageStreamKeyResolver(ChatRedisProperties())

@@ -13,8 +13,8 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories
         "com.chat.domain",
         "com.chat.persistence",
         "com.chat.api",
-        "com.chat.websocket"
-    ]
+        "com.chat.websocket",
+    ],
 )
 @EnableJpaAuditing // JPA에 대한 감사 기능 @CreatedDate
 @EnableJpaRepositories(basePackages = ["com.chat.persistence.repository"])

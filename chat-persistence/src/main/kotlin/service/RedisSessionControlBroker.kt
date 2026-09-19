@@ -25,7 +25,6 @@ class RedisSessionControlBroker(
     private val authProperties: ChatAuthProperties,
     redisProperties: ChatRedisProperties,
 ) : SessionControlPublisher, MessageListener {
-
     private val logger = LoggerFactory.getLogger(javaClass)
     private val serverId = redisProperties.broker.serverId
         ?.takeIf { it.isNotBlank() }

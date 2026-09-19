@@ -7,7 +7,6 @@ import org.junit.jupiter.api.Test
 import java.time.Instant
 
 class AdminMessageSearchCursorCodecTest {
-
     @Test
     fun `admin message cursor codec은 createdAt roomSeq messageId를 opaque 문자열로 왕복한다`() {
         val cursor = AdminMessageCursor(

@@ -1,7 +1,7 @@
 package com.chat.persistence.repository
 
-import com.chat.domain.dto.AdminMessageDto
 import com.chat.domain.dto.AdminMessageCursor
+import com.chat.domain.dto.AdminMessageDto
 import com.chat.domain.dto.AdminMessageSearchCursor
 import com.chat.domain.dto.AdminMessageSearchMode
 import com.chat.domain.dto.AdminRoomPolicyUpdateRequest
@@ -23,7 +23,6 @@ class AdminMessageRepository(
     @Qualifier("jdbcTemplate")
     private val writeJdbcTemplate: JdbcTemplate,
 ) {
-
     fun findRoomMessages(
         roomId: Long,
         from: Instant?,
@@ -42,13 +41,14 @@ class AdminMessageRepository(
             args += Timestamp.from(to)
         }
         if (cursor != null) {
-            where += """
+            where +=
+                """
                 (
                     cm.room_seq < ?
                     OR (cm.room_seq = ? AND cm.created_at < ?)
                     OR (cm.room_seq = ? AND cm.created_at = ? AND cm.message_id < ?)
                 )
-            """.trimIndent()
+                """.trimIndent()
             args += cursor.roomSeq
             args += cursor.roomSeq
             args += Timestamp.from(cursor.createdAt)
@@ -112,13 +112,14 @@ class AdminMessageRepository(
             args += senderId
         }
         if (cursor != null) {
-            where += """
+            where +=
+                """
                 (
                     cm.created_at < ?
                     OR (cm.created_at = ? AND cm.room_seq < ?)
                     OR (cm.created_at = ? AND cm.room_seq = ? AND cm.message_id < ?)
                 )
-            """.trimIndent()
+                """.trimIndent()
             args += Timestamp.from(cursor.createdAt)
             args += Timestamp.from(cursor.createdAt)
             args += cursor.roomSeq
@@ -143,8 +144,8 @@ class AdminMessageRepository(
         )
     }
 
-    fun findRoomStatus(roomId: Long): AdminRoomStatusDto {
-        return try {
+    fun findRoomStatus(roomId: Long): AdminRoomStatusDto =
+        try {
             jdbcTemplate.queryForObject(
                 """
                 SELECT
@@ -168,7 +169,6 @@ class AdminMessageRepository(
         } catch (e: EmptyResultDataAccessException) {
             defaultRoomStatus(roomId)
         }
-    }
 
     fun updateRoomPolicy(
         roomId: Long,
@@ -254,8 +254,8 @@ class AdminMessageRepository(
         ) ?: defaultRoomStatus(roomId)
     }
 
-    private fun defaultRoomStatus(roomId: Long): AdminRoomStatusDto {
-        return AdminRoomStatusDto(
+    private fun defaultRoomStatus(roomId: Long): AdminRoomStatusDto =
+        AdminRoomStatusDto(
             roomId = roomId,
             heatLevel = "NORMAL",
             liveFeedMaxMessages = 1000,
@@ -268,10 +268,10 @@ class AdminMessageRepository(
             autoPolicyEnabled = true,
             moderatorPriority = true,
         )
-    }
 
     private companion object {
-        val BASE_SELECT = """
+        val BASE_SELECT =
+            """
             SELECT
                 cm.message_id,
                 cm.client_message_id,
@@ -287,7 +287,7 @@ class AdminMessageRepository(
                 cm.created_at
             FROM chat_messages cm
             JOIN app_users u ON u.id = cm.sender_id
-        """.trimIndent()
+            """.trimIndent()
 
         val messageRowMapper = RowMapper { rs: ResultSet, _: Int ->
             AdminMessageDto(
@@ -322,9 +322,7 @@ class AdminMessageRepository(
             )
         }
 
-        fun ResultSet.instant(column: String): Instant? {
-            return getTimestamp(column)?.toInstant()
-        }
+        fun ResultSet.instant(column: String): Instant? = getTimestamp(column)?.toInstant()
 
         fun ResultSet.nullableInt(column: String): Int? {
             val value = getInt(column)

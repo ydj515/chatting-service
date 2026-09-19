@@ -20,7 +20,6 @@ class MessageWorkerScheduler(
     private val redisStreamLagMonitor: RedisStreamLagMonitor,
     private val roomSeqGapAuditWorker: RoomSeqGapAuditWorker,
 ) {
-
     @Scheduled(fixedDelayString = "\${chat.worker.poll-delay-millis:100}")
     fun pollWriter() {
         if (workerProperties.roleEnabled(ROLE_MESSAGE_WRITER)) {

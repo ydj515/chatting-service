@@ -1,6 +1,5 @@
 package com.chat.websocket.config
 
-
 import com.chat.websocket.handler.ChatWebSocketHandler
 import com.chat.websocket.interceptor.WebSocketHandshakeInterceptor
 import org.springframework.context.annotation.Configuration
@@ -20,5 +19,4 @@ class WebSocketConfig(
             .addInterceptors(webSocketHandshakeInterceptor)
             .setAllowedOrigins(*webSocketProperties.allowedOrigins.toTypedArray())
     }
-
 }

@@ -6,8 +6,8 @@ import com.chat.persistence.config.ChatRedisProperties
 import com.chat.persistence.config.ChatWorkerProperties
 import com.chat.persistence.redis.MessageStreamConsumer
 import com.chat.persistence.redis.MessageStreamEnvelope
-import com.chat.persistence.redis.MessageStreamRecord
 import com.chat.persistence.redis.MessageStreamKeyResolver
+import com.chat.persistence.redis.MessageStreamRecord
 import com.chat.persistence.redis.RedisMessageBroker
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
@@ -175,12 +175,12 @@ class HotRoomFanoutWorker(
         )
     }
 
-    private fun MessageStreamEnvelope.toChatMessage(): ChatMessage {
-        return ChatMessage(
+    private fun MessageStreamEnvelope.toChatMessage(): ChatMessage =
+        ChatMessage(
             id = roomSeq,
             messageId = messageId,
             clientMessageId = clientMessageId,
-            content = content ?: "",
+            content = content.orEmpty(),
             messageType = messageType,
             senderId = senderId,
             senderName = senderName,
@@ -192,7 +192,6 @@ class HotRoomFanoutWorker(
             chatRoomId = chatRoomId,
             timestamp = createdAt,
         )
-    }
 
     private companion object {
         const val OUTCOME_FAILURE = "failure"

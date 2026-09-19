@@ -14,19 +14,21 @@ class PartitionedMessageRepository(
     @Qualifier("jdbcTemplate")
     private val jdbcTemplate: JdbcTemplate,
 ) {
-
     fun batchInsert(requests: List<MessageWriteRequest>): List<Boolean> {
         if (requests.isEmpty()) {
             return emptyList()
         }
 
-        return jdbcTemplate.batchUpdate(INSERT_SQL, object : BatchPreparedStatementSetter {
-            override fun setValues(ps: PreparedStatement, i: Int) {
-                bindInsert(ps, requests[i])
-            }
+        return jdbcTemplate.batchUpdate(
+            INSERT_SQL,
+            object : BatchPreparedStatementSetter {
+                override fun setValues(ps: PreparedStatement, i: Int) {
+                    bindInsert(ps, requests[i])
+                }
 
-            override fun getBatchSize(): Int = requests.size
-        }).map { updateCount ->
+                override fun getBatchSize(): Int = requests.size
+            },
+        ).map { updateCount ->
             toInsertResult(updateCount)
         }
     }
@@ -45,12 +47,11 @@ class PartitionedMessageRepository(
         ps.setTimestamp(11, Timestamp.valueOf(request.createdAt))
     }
 
-    private fun toInsertResult(updateCount: Int): Boolean {
-        return updateCount > 0 || updateCount == Statement.SUCCESS_NO_INFO
-    }
+    private fun toInsertResult(updateCount: Int): Boolean = updateCount > 0 || updateCount == Statement.SUCCESS_NO_INFO
 
     private companion object {
-        val INSERT_SQL = """
+        val INSERT_SQL =
+            """
             INSERT INTO chat_messages (
                 message_id,
                 client_message_id,
@@ -66,6 +67,6 @@ class PartitionedMessageRepository(
             )
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT DO NOTHING
-        """.trimIndent()
+            """.trimIndent()
     }
 }

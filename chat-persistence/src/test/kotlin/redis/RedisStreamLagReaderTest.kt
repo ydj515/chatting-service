@@ -11,7 +11,6 @@ import org.springframework.data.redis.core.SetOperations
 import org.springframework.data.redis.core.StreamOperations
 
 class RedisStreamLagReaderTest {
-
     @Test
     fun `known stream group의 lag와 pending summary를 읽는다`() {
         val redisTemplate = redisTemplate()
@@ -43,19 +42,16 @@ class RedisStreamLagReaderTest {
     }
 
     @Suppress("UNCHECKED_CAST")
-    private fun redisTemplate(): RedisTemplate<String, String> {
-        return mock(RedisTemplate::class.java) as RedisTemplate<String, String>
-    }
+    private fun redisTemplate(): RedisTemplate<String, String> =
+        mock(RedisTemplate::class.java) as RedisTemplate<String, String>
 
     @Suppress("UNCHECKED_CAST")
-    private fun setOperations(): SetOperations<String, String> {
-        return mock(SetOperations::class.java) as SetOperations<String, String>
-    }
+    private fun setOperations(): SetOperations<String, String> =
+        mock(SetOperations::class.java) as SetOperations<String, String>
 
     @Suppress("UNCHECKED_CAST")
-    private fun streamOperations(): StreamOperations<String, String, String> {
-        return mock(StreamOperations::class.java) as StreamOperations<String, String, String>
-    }
+    private fun streamOperations(): StreamOperations<String, String, String> =
+        mock(StreamOperations::class.java) as StreamOperations<String, String, String>
 
     private fun xInfoGroups(
         consumerGroup: String,

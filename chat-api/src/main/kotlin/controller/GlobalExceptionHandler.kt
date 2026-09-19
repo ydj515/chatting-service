@@ -23,7 +23,6 @@ import java.time.LocalDateTime
 
 @RestControllerAdvice
 class GlobalExceptionHandler {
-
     private val logger = LoggerFactory.getLogger(GlobalExceptionHandler::class.java)
 
     @ExceptionHandler(MethodArgumentNotValidException::class)
@@ -50,109 +49,100 @@ class GlobalExceptionHandler {
     fun handleBadRequestException(
         exception: Exception,
         request: HttpServletRequest,
-    ): ResponseEntity<ApiErrorResponse> {
-        return buildResponse(
+    ): ResponseEntity<ApiErrorResponse> =
+        buildResponse(
             status = HttpStatus.BAD_REQUEST,
             message = exception.message ?: "잘못된 요청입니다.",
             path = request.requestURI,
         )
-    }
 
     @ExceptionHandler(IllegalArgumentException::class)
     fun handleIllegalArgumentException(
         exception: IllegalArgumentException,
         request: HttpServletRequest,
-    ): ResponseEntity<ApiErrorResponse> {
-        return buildResponse(
+    ): ResponseEntity<ApiErrorResponse> =
+        buildResponse(
             status = HttpStatus.BAD_REQUEST,
             message = exception.message ?: "잘못된 요청입니다.",
             path = request.requestURI,
         )
-    }
 
     @ExceptionHandler(UnauthenticatedException::class)
     fun handleUnauthenticatedException(
         exception: UnauthenticatedException,
         request: HttpServletRequest,
-    ): ResponseEntity<ApiErrorResponse> {
-        return buildResponse(
+    ): ResponseEntity<ApiErrorResponse> =
+        buildResponse(
             status = HttpStatus.UNAUTHORIZED,
             message = exception.message ?: "인증이 필요합니다.",
             path = request.requestURI,
         )
-    }
 
     @ExceptionHandler(IllegalStateException::class)
     fun handleIllegalStateException(
         exception: IllegalStateException,
         request: HttpServletRequest,
-    ): ResponseEntity<ApiErrorResponse> {
-        return buildResponse(
+    ): ResponseEntity<ApiErrorResponse> =
+        buildResponse(
             status = HttpStatus.CONFLICT,
             message = exception.message ?: "요청 상태가 현재 리소스 상태와 충돌합니다.",
             path = request.requestURI,
         )
-    }
 
     @ExceptionHandler(ResourceNotFoundException::class)
     fun handleResourceNotFoundException(
         exception: ResourceNotFoundException,
         request: HttpServletRequest,
-    ): ResponseEntity<ApiErrorResponse> {
-        return buildResponse(
+    ): ResponseEntity<ApiErrorResponse> =
+        buildResponse(
             status = HttpStatus.NOT_FOUND,
             message = exception.message ?: "요청한 리소스를 찾을 수 없습니다.",
             path = request.requestURI,
         )
-    }
 
     @ExceptionHandler(ResourceConflictException::class)
     fun handleResourceConflictException(
         exception: ResourceConflictException,
         request: HttpServletRequest,
-    ): ResponseEntity<ApiErrorResponse> {
-        return buildResponse(
+    ): ResponseEntity<ApiErrorResponse> =
+        buildResponse(
             status = HttpStatus.CONFLICT,
             message = exception.message ?: "요청 상태가 현재 리소스 상태와 충돌합니다.",
             path = request.requestURI,
         )
-    }
 
     @ExceptionHandler(ForbiddenOperationException::class)
     fun handleForbiddenOperationException(
         exception: ForbiddenOperationException,
         request: HttpServletRequest,
-    ): ResponseEntity<ApiErrorResponse> {
-        return buildResponse(
+    ): ResponseEntity<ApiErrorResponse> =
+        buildResponse(
             status = HttpStatus.FORBIDDEN,
             message = exception.message ?: "해당 작업을 수행할 권한이 없습니다.",
             path = request.requestURI,
         )
-    }
 
     @ExceptionHandler(MessageAdmissionRejectedException::class)
     fun handleMessageAdmissionRejectedException(
         exception: MessageAdmissionRejectedException,
         request: HttpServletRequest,
-    ): ResponseEntity<ApiErrorResponse> {
-        return buildResponse(
+    ): ResponseEntity<ApiErrorResponse> =
+        buildResponse(
             status = HttpStatus.TOO_MANY_REQUESTS,
             message = exception.message ?: "메시지 전송 제한을 초과했습니다.",
             path = request.requestURI,
         )
-    }
 
     @ExceptionHandler(MessageModerationRejectedException::class)
     fun handleMessageModerationRejectedException(
         exception: MessageModerationRejectedException,
         request: HttpServletRequest,
-    ): ResponseEntity<ApiErrorResponse> {
-        return buildResponse(
+    ): ResponseEntity<ApiErrorResponse> =
+        buildResponse(
             status = HttpStatus.FORBIDDEN,
             message = exception.message ?: "메시지가 moderation 정책에 의해 거부되었습니다.",
             path = request.requestURI,
         )
-    }
 
     @ExceptionHandler(Exception::class)
     fun handleException(
@@ -173,25 +163,23 @@ class GlobalExceptionHandler {
         message: String,
         path: String,
         errors: List<ApiFieldErrorResponse>? = null,
-    ): ResponseEntity<ApiErrorResponse> {
-        return ResponseEntity.status(status).body(
+    ): ResponseEntity<ApiErrorResponse> =
+        ResponseEntity.status(status).body(
             ApiErrorResponse(
                 status = status.value(),
                 error = status.name,
                 message = message,
                 path = path,
                 errors = errors.orEmpty(),
-            )
+            ),
         )
-    }
 
-    private fun FieldError.toFieldErrorResponse(): ApiFieldErrorResponse {
-        return ApiFieldErrorResponse(
+    private fun FieldError.toFieldErrorResponse(): ApiFieldErrorResponse =
+        ApiFieldErrorResponse(
             field = field,
             message = defaultMessage ?: "유효하지 않은 값입니다.",
             rejectedValue = rejectedValue,
         )
-    }
 }
 
 @JsonInclude(JsonInclude.Include.NON_EMPTY)

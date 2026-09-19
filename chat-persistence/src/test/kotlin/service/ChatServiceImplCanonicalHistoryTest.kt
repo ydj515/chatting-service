@@ -31,7 +31,6 @@ import java.time.Instant
 import java.time.LocalDateTime
 
 class ChatServiceImplCanonicalHistoryTest {
-
     @Test
     fun `getMessages는 canonical read port의 page 결과를 반환한다`() {
         val readPort = FakeMessageReadPort(
@@ -192,8 +191,8 @@ class ChatServiceImplCanonicalHistoryTest {
         override fun shardConfig(roomId: Long): RoomShardConfig = RoomShardConfig()
     }
 
-    private fun messageDto(roomSeq: Long): MessageDto {
-        return MessageDto(
+    private fun messageDto(roomSeq: Long): MessageDto =
+        MessageDto(
             id = roomSeq,
             messageId = "msg-$roomSeq",
             clientMessageId = "client-$roomSeq",
@@ -218,7 +217,6 @@ class ChatServiceImplCanonicalHistoryTest {
             roomSeq = roomSeq,
             writeShard = 1,
         )
-    }
 
     private class FakeMessageReadPort(
         private val page: PageImpl<MessageDto> = PageImpl(emptyList()),

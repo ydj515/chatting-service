@@ -1,28 +1,11 @@
 <?xml version="1.0" ?>
 <SmellBaseline>
-  <ManuallySuppressedIssues/>
+  <ManuallySuppressedIssues />
   <CurrentIssues>
-    <ID>InvalidPackageDeclaration:AuthenticatedUserResolver.kt$package com.chat.api.security</ID>
-    <ID>InvalidPackageDeclaration:AuthenticatedUserResolverTest.kt$package com.chat.api.security</ID>
-    <ID>InvalidPackageDeclaration:ChatController.kt$package com.chat.api.controller</ID>
-    <ID>InvalidPackageDeclaration:ChatControllerTest.kt$package com.chat.api.controller</ID>
-    <ID>InvalidPackageDeclaration:CorsProperties.kt$package com.chat.api.config</ID>
-    <ID>InvalidPackageDeclaration:CurrentSessionToken.kt$package com.chat.api.security</ID>
-    <ID>InvalidPackageDeclaration:CurrentUserId.kt$package com.chat.api.security</ID>
-    <ID>InvalidPackageDeclaration:FixedCurrentAuthenticationResolver.kt$package com.chat.api.security</ID>
-    <ID>InvalidPackageDeclaration:GlobalExceptionHandler.kt$package com.chat.api.controller</ID>
-    <ID>InvalidPackageDeclaration:GlobalExceptionHandlerTest.kt$package com.chat.api.controller</ID>
-    <ID>InvalidPackageDeclaration:MessagePaginationProperties.kt$package com.chat.api.config</ID>
-    <ID>InvalidPackageDeclaration:UserController.kt$package com.chat.api.controller</ID>
-    <ID>InvalidPackageDeclaration:UserControllerTest.kt$package com.chat.api.controller</ID>
-    <ID>InvalidPackageDeclaration:WebConfig.kt$package com.chat.api.config</ID>
-    <ID>InvalidPackageDeclaration:WebSocketTicketController.kt$package com.chat.api.controller</ID>
-    <ID>InvalidPackageDeclaration:WebSocketTicketControllerTest.kt$package com.chat.api.controller</ID>
     <ID>LongParameterList:ChatController.kt$ChatController$( @CurrentUserId authenticatedUserId: Long, @PathVariable id: Long, @RequestParam(required = false) cursor: Long?, @RequestParam(required = false) cursorToken: String?, @RequestParam(required = false) limit: Int?, @RequestParam(required = false) direction: MessageDirection?, )</ID>
     <ID>SpreadOperator:WebConfig.kt$WebConfig$(*corsProperties.allowedHeaders.toTypedArray())</ID>
     <ID>SpreadOperator:WebConfig.kt$WebConfig$(*corsProperties.allowedMethods.toTypedArray())</ID>
     <ID>SpreadOperator:WebConfig.kt$WebConfig$(*corsProperties.allowedOrigins.toTypedArray())</ID>
     <ID>TooGenericExceptionThrown:GlobalExceptionHandlerTest.kt$GlobalExceptionHandlerTest.TestErrorController$throw RuntimeException("database password leaked in stack trace")</ID>
-    <ID>UseCheckOrError:GlobalExceptionHandlerTest.kt$GlobalExceptionHandlerTest.TestErrorController$throw IllegalStateException("이미 참여한 채팅방입니다")</ID>
   </CurrentIssues>
 </SmellBaseline>

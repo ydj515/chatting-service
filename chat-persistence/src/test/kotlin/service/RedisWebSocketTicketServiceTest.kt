@@ -28,11 +28,11 @@ import java.time.ZoneOffset
 import java.util.stream.Stream
 
 class RedisWebSocketTicketServiceTest {
-
     private val clock = Clock.fixed(Instant.parse("2026-06-13T00:00:00Z"), ZoneOffset.UTC)
     private val objectMapper = ObjectMapper()
         .registerModule(JavaTimeModule())
         .registerModule(KotlinModule.Builder().build())
+
     @Suppress("UNCHECKED_CAST")
     private val redisScriptMatcherPlaceholder = mock(RedisScript::class.java) as RedisScript<Long>
 
@@ -139,7 +139,7 @@ class RedisWebSocketTicketServiceTest {
     fun `rate limit Lua script 실패는 전용 metric을 기록하고 fail closed로 실패한다`() {
         val redis = redisTemplate()
         doAnswer {
-            throw IllegalStateException("redis script failed")
+            error("redis script failed")
         }.`when`(redis.template).execute(
             anyRedisScript(),
             eq(listOf("chat:ws-ticket:rate:user:42")),
@@ -190,47 +190,31 @@ class RedisWebSocketTicketServiceTest {
         ),
         clock: Clock = this.clock,
         meterRegistry: MeterRegistry? = null,
-    ): RedisWebSocketTicketService {
-        return RedisWebSocketTicketService(
+    ): RedisWebSocketTicketService =
+        RedisWebSocketTicketService(
             redisTemplate = redis,
             objectMapper = objectMapper,
             authProperties = properties,
             clock = clock,
             meterRegistryProvider = meterRegistry?.let { meterRegistryProvider(it) },
         )
-    }
 
-    private fun meterRegistryProvider(meterRegistry: MeterRegistry): ObjectProvider<MeterRegistry> {
-        return object : ObjectProvider<MeterRegistry> {
-            override fun getObject(): MeterRegistry {
-                return meterRegistry
-            }
+    private fun meterRegistryProvider(meterRegistry: MeterRegistry): ObjectProvider<MeterRegistry> =
+        object : ObjectProvider<MeterRegistry> {
+            override fun getObject(): MeterRegistry = meterRegistry
 
-            override fun getObject(vararg args: Any?): MeterRegistry {
-                return meterRegistry
-            }
+            override fun getObject(vararg args: Any?): MeterRegistry = meterRegistry
 
-            override fun getIfAvailable(): MeterRegistry {
-                return meterRegistry
-            }
+            override fun getIfAvailable(): MeterRegistry = meterRegistry
 
-            override fun getIfUnique(): MeterRegistry {
-                return meterRegistry
-            }
+            override fun getIfUnique(): MeterRegistry = meterRegistry
 
-            override fun iterator(): MutableIterator<MeterRegistry> {
-                return mutableListOf(meterRegistry).iterator()
-            }
+            override fun iterator(): MutableIterator<MeterRegistry> = mutableListOf(meterRegistry).iterator()
 
-            override fun stream(): Stream<MeterRegistry> {
-                return Stream.of(meterRegistry)
-            }
+            override fun stream(): Stream<MeterRegistry> = Stream.of(meterRegistry)
 
-            override fun orderedStream(): Stream<MeterRegistry> {
-                return Stream.of(meterRegistry)
-            }
+            override fun orderedStream(): Stream<MeterRegistry> = Stream.of(meterRegistry)
         }
-    }
 
     @Suppress("UNCHECKED_CAST")
     private fun redisTemplate(): RedisFixture {

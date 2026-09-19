@@ -19,7 +19,6 @@ class PartitionedMessageReadRepository(
     private val messageReadJdbcTemplate: JdbcTemplate,
     private val latestHistoryReadRoutingPolicy: LatestHistoryReadRoutingPolicy,
 ) {
-
     fun findPageByRoom(roomId: Long, pageable: Pageable): Page<CanonicalMessageRecord> {
         val template = latestHistoryTemplate()
         val messages = template.query(
@@ -33,49 +32,43 @@ class PartitionedMessageReadRepository(
         return PageImpl(messages, pageable, total)
     }
 
-    fun findLatestMessages(roomId: Long, limit: Int): List<CanonicalMessageRecord> {
-        return latestHistoryTemplate().query(
+    fun findLatestMessages(roomId: Long, limit: Int): List<CanonicalMessageRecord> =
+        latestHistoryTemplate().query(
             "$BASE_SELECT $ROOM_FILTER ORDER BY cm.room_seq DESC, cm.created_at DESC LIMIT ?",
             rowMapper,
             roomId,
             limit,
         )
-    }
 
-    fun findMessagesBefore(roomId: Long, cursor: Long, limit: Int): List<CanonicalMessageRecord> {
-        return messageReadJdbcTemplate.query(
+    fun findMessagesBefore(roomId: Long, cursor: Long, limit: Int): List<CanonicalMessageRecord> =
+        messageReadJdbcTemplate.query(
             "$BASE_SELECT $ROOM_FILTER AND cm.room_seq < ? ORDER BY cm.room_seq DESC, cm.created_at DESC LIMIT ?",
             rowMapper,
             roomId,
             cursor,
             limit,
         )
-    }
 
-    fun findMessagesAfter(roomId: Long, cursor: Long, limit: Int): List<CanonicalMessageRecord> {
-        return messageReadJdbcTemplate.query(
+    fun findMessagesAfter(roomId: Long, cursor: Long, limit: Int): List<CanonicalMessageRecord> =
+        messageReadJdbcTemplate.query(
             "$BASE_SELECT $ROOM_FILTER AND cm.room_seq > ? ORDER BY cm.room_seq ASC, cm.created_at ASC LIMIT ?",
             rowMapper,
             roomId,
             cursor,
             limit,
         )
-    }
 
-    fun findGapMessages(roomId: Long, afterSeq: Long, limit: Int): List<CanonicalMessageRecord> {
-        return findMessagesAfter(roomId, afterSeq, limit)
-    }
+    fun findGapMessages(roomId: Long, afterSeq: Long, limit: Int): List<CanonicalMessageRecord> = findMessagesAfter(roomId, afterSeq, limit)
 
-    fun findLatestMessage(roomId: Long): CanonicalMessageRecord? {
-        return latestHistoryTemplate().query(
+    fun findLatestMessage(roomId: Long): CanonicalMessageRecord? =
+        latestHistoryTemplate().query(
             "$BASE_SELECT $ROOM_FILTER ORDER BY cm.room_seq DESC, cm.created_at DESC LIMIT 1",
             rowMapper,
             roomId,
         ).firstOrNull()
-    }
 
-    fun findByClientMessageId(roomId: Long, senderId: Long, clientMessageId: String): CanonicalMessageRecord? {
-        return jdbcTemplate.query(
+    fun findByClientMessageId(roomId: Long, senderId: Long, clientMessageId: String): CanonicalMessageRecord? =
+        jdbcTemplate.query(
             """
             $BASE_SELECT
             $ROOM_FILTER
@@ -89,26 +82,24 @@ class PartitionedMessageReadRepository(
             senderId,
             clientMessageId,
         ).firstOrNull()
-    }
 
-    private fun countByRoom(roomId: Long, template: JdbcTemplate): Long {
-        return template.queryForObject(
+    private fun countByRoom(roomId: Long, template: JdbcTemplate): Long =
+        template.queryForObject(
             "SELECT count(*) FROM chat_messages cm WHERE cm.room_id = ? AND cm.is_deleted = false",
             Long::class.java,
             roomId,
         ) ?: 0L
-    }
 
-    private fun latestHistoryTemplate(): JdbcTemplate {
-        return if (latestHistoryReadRoutingPolicy.usePrimaryForLatestHistory()) {
+    private fun latestHistoryTemplate(): JdbcTemplate =
+        if (latestHistoryReadRoutingPolicy.usePrimaryForLatestHistory()) {
             jdbcTemplate
         } else {
             messageReadJdbcTemplate
         }
-    }
 
     private companion object {
-        val BASE_SELECT = """
+        val BASE_SELECT =
+            """
             SELECT
                 cm.message_id,
                 cm.client_message_id,
@@ -131,7 +122,7 @@ class PartitionedMessageReadRepository(
                 cm.created_at
             FROM chat_messages cm
             JOIN app_users u ON u.id = cm.sender_id
-        """.trimIndent()
+            """.trimIndent()
         const val ROOM_FILTER = "WHERE cm.room_id = ? AND cm.is_deleted = false"
 
         val rowMapper = RowMapper { rs: ResultSet, _: Int ->

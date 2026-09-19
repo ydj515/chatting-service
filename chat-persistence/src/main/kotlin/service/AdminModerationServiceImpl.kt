@@ -33,11 +33,8 @@ class AdminModerationServiceImpl(
     private val sessionControlPublisher: SessionControlPublisher,
     private val cacheManager: CacheManager,
 ) : AdminModerationService {
-
     @Transactional(readOnly = true)
-    override fun listRules(actor: String, roomId: Long?, enabled: Boolean?): List<AdminModerationRuleDto> {
-        return ruleRepository.listRules(roomId, enabled).map { it.toDto() }
-    }
+    override fun listRules(actor: String, roomId: Long?, enabled: Boolean?): List<AdminModerationRuleDto> = ruleRepository.listRules(roomId, enabled).map { it.toDto() }
 
     @Transactional
     @CacheEvict(value = ["moderationRules"], allEntries = true)
@@ -58,9 +55,7 @@ class AdminModerationServiceImpl(
         ruleId: Long,
         request: AdminUpdateModerationRuleRequest,
     ): AdminModerationRuleDto {
-        if (request.pattern?.isBlank() == true) {
-            throw IllegalArgumentException("pattern must not be blank")
-        }
+        require(request.pattern?.isBlank() != true) { "pattern must not be blank" }
 
         val record = ruleRepository.update(ruleId, request)
         audit(actor, "ADMIN_MODERATION_RULE_UPDATED", "MODERATION_RULE", "rule:${record.id}", request)
@@ -82,9 +77,7 @@ class AdminModerationServiceImpl(
     }
 
     @Transactional(readOnly = true)
-    override fun listSanctions(actor: String, roomId: Long?, userId: Long?, active: Boolean?): List<AdminUserSanctionDto> {
-        return sanctionRepository.listSanctions(roomId, userId, active).map { it.toDto() }
-    }
+    override fun listSanctions(actor: String, roomId: Long?, userId: Long?, active: Boolean?): List<AdminUserSanctionDto> = sanctionRepository.listSanctions(roomId, userId, active).map { it.toDto() }
 
     @Transactional
     override fun createSanction(actor: String, request: AdminCreateUserSanctionRequest): AdminUserSanctionDto {
@@ -116,35 +109,27 @@ class AdminModerationServiceImpl(
     }
 
     private fun validateRuleRequest(scopeType: ModerationScopeType, roomId: Long?, pattern: String) {
-        if (scopeType == ModerationScopeType.GLOBAL && roomId != null) {
-            throw IllegalArgumentException("GLOBAL rule must not have roomId")
-        }
-        if (scopeType == ModerationScopeType.ROOM && roomId == null) {
-            throw IllegalArgumentException("ROOM rule requires roomId")
-        }
-        if (pattern.isBlank()) {
-            throw IllegalArgumentException("pattern must not be blank")
-        }
+        require(scopeType != ModerationScopeType.GLOBAL || roomId == null) { "GLOBAL rule must not have roomId" }
+        require(scopeType != ModerationScopeType.ROOM || roomId != null) { "ROOM rule requires roomId" }
+        require(pattern.isNotBlank()) { "pattern must not be blank" }
     }
 
     private fun validateSanctionRequest(request: AdminCreateUserSanctionRequest) {
         when (request.type) {
             UserSanctionType.MUTE, UserSanctionType.BAN -> {
-                if (request.scopeType != ModerationScopeType.ROOM || request.roomId == null) {
-                    throw IllegalArgumentException("MUTE and BAN require ROOM scope")
+                require(request.scopeType == ModerationScopeType.ROOM && request.roomId != null) {
+                    "MUTE and BAN require ROOM scope"
                 }
             }
             UserSanctionType.SUSPEND -> {
-                if (request.scopeType != ModerationScopeType.GLOBAL || request.roomId != null) {
-                    throw IllegalArgumentException("SUSPEND requires GLOBAL scope")
+                require(request.scopeType == ModerationScopeType.GLOBAL && request.roomId == null) {
+                    "SUSPEND requires GLOBAL scope"
                 }
             }
         }
         // 만료 시각이 과거/현재면 send 경로(activeSanctionsForUser)에서 절대 적용되지 않으므로 거부한다.
         val expiresAt = request.expiresAt
-        if (expiresAt != null && !expiresAt.isAfter(Instant.now())) {
-            throw IllegalArgumentException("expiresAt must be in the future")
-        }
+        require(expiresAt == null || expiresAt.isAfter(Instant.now())) { "expiresAt must be in the future" }
     }
 
     private fun audit(actor: String, action: String, targetType: String, targetId: String, metadata: Any) {

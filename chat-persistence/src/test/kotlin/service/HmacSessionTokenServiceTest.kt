@@ -12,13 +12,12 @@ import java.time.Instant
 import java.time.ZoneOffset
 
 class HmacSessionTokenServiceTest {
-
     private val clock = Clock.fixed(Instant.parse("2026-06-12T00:00:00Z"), ZoneOffset.UTC)
     private val properties = ChatAuthProperties(
         session = ChatAuthProperties.Session(
             secret = "test-secret-that-is-long-enough-for-hmac",
             ttl = Duration.ofMinutes(30),
-        )
+        ),
     )
 
     @Test

@@ -18,14 +18,12 @@ import org.springframework.data.redis.serializer.StringRedisSerializer
 import java.time.Duration
 import java.util.concurrent.Executors
 
-
 @Configuration
 class RedisConfig {
-
     @Bean
     @Profile("redis-cluster")
-    fun redisClusterTopologyRefreshCustomizer(): LettuceClientConfigurationBuilderCustomizer {
-        return LettuceClientConfigurationBuilderCustomizer { builder ->
+    fun redisClusterTopologyRefreshCustomizer(): LettuceClientConfigurationBuilderCustomizer =
+        LettuceClientConfigurationBuilderCustomizer { builder ->
             val topologyRefreshOptions = ClusterTopologyRefreshOptions.builder()
                 .enableAllAdaptiveRefreshTriggers()
                 .enablePeriodicRefresh(Duration.ofSeconds(30))
@@ -36,10 +34,9 @@ class RedisConfig {
 
             builder.clientOptions(clusterClientOptions)
         }
-    }
 
     @Bean("distributedObjectMapper")
-    fun distributedObjectMapper() : ObjectMapper {
+    fun distributedObjectMapper(): ObjectMapper {
         // 1751027620000 -> "2025-06-27T11:47:00"
         return ObjectMapper().apply {
             registerModule(JavaTimeModule())
@@ -50,8 +47,8 @@ class RedisConfig {
     }
 
     @Bean
-    fun redisTemplate(connectionFactory: RedisConnectionFactory) : RedisTemplate<String, String> {
-        return RedisTemplate<String, String>().apply {
+    fun redisTemplate(connectionFactory: RedisConnectionFactory): RedisTemplate<String, String> =
+        RedisTemplate<String, String>().apply {
             setConnectionFactory(connectionFactory)
             keySerializer = StringRedisSerializer()
             valueSerializer = StringRedisSerializer()
@@ -59,24 +56,24 @@ class RedisConfig {
             hashValueSerializer = StringRedisSerializer()
             afterPropertiesSet()
         }
-    }
 
     @Bean
     fun redisMessageListenerContainer(
         connectionFactory: RedisConnectionFactory,
-    ) : RedisMessageListenerContainer{
-        return RedisMessageListenerContainer().apply {
+    ): RedisMessageListenerContainer =
+        RedisMessageListenerContainer().apply {
             setConnectionFactory(connectionFactory)
-            setTaskExecutor(Executors.newCachedThreadPool { runnable ->
-                Thread(runnable).apply {
-                    name = "redis-message-listener-container-${System.currentTimeMillis()}"
-                    isDaemon = true
-                }
-            })
-            setErrorHandler { t->
+            setTaskExecutor(
+                Executors.newCachedThreadPool { runnable ->
+                    Thread(runnable).apply {
+                        name = "redis-message-listener-container-${System.currentTimeMillis()}"
+                        isDaemon = true
+                    }
+                },
+            )
+            setErrorHandler { t ->
                 println("Redis Message Listener Error: $t")
                 t.printStackTrace()
             }
         }
-    }
 }

@@ -14,10 +14,8 @@ import org.springframework.web.method.support.ModelAndViewContainer
 class AuthenticatedUserResolver(
     private val sessionTokenService: SessionTokenService,
 ) : HandlerMethodArgumentResolver {
-
-    override fun supportsParameter(parameter: MethodParameter): Boolean {
-        return supportsCurrentUserId(parameter) || supportsCurrentSessionToken(parameter)
-    }
+    override fun supportsParameter(parameter: MethodParameter): Boolean =
+        supportsCurrentUserId(parameter) || supportsCurrentSessionToken(parameter)
 
     override fun resolveArgument(
         parameter: MethodParameter,
@@ -33,29 +31,25 @@ class AuthenticatedUserResolver(
         }
     }
 
-    private fun authenticateUserId(token: String): Long {
-        return sessionTokenService.authenticate(token)?.userId
+    private fun authenticateUserId(token: String): Long =
+        sessionTokenService.authenticate(token)?.userId
             ?: throw UnauthenticatedException("유효하지 않은 인증 토큰입니다.")
-    }
 
-    private fun resolveBearerToken(authorizationHeader: String?): String {
-        return authorizationHeader
+    private fun resolveBearerToken(authorizationHeader: String?): String =
+        authorizationHeader
             ?.takeIf { it.startsWith(BEARER_PREFIX, ignoreCase = true) }
             ?.substring(BEARER_PREFIX.length)
             ?.trim()
             ?.takeIf { it.isNotBlank() }
             ?: throw UnauthenticatedException("인증 토큰이 필요합니다.")
-    }
 
-    private fun supportsCurrentUserId(parameter: MethodParameter): Boolean {
-        return parameter.hasParameterAnnotation(CurrentUserId::class.java) &&
+    private fun supportsCurrentUserId(parameter: MethodParameter): Boolean =
+        parameter.hasParameterAnnotation(CurrentUserId::class.java) &&
             (parameter.parameterType == java.lang.Long.TYPE || parameter.parameterType == java.lang.Long::class.java)
-    }
 
-    private fun supportsCurrentSessionToken(parameter: MethodParameter): Boolean {
-        return parameter.hasParameterAnnotation(CurrentSessionToken::class.java) &&
+    private fun supportsCurrentSessionToken(parameter: MethodParameter): Boolean =
+        parameter.hasParameterAnnotation(CurrentSessionToken::class.java) &&
             parameter.parameterType == String::class.java
-    }
 
     private companion object {
         const val BEARER_PREFIX = "Bearer "

@@ -5,7 +5,6 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 
 class RoomPolicyAutoDowngradeServiceTest {
-
     @Test
     fun `traffic snapshot을 heat policy로 분류한 뒤 room policy repository에 적용한다`() {
         val repository = RecordingRoomPolicyRepository()

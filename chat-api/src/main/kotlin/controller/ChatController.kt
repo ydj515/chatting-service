@@ -17,7 +17,6 @@ class ChatController(
     private val chatService: ChatService,
     private val messagePaginationProperties: MessagePaginationProperties,
 ) {
-
     @PostMapping
     fun createChatRoom(
         @CurrentUserId userId: Long,
@@ -46,7 +45,7 @@ class ChatController(
     fun joinChatRoom(
         @CurrentUserId userId: Long,
         @PathVariable id: Long,
-    ): ResponseEntity<Void> {
+    ): ResponseEntity<Unit> {
         chatService.joinChatRoom(id, userId)
         return ResponseEntity.ok().build()
     }
@@ -55,7 +54,7 @@ class ChatController(
     fun leaveChatRoom(
         @CurrentUserId authenticatedUserId: Long,
         @PathVariable id: Long,
-    ): ResponseEntity<Void> {
+    ): ResponseEntity<Unit> {
         chatService.leaveChatRoom(id, authenticatedUserId)
         return ResponseEntity.ok().build()
     }

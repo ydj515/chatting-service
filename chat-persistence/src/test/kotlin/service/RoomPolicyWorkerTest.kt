@@ -7,7 +7,6 @@ import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
 
 class RoomPolicyWorkerTest {
-
     @Test
     fun `active room snapshot마다 자동 downgrade policy를 적용한다`() {
         val trafficStatsService = StaticRoomTrafficStatsService(
@@ -87,27 +86,21 @@ class RoomPolicyWorkerTest {
     private class StaticRoomTrafficStatsService(
         private val snapshots: Map<Long, RoomTrafficSnapshot>,
     ) : RoomTrafficStatsService {
-
         override fun recordAccepted(roomId: Long) = Unit
 
         override fun activeRoomIds(): Set<Long> = snapshots.keys
 
-        override fun snapshot(roomId: Long): RoomTrafficSnapshot {
-            return snapshots.getValue(roomId)
-        }
+        override fun snapshot(roomId: Long): RoomTrafficSnapshot = snapshots.getValue(roomId)
     }
 
     private class StaticRoomPolicySignalProvider(
         private val signals: Map<Long, RoomPolicySignals>,
     ) : RoomPolicySignalProvider {
-
-        override fun signals(roomId: Long): RoomPolicySignals {
-            return signals.getValue(roomId)
-        }
+        override fun signals(roomId: Long): RoomPolicySignals = signals.getValue(roomId)
     }
 
-    private fun normalPolicy(roomId: Long): RoomHeatPolicy {
-        return RoomHeatPolicy(
+    private fun normalPolicy(roomId: Long): RoomHeatPolicy =
+        RoomHeatPolicy(
             roomId = roomId,
             heatLevel = RoomHeatLevel.NORMAL,
             liveFeedMaxMessages = 1000,
@@ -117,5 +110,4 @@ class RoomPolicyWorkerTest {
             writeShardCount = 1,
             fanoutShardCount = 1,
         )
-    }
 }

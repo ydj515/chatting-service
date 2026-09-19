@@ -36,7 +36,6 @@ class AdminChatServiceImpl(
     private val objectStorageProperties: ChatObjectStorageProperties,
     private val objectMapper: ObjectMapper,
 ) : AdminChatService {
-
     override fun getRoomMessages(
         actor: String,
         request: AdminMessageHistoryRequest,
@@ -205,23 +204,21 @@ class AdminChatServiceImpl(
 
     private fun Long.toMillis(): Long = this / 1_000_000
 
-    private fun AdminMessageDto.toSearchCursor(): String {
-        return AdminMessageSearchCursorCodec.encode(
+    private fun AdminMessageDto.toSearchCursor(): String =
+        AdminMessageSearchCursorCodec.encode(
             AdminMessageSearchCursor(
                 createdAt = createdAt,
                 roomSeq = roomSeq,
                 messageId = messageId,
             ),
         )
-    }
 
-    private fun AdminMessageDto.toAdminMessageCursor(): String {
-        return AdminMessageCursorCodec.encode(
+    private fun AdminMessageDto.toAdminMessageCursor(): String =
+        AdminMessageCursorCodec.encode(
             AdminMessageCursor(
                 createdAt = createdAt,
                 roomSeq = roomSeq,
                 messageId = messageId,
             ),
         )
-    }
 }

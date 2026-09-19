@@ -16,7 +16,6 @@ import org.springframework.jdbc.core.RowMapper
 import java.time.Instant
 
 class ModerationRuleJdbcRepositoryTest {
-
     @Test
     fun `activeRulesForRoom은 global과 room rule을 함께 조회한다`() {
         val jdbcTemplate = mock(JdbcTemplate::class.java)
@@ -43,8 +42,8 @@ class ModerationRuleJdbcRepositoryTest {
     private fun rule(
         id: Long,
         scopeType: ModerationScopeType,
-    ): ModerationRuleRecord {
-        return ModerationRuleRecord(
+    ): ModerationRuleRecord =
+        ModerationRuleRecord(
             id = id,
             scopeType = scopeType,
             roomId = null,
@@ -57,5 +56,4 @@ class ModerationRuleJdbcRepositoryTest {
             createdAt = Instant.parse("2026-06-26T00:00:00Z"),
             updatedAt = Instant.parse("2026-06-26T00:00:00Z"),
         )
-    }
 }

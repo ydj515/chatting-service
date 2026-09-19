@@ -8,8 +8,8 @@ import com.chat.persistence.redis.RedisMessageBroker
 import com.chat.persistence.repository.ChatRoomMemberRepository
 import com.fasterxml.jackson.databind.ObjectMapper
 import jakarta.annotation.PostConstruct
-import org.springframework.beans.factory.annotation.Qualifier
 import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.stereotype.Service
 import org.springframework.web.socket.CloseStatus
@@ -236,9 +236,7 @@ class WebSocketSessionManager(
         return sessionRef.outboundQueue.enqueue(payload, priority = priority)
     }
 
-    fun isUserOnlineLocally(userId: Long): Boolean {
-        return openSessionRefsForUser(userId).isNotEmpty()
-    }
+    fun isUserOnlineLocally(userId: Long): Boolean = openSessionRefsForUser(userId).isNotEmpty()
 
     fun closeSessionsForUser(userId: Long, closeStatus: CloseStatus = SESSION_REVOKED_STATUS) {
         openSessionRefsForUser(userId).forEach { sessionRef ->
@@ -342,9 +340,7 @@ class WebSocketSessionManager(
         }
     }
 
-    private fun serverRoomKey(serverId: String): String {
-        return "${redisProperties.serverRoomsKeyPrefix}$serverId"
-    }
+    private fun serverRoomKey(serverId: String): String = "${redisProperties.serverRoomsKeyPrefix}$serverId"
 
     private fun closeSession(session: WebSocketSession, closeStatus: CloseStatus) {
         try {

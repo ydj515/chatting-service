@@ -65,17 +65,15 @@ class BoundedOutboundSessionQueue(
         return true
     }
 
-    fun pendingSize(): Int {
-        return synchronized(lock) {
+    fun pendingSize(): Int =
+        synchronized(lock) {
             pendingSizeLocked()
         }
-    }
 
-    fun isClosed(): Boolean {
-        return synchronized(lock) {
+    fun isClosed(): Boolean =
+        synchronized(lock) {
             closed
         }
-    }
 
     private fun drain() {
         while (true) {
@@ -90,8 +88,8 @@ class BoundedOutboundSessionQueue(
         }
     }
 
-    private fun nextMessage(): String? {
-        return synchronized(lock) {
+    private fun nextMessage(): String? =
+        synchronized(lock) {
             if (closed) {
                 sending = false
                 null
@@ -103,7 +101,6 @@ class BoundedOutboundSessionQueue(
                 next
             }
         }
-    }
 
     fun close() {
         synchronized(lock) {
@@ -114,7 +111,5 @@ class BoundedOutboundSessionQueue(
         }
     }
 
-    private fun pendingSizeLocked(): Int {
-        return priorityMessages.size + normalMessages.size
-    }
+    private fun pendingSizeLocked(): Int = priorityMessages.size + normalMessages.size
 }

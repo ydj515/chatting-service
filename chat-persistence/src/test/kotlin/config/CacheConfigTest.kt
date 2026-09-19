@@ -11,7 +11,6 @@ import org.junit.jupiter.api.Test
 import java.time.Instant
 
 class CacheConfigTest {
-
     @Test
     fun `Redis cache serializer는 RoomAdmissionPolicy 타입을 보존한다`() {
         val serializer = CacheConfig.redisCacheValueSerializer()

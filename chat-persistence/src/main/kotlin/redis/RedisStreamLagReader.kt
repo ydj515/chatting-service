@@ -20,14 +20,13 @@ class SpringRedisStreamLagReader(
     private val redisTemplate: RedisTemplate<String, String>,
     private val keyResolver: MessageStreamKeyResolver,
 ) : RedisStreamLagReader {
-
     override fun read(consumerGroups: Set<String>): List<RedisStreamGroupLagSnapshot> {
         if (consumerGroups.isEmpty()) {
             return emptyList()
         }
 
         val streamOperations = redisTemplate.opsForStream<String, String>()
-        val streamKeys = redisTemplate.opsForSet().members(keyResolver.knownStreamsKey()) ?: emptySet()
+        val streamKeys = redisTemplate.opsForSet().members(keyResolver.knownStreamsKey()).orEmpty()
         return streamKeys.flatMap { streamKey ->
             val streamShard = keyResolver.parseRoomStreamKey(streamKey)?.streamShard
             val groupsByName = readGroups(streamOperations, streamKey).associateBy { group -> group.groupName() }
@@ -46,11 +45,10 @@ class SpringRedisStreamLagReader(
     private fun readGroups(
         streamOperations: org.springframework.data.redis.core.StreamOperations<String, String, String>,
         streamKey: String,
-    ): List<StreamInfo.XInfoGroup> {
-        return runCatching {
-            streamOperations.groups(streamKey)?.toList() ?: emptyList()
+    ): List<StreamInfo.XInfoGroup> =
+        runCatching {
+            streamOperations.groups(streamKey).toList()
         }.getOrDefault(emptyList())
-    }
 
     private fun StreamInfo.XInfoGroup.lagOrNull(): Long? {
         val rawLag = raw["lag"] ?: return null

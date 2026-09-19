@@ -16,7 +16,6 @@ import org.springframework.jdbc.core.RowMapper
 import java.time.Instant
 
 class UserSanctionJdbcRepositoryTest {
-
     @Test
     fun `activeSanctionsForUser는 room scoped active sanction만 조회한다`() {
         val jdbcTemplate = mock(JdbcTemplate::class.java)
@@ -77,8 +76,8 @@ class UserSanctionJdbcRepositoryTest {
     private fun sanction(
         id: Long,
         type: UserSanctionType,
-    ): UserSanctionRecord {
-        return UserSanctionRecord(
+    ): UserSanctionRecord =
+        UserSanctionRecord(
             id = id,
             scopeType = ModerationScopeType.ROOM,
             roomId = 10L,
@@ -92,5 +91,4 @@ class UserSanctionJdbcRepositoryTest {
             revokedBy = null,
             revokedAt = null,
         )
-    }
 }

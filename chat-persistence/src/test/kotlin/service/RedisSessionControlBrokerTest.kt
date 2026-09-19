@@ -17,7 +17,6 @@ import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.data.redis.listener.RedisMessageListenerContainer
 
 class RedisSessionControlBrokerTest {
-
     @Test
     fun `forceLogoutUser는 session control topic으로 이벤트를 발행한다`() {
         val redisTemplate = mockRedisTemplate()
@@ -123,15 +122,14 @@ class RedisSessionControlBrokerTest {
     }
 
     @Suppress("UNCHECKED_CAST")
-    private fun mockRedisTemplate(): RedisTemplate<String, String> {
-        return mock(RedisTemplate::class.java) as RedisTemplate<String, String>
-    }
+    private fun mockRedisTemplate(): RedisTemplate<String, String> =
+        mock(RedisTemplate::class.java) as RedisTemplate<String, String>
 
     private fun broker(
         redisTemplate: RedisTemplate<String, String> = mockRedisTemplate(),
         objectMapper: ObjectMapper = objectMapper(),
-    ): RedisSessionControlBroker {
-        return RedisSessionControlBroker(
+    ): RedisSessionControlBroker =
+        RedisSessionControlBroker(
             redisTemplate = redisTemplate,
             messageListenerContainer = mock(RedisMessageListenerContainer::class.java),
             objectMapper = objectMapper,
@@ -139,17 +137,15 @@ class RedisSessionControlBrokerTest {
                 session = ChatAuthProperties.Session(
                     secret = "test-secret",
                     controlTopic = "chat.session.control",
-                )
+                ),
             ),
             redisProperties = ChatRedisProperties(
                 broker = ChatRedisProperties.Broker(serverId = "local-server"),
             ),
         )
-    }
 
-    private fun objectMapper(): ObjectMapper {
-        return ObjectMapper()
+    private fun objectMapper(): ObjectMapper =
+        ObjectMapper()
             .registerModule(JavaTimeModule())
             .registerModule(KotlinModule.Builder().build())
-    }
 }

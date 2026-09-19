@@ -14,7 +14,6 @@ import org.springframework.transaction.annotation.Transactional
 class PartitionedMessageWriteAdapter(
     private val partitionedMessageRepository: PartitionedMessageRepository,
 ) : MessageWritePort {
-
     @Transactional
     override fun write(requests: List<MessageWriteRequest>): MessageWriteResult {
         if (requests.isEmpty()) {
@@ -25,10 +24,8 @@ class PartitionedMessageWriteAdapter(
         // canonical table의 PK가 write_shard를 포함하므로, 재계산하면 ack 유실 후 shard 확장 시 replay가
         // 다른 shard로 들어가 ON CONFLICT DO NOTHING을 우회해 같은 메시지의 중복 canonical row가 생긴다.
         val inserted = partitionedMessageRepository.batchInsert(requests)
-        if (inserted.size != requests.size) {
-            throw IllegalStateException(
-                "PartitionedMessageRepository returned ${inserted.size} results for ${requests.size} requests",
-            )
+        check(inserted.size == requests.size) {
+            "PartitionedMessageRepository returned ${inserted.size} results for ${requests.size} requests"
         }
 
         return MessageWriteResult(

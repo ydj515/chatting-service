@@ -15,17 +15,16 @@ import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.verifyNoInteractions
 import org.mockito.Mockito.`when`
+import org.springframework.http.server.ServerHttpRequest
+import org.springframework.http.server.ServerHttpResponse
 import org.springframework.http.server.ServletServerHttpRequest
 import org.springframework.http.server.ServletServerHttpResponse
 import org.springframework.mock.web.MockHttpServletRequest
 import org.springframework.mock.web.MockHttpServletResponse
-import org.springframework.http.server.ServerHttpRequest
-import org.springframework.http.server.ServerHttpResponse
 import org.springframework.web.socket.WebSocketHandler
 import java.time.LocalDateTime
 
 class WebSocketHandshakeInterceptorTest {
-
     private val webSocketProperties = WebSocketProperties(userIdAttribute = "userId")
     private val authProperties = ChatAuthProperties(
         session = ChatAuthProperties.Session(
@@ -67,7 +66,7 @@ class WebSocketHandshakeInterceptorTest {
             AuthenticatedSession(
                 userId = 42L,
                 expiresAt = LocalDateTime.parse("2026-06-12T12:30:00"),
-            )
+            ),
         )
         val ticketService = mock(WebSocketTicketService::class.java)
         val interceptor = interceptor(sessionTokenService, ticketService)
@@ -134,14 +133,13 @@ class WebSocketHandshakeInterceptorTest {
         sessionTokenService: SessionTokenService,
         ticketService: WebSocketTicketService,
         authProperties: ChatAuthProperties = this.authProperties,
-    ): WebSocketHandshakeInterceptor {
-        return WebSocketHandshakeInterceptor(
+    ): WebSocketHandshakeInterceptor =
+        WebSocketHandshakeInterceptor(
             webSocketProperties = webSocketProperties,
             sessionTokenService = sessionTokenService,
             webSocketTicketService = ticketService,
             authProperties = authProperties,
         )
-    }
 
     private fun request(queryString: String): ServerHttpRequest {
         val servletRequest = MockHttpServletRequest("GET", "/api/ws/chat")
@@ -149,7 +147,5 @@ class WebSocketHandshakeInterceptorTest {
         return ServletServerHttpRequest(servletRequest)
     }
 
-    private fun response(): ServerHttpResponse {
-        return ServletServerHttpResponse(MockHttpServletResponse())
-    }
+    private fun response(): ServerHttpResponse = ServletServerHttpResponse(MockHttpServletResponse())
 }

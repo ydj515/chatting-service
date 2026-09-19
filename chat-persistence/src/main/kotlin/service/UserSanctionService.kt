@@ -24,7 +24,6 @@ class UserSanctionService(
     private val clock: Clock,
     private val meterRegistryProvider: ObjectProvider<MeterRegistry>? = null,
 ) : UserSanctionPolicyService {
-
     override fun requireAllowedToSend(roomId: Long, userId: Long) {
         val now = clock.instant()
         val sanctions = userSanctionRepository.activeGlobalSanctionsForUser(userId) +

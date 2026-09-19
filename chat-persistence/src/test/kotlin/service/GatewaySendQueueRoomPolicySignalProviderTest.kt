@@ -8,7 +8,6 @@ import org.springframework.beans.factory.ObjectProvider
 import java.util.stream.Stream
 
 class GatewaySendQueueRoomPolicySignalProviderTest {
-
     @Test
     fun `exposes gateway send queue depth as room policy signal`() {
         val sessionManager = mock(WebSocketSessionManager::class.java)
@@ -27,18 +26,23 @@ class GatewaySendQueueRoomPolicySignalProviderTest {
         assertEquals(0, provider.signals(roomId = 10L).gatewaySendQueueDepth)
     }
 
-    private fun providerOf(sessionManager: WebSocketSessionManager?): ObjectProvider<WebSocketSessionManager> {
-        return object : ObjectProvider<WebSocketSessionManager> {
+    private fun providerOf(sessionManager: WebSocketSessionManager?): ObjectProvider<WebSocketSessionManager> =
+        object : ObjectProvider<WebSocketSessionManager> {
             override fun getObject(vararg args: Any?): WebSocketSessionManager =
-                sessionManager ?: throw IllegalStateException("no session manager")
+                sessionManager ?: error("no session manager")
+
             override fun getObject(): WebSocketSessionManager =
-                sessionManager ?: throw IllegalStateException("no session manager")
+                sessionManager ?: error("no session manager")
+
             override fun getIfAvailable(): WebSocketSessionManager? = sessionManager
+
             override fun getIfUnique(): WebSocketSessionManager? = sessionManager
+
             override fun iterator(): MutableIterator<WebSocketSessionManager> =
                 listOfNotNull(sessionManager).toMutableList().iterator()
+
             override fun stream(): Stream<WebSocketSessionManager> = Stream.ofNullable(sessionManager)
+
             override fun orderedStream(): Stream<WebSocketSessionManager> = Stream.ofNullable(sessionManager)
         }
-    }
 }

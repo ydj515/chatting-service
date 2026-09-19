@@ -15,9 +15,10 @@ class RoomStorageConfigJdbcRepository(
     @Qualifier("jdbcTemplate")
     private val jdbcTemplate: JdbcTemplate,
 ) : RoomStorageConfigReader, RoomAdmissionPolicyReader {
-
-    override fun currentShardCount(roomId: Long): Int {
-        return try {
+    // queryForObject can return SQL NULL; retain the fallback despite generic type inference.
+    @Suppress("UnnecessarySafeCall")
+    override fun currentShardCount(roomId: Long): Int =
+        try {
             jdbcTemplate.queryForObject(
                 SELECT_CURRENT_SHARD_COUNT_SQL,
                 Int::class.java,
@@ -26,11 +27,10 @@ class RoomStorageConfigJdbcRepository(
         } catch (e: EmptyResultDataAccessException) {
             DEFAULT_SHARD_COUNT
         }
-    }
 
     @Cacheable(value = ["roomShardConfigs"], key = "#roomId")
-    override fun shardConfig(roomId: Long): RoomShardConfig {
-        return try {
+    override fun shardConfig(roomId: Long): RoomShardConfig =
+        try {
             val config = jdbcTemplate.queryForObject(
                 SELECT_SHARD_CONFIG_SQL,
                 { rs, _ ->
@@ -45,11 +45,10 @@ class RoomStorageConfigJdbcRepository(
         } catch (e: EmptyResultDataAccessException) {
             RoomShardConfig()
         }
-    }
 
     @Cacheable(value = ["roomAdmissionPolicies"], key = "#roomId")
-    override fun admissionPolicy(roomId: Long): RoomAdmissionPolicy {
-        return try {
+    override fun admissionPolicy(roomId: Long): RoomAdmissionPolicy =
+        try {
             jdbcTemplate.queryForObject(
                 SELECT_ADMISSION_POLICY_SQL,
                 { rs, _ ->
@@ -65,14 +64,12 @@ class RoomStorageConfigJdbcRepository(
         } catch (e: EmptyResultDataAccessException) {
             RoomAdmissionPolicy()
         }
-    }
 
-    private fun RoomShardConfig.sanitized(): RoomShardConfig {
-        return copy(
+    private fun RoomShardConfig.sanitized(): RoomShardConfig =
+        copy(
             writeShardCount = writeShardCount.coerceAtLeast(MIN_SHARD_COUNT),
             fanoutShardCount = fanoutShardCount.coerceAtLeast(MIN_SHARD_COUNT),
         )
-    }
 
     private fun java.sql.ResultSet.nullableInt(column: String): Int? {
         val value = getInt(column)

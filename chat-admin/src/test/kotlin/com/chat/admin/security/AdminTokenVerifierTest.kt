@@ -7,7 +7,6 @@ import org.junit.jupiter.api.Test
 import org.springframework.web.server.ResponseStatusException
 
 class AdminTokenVerifierTest {
-
     @Test
     fun `valid token returns configured actor`() {
         val verifier = AdminTokenVerifier(

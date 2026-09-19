@@ -20,11 +20,13 @@ interface ChatRoomMemberRepository : CrudRepository<ChatRoomMember, Long> {
     fun countActiveMembersInRoom(chatRoomId: Long): Long
 
     @Modifying
-    @Query("""
+    @Query(
+        """
         UPDATE ChatRoomMember crm 
         SET crm.isActive = false, crm.leftAt = CURRENT_TIMESTAMP 
         WHERE crm.chatRoom.id = :chatRoomId AND crm.user.id = :userId
-    """)
+    """,
+    )
     fun leaveChatRoom(chatRoomId: Long, userId: Long)
 
     /*

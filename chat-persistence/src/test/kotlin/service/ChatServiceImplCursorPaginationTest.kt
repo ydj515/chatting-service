@@ -40,7 +40,6 @@ import java.time.LocalDateTime
 @DataJpaTest
 @ContextConfiguration(classes = [ChatServiceImplCursorPaginationTest.JpaTestConfig::class])
 class ChatServiceImplCursorPaginationTest {
-
     @Autowired
     private lateinit var entityManager: TestEntityManager
 
@@ -174,20 +173,18 @@ class ChatServiceImplCursorPaginationTest {
         override fun shardConfig(roomId: Long): RoomShardConfig = RoomShardConfig()
     }
 
-    private fun user(username: String): User {
-        return User(
+    private fun user(username: String): User =
+        User(
             username = username,
             password = "password",
             displayName = username,
         )
-    }
 
-    private fun chatRoom(name: String, createdBy: User): ChatRoom {
-        return ChatRoom(
+    private fun chatRoom(name: String, createdBy: User): ChatRoom =
+        ChatRoom(
             name = name,
             createdBy = createdBy,
         )
-    }
 
     private fun message(
         chatRoom: ChatRoom,
@@ -196,8 +193,8 @@ class ChatServiceImplCursorPaginationTest {
         clientMessageId: String,
         roomSeq: Long,
         createdAt: LocalDateTime,
-    ): Message {
-        return Message(
+    ): Message =
+        Message(
             messageId = messageId,
             clientMessageId = clientMessageId,
             chatRoom = chatRoom,
@@ -208,7 +205,6 @@ class ChatServiceImplCursorPaginationTest {
             roomSeq = roomSeq,
             createdAt = createdAt,
         )
-    }
 
     @SpringBootConfiguration
     @EnableAutoConfiguration

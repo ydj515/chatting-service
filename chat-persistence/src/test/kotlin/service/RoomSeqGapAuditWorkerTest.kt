@@ -6,7 +6,6 @@ import com.chat.persistence.repository.RoomSeqGapAuditSummary
 import org.junit.jupiter.api.Assertions.assertDoesNotThrow
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.mock
-import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.verifyNoInteractions
 import org.mockito.Mockito.`when`
@@ -16,7 +15,6 @@ import java.time.Instant
 import java.time.ZoneOffset
 
 class RoomSeqGapAuditWorkerTest {
-
     @Test
     fun `enabled이면 lookback cutoff로 gap audit을 수행하고 metric을 갱신한다`() {
         val repository = mock(RoomSeqGapAuditRepository::class.java)

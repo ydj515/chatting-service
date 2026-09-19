@@ -13,7 +13,6 @@ import java.time.Instant
 import java.time.ZoneOffset
 
 class WebSocketHeartbeatSchedulerTest {
-
     @Test
     fun `scheduler fixed delay는 heartbeat interval과 별도 poll interval 설정을 사용한다`() {
         val annotation = WebSocketHeartbeatScheduler::class.java

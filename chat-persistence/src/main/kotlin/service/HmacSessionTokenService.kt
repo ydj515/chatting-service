@@ -2,8 +2,8 @@ package com.chat.persistence.service
 
 import com.chat.domain.dto.AuthenticatedSession
 import com.chat.domain.dto.SessionToken
-import com.chat.domain.service.SessionTokenService
 import com.chat.domain.service.SessionTokenRevocationStore
+import com.chat.domain.service.SessionTokenService
 import com.chat.persistence.config.ChatAuthProperties
 import org.springframework.stereotype.Service
 import java.nio.charset.StandardCharsets
@@ -23,7 +23,6 @@ class HmacSessionTokenService(
     private val clock: Clock,
     private val revocationStore: SessionTokenRevocationStore,
 ) : SessionTokenService {
-
     private val encoder = Base64.getUrlEncoder().withoutPadding()
     private val decoder = Base64.getUrlDecoder()
 

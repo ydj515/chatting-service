@@ -52,8 +52,8 @@ class UserSanctionJdbcRepository(
         value = ["userSanctions"],
         key = "#roomId + ':' + #userId",
     )
-    fun activeSanctionsForUser(roomId: Long, userId: Long): List<UserSanctionRecord> {
-        return jdbcTemplate.query(
+    fun activeSanctionsForUser(roomId: Long, userId: Long): List<UserSanctionRecord> =
+        jdbcTemplate.query(
             """
             SELECT id, scope_type, room_id, user_id, type, reason, expires_at, active, created_by, created_at, revoked_by, revoked_at
             FROM user_sanctions
@@ -67,14 +67,13 @@ class UserSanctionJdbcRepository(
             userId,
             roomId,
         )
-    }
 
     @Cacheable(
         value = ["userSanctions"],
         key = "'global:' + #userId",
     )
-    fun activeGlobalSanctionsForUser(userId: Long): List<UserSanctionRecord> {
-        return jdbcTemplate.query(
+    fun activeGlobalSanctionsForUser(userId: Long): List<UserSanctionRecord> =
+        jdbcTemplate.query(
             """
             SELECT id, scope_type, room_id, user_id, type, reason, expires_at, active, created_by, created_at, revoked_by, revoked_at
             FROM user_sanctions
@@ -87,7 +86,6 @@ class UserSanctionJdbcRepository(
             ROW_MAPPER,
             userId,
         )
-    }
 
     fun listSanctions(roomId: Long?, userId: Long?, active: Boolean?): List<UserSanctionRecord> {
         val conditions = mutableListOf<String>()
@@ -118,8 +116,8 @@ class UserSanctionJdbcRepository(
         )
     }
 
-    fun create(actor: String, request: AdminCreateUserSanctionRequest): UserSanctionRecord {
-        return jdbcTemplate.queryForObject(
+    fun create(actor: String, request: AdminCreateUserSanctionRequest): UserSanctionRecord =
+        jdbcTemplate.queryForObject(
             """
             INSERT INTO user_sanctions (scope_type, room_id, user_id, type, reason, expires_at, created_by)
             VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -134,7 +132,6 @@ class UserSanctionJdbcRepository(
             request.expiresAt?.let { Timestamp.from(it) },
             actor,
         ) ?: error("failed to create user sanction")
-    }
 
     fun revoke(actor: String, sanctionId: Long): UserSanctionRecord {
         // revoke를 멱등하게 만든다: 이미 취소된 제재를 다시 호출해도

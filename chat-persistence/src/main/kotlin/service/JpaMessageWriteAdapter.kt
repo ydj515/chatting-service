@@ -20,7 +20,6 @@ class JpaMessageWriteAdapter(
     private val chatRoomRepository: ChatRoomRepository,
     private val userRepository: UserRepository,
 ) : MessageWritePort {
-
     override fun write(requests: List<MessageWriteRequest>): MessageWriteResult {
         if (requests.isEmpty()) {
             return MessageWriteResult(emptyList())
@@ -70,8 +69,8 @@ class JpaMessageWriteAdapter(
         return outcomes.toResult()
     }
 
-    private fun writeOne(pendingWrite: PendingJpaWrite): Boolean {
-        return try {
+    private fun writeOne(pendingWrite: PendingJpaWrite): Boolean =
+        try {
             messageRepository.saveAndFlush(pendingWrite.message)
             true
         } catch (e: DataIntegrityViolationException) {
@@ -81,7 +80,6 @@ class JpaMessageWriteAdapter(
                 throw e
             }
         }
-    }
 
     private fun messageForWrite(request: MessageWriteRequest): Message? {
         if (messageRepository.findByMessageId(request.messageId).isPresent) {
@@ -131,13 +129,12 @@ class JpaMessageWriteAdapter(
         ).isPresent
     }
 
-    private fun MutableList<MessageWriteOutcome?>.toResult(): MessageWriteResult {
-        return MessageWriteResult(
+    private fun MutableList<MessageWriteOutcome?>.toResult(): MessageWriteResult =
+        MessageWriteResult(
             outcomes = mapIndexed { index, outcome ->
                 outcome ?: error("Missing write outcome for index $index")
             },
         )
-    }
 
     private data class PendingJpaWrite(
         val index: Int,

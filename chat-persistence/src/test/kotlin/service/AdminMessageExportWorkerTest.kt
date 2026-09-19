@@ -1,10 +1,10 @@
 package com.chat.persistence.service
 
-import com.chat.domain.dto.AdminMessageDto
 import com.chat.domain.dto.AdminMessageCursor
 import com.chat.domain.dto.AdminMessageCursorCodec
-import com.chat.domain.model.MessageType
+import com.chat.domain.dto.AdminMessageDto
 import com.chat.domain.dto.AdminMessageSearchMode
+import com.chat.domain.model.MessageType
 import com.chat.persistence.config.ChatObjectStorageProperties
 import com.chat.persistence.config.ChatWorkerProperties
 import com.chat.persistence.repository.AdminExportJobRecord
@@ -33,7 +33,6 @@ import java.time.Duration
 import java.time.Instant
 
 class AdminMessageExportWorkerTest {
-
     @Test
     fun `export worker는 pending job을 claim하고 CSV 파일을 완료 상태로 기록한다`(
         @TempDir tempDir: Path,
@@ -256,7 +255,8 @@ class AdminMessageExportWorkerTest {
         val output = tempDir.resolve("export-1.csv")
         Files.writeString(
             output,
-            "messageId,clientMessageId,roomId,roomSeq,writeShard,senderId,senderUsername,senderDisplayName,messageType,content,isDeleted,createdAt\n" +
+            "messageId,clientMessageId,roomId,roomSeq,writeShard,senderId,senderUsername," +
+                "senderDisplayName,messageType,content,isDeleted,createdAt\n" +
                 "msg-100,client-100,10,100,0,7,sender,Sender,TEXT,hello,false,2026-06-14T00:00:02Z\n" +
                 "msg-99,client-99,10,99,0,7,sender,Sender,TEXT,hello,false,2026-06-14T00:00:01Z\n",
             Charsets.UTF_8,
@@ -348,8 +348,8 @@ class AdminMessageExportWorkerTest {
         messageRepository: AdminMessageRepository,
         tempDir: Path,
         objectStoragePort: ObjectStoragePort = RecordingObjectStoragePort(),
-    ): AdminMessageExportWorker {
-        return AdminMessageExportWorker(
+    ): AdminMessageExportWorker =
+        AdminMessageExportWorker(
             exportJobRepository = exportJobRepository,
             messageRepository = messageRepository,
             workerProperties = ChatWorkerProperties(consumerName = "worker-1"),
@@ -359,7 +359,6 @@ class AdminMessageExportWorkerTest {
             objectStoragePort = objectStoragePort,
             objectStorageProperties = ChatObjectStorageProperties(),
         )
-    }
 
     private class RecordingObjectStoragePort : ObjectStoragePort {
         var uploadedFile: Path? = null
@@ -384,12 +383,11 @@ class AdminMessageExportWorkerTest {
         override fun createDownloadUrl(
             objectUri: String,
             ttl: Duration,
-        ): PresignedObjectUrl {
-            return PresignedObjectUrl(
+        ): PresignedObjectUrl =
+            PresignedObjectUrl(
                 url = "http://localhost/download",
                 expiresAt = Instant.parse("2026-06-26T00:15:00Z"),
             )
-        }
     }
 
     private fun message(
@@ -398,8 +396,8 @@ class AdminMessageExportWorkerTest {
         createdAt: Instant = Instant.parse("2026-06-14T00:00:00Z"),
         senderDisplayName: String = "Sender",
         content: String = "hello",
-    ): AdminMessageDto {
-        return AdminMessageDto(
+    ): AdminMessageDto =
+        AdminMessageDto(
             messageId = messageId,
             clientMessageId = "client-$roomSeq",
             roomId = 10L,
@@ -413,11 +411,8 @@ class AdminMessageExportWorkerTest {
             isDeleted = false,
             createdAt = createdAt,
         )
-    }
 
-    private fun testObjectMapper(): ObjectMapper {
-        return jacksonObjectMapper().registerModule(JavaTimeModule())
-    }
+    private fun testObjectMapper(): ObjectMapper = jacksonObjectMapper().registerModule(JavaTimeModule())
 
     private fun eqString(value: String): String {
         eq(value)

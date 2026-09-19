@@ -17,6 +17,8 @@ complexity:
     thresholdInEnums: 20
 
 style:
+  VarCouldBeVal:
+    ignoreLateinitVar: true
   MagicNumber:
     active: false
   MaxLineLength:
@@ -27,3 +29,15 @@ style:
     max: 7
   ThrowsCount:
     max: 5
+
+# Mockito matchers/captors register arguments as a side effect and may return null.
+potential-bugs:
+  IgnoredReturnValue:
+    ignoreFunctionCall:
+      - 'org.mockito.ArgumentMatchers.any'
+      - 'org.mockito.ArgumentMatchers.anyString'
+      - 'org.mockito.ArgumentMatchers.anyList'
+      - 'org.mockito.ArgumentMatchers.anyMap'
+      - 'org.mockito.ArgumentMatchers.eq'
+      - 'org.mockito.ArgumentMatchers.contains'
+      - 'org.mockito.ArgumentCaptor.capture'

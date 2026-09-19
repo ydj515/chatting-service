@@ -20,7 +20,6 @@ import java.time.LocalDateTime
 import java.util.stream.Stream
 
 class HotRoomFanoutWorkerTest {
-
     @Test
     fun `fanout worker는 stream 메시지를 방별 batch로 묶어 broadcast하고 ack한다`() {
         val consumer = FakeMessageStreamConsumer(
@@ -295,8 +294,8 @@ class HotRoomFanoutWorkerTest {
         recordId: String,
         roomSeq: Long,
         streamShard: Int = 0,
-    ): MessageStreamRecord {
-        return MessageStreamRecord(
+    ): MessageStreamRecord =
+        MessageStreamRecord(
             streamKey = "chat:stream:room:10:shard:$streamShard",
             recordId = recordId,
             envelope = MessageStreamEnvelope(
@@ -315,7 +314,6 @@ class HotRoomFanoutWorkerTest {
                 createdAt = LocalDateTime.parse("2026-06-13T12:00:00"),
             ),
         )
-    }
 
     private class FakeMessageStreamConsumer(
         private val records: List<MessageStreamRecord>,
@@ -326,9 +324,7 @@ class HotRoomFanoutWorkerTest {
         val claims = mutableListOf<String>()
         val acked = mutableListOf<String>()
 
-        override fun listStreamKeys(): Set<String> {
-            return (records + claimedRecords).mapTo(sortedSetOf()) { it.streamKey }
-        }
+        override fun listStreamKeys(): Set<String> = (records + claimedRecords).mapTo(sortedSetOf()) { it.streamKey }
 
         override fun ensureConsumerGroup(streamKey: String, consumerGroup: String) {
             ensuredGroups += "$streamKey:$consumerGroup"
@@ -425,15 +421,20 @@ class HotRoomFanoutWorkerTest {
     @Suppress("UNCHECKED_CAST")
     private fun <T> uninitialized(): T = null as T
 
-    private fun meterRegistryProvider(meterRegistry: MeterRegistry): ObjectProvider<MeterRegistry> {
-        return object : ObjectProvider<MeterRegistry> {
+    private fun meterRegistryProvider(meterRegistry: MeterRegistry): ObjectProvider<MeterRegistry> =
+        object : ObjectProvider<MeterRegistry> {
             override fun getObject(): MeterRegistry = meterRegistry
+
             override fun getObject(vararg args: Any?): MeterRegistry = meterRegistry
+
             override fun getIfAvailable(): MeterRegistry = meterRegistry
+
             override fun getIfUnique(): MeterRegistry = meterRegistry
+
             override fun iterator(): MutableIterator<MeterRegistry> = mutableListOf(meterRegistry).iterator()
+
             override fun stream(): Stream<MeterRegistry> = Stream.of(meterRegistry)
+
             override fun orderedStream(): Stream<MeterRegistry> = Stream.of(meterRegistry)
         }
-    }
 }

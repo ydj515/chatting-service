@@ -11,7 +11,6 @@ import org.springframework.beans.factory.ObjectProvider
 import java.util.stream.Stream
 
 class RedisStreamLagMonitorTest {
-
     @Test
     fun `stream shard와 consumer group 단위로 lag와 pending gauge를 합산한다`() {
         val meterRegistry = SimpleMeterRegistry()
@@ -56,20 +55,24 @@ class RedisStreamLagMonitorTest {
     private class FakeRedisStreamLagReader(
         private val snapshots: List<RedisStreamGroupLagSnapshot>,
     ) : RedisStreamLagReader {
-        override fun read(consumerGroups: Set<String>): List<RedisStreamGroupLagSnapshot> {
-            return snapshots.filter { snapshot -> consumerGroups.contains(snapshot.consumerGroup) }
-        }
+        override fun read(consumerGroups: Set<String>): List<RedisStreamGroupLagSnapshot> =
+            snapshots.filter { snapshot -> consumerGroups.contains(snapshot.consumerGroup) }
     }
 
-    private fun meterRegistryProvider(meterRegistry: MeterRegistry): ObjectProvider<MeterRegistry> {
-        return object : ObjectProvider<MeterRegistry> {
+    private fun meterRegistryProvider(meterRegistry: MeterRegistry): ObjectProvider<MeterRegistry> =
+        object : ObjectProvider<MeterRegistry> {
             override fun getObject(): MeterRegistry = meterRegistry
+
             override fun getObject(vararg args: Any?): MeterRegistry = meterRegistry
+
             override fun getIfAvailable(): MeterRegistry = meterRegistry
+
             override fun getIfUnique(): MeterRegistry = meterRegistry
+
             override fun iterator(): MutableIterator<MeterRegistry> = mutableListOf(meterRegistry).iterator()
+
             override fun stream(): Stream<MeterRegistry> = Stream.of(meterRegistry)
+
             override fun orderedStream(): Stream<MeterRegistry> = Stream.of(meterRegistry)
         }
-    }
 }

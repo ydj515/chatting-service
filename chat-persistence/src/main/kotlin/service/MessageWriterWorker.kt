@@ -93,10 +93,8 @@ class MessageWriterWorker(
         val startedAtNanos = System.nanoTime()
         return try {
             val result = messageWritePort.write(records.map { it.envelope.toWriteRequest() })
-            if (result.outcomes.size != records.size) {
-                throw IllegalStateException(
-                    "MessageWritePort returned ${result.outcomes.size} outcomes for ${records.size} records",
-                )
+            check(result.outcomes.size == records.size) {
+                "MessageWritePort returned ${result.outcomes.size} outcomes for ${records.size} records"
             }
             if (result.writtenCount == 0) {
                 logger.warn(
@@ -136,10 +134,8 @@ class MessageWriterWorker(
         records.forEach { record ->
             try {
                 val result = messageWritePort.write(listOf(record.envelope.toWriteRequest()))
-                if (result.outcomes.size != 1) {
-                    throw IllegalStateException(
-                        "MessageWritePort returned ${result.outcomes.size} outcomes for 1 record",
-                    )
+                check(result.outcomes.size == 1) {
+                    "MessageWritePort returned ${result.outcomes.size} outcomes for 1 record"
                 }
                 acknowledge(record, consumerGroup)
                 if (result.outcomes.single().written) {
@@ -163,8 +159,8 @@ class MessageWriterWorker(
         )
     }
 
-    private fun MessageStreamEnvelope.toWriteRequest(): MessageWriteRequest {
-        return MessageWriteRequest(
+    private fun MessageStreamEnvelope.toWriteRequest(): MessageWriteRequest =
+        MessageWriteRequest(
             messageId = messageId,
             clientMessageId = clientMessageId,
             chatRoomId = chatRoomId,
@@ -178,7 +174,6 @@ class MessageWriterWorker(
             fanoutShard = fanoutShard,
             createdAt = createdAt,
         )
-    }
 
     private companion object {
         const val OUTCOME_FAILURE = "failure"

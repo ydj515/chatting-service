@@ -19,13 +19,11 @@ import org.springframework.beans.factory.ObjectProvider
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.data.redis.core.script.RedisScript
 import java.time.Clock
-import java.time.Duration
 import java.time.Instant
 import java.time.ZoneOffset
 import java.util.stream.Stream
 
 class RedisMessageAdmissionPolicyServiceTest {
-
     private val clock = Clock.fixed(Instant.parse("2026-06-18T00:00:00Z"), ZoneOffset.UTC)
 
     @Suppress("UNCHECKED_CAST")
@@ -154,7 +152,7 @@ class RedisMessageAdmissionPolicyServiceTest {
         val redis = redisTemplate()
         val meterRegistry = SimpleMeterRegistry()
         doAnswer {
-            throw IllegalStateException("redis unavailable")
+            error("redis unavailable")
         }.`when`(redis.template).execute(
             anyRedisScript(),
             anyList<String>(),
@@ -188,29 +186,25 @@ class RedisMessageAdmissionPolicyServiceTest {
         redis: RedisTemplate<String, String>,
         policy: RoomAdmissionPolicy,
         meterRegistry: SimpleMeterRegistry? = null,
-    ): RedisMessageAdmissionPolicyService {
-        return RedisMessageAdmissionPolicyService(
+    ): RedisMessageAdmissionPolicyService =
+        RedisMessageAdmissionPolicyService(
             redisTemplate = redis,
             redisProperties = ChatRedisProperties(),
             roomAdmissionPolicyReader = StaticRoomAdmissionPolicyReader(policy),
             clock = clock,
             meterRegistryProvider = meterRegistry?.let { meterRegistryProvider(it) },
         )
-    }
 
     private class StaticRoomAdmissionPolicyReader(
         private val policy: RoomAdmissionPolicy,
     ) : RoomAdmissionPolicyReader {
-
-        override fun admissionPolicy(roomId: Long): RoomAdmissionPolicy {
-            return policy
-        }
+        override fun admissionPolicy(roomId: Long): RoomAdmissionPolicy = policy
     }
 
     private fun meterRegistryProvider(
         meterRegistry: SimpleMeterRegistry,
-    ): ObjectProvider<io.micrometer.core.instrument.MeterRegistry> {
-        return object : ObjectProvider<io.micrometer.core.instrument.MeterRegistry> {
+    ): ObjectProvider<io.micrometer.core.instrument.MeterRegistry> =
+        object : ObjectProvider<io.micrometer.core.instrument.MeterRegistry> {
             override fun getObject(): io.micrometer.core.instrument.MeterRegistry = meterRegistry
 
             override fun getObject(vararg args: Any?): io.micrometer.core.instrument.MeterRegistry = meterRegistry
@@ -219,19 +213,13 @@ class RedisMessageAdmissionPolicyServiceTest {
 
             override fun getIfUnique(): io.micrometer.core.instrument.MeterRegistry = meterRegistry
 
-            override fun iterator(): MutableIterator<io.micrometer.core.instrument.MeterRegistry> {
-                return mutableListOf<io.micrometer.core.instrument.MeterRegistry>(meterRegistry).iterator()
-            }
+            override fun iterator(): MutableIterator<io.micrometer.core.instrument.MeterRegistry> =
+                mutableListOf<io.micrometer.core.instrument.MeterRegistry>(meterRegistry).iterator()
 
-            override fun stream(): Stream<io.micrometer.core.instrument.MeterRegistry> {
-                return Stream.of(meterRegistry)
-            }
+            override fun stream(): Stream<io.micrometer.core.instrument.MeterRegistry> = Stream.of(meterRegistry)
 
-            override fun orderedStream(): Stream<io.micrometer.core.instrument.MeterRegistry> {
-                return Stream.of(meterRegistry)
-            }
+            override fun orderedStream(): Stream<io.micrometer.core.instrument.MeterRegistry> = Stream.of(meterRegistry)
         }
-    }
 
     @Suppress("UNCHECKED_CAST")
     private fun redisTemplate(): RedisFixture {

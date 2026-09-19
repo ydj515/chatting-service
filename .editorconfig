@@ -9,10 +9,23 @@ trim_trailing_whitespace = true
 [*.{kt,kts}]
 indent_style = space
 indent_size = 4
-max_line_length = 120
+max_line_length = off
 ktlint_code_style = ktlint_official
 ktlint_standard_filename = disabled
 ktlint_standard_no-wildcard-imports = disabled
+# Keep author-chosen line breaks; do not wrap by line length or expression shape.
+ktlint_standard_max-line-length = disabled
+ktlint_standard_multiline-expression-wrapping = disabled
+ktlint_standard_argument-list-wrapping = disabled
+ktlint_standard_parameter-list-wrapping = disabled
+ktlint_standard_parameter-wrapping = disabled
+ktlint_standard_function-signature = disabled
+ktlint_standard_class-signature = disabled
+ktlint_standard_chain-method-continuation = disabled
+ktlint_standard_chain-wrapping = disabled
+ktlint_standard_binary-expression-wrapping = disabled
+ktlint_standard_condition-wrapping = disabled
+ktlint_standard_property-wrapping = disabled
 ij_kotlin_allow_trailing_comma = true
 ij_kotlin_allow_trailing_comma_on_call_site = true
 

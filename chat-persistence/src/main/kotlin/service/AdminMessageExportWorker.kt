@@ -165,8 +165,8 @@ class AdminMessageExportWorker(
         }
     }
 
-    private fun csvHeader(): String {
-        return listOf(
+    private fun csvHeader(): String =
+        listOf(
             "messageId",
             "clientMessageId",
             "roomId",
@@ -180,18 +180,16 @@ class AdminMessageExportWorker(
             "isDeleted",
             "createdAt",
         ).joinToString(",")
-    }
 
-    private fun AdminMessageDto.toExportCursor(): AdminMessageCursor {
-        return AdminMessageCursor(
+    private fun AdminMessageDto.toExportCursor(): AdminMessageCursor =
+        AdminMessageCursor(
             createdAt = createdAt,
             roomSeq = roomSeq,
             messageId = messageId,
         )
-    }
 
-    private fun AdminMessageDto.toCsvRow(): String {
-        return listOf(
+    private fun AdminMessageDto.toCsvRow(): String =
+        listOf(
             messageId,
             clientMessageId.orEmpty(),
             roomId.toString(),
@@ -205,7 +203,6 @@ class AdminMessageExportWorker(
             isDeleted.toString(),
             createdAt.toString(),
         ).joinToString(",") { it.csvEscape() }
-    }
 
     private fun String.csvEscape(): String {
         val formulaSafe = if (startsWithSpreadsheetFormulaPrefix()) "'$this" else this
@@ -214,9 +211,7 @@ class AdminMessageExportWorker(
         return if (needsQuoting) "\"$escaped\"" else escaped
     }
 
-    private fun String.startsWithSpreadsheetFormulaPrefix(): Boolean {
-        return firstOrNull() in setOf('=', '+', '-', '@')
-    }
+    private fun String.startsWithSpreadsheetFormulaPrefix(): Boolean = firstOrNull() in setOf('=', '+', '-', '@')
 
     private companion object {
         const val DEFAULT_EXPORT_CHUNK_SIZE = 1_000

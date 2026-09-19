@@ -20,7 +20,6 @@ import org.springframework.web.bind.annotation.RestController
 import java.time.LocalDateTime
 
 class AuthenticatedUserResolverTest {
-
     private lateinit var mockMvc: MockMvc
     private lateinit var sessionTokenService: SessionTokenService
 
@@ -40,7 +39,7 @@ class AuthenticatedUserResolverTest {
             AuthenticatedSession(
                 userId = 42L,
                 expiresAt = LocalDateTime.parse("2026-06-12T12:30:00"),
-            )
+            ),
         )
 
         mockMvc.get("/test/current-user") {
@@ -98,13 +97,9 @@ class AuthenticatedUserResolverTest {
     @RestController
     private class TestAuthController {
         @GetMapping("/test/current-user")
-        fun currentUser(@CurrentUserId userId: Long): Map<String, Long> {
-            return mapOf("userId" to userId)
-        }
+        fun currentUser(@CurrentUserId userId: Long): Map<String, Long> = mapOf("userId" to userId)
 
         @PostMapping("/test/current-session-token")
-        fun currentSessionToken(@CurrentSessionToken sessionToken: String): Map<String, String> {
-            return mapOf("token" to sessionToken)
-        }
+        fun currentSessionToken(@CurrentSessionToken sessionToken: String): Map<String, String> = mapOf("token" to sessionToken)
     }
 }

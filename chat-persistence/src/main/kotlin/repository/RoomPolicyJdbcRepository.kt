@@ -13,7 +13,6 @@ class RoomPolicyJdbcRepository(
     @Qualifier("jdbcTemplate")
     private val jdbcTemplate: JdbcTemplate,
 ) : RoomPolicyRepository {
-
     @Caching(
         evict = [
             CacheEvict(value = ["roomAdmissionPolicies"], key = "#policy.roomId"),

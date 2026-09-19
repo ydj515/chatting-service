@@ -6,7 +6,6 @@ import org.junit.jupiter.api.Test
 import org.mockito.ArgumentMatchers.any
 import org.mockito.ArgumentMatchers.anyDouble
 import org.mockito.ArgumentMatchers.anyString
-import org.mockito.ArgumentMatchers.eq
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
@@ -20,7 +19,6 @@ import java.time.Instant
 import java.time.ZoneOffset
 
 class RedisRoomTrafficStatsServiceTest {
-
     private val clock = Clock.fixed(Instant.parse("2026-06-18T00:01:00Z"), ZoneOffset.UTC)
 
     @Test

@@ -1,21 +1,21 @@
 package com.chat.websocket.handler
 
-import com.chat.domain.exception.MessageAdmissionRejectedException
-import com.chat.domain.exception.MessageModerationRejectedException
 import com.chat.domain.dto.MessageDto
 import com.chat.domain.dto.SendMessageRequest
 import com.chat.domain.dto.UserDto
+import com.chat.domain.exception.MessageAdmissionRejectedException
+import com.chat.domain.exception.MessageModerationRejectedException
 import com.chat.domain.model.MessageType
 import com.chat.domain.service.ChatService
 import com.chat.persistence.service.WebSocketSessionManager
 import com.chat.websocket.config.WebSocketProperties
-import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.DeserializationFeature
+import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
 import com.fasterxml.jackson.module.kotlin.KotlinModule
-import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Assertions.assertSame
 import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Test
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.mockingDetails
 import org.mockito.Mockito.verify
@@ -29,7 +29,6 @@ import java.nio.ByteBuffer
 import java.time.LocalDateTime
 
 class ChatWebSocketHandlerTest {
-
     @Test
     fun `PONG frame은 세션 activity로 기록하고 비즈니스 메시지로 처리하지 않는다`() {
         val sessionManager = mock(WebSocketSessionManager::class.java)
@@ -81,7 +80,7 @@ class ChatWebSocketHandlerTest {
                     clientMessageId = "client-1",
                 ),
                 7L,
-            )
+            ),
         ).thenReturn(messageDto())
 
         handler.handleMessage(
@@ -134,7 +133,7 @@ class ChatWebSocketHandlerTest {
                     clientMessageId = "client-1",
                 ),
                 7L,
-            )
+            ),
         ).thenThrow(MessageAdmissionRejectedException("slow mode active"))
 
         handler.handleMessage(
@@ -189,7 +188,7 @@ class ChatWebSocketHandlerTest {
                     clientMessageId = "client-1",
                 ),
                 7L,
-            )
+            ),
         ).thenThrow(MessageModerationRejectedException("message blocked by moderation policy"))
 
         handler.handleMessage(
@@ -218,8 +217,8 @@ class ChatWebSocketHandlerTest {
         assertTrue(!payload.contains("\"type\":\"MESSAGE_ACCEPTED\""), payload)
     }
 
-    private fun messageDto(): MessageDto {
-        return MessageDto(
+    private fun messageDto(): MessageDto =
+        MessageDto(
             id = 100L,
             messageId = "msg-100",
             clientMessageId = "client-1",
@@ -246,5 +245,4 @@ class ChatWebSocketHandlerTest {
             writeShard = 0,
             fanoutShard = 0,
         )
-    }
 }

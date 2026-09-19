@@ -47,11 +47,10 @@ class RoomPolicyWorker(
         return appliedCount
     }
 
-    private fun RoomTrafficSnapshot.withSignals(signals: RoomPolicySignals): RoomTrafficSnapshot {
-        return copy(
+    private fun RoomTrafficSnapshot.withSignals(signals: RoomPolicySignals): RoomTrafficSnapshot =
+        copy(
             writerLagMillis = signals.writerLagMillis,
             fanoutLagMillis = signals.fanoutLagMillis,
             gatewaySendQueueDepth = signals.gatewaySendQueueDepth,
         )
-    }
 }

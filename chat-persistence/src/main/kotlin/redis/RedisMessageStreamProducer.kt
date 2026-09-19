@@ -36,7 +36,7 @@ class RedisMessageStreamProducer(
                 FIELD_PAYLOAD to objectMapper.writeValueAsString(envelope),
             )
             val recordId = appendToStream(streamKey, fields)
-                ?: throw IllegalStateException("Redis Streams append returned null: $streamKey")
+                ?: error("Redis Streams append returned null: $streamKey")
 
             if (knownStreamsCache.add(streamKey)) {
                 try {
@@ -70,20 +70,19 @@ class RedisMessageStreamProducer(
         val options = RedisStreamCommands.XAddOptions.maxlen(streams.maxLen)
             .approximateTrimming(streams.maxLenApproximate)
 
-        return redisTemplate.execute(RedisCallback<RecordId> { connection ->
-            connection.streamCommands().xAdd(record, options)
-        })
+        return redisTemplate.execute(
+            RedisCallback<RecordId> { connection ->
+                connection.streamCommands().xAdd(record, options)
+            },
+        )
     }
 
-    private fun rawFields(fields: Map<String, String>): Map<ByteArray, ByteArray> {
-        return fields.entries.associateTo(LinkedHashMap()) { (key, value) ->
+    private fun rawFields(fields: Map<String, String>): Map<ByteArray, ByteArray> =
+        fields.entries.associateTo(LinkedHashMap()) { (key, value) ->
             bytes(key) to bytes(value)
         }
-    }
 
-    private fun bytes(value: String): ByteArray {
-        return value.toByteArray(StandardCharsets.UTF_8)
-    }
+    private fun bytes(value: String): ByteArray = value.toByteArray(StandardCharsets.UTF_8)
 
     private companion object {
         const val FIELD_MESSAGE_ID = "messageId"

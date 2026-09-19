@@ -8,7 +8,6 @@ import org.mockito.Mockito.verify
 import org.springframework.jdbc.core.JdbcTemplate
 
 class AdminAuditLogRepositoryTest {
-
     @Test
     fun `audit log insert는 actor action target metadata를 바인딩한다`() {
         val jdbcTemplate = mock(JdbcTemplate::class.java)

@@ -18,42 +18,33 @@ import org.springframework.stereotype.Service
 class PartitionedMessageReadAdapter(
     private val partitionedMessageReadRepository: PartitionedMessageReadRepository,
 ) : MessageReadPort {
-
-    override fun findPageByRoom(roomId: Long, pageable: Pageable): Page<MessageDto> {
-        return partitionedMessageReadRepository.findPageByRoom(roomId, pageable)
+    override fun findPageByRoom(roomId: Long, pageable: Pageable): Page<MessageDto> =
+        partitionedMessageReadRepository.findPageByRoom(roomId, pageable)
             .map { it.toDto() }
-    }
 
-    override fun findLatestMessages(roomId: Long, limit: Int): List<MessageDto> {
-        return partitionedMessageReadRepository.findLatestMessages(roomId, limit)
+    override fun findLatestMessages(roomId: Long, limit: Int): List<MessageDto> =
+        partitionedMessageReadRepository.findLatestMessages(roomId, limit)
             .map { it.toDto() }
-    }
 
-    override fun findMessagesBefore(roomId: Long, cursor: Long, limit: Int): List<MessageDto> {
-        return partitionedMessageReadRepository.findMessagesBefore(roomId, cursor, limit)
+    override fun findMessagesBefore(roomId: Long, cursor: Long, limit: Int): List<MessageDto> =
+        partitionedMessageReadRepository.findMessagesBefore(roomId, cursor, limit)
             .map { it.toDto() }
-    }
 
-    override fun findMessagesAfter(roomId: Long, cursor: Long, limit: Int): List<MessageDto> {
-        return partitionedMessageReadRepository.findMessagesAfter(roomId, cursor, limit)
+    override fun findMessagesAfter(roomId: Long, cursor: Long, limit: Int): List<MessageDto> =
+        partitionedMessageReadRepository.findMessagesAfter(roomId, cursor, limit)
             .map { it.toDto() }
-    }
 
-    override fun findGapMessages(roomId: Long, afterSeq: Long, limit: Int): List<MessageDto> {
-        return partitionedMessageReadRepository.findGapMessages(roomId, afterSeq, limit)
+    override fun findGapMessages(roomId: Long, afterSeq: Long, limit: Int): List<MessageDto> =
+        partitionedMessageReadRepository.findGapMessages(roomId, afterSeq, limit)
             .map { it.toDto() }
-    }
 
-    override fun findLatestMessage(roomId: Long): MessageDto? {
-        return partitionedMessageReadRepository.findLatestMessage(roomId)?.toDto()
-    }
+    override fun findLatestMessage(roomId: Long): MessageDto? =
+        partitionedMessageReadRepository.findLatestMessage(roomId)?.toDto()
 
-    override fun findByClientMessageId(roomId: Long, senderId: Long, clientMessageId: String): MessageDto? {
-        return partitionedMessageReadRepository.findByClientMessageId(roomId, senderId, clientMessageId)?.toDto()
-    }
+    override fun findByClientMessageId(roomId: Long, senderId: Long, clientMessageId: String): MessageDto? = partitionedMessageReadRepository.findByClientMessageId(roomId, senderId, clientMessageId)?.toDto()
 
-    private fun CanonicalMessageRecord.toDto(): MessageDto {
-        return MessageDto(
+    private fun CanonicalMessageRecord.toDto(): MessageDto =
+        MessageDto(
             id = roomSeq,
             messageId = messageId,
             clientMessageId = clientMessageId,
@@ -80,5 +71,4 @@ class PartitionedMessageReadAdapter(
             writeShard = writeShard,
             fanoutShard = fanoutShard,
         )
-    }
 }

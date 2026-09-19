@@ -5,7 +5,6 @@ import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
 
 class ChatWebSocketGatewayPropertiesTest {
-
     @Test
     fun `heartbeat interval은 양수여야 한다`() {
         assertThrows(IllegalArgumentException::class.java) {

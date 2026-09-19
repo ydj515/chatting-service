@@ -1,8 +1,8 @@
 package com.chat.persistence.service
 
+import com.chat.persistence.config.ChatRedisProperties
 import com.chat.persistence.config.ChatWorkerProperties
 import com.chat.persistence.redis.MessageStreamKeyResolver
-import com.chat.persistence.config.ChatRedisProperties
 import io.micrometer.core.instrument.MeterRegistry
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -27,7 +27,6 @@ import java.time.ZoneId
 import java.util.stream.Stream
 
 class FanoutOwnerLeaseServiceTest {
-
     @Suppress("UNCHECKED_CAST")
     private val redisScriptMatcherPlaceholder = mock(RedisScript::class.java) as RedisScript<Long>
 
@@ -212,26 +211,30 @@ class FanoutOwnerLeaseServiceTest {
         workerProperties: ChatWorkerProperties = ChatWorkerProperties(consumerName = "worker-1"),
         meterRegistry: MeterRegistry? = null,
         clock: Clock = Clock.systemUTC(),
-    ): RedisFanoutOwnerLeaseService {
-        return RedisFanoutOwnerLeaseService(
+    ): RedisFanoutOwnerLeaseService =
+        RedisFanoutOwnerLeaseService(
             redisTemplate = redis,
             workerProperties = workerProperties,
             meterRegistryProvider = meterRegistry?.let { meterRegistryProvider(it) },
             clock = clock,
         )
-    }
 
-    private fun meterRegistryProvider(meterRegistry: MeterRegistry): ObjectProvider<MeterRegistry> {
-        return object : ObjectProvider<MeterRegistry> {
+    private fun meterRegistryProvider(meterRegistry: MeterRegistry): ObjectProvider<MeterRegistry> =
+        object : ObjectProvider<MeterRegistry> {
             override fun getObject(): MeterRegistry = meterRegistry
+
             override fun getObject(vararg args: Any?): MeterRegistry = meterRegistry
+
             override fun getIfAvailable(): MeterRegistry = meterRegistry
+
             override fun getIfUnique(): MeterRegistry = meterRegistry
+
             override fun iterator(): MutableIterator<MeterRegistry> = mutableListOf(meterRegistry).iterator()
+
             override fun stream(): Stream<MeterRegistry> = Stream.of(meterRegistry)
+
             override fun orderedStream(): Stream<MeterRegistry> = Stream.of(meterRegistry)
         }
-    }
 
     @Suppress("UNCHECKED_CAST")
     private fun redisTemplate(): RedisFixture {
@@ -257,9 +260,7 @@ class FanoutOwnerLeaseServiceTest {
             }
         }.`when`(valueOperations).setIfAbsent(anyString(), anyString(), any(Duration::class.java))
         doAnswer { invocation ->
-            if (getFailures.removeFirstOrNull() == true) {
-                throw IllegalStateException("redis get unavailable")
-            }
+            check(getFailures.removeFirstOrNull() != true) { "redis get unavailable" }
             storage[invocation.arguments[0] as String]
         }.`when`(valueOperations).get(anyString())
         doAnswer { invocation ->
@@ -267,9 +268,7 @@ class FanoutOwnerLeaseServiceTest {
             val key = keys.single() as String
             val args = invocation.arguments.drop(2).map { it as String }
             scriptCalls += ScriptCall(key, args)
-            if (scriptFailures.removeFirstOrNull() == true) {
-                throw IllegalStateException("redis script unavailable")
-            }
+            check(scriptFailures.removeFirstOrNull() != true) { "redis script unavailable" }
             if (storage[key] == args.first()) {
                 1L
             } else {

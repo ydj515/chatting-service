@@ -2,10 +2,10 @@ package com.chat.persistence.repository
 
 import com.chat.domain.dto.AdminMessageCursor
 import com.chat.domain.dto.AdminMessageDto
-import com.chat.domain.dto.AdminRoomPolicyUpdateRequest
-import com.chat.domain.dto.AdminRoomStatusDto
 import com.chat.domain.dto.AdminMessageSearchCursor
 import com.chat.domain.dto.AdminMessageSearchMode
+import com.chat.domain.dto.AdminRoomPolicyUpdateRequest
+import com.chat.domain.dto.AdminRoomStatusDto
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -25,7 +25,6 @@ import java.sql.Timestamp
 import java.time.Instant
 
 class AdminMessageRepositoryTest {
-
     @Test
     fun `history query는 roomId와 created_at 범위와 cursor를 parameter로 바인딩한다`() {
         val jdbcTemplate = mock(JdbcTemplate::class.java)

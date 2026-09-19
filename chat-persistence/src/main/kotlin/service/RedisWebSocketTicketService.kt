@@ -32,7 +32,6 @@ class RedisWebSocketTicketService(
     private val clock: Clock,
     private val meterRegistryProvider: ObjectProvider<MeterRegistry>? = null,
 ) : WebSocketTicketService {
-
     private val logger = LoggerFactory.getLogger(javaClass)
     private val secureRandom = SecureRandom()
     private val encoder = Base64.getUrlEncoder().withoutPadding()
@@ -202,9 +201,8 @@ class RedisWebSocketTicketService(
         return "${authProperties.webSocketTicket.keyPrefix}${encoder.encodeToString(digest)}"
     }
 
-    private fun rateLimitUserKey(userId: Long): String {
-        return "${authProperties.webSocketTicket.rateLimitKeyPrefix}user:$userId"
-    }
+    private fun rateLimitUserKey(userId: Long): String =
+        "${authProperties.webSocketTicket.rateLimitKeyPrefix}user:$userId"
 
     private fun rateLimitIpKey(clientIp: String): String {
         val digest = MessageDigest.getInstance("SHA-256")

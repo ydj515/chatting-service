@@ -10,7 +10,6 @@ import org.springframework.beans.factory.ObjectProvider
 import java.util.stream.Stream
 
 class RoomSeqGapAuditMetricsTest {
-
     @Test
     fun `roomSeq gap audit metric은 aggregate gauge 네 개를 tag 없이 등록한다`() {
         val meterRegistry = SimpleMeterRegistry()
@@ -54,15 +53,20 @@ class RoomSeqGapAuditMetricsTest {
         )
     }
 
-    private fun meterRegistryProvider(meterRegistry: MeterRegistry): ObjectProvider<MeterRegistry> {
-        return object : ObjectProvider<MeterRegistry> {
+    private fun meterRegistryProvider(meterRegistry: MeterRegistry): ObjectProvider<MeterRegistry> =
+        object : ObjectProvider<MeterRegistry> {
             override fun getObject(): MeterRegistry = meterRegistry
+
             override fun getObject(vararg args: Any?): MeterRegistry = meterRegistry
+
             override fun getIfAvailable(): MeterRegistry = meterRegistry
+
             override fun getIfUnique(): MeterRegistry = meterRegistry
+
             override fun iterator(): MutableIterator<MeterRegistry> = mutableListOf(meterRegistry).iterator()
+
             override fun stream(): Stream<MeterRegistry> = Stream.of(meterRegistry)
+
             override fun orderedStream(): Stream<MeterRegistry> = Stream.of(meterRegistry)
         }
-    }
 }

@@ -1,15 +1,7 @@
 <?xml version="1.0" ?>
 <SmellBaseline>
-  <ManuallySuppressedIssues/>
+  <ManuallySuppressedIssues />
   <CurrentIssues>
-    <ID>InvalidPackageDeclaration:ChatWebSocketHandler.kt$package com.chat.websocket.handler</ID>
-    <ID>InvalidPackageDeclaration:ChatWebSocketHandlerTest.kt$package com.chat.websocket.handler</ID>
-    <ID>InvalidPackageDeclaration:WebSocketConfig.kt$package com.chat.websocket.config</ID>
-    <ID>InvalidPackageDeclaration:WebSocketHandshakeInterceptor.kt$package com.chat.websocket.interceptor</ID>
-    <ID>InvalidPackageDeclaration:WebSocketHandshakeInterceptorTest.kt$package com.chat.websocket.interceptor</ID>
-    <ID>InvalidPackageDeclaration:WebSocketHeartbeatScheduler.kt$package com.chat.websocket.service</ID>
-    <ID>InvalidPackageDeclaration:WebSocketHeartbeatSchedulerTest.kt$package com.chat.websocket.service</ID>
-    <ID>InvalidPackageDeclaration:WebSocketProperties.kt$package com.chat.websocket.config</ID>
     <ID>SpreadOperator:WebSocketConfig.kt$WebSocketConfig$(*webSocketProperties.allowedOrigins.toTypedArray())</ID>
     <ID>SwallowedException:ChatWebSocketHandler.kt$ChatWebSocketHandler$e: Exception</ID>
     <ID>TooGenericExceptionCaught:ChatWebSocketHandler.kt$ChatWebSocketHandler$e: Exception</ID>

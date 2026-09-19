@@ -34,9 +34,8 @@ data class RoomHeatPolicy(
 class RoomHeatClassifier(
     private val properties: ChatRoomPolicyProperties,
 ) {
-
-    fun classify(snapshot: RoomTrafficSnapshot): RoomHeatPolicy {
-        return when {
+    fun classify(snapshot: RoomTrafficSnapshot): RoomHeatPolicy =
+        when {
             snapshot.isOverload() -> snapshot.policy(
                 heatLevel = RoomHeatLevel.OVERLOAD,
                 liveFeedMaxMessages = properties.overloadLiveFeedMaxMessages,
@@ -73,18 +72,15 @@ class RoomHeatClassifier(
                 shardCount = MIN_SHARD_COUNT,
             )
         }
-    }
 
-    private fun RoomTrafficSnapshot.isVeryHot(): Boolean {
-        return roomMessagesPerSecond >= properties.veryHotMessagesPerSecond ||
+    private fun RoomTrafficSnapshot.isVeryHot(): Boolean =
+        roomMessagesPerSecond >= properties.veryHotMessagesPerSecond ||
             roomMessagesP95PerSecond >= properties.veryHotMessagesPerSecond
-    }
 
-    private fun RoomTrafficSnapshot.isOverload(): Boolean {
-        return writerLagMillis > properties.overloadWriterLagMillis ||
+    private fun RoomTrafficSnapshot.isOverload(): Boolean =
+        writerLagMillis > properties.overloadWriterLagMillis ||
             fanoutLagMillis > properties.overloadFanoutLagMillis ||
             gatewaySendQueueDepth > properties.overloadGatewayQueueDepth
-    }
 
     private fun RoomTrafficSnapshot.policy(
         heatLevel: RoomHeatLevel,

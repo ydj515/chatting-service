@@ -12,7 +12,6 @@ import org.springframework.jdbc.core.JdbcTemplate
 import java.time.Duration
 
 class ReadReplicaLagPolicyTest {
-
     @Test
     fun `usePrimaryForLatestHistory는 read datasource가 꺼져 있으면 false를 반환한다`() {
         val policy = ReadReplicaLagPolicy(

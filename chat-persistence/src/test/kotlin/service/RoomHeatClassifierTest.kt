@@ -5,7 +5,6 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 
 class RoomHeatClassifierTest {
-
     @Test
     fun `NORMAL 방은 기본 live feed window를 유지한다`() {
         val policy = classifier().classify(
@@ -131,7 +130,5 @@ class RoomHeatClassifierTest {
         assertEquals(64, policy.fanoutShardCount)
     }
 
-    private fun classifier(): RoomHeatClassifier {
-        return RoomHeatClassifier(ChatRoomPolicyProperties())
-    }
+    private fun classifier(): RoomHeatClassifier = RoomHeatClassifier(ChatRoomPolicyProperties())
 }

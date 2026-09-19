@@ -27,7 +27,6 @@ class ChatWebSocketHandler(
     private val objectMapper: ObjectMapper,
     private val webSocketProperties: WebSocketProperties,
 ) : WebSocketHandler {
-
     private val logger = LoggerFactory.getLogger(javaClass)
 
     override fun afterConnectionEstablished(session: WebSocketSession) {
@@ -103,9 +102,8 @@ class ChatWebSocketHandler(
 
     override fun supportsPartialMessages(): Boolean = false
 
-    private fun getUserIdFromSession(session: WebSocketSession): Long? {
-        return session.attributes[webSocketProperties.userIdAttribute] as? Long
-    }
+    private fun getUserIdFromSession(session: WebSocketSession): Long? =
+        session.attributes[webSocketProperties.userIdAttribute] as? Long
 
     private fun loadUserChatRooms(userId: Long) {
         try {
@@ -119,7 +117,6 @@ class ChatWebSocketHandler(
             }
 
             logger.info("Loaded ${chatRooms.content.size} chat rooms for user: $userId")
-
         } catch (e: Exception) {
             logger.error("Failed to load chat rooms for user: $userId", e)
         }
@@ -141,13 +138,12 @@ class ChatWebSocketHandler(
         }
     }
 
-    private fun extractMessageType(payload: String): String? {
-        return try {
+    private fun extractMessageType(payload: String): String? =
+        try {
             objectMapper.readTree(payload).get("type")?.asText()
         } catch (e: Exception) {
             null
         }
-    }
 
     private fun handleTextMessage(session: WebSocketSession, userId: Long, payload: String) {
         try {
@@ -239,7 +235,6 @@ class ChatWebSocketHandler(
         MESSAGE_MODERATION_REJECTED,
     }
 
-    private fun writeWebSocketMessage(message: com.chat.domain.dto.WebSocketMessage): String {
-        return objectMapper.writerFor(com.chat.domain.dto.WebSocketMessage::class.java).writeValueAsString(message)
-    }
+    private fun writeWebSocketMessage(message: com.chat.domain.dto.WebSocketMessage): String =
+        objectMapper.writerFor(com.chat.domain.dto.WebSocketMessage::class.java).writeValueAsString(message)
 }

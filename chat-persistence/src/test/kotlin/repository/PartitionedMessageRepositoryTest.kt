@@ -16,7 +16,6 @@ import java.sql.Timestamp
 import java.time.LocalDateTime
 
 class PartitionedMessageRepositoryTest {
-
     @Test
     fun `batchInsert는 chat_messages에 batch insert하고 insert count를 written 여부로 변환한다`() {
         val jdbcTemplate = mock(JdbcTemplate::class.java)
@@ -60,8 +59,8 @@ class PartitionedMessageRepositoryTest {
         verify(preparedStatement).setTimestamp(11, Timestamp.valueOf(LocalDateTime.parse("2026-06-13T12:00:00")))
     }
 
-    private fun writeRequest(messageId: String): MessageWriteRequest {
-        return MessageWriteRequest(
+    private fun writeRequest(messageId: String): MessageWriteRequest =
+        MessageWriteRequest(
             messageId = messageId,
             clientMessageId = "client-1",
             chatRoomId = 10L,
@@ -75,7 +74,6 @@ class PartitionedMessageRepositoryTest {
             fanoutShard = 2,
             createdAt = LocalDateTime.parse("2026-06-13T12:00:00"),
         )
-    }
 
     private fun anyString(): String {
         org.mockito.ArgumentMatchers.anyString()

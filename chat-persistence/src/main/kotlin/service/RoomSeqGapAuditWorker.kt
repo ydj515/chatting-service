@@ -13,7 +13,6 @@ class RoomSeqGapAuditWorker(
     private val metrics: RoomSeqGapAuditMetrics = RoomSeqGapAuditMetrics.Noop,
     private val clock: Clock = Clock.systemUTC(),
 ) {
-
     fun poll() {
         val properties = workerProperties.roomSeqGapAudit
         if (!properties.enabled) {

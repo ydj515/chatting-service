@@ -11,7 +11,6 @@ class RoomPolicyAutoDowngradeService(
     private val roomHeatClassifier: RoomHeatClassifier,
     private val roomPolicyRepository: RoomPolicyRepository,
 ) {
-
     fun applyDowngradePolicy(snapshot: RoomTrafficSnapshot): RoomHeatPolicy {
         val policy = roomHeatClassifier.classify(snapshot)
         roomPolicyRepository.applyAutomaticPolicy(policy)

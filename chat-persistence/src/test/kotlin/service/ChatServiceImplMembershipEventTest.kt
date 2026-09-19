@@ -1,5 +1,7 @@
 package com.chat.persistence.service
 
+import com.chat.domain.model.ChatRoom
+import com.chat.domain.model.User
 import com.chat.persistence.config.ChatRedisProperties
 import com.chat.persistence.config.ChatWebSocketGatewayProperties
 import com.chat.persistence.config.MessageSequenceProperties
@@ -9,8 +11,6 @@ import com.chat.persistence.repository.ChatRoomMemberRepository
 import com.chat.persistence.repository.ChatRoomRepository
 import com.chat.persistence.repository.MessageRepository
 import com.chat.persistence.repository.UserRepository
-import com.chat.domain.model.ChatRoom
-import com.chat.domain.model.User
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
 import com.fasterxml.jackson.module.kotlin.KotlinModule
@@ -25,7 +25,6 @@ import org.springframework.data.redis.listener.RedisMessageListenerContainer
 import java.util.Optional
 
 class ChatServiceImplMembershipEventTest {
-
     @Test
     fun `채팅방 참여는 JOIN membership event를 발행한다`() {
         val chatRoomMemberRepository = mock(ChatRoomMemberRepository::class.java)
@@ -62,9 +61,8 @@ class ChatServiceImplMembershipEventTest {
     }
 
     @Suppress("UNCHECKED_CAST")
-    private fun redisTemplate(): RedisTemplate<String, String> {
-        return mock(RedisTemplate::class.java) as RedisTemplate<String, String>
-    }
+    private fun redisTemplate(): RedisTemplate<String, String> =
+        mock(RedisTemplate::class.java) as RedisTemplate<String, String>
 
     private fun chatService(
         chatRoomMemberRepository: ChatRoomMemberRepository,
@@ -125,20 +123,18 @@ class ChatServiceImplMembershipEventTest {
         override fun shardConfig(roomId: Long): RoomShardConfig = RoomShardConfig()
     }
 
-    private fun user(id: Long): User {
-        return User(
+    private fun user(id: Long): User =
+        User(
             id = id,
             username = "user$id",
             password = "password",
             displayName = "User $id",
         )
-    }
 
-    private fun chatRoom(id: Long): ChatRoom {
-        return ChatRoom(
+    private fun chatRoom(id: Long): ChatRoom =
+        ChatRoom(
             id = id,
             name = "room-$id",
             createdBy = user(id = 1L),
         )
-    }
 }

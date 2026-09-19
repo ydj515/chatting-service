@@ -31,7 +31,6 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.time.Instant
 
 class AdminModerationServiceImplTest {
-
     @Test
     fun `createRule은 repository 저장과 audit log를 transaction으로 묶는다`() {
         val method = AdminModerationServiceImpl::class.java.getMethod(
@@ -249,8 +248,8 @@ class AdminModerationServiceImplTest {
         val userSanctionsCache: Cache,
     )
 
-    private fun ruleRecord(): ModerationRuleRecord {
-        return ModerationRuleRecord(
+    private fun ruleRecord(): ModerationRuleRecord =
+        ModerationRuleRecord(
             id = 1L,
             scopeType = ModerationScopeType.GLOBAL,
             roomId = null,
@@ -263,14 +262,13 @@ class AdminModerationServiceImplTest {
             createdAt = Instant.parse("2026-06-26T00:00:00Z"),
             updatedAt = Instant.parse("2026-06-26T00:00:00Z"),
         )
-    }
 
     private fun sanctionRecord(
         scopeType: ModerationScopeType = ModerationScopeType.ROOM,
         roomId: Long? = 10L,
         type: UserSanctionType = UserSanctionType.MUTE,
-    ): UserSanctionRecord {
-        return UserSanctionRecord(
+    ): UserSanctionRecord =
+        UserSanctionRecord(
             id = 2L,
             scopeType = scopeType,
             roomId = roomId,
@@ -284,7 +282,6 @@ class AdminModerationServiceImplTest {
             revokedBy = null,
             revokedAt = null,
         )
-    }
 
     private fun eqString(value: String): String {
         eq(value)

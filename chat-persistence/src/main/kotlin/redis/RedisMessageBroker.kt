@@ -166,7 +166,6 @@ class RedisMessageBroker(
             }
 
             logger.info("processedMessages $distributedMessage.id")
-
         } catch (e: Exception) {
             logger.error("Error in on message", e)
         }

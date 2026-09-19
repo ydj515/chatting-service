@@ -28,9 +28,7 @@ interface FanoutOwnerLeaseService {
 
     companion object {
         val Noop: FanoutOwnerLeaseService = object : FanoutOwnerLeaseService {
-            override fun acquire(roomId: Long, streamShard: Int): FanoutOwnerLease {
-                return FanoutOwnerLease.disabled(roomId = roomId, streamShard = streamShard)
-            }
+            override fun acquire(roomId: Long, streamShard: Int): FanoutOwnerLease = FanoutOwnerLease.disabled(roomId = roomId, streamShard = streamShard)
 
             override fun validate(
                 lease: FanoutOwnerLease,
@@ -50,15 +48,14 @@ data class FanoutOwnerLease(
     val enabled: Boolean = true,
 ) {
     companion object {
-        fun disabled(roomId: Long, streamShard: Int): FanoutOwnerLease {
-            return FanoutOwnerLease(
+        fun disabled(roomId: Long, streamShard: Int): FanoutOwnerLease =
+            FanoutOwnerLease(
                 key = "disabled:$roomId:$streamShard",
                 value = "disabled",
                 roomId = roomId,
                 streamShard = streamShard,
                 enabled = false,
             )
-        }
     }
 }
 
@@ -231,9 +228,7 @@ class RedisFanoutOwnerLeaseService(
         return false
     }
 
-    private fun leaseKey(roomId: Long, streamShard: Int): String {
-        return "${workerProperties.fanout.ownerLease.keyPrefix}$roomId:shard:$streamShard"
-    }
+    private fun leaseKey(roomId: Long, streamShard: Int): String = "${workerProperties.fanout.ownerLease.keyPrefix}$roomId:shard:$streamShard"
 
     private fun nowMillis(): Long = clock.millis()
 

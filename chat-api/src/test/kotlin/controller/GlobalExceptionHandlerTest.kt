@@ -12,8 +12,8 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.MockMvc
-import org.springframework.test.web.servlet.post
 import org.springframework.test.web.servlet.get
+import org.springframework.test.web.servlet.post
 import org.springframework.test.web.servlet.setup.MockMvcBuilders
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PostMapping
@@ -21,7 +21,6 @@ import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RestController
 
 class GlobalExceptionHandlerTest {
-
     private lateinit var mockMvc: MockMvc
 
     @BeforeEach
@@ -36,13 +35,14 @@ class GlobalExceptionHandlerTest {
     fun `validation 오류는 errors 배열을 포함한 400 응답으로 변환한다`() {
         mockMvc.post("/test/users") {
             contentType = MediaType.APPLICATION_JSON
-            content = """
+            content =
+                """
                 {
                   "username": "ab",
                   "password": "12",
                   "displayName": ""
                 }
-            """.trimIndent()
+                """.trimIndent()
         }
             .andExpect {
                 status { isBadRequest() }
@@ -62,13 +62,14 @@ class GlobalExceptionHandlerTest {
     fun `회원가입 비밀번호는 BCrypt 한계인 72 UTF-8 bytes를 초과할 수 없다`() {
         mockMvc.post("/test/users") {
             contentType = MediaType.APPLICATION_JSON
-            content = """
+            content =
+                """
                 {
                   "username": "tester",
                   "password": "${"a".repeat(73)}",
                   "displayName": "테스터"
                 }
-            """.trimIndent()
+                """.trimIndent()
         }
             .andExpect {
                 status { isBadRequest() }
@@ -80,12 +81,13 @@ class GlobalExceptionHandlerTest {
     fun `로그인 비밀번호도 BCrypt 한계인 72 UTF-8 bytes를 초과할 수 없다`() {
         mockMvc.post("/test/login") {
             contentType = MediaType.APPLICATION_JSON
-            content = """
+            content =
+                """
                 {
                   "username": "tester",
                   "password": "${"한".repeat(25)}"
                 }
-            """.trimIndent()
+                """.trimIndent()
         }
             .andExpect {
                 status { isBadRequest() }
@@ -199,43 +201,28 @@ class GlobalExceptionHandlerTest {
         fun login(@Valid @RequestBody request: LoginRequest): LoginRequest = request
 
         @GetMapping("/test/bad-request")
-        fun badRequest(): String {
-            throw IllegalArgumentException("잘못된 요청입니다.")
-        }
+        fun badRequest(): String = throw IllegalArgumentException("잘못된 요청입니다.")
 
         @GetMapping("/test/conflict")
-        fun conflict(): String {
-            throw IllegalStateException("이미 참여한 채팅방입니다")
-        }
+        fun conflict(): String = error("이미 참여한 채팅방입니다")
 
         @GetMapping("/test/not-found")
-        fun notFound(): String {
-            throw ResourceNotFoundException("채팅방을 찾을 수 없습니다: 1")
-        }
+        fun notFound(): String = throw ResourceNotFoundException("채팅방을 찾을 수 없습니다: 1")
 
         @GetMapping("/test/resource-conflict")
-        fun resourceConflict(): String {
-            throw ResourceConflictException("이미 존재하는 사용자명입니다: tester")
-        }
+        fun resourceConflict(): String = throw ResourceConflictException("이미 존재하는 사용자명입니다: tester")
 
         @GetMapping("/test/forbidden")
-        fun forbidden(): String {
-            throw ForbiddenOperationException("채팅방 멤버가 아닙니다")
-        }
+        fun forbidden(): String = throw ForbiddenOperationException("채팅방 멤버가 아닙니다")
 
         @GetMapping("/test/message-admission-rejected")
-        fun messageAdmissionRejected(): String {
-            throw MessageAdmissionRejectedException("room rate limit exceeded")
-        }
+        fun messageAdmissionRejected(): String = throw MessageAdmissionRejectedException("room rate limit exceeded")
 
         @GetMapping("/test/message-moderation-rejected")
-        fun messageModerationRejected(): String {
+        fun messageModerationRejected(): String =
             throw MessageModerationRejectedException("message blocked by moderation policy")
-        }
 
         @GetMapping("/test/server-error")
-        fun serverError(): String {
-            throw RuntimeException("database password leaked in stack trace")
-        }
+        fun serverError(): String = throw RuntimeException("database password leaked in stack trace")
     }
 }

@@ -27,7 +27,6 @@ import java.time.Instant
 import java.time.ZoneOffset
 
 class WebSocketSessionManagerHeartbeatTest {
-
     @Test
     fun `heartbeat poll은 열린 세션에 ping frame을 전송한다`() {
         val session = session("session-1")

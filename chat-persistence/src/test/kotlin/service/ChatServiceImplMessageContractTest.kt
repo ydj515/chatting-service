@@ -37,7 +37,6 @@ import org.mockito.Mockito.never
 import org.mockito.Mockito.times
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
-import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.data.redis.core.ValueOperations
 import org.springframework.data.redis.listener.RedisMessageListenerContainer
@@ -45,7 +44,6 @@ import java.time.LocalDateTime
 import java.util.Optional
 
 class ChatServiceImplMessageContractTest {
-
     @Test
     fun `메시지 수락 정책과 traffic stats 의존성은 constructor default로 fail open 되지 않는다`() {
         val hasDefaultConstructorBridge = ChatServiceImpl::class.java.declaredConstructors.any { constructor ->
@@ -64,7 +62,7 @@ class ChatServiceImplMessageContractTest {
                 10L,
                 7L,
                 clientMessageId,
-            )
+            ),
         ).thenReturn(Optional.empty())
 
         val message = fixture.chatService.sendMessage(
@@ -98,7 +96,7 @@ class ChatServiceImplMessageContractTest {
                 10L,
                 7L,
                 clientMessageId,
-            )
+            ),
         ).thenReturn(Optional.empty())
 
         val message = fixture.chatService.sendMessage(
@@ -142,7 +140,7 @@ class ChatServiceImplMessageContractTest {
                 10L,
                 7L,
                 clientMessageId,
-            )
+            ),
         ).thenReturn(Optional.empty())
 
         fixture.chatService.sendMessage(
@@ -174,7 +172,7 @@ class ChatServiceImplMessageContractTest {
                 10L,
                 7L,
                 clientMessageId,
-            )
+            ),
         ).thenReturn(Optional.empty())
 
         assertThrows(IllegalStateException::class.java) {
@@ -201,7 +199,7 @@ class ChatServiceImplMessageContractTest {
                 10L,
                 7L,
                 clientMessageId,
-            )
+            ),
         ).thenReturn(Optional.empty())
 
         val message = fixture.chatService.sendMessage(
@@ -218,7 +216,6 @@ class ChatServiceImplMessageContractTest {
         assertEquals(1L, message.roomSeq)
     }
 
-
     @Test
     fun `Redis Streams append 실패 시 메시지를 저장하거나 fanout하지 않는다`() {
         val messageStreamProducer = mock(MessageStreamProducer::class.java)
@@ -231,7 +228,7 @@ class ChatServiceImplMessageContractTest {
                 10L,
                 7L,
                 clientMessageId,
-            )
+            ),
         ).thenReturn(Optional.empty())
 
         assertThrows(IllegalStateException::class.java) {
@@ -274,7 +271,7 @@ class ChatServiceImplMessageContractTest {
                 10L,
                 7L,
                 clientMessageId,
-            )
+            ),
         ).thenReturn(Optional.of(existingMessage))
 
         val message = fixture.chatService.sendMessage(
@@ -308,7 +305,7 @@ class ChatServiceImplMessageContractTest {
                 10L,
                 7L,
                 clientMessageId,
-            )
+            ),
         ).thenReturn(Optional.empty())
 
         val exception = assertThrows(MessageAdmissionRejectedException::class.java) {
@@ -354,7 +351,7 @@ class ChatServiceImplMessageContractTest {
                 10L,
                 7L,
                 clientMessageId,
-            )
+            ),
         ).thenReturn(Optional.of(existingMessage))
 
         fixture.chatService.sendMessage(
@@ -385,7 +382,7 @@ class ChatServiceImplMessageContractTest {
                 10L,
                 7L,
                 clientMessageId,
-            )
+            ),
         ).thenReturn(Optional.empty())
 
         val exception = assertThrows(MessageModerationRejectedException::class.java) {
@@ -423,7 +420,7 @@ class ChatServiceImplMessageContractTest {
                 10L,
                 7L,
                 clientMessageId,
-            )
+            ),
         ).thenReturn(Optional.empty())
 
         val exception = assertThrows(MessageModerationRejectedException::class.java) {
@@ -474,7 +471,7 @@ class ChatServiceImplMessageContractTest {
                 10L,
                 7L,
                 clientMessageId,
-            )
+            ),
         ).thenReturn(Optional.of(existingMessage))
 
         fixture.chatService.sendMessage(
@@ -504,7 +501,7 @@ class ChatServiceImplMessageContractTest {
                 10L,
                 7L,
                 clientMessageId,
-            )
+            ),
         ).thenReturn(Optional.empty())
 
         fixture.chatService.sendMessage(
@@ -539,14 +536,14 @@ class ChatServiceImplMessageContractTest {
                 10L,
                 7L,
                 "client-message-1",
-            )
+            ),
         ).thenReturn(Optional.empty())
         `when`(
             fixture.messageRepository.findByChatRoomIdAndSenderIdAndClientMessageId(
                 10L,
                 7L,
                 "client-message-2",
-            )
+            ),
         ).thenReturn(Optional.empty())
 
         fixture.chatService.sendMessage(
@@ -578,7 +575,6 @@ class ChatServiceImplMessageContractTest {
         }
         assertEquals(listOf(10L, 10L), shardReader.shardConfigRoomIds)
     }
-
 
     @Suppress("UNCHECKED_CAST")
     private fun chatServiceFixture(
@@ -662,22 +658,20 @@ class ChatServiceImplMessageContractTest {
         )
     }
 
-    private fun user(id: Long): User {
-        return User(
+    private fun user(id: Long): User =
+        User(
             id = id,
             username = "user$id",
             password = "password",
             displayName = "User $id",
         )
-    }
 
-    private fun chatRoom(id: Long): ChatRoom {
-        return ChatRoom(
+    private fun chatRoom(id: Long): ChatRoom =
+        ChatRoom(
             id = id,
             name = "room-$id",
             createdBy = user(1L),
         )
-    }
 
     private fun anyMessageStreamEnvelope(): MessageStreamEnvelope {
         any(MessageStreamEnvelope::class.java)
@@ -700,10 +694,7 @@ class ChatServiceImplMessageContractTest {
     private class RejectingMessageAdmissionPolicyService(
         private val message: String,
     ) : MessageAdmissionPolicyService {
-
-        override fun requireAllowed(roomId: Long, senderId: Long, memberRole: MemberRole) {
-            throw MessageAdmissionRejectedException(message)
-        }
+        override fun requireAllowed(roomId: Long, senderId: Long, memberRole: MemberRole): Unit = throw MessageAdmissionRejectedException(message)
     }
 
     private class RecordingMessageAdmissionPolicyService : MessageAdmissionPolicyService {
@@ -721,10 +712,7 @@ class ChatServiceImplMessageContractTest {
     private class RejectingMessageModerationPolicyService(
         private val message: String,
     ) : MessageModerationPolicyService {
-
-        override fun requireAllowed(roomId: Long, senderId: Long, content: String?, messageType: MessageType) {
-            throw MessageModerationRejectedException(message)
-        }
+        override fun requireAllowed(roomId: Long, senderId: Long, content: String?, messageType: MessageType): Unit = throw MessageModerationRejectedException(message)
     }
 
     private class RecordingMessageModerationPolicyService : MessageModerationPolicyService {
@@ -739,10 +727,7 @@ class ChatServiceImplMessageContractTest {
     private class RejectingUserSanctionPolicyService(
         private val message: String,
     ) : UserSanctionPolicyService {
-
-        override fun requireAllowedToSend(roomId: Long, userId: Long) {
-            throw MessageModerationRejectedException(message)
-        }
+        override fun requireAllowedToSend(roomId: Long, userId: Long): Unit = throw MessageModerationRejectedException(message)
     }
 
     private class RecordingUserSanctionPolicyService : UserSanctionPolicyService {
@@ -778,29 +763,25 @@ class ChatServiceImplMessageContractTest {
 
         override fun activeRoomIds(): Set<Long> = emptySet()
 
-        override fun snapshot(roomId: Long): RoomTrafficSnapshot {
-            return RoomTrafficSnapshot(
+        override fun snapshot(roomId: Long): RoomTrafficSnapshot =
+            RoomTrafficSnapshot(
                 roomId = roomId,
                 roomMessagesPerSecond = 0,
                 roomMessagesP95PerSecond = 0,
             )
-        }
     }
 
     private class ThrowingRoomTrafficStatsService : RoomTrafficStatsService {
-        override fun recordAccepted(roomId: Long) {
-            throw IllegalStateException("traffic stats unavailable")
-        }
+        override fun recordAccepted(roomId: Long): Unit = error("traffic stats unavailable")
 
         override fun activeRoomIds(): Set<Long> = emptySet()
 
-        override fun snapshot(roomId: Long): RoomTrafficSnapshot {
-            return RoomTrafficSnapshot(
+        override fun snapshot(roomId: Long): RoomTrafficSnapshot =
+            RoomTrafficSnapshot(
                 roomId = roomId,
                 roomMessagesPerSecond = 0,
                 roomMessagesP95PerSecond = 0,
             )
-        }
     }
 
     @Suppress("UNCHECKED_CAST")

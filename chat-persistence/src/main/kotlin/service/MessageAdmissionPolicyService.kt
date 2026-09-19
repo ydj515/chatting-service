@@ -27,11 +27,10 @@ data class RoomAdmissionPolicy(
     val slowModeSeconds: Int? = null,
     val moderatorPriority: Boolean = true,
 ) {
-    fun hasLimit(): Boolean {
-        return positive(roomRateLimitPerSecond) ||
+    fun hasLimit(): Boolean =
+        positive(roomRateLimitPerSecond) ||
             positive(userRateLimitPerSecond) ||
             positive(slowModeSeconds)
-    }
 
     private fun positive(value: Int?): Boolean = value != null && value > 0
 }
@@ -48,7 +47,6 @@ class RedisMessageAdmissionPolicyService(
     private val clock: Clock,
     private val meterRegistryProvider: ObjectProvider<MeterRegistry>? = null,
 ) : MessageAdmissionPolicyService {
-
     private val logger = LoggerFactory.getLogger(javaClass)
     private val script: RedisScript<Long> = DefaultRedisScript(
         ADMISSION_SCRIPT,
@@ -117,23 +115,15 @@ class RedisMessageAdmissionPolicyService(
         }
     }
 
-    private fun roomRateKey(roomId: Long, epochSecond: Long): String {
-        return "${redisProperties.admission.keyPrefix}{$roomId}:rate:room:$epochSecond"
-    }
+    private fun roomRateKey(roomId: Long, epochSecond: Long): String = "${redisProperties.admission.keyPrefix}{$roomId}:rate:room:$epochSecond"
 
-    private fun userRateKey(roomId: Long, senderId: Long, epochSecond: Long): String {
-        return "${redisProperties.admission.keyPrefix}{$roomId}:rate:user:$senderId:$epochSecond"
-    }
+    private fun userRateKey(roomId: Long, senderId: Long, epochSecond: Long): String = "${redisProperties.admission.keyPrefix}{$roomId}:rate:user:$senderId:$epochSecond"
 
-    private fun slowModeKey(roomId: Long, senderId: Long): String {
-        return "${redisProperties.admission.keyPrefix}{$roomId}:slow:user:$senderId"
-    }
+    private fun slowModeKey(roomId: Long, senderId: Long): String = "${redisProperties.admission.keyPrefix}{$roomId}:slow:user:$senderId"
 
     private fun Int?.positiveOrZero(): Int = this?.takeIf { it > 0 } ?: 0
 
-    private fun MemberRole.priorityBypassesAdmission(): Boolean {
-        return this == MemberRole.OWNER || this == MemberRole.ADMIN
-    }
+    private fun MemberRole.priorityBypassesAdmission(): Boolean = this == MemberRole.OWNER || this == MemberRole.ADMIN
 
     private companion object {
         const val MILLIS_PER_SECOND = 1_000

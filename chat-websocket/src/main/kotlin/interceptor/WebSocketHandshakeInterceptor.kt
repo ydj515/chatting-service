@@ -4,7 +4,6 @@ import com.chat.domain.service.SessionTokenService
 import com.chat.domain.service.WebSocketTicketService
 import com.chat.persistence.config.ChatAuthProperties
 import com.chat.websocket.config.WebSocketProperties
-import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
@@ -22,7 +21,6 @@ class WebSocketHandshakeInterceptor(
     private val webSocketTicketService: WebSocketTicketService,
     private val authProperties: ChatAuthProperties,
 ) : HandshakeInterceptor {
-
     private val logger = LoggerFactory.getLogger(WebSocketHandshakeInterceptor::class.java)
 
     override fun beforeHandshake(
@@ -76,13 +74,12 @@ class WebSocketHandshakeInterceptor(
         return extractQueryParam(request, authProperties.session.tokenQueryParam)
     }
 
-    private fun extractQueryParam(request: ServerHttpRequest, name: String): String? {
-        return UriComponentsBuilder.fromUri(request.uri)
+    private fun extractQueryParam(request: ServerHttpRequest, name: String): String? =
+        UriComponentsBuilder.fromUri(request.uri)
             .build()
             .queryParams
             .getFirst(name)
             ?.takeIf { it.isNotBlank() }
-    }
 
     override fun afterHandshake(
         request: ServerHttpRequest,

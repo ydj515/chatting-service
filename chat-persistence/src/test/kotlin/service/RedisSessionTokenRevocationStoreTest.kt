@@ -18,7 +18,6 @@ import java.time.Instant
 import java.time.ZoneOffset
 
 class RedisSessionTokenRevocationStoreTest {
-
     private val clock = Clock.fixed(Instant.parse("2026-06-27T00:00:00Z"), ZoneOffset.UTC)
 
     @Test
@@ -57,7 +56,7 @@ class RedisSessionTokenRevocationStoreTest {
                 secret = "test-secret",
                 ttl = Duration.ofHours(12),
                 userRevocationGraceTtl = Duration.ofHours(1),
-            )
+            ),
         ),
         clock = clock,
     )

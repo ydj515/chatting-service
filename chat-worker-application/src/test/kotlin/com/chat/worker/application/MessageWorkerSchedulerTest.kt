@@ -13,7 +13,6 @@ import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
 
 class MessageWorkerSchedulerTest {
-
     @Test
     fun `message-writer role이 켜져 있으면 writer worker를 poll한다`() {
         val fixture = schedulerFixture(ChatWorkerProperties(roles = setOf("message-writer")))

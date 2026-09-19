@@ -1,0 +1,5 @@
+# 기존 Kotlin 소스 디렉터리에서 생략한 공통 패키지 접두사입니다.
+naming:
+  InvalidPackageDeclaration:
+    rootPackage: 'com.chat.api'
+    requireRootInDeclaration: true

@@ -11,8 +11,8 @@ import java.time.LocalDateTime
 
 @Repository
 interface UserRepository : JpaRepository<User, Long> {
-
     fun findByUsername(username: String): User?
+
     fun existsByUsername(username: String): Boolean
 
     @Modifying
@@ -23,8 +23,10 @@ interface UserRepository : JpaRepository<User, Long> {
     @Query("UPDATE User u SET u.password = :password WHERE u.id = :userId")
     fun updatePassword(userId: Long, password: String): Int
 
-    @Query("SELECT u FROM User u WHERE " +
+    @Query(
+        "SELECT u FROM User u WHERE " +
             "LOWER(u.username) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
-            "LOWER(u.displayName) LIKE LOWER(CONCAT('%', :query, '%'))")
+            "LOWER(u.displayName) LIKE LOWER(CONCAT('%', :query, '%'))",
+    )
     fun searchUsers(query: String, pageable: Pageable): Page<User>
 }

@@ -10,9 +10,6 @@ import org.springframework.transaction.annotation.Transactional
 class MessagePersistenceService(
     private val messageRepository: MessageRepository,
 ) {
-
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    fun save(message: Message): Message {
-        return messageRepository.saveAndFlush(message)
-    }
+    fun save(message: Message): Message = messageRepository.saveAndFlush(message)
 }

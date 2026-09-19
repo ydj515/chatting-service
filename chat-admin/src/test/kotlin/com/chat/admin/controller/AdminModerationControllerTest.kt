@@ -7,9 +7,6 @@ import com.chat.domain.dto.AdminCreateUserSanctionRequest
 import com.chat.domain.dto.AdminModerationRuleDto
 import com.chat.domain.dto.AdminUpdateModerationRuleRequest
 import com.chat.domain.dto.AdminUserSanctionDto
-import com.chat.domain.dto.ModerationAction
-import com.chat.domain.dto.ModerationMatchType
-import com.chat.domain.dto.ModerationScopeType
 import com.chat.domain.dto.UserSanctionType
 import com.chat.domain.service.AdminModerationService
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -23,7 +20,6 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders
 import java.time.Instant
 
 class AdminModerationControllerTest {
-
     private lateinit var mockMvc: MockMvc
     private lateinit var service: RecordingAdminModerationService
 
@@ -46,7 +42,8 @@ class AdminModerationControllerTest {
         mockMvc.post("/admin/moderation/rules") {
             header("X-Admin-Token", "local-admin-token")
             contentType = MediaType.APPLICATION_JSON
-            content = """
+            content =
+                """
                 {
                   "scopeType": "ROOM",
                   "roomId": 10,
@@ -55,7 +52,7 @@ class AdminModerationControllerTest {
                   "action": "REJECT",
                   "reason": "blocked phrase"
                 }
-            """.trimIndent()
+                """.trimIndent()
         }.andExpect {
             status { isCreated() }
             jsonPath("$.id") { value(1) }
@@ -71,7 +68,8 @@ class AdminModerationControllerTest {
         mockMvc.post("/admin/moderation/sanctions") {
             header("X-Admin-Token", "local-admin-token")
             contentType = MediaType.APPLICATION_JSON
-            content = """
+            content =
+                """
                 {
                   "scopeType": "ROOM",
                   "roomId": 10,
@@ -79,7 +77,7 @@ class AdminModerationControllerTest {
                   "type": "MUTE",
                   "reason": "spam"
                 }
-            """.trimIndent()
+                """.trimIndent()
         }.andExpect {
             status { isCreated() }
             jsonPath("$.id") { value(2) }
@@ -104,7 +102,8 @@ class AdminModerationControllerTest {
         mockMvc.post("/admin/moderation/rules") {
             header("X-Admin-Token", "local-admin-token")
             contentType = MediaType.APPLICATION_JSON
-            content = """
+            content =
+                """
                 {
                   "scopeType": "GLOBAL",
                   "roomId": 10,
@@ -112,7 +111,7 @@ class AdminModerationControllerTest {
                   "matchType": "CONTAINS",
                   "action": "REJECT"
                 }
-            """.trimIndent()
+                """.trimIndent()
         }.andExpect {
             status { isBadRequest() }
         }
@@ -125,9 +124,7 @@ class AdminModerationControllerTest {
         var createSanctionActor: String? = null
         var createSanctionRequest: AdminCreateUserSanctionRequest? = null
 
-        override fun listRules(actor: String, roomId: Long?, enabled: Boolean?): List<AdminModerationRuleDto> {
-            return emptyList()
-        }
+        override fun listRules(actor: String, roomId: Long?, enabled: Boolean?): List<AdminModerationRuleDto> = emptyList()
 
         override fun createRule(actor: String, request: AdminCreateModerationRuleRequest): AdminModerationRuleDto {
             createRuleFailure?.let { throw it }
@@ -152,22 +149,16 @@ class AdminModerationControllerTest {
             actor: String,
             ruleId: Long,
             request: AdminUpdateModerationRuleRequest,
-        ): AdminModerationRuleDto {
-            throw UnsupportedOperationException()
-        }
+        ): AdminModerationRuleDto = throw UnsupportedOperationException()
 
-        override fun disableRule(actor: String, ruleId: Long): AdminModerationRuleDto {
-            throw UnsupportedOperationException()
-        }
+        override fun disableRule(actor: String, ruleId: Long): AdminModerationRuleDto = throw UnsupportedOperationException()
 
         override fun listSanctions(
             actor: String,
             roomId: Long?,
             userId: Long?,
             active: Boolean?,
-        ): List<AdminUserSanctionDto> {
-            return emptyList()
-        }
+        ): List<AdminUserSanctionDto> = emptyList()
 
         override fun createSanction(actor: String, request: AdminCreateUserSanctionRequest): AdminUserSanctionDto {
             createSanctionActor = actor
@@ -188,8 +179,6 @@ class AdminModerationControllerTest {
             )
         }
 
-        override fun revokeSanction(actor: String, sanctionId: Long): AdminUserSanctionDto {
-            throw UnsupportedOperationException()
-        }
+        override fun revokeSanction(actor: String, sanctionId: Long): AdminUserSanctionDto = throw UnsupportedOperationException()
     }
 }

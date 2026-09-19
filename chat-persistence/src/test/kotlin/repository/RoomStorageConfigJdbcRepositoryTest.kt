@@ -11,7 +11,6 @@ import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.jdbc.core.RowMapper
 
 class RoomStorageConfigJdbcRepositoryTest {
-
     @Test
     fun `currentShardCount는 room_storage_configs의 current_shard_count를 반환한다`() {
         val jdbcTemplate = mock(JdbcTemplate::class.java)

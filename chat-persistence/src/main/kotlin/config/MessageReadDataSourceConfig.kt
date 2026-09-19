@@ -1,11 +1,11 @@
 package com.chat.persistence.config
 
 import com.zaxxer.hikari.HikariDataSource
+import org.springframework.beans.factory.DisposableBean
+import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.boot.context.properties.EnableConfigurationProperties
-import org.springframework.beans.factory.DisposableBean
-import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.context.annotation.Primary
@@ -15,13 +15,10 @@ import javax.sql.DataSource
 @Configuration
 @EnableConfigurationProperties(ChatReadDataSourceProperties::class)
 class MessageReadDataSourceConfig {
-
     @Bean("jdbcTemplate")
     @Primary
     @ConditionalOnMissingBean(name = ["jdbcTemplate"])
-    fun primaryJdbcTemplate(dataSource: DataSource): JdbcTemplate {
-        return JdbcTemplate(dataSource)
-    }
+    fun primaryJdbcTemplate(dataSource: DataSource): JdbcTemplate = JdbcTemplate(dataSource)
 
     @Bean
     @ConditionalOnProperty(
@@ -29,9 +26,8 @@ class MessageReadDataSourceConfig {
         name = ["enabled"],
         havingValue = "true",
     )
-    fun messageReadDataSourceHolder(properties: ChatReadDataSourceProperties): MessageReadDataSourceHolder {
-        return MessageReadDataSourceHolder(properties)
-    }
+    fun messageReadDataSourceHolder(properties: ChatReadDataSourceProperties): MessageReadDataSourceHolder =
+        MessageReadDataSourceHolder(properties)
 
     @Bean("messageReadJdbcTemplate")
     @ConditionalOnProperty(
@@ -39,15 +35,11 @@ class MessageReadDataSourceConfig {
         name = ["enabled"],
         havingValue = "true",
     )
-    fun messageReadJdbcTemplate(holder: MessageReadDataSourceHolder): JdbcTemplate {
-        return JdbcTemplate(holder.dataSource)
-    }
+    fun messageReadJdbcTemplate(holder: MessageReadDataSourceHolder): JdbcTemplate = JdbcTemplate(holder.dataSource)
 
     @Bean("messageReadJdbcTemplate")
     @ConditionalOnMissingBean(name = ["messageReadJdbcTemplate"])
-    fun primaryFallbackMessageReadJdbcTemplate(@Qualifier("jdbcTemplate") jdbcTemplate: JdbcTemplate): JdbcTemplate {
-        return jdbcTemplate
-    }
+    fun primaryFallbackMessageReadJdbcTemplate(@Qualifier("jdbcTemplate") jdbcTemplate: JdbcTemplate): JdbcTemplate = jdbcTemplate
 }
 
 class MessageReadDataSourceHolder(

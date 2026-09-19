@@ -17,7 +17,6 @@ class RedisSessionTokenRevocationStore(
     private val authProperties: ChatAuthProperties,
     private val clock: Clock,
 ) : SessionTokenRevocationStore {
-
     private val encoder = Base64.getUrlEncoder().withoutPadding()
 
     override fun revokeToken(token: String, expiresAt: Instant) {
@@ -37,23 +36,16 @@ class RedisSessionTokenRevocationStore(
         )
     }
 
-    override fun isTokenRevoked(token: String): Boolean {
-        return redisTemplate.opsForValue().get(tokenKey(token)) != null
-    }
+    override fun isTokenRevoked(token: String): Boolean = redisTemplate.opsForValue().get(tokenKey(token)) != null
 
-    override fun userRevokedAt(userId: Long): Instant? {
-        return redisTemplate.opsForValue().get(userKey(userId))
+    override fun userRevokedAt(userId: Long): Instant? =
+        redisTemplate.opsForValue().get(userKey(userId))
             ?.toLongOrNull()
             ?.let { Instant.ofEpochSecond(it) }
-    }
 
-    private fun tokenKey(token: String): String {
-        return "${authProperties.session.revocationKeyPrefix}token:${hash(token)}"
-    }
+    private fun tokenKey(token: String): String = "${authProperties.session.revocationKeyPrefix}token:${hash(token)}"
 
-    private fun userKey(userId: Long): String {
-        return "${authProperties.session.revocationKeyPrefix}user:$userId"
-    }
+    private fun userKey(userId: Long): String = "${authProperties.session.revocationKeyPrefix}user:$userId"
 
     private fun hash(value: String): String {
         val digest = MessageDigest.getInstance("SHA-256")

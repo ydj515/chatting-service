@@ -8,15 +8,15 @@ import com.chat.domain.dto.AdminMessageDto
 import com.chat.domain.dto.AdminMessageHistoryRequest
 import com.chat.domain.dto.AdminMessageSearchCursor
 import com.chat.domain.dto.AdminMessageSearchCursorCodec
-import com.chat.domain.dto.AdminMessageSearchRequest
 import com.chat.domain.dto.AdminMessageSearchMode
+import com.chat.domain.dto.AdminMessageSearchRequest
 import com.chat.domain.dto.AdminRoomPolicyUpdateRequest
 import com.chat.domain.dto.AdminRoomStatusDto
 import com.chat.domain.model.MessageType
 import com.chat.persistence.config.ChatObjectStorageProperties
 import com.chat.persistence.repository.AdminAuditLogRepository
-import com.chat.persistence.repository.AdminExportJobStatusRecord
 import com.chat.persistence.repository.AdminExportJobRepository
+import com.chat.persistence.repository.AdminExportJobStatusRecord
 import com.chat.persistence.repository.AdminMessageRepository
 import com.chat.persistence.storage.ObjectStoragePort
 import com.chat.persistence.storage.ObjectUploadRequest
@@ -41,7 +41,6 @@ import java.time.Instant
 import java.time.LocalDateTime
 
 class AdminChatServiceImplTest {
-
     @Test
     fun `room policy update는 정책 DB 갱신과 audit log를 하나의 transaction으로 묶는다`() {
         val method = AdminChatServiceImpl::class.java.getMethod(
@@ -227,11 +226,12 @@ class AdminChatServiceImplTest {
     @Test
     fun `search는 opaque cursor를 decode해서 repository로 전달한다`() {
         val fixture = fixture()
-        val cursor = AdminMessageSearchCursor(
-            createdAt = Instant.parse("2026-06-14T00:00:01Z"),
-            roomSeq = 1001L,
-            messageId = "msg-1001",
-        )
+        val cursor =
+            AdminMessageSearchCursor(
+                createdAt = Instant.parse("2026-06-14T00:00:01Z"),
+                roomSeq = 1001L,
+                messageId = "msg-1001",
+            )
         val encodedCursor = AdminMessageSearchCursorCodec.encode(cursor)
         `when`(
             fixture.messageRepository.searchMessages(
@@ -248,16 +248,17 @@ class AdminChatServiceImplTest {
 
         fixture.service.searchMessages(
             actor = "admin-local",
-            request = AdminMessageSearchRequest(
-                query = "hello",
-                searchMode = AdminMessageSearchMode.FTS,
-                roomId = null,
-                from = null,
-                to = null,
-                senderId = null,
-                cursor = encodedCursor,
-                limit = 50,
-            ),
+            request =
+                AdminMessageSearchRequest(
+                    query = "hello",
+                    searchMode = AdminMessageSearchMode.FTS,
+                    roomId = null,
+                    from = null,
+                    to = null,
+                    senderId = null,
+                    cursor = encodedCursor,
+                    limit = 50,
+                ),
         )
 
         verify(fixture.messageRepository).searchMessages(
@@ -288,16 +289,18 @@ class AdminChatServiceImplTest {
             ),
         )
 
-        val job = fixture.service.createMessageExport(
-            actor = "admin-local",
-            request = AdminExportMessagesRequest(
-                roomId = 10L,
-                from = Instant.parse("2026-06-14T00:00:00Z"),
-                to = null,
-                query = "hello",
-                senderId = null,
-            ),
-        )
+        val job =
+            fixture.service.createMessageExport(
+                actor = "admin-local",
+                request =
+                    AdminExportMessagesRequest(
+                        roomId = 10L,
+                        from = Instant.parse("2026-06-14T00:00:00Z"),
+                        to = null,
+                        query = "hello",
+                        senderId = null,
+                    ),
+            )
 
         assertEquals("export-1", job.jobId)
         verify(fixture.auditRepository).record(
@@ -467,14 +470,15 @@ class AdminChatServiceImplTest {
             auditRepository = auditRepository,
             exportJobRepository = exportJobRepository,
             objectStoragePort = objectStoragePort,
-            service = AdminChatServiceImpl(
-                messageRepository = messageRepository,
-                auditLogRepository = auditRepository,
-                exportJobRepository = exportJobRepository,
-                objectStoragePort = objectStoragePort,
-                objectStorageProperties = objectStorageProperties,
-                objectMapper = jacksonObjectMapper().registerModule(JavaTimeModule()),
-            ),
+            service =
+                AdminChatServiceImpl(
+                    messageRepository = messageRepository,
+                    auditLogRepository = auditRepository,
+                    exportJobRepository = exportJobRepository,
+                    objectStoragePort = objectStoragePort,
+                    objectStorageProperties = objectStorageProperties,
+                    objectMapper = jacksonObjectMapper().registerModule(JavaTimeModule()),
+                ),
         )
     }
 
@@ -482,8 +486,8 @@ class AdminChatServiceImplTest {
         roomSeq: Long,
         messageId: String = "msg-$roomSeq",
         createdAt: Instant = Instant.parse("2026-06-14T00:00:00Z"),
-    ): AdminMessageDto {
-        return AdminMessageDto(
+    ): AdminMessageDto =
+        AdminMessageDto(
             messageId = messageId,
             clientMessageId = "client-$roomSeq",
             roomId = 10L,
@@ -497,7 +501,6 @@ class AdminChatServiceImplTest {
             isDeleted = false,
             createdAt = createdAt,
         )
-    }
 
     private fun eqString(value: String): String {
         eq(value)
@@ -526,9 +529,8 @@ class AdminChatServiceImplTest {
         var nextDownloadUrl: PresignedObjectUrl? = null
         var presignedObjectUri: String? = null
 
-        override fun uploadFile(request: ObjectUploadRequest): ObjectUploadResult {
-            return ObjectUploadResult("s3://chat-archives/${request.objectKey}")
-        }
+        override fun uploadFile(request: ObjectUploadRequest): ObjectUploadResult =
+            ObjectUploadResult("s3://chat-archives/${request.objectKey}")
 
         override fun createDownloadUrl(
             objectUri: String,
