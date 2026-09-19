@@ -13,7 +13,7 @@
 1. `admin_message_export_jobs`에서 pending job을 claim한다.
 2. PostgreSQL canonical store에서 `exportChunkSize` 단위로 메시지를 읽는다.
 3. CSV 파일에 chunk를 append한다.
-4. append가 끝난 뒤 `cursor_token`, `exported_rows`, `output_uri` checkpoint를 저장한다.
+4. writer를 `flush`하고 파일에 `FileChannel.force(true)`를 실행한 뒤 `cursor_token`, `exported_rows`, `output_uri` checkpoint를 저장한다. 파일 기록 실패 시 checkpoint를 전진시키지 않는다.
 5. job이 재시도되면 checkpoint cursor와 기존 output file에서 이어 쓴다.
 
 이 방식은 데이터 유실 가능성을 낮추고, worker crash 이후 재개할 수 있다.

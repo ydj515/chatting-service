@@ -2,95 +2,43 @@ package com.chat.persistence.redis
 
 import com.chat.persistence.config.ChatRedisProperties
 import com.chat.persistence.service.MessageStreamMetrics
-import com.fasterxml.jackson.databind.ObjectMapper
-import org.springframework.data.redis.connection.RedisStreamCommands
-import org.springframework.data.redis.connection.stream.RecordId
-import org.springframework.data.redis.connection.stream.StreamRecords
-import org.springframework.data.redis.core.RedisCallback
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.stereotype.Service
-import java.nio.charset.StandardCharsets
-import java.util.LinkedHashMap
 import java.util.concurrent.ConcurrentHashMap
 
 @Service
 class RedisMessageStreamProducer(
     private val redisTemplate: RedisTemplate<String, String>,
-    private val objectMapper: ObjectMapper,
     private val redisProperties: ChatRedisProperties,
     private val keyResolver: MessageStreamKeyResolver,
+    private val acceptance: RedisMessageAcceptance,
     private val messageStreamMetrics: MessageStreamMetrics = MessageStreamMetrics.Noop,
 ) : MessageStreamProducer {
-    private val knownStreamsCache = ConcurrentHashMap.newKeySet<String>()
+    private val knownStreamsCache = ConcurrentHashMap<String, Boolean>()
 
-    override fun append(envelope: MessageStreamEnvelope): String {
+    override fun findAccepted(roomId: Long, senderId: Long, clientMessageId: String): MessageStreamEnvelope? =
+        acceptance.findAccepted(roomId, senderId, clientMessageId)
+
+    override fun append(envelope: MessageStreamEnvelope): MessageStreamEnvelope {
         val startedAtNanos = System.nanoTime()
-        var outcome = OUTCOME_FAILURE
+        var outcome = "failure"
         return try {
-            val streamKey = keyResolver.roomStreamKey(envelope.chatRoomId, envelope.streamShard)
-            val fields = linkedMapOf(
-                FIELD_MESSAGE_ID to envelope.messageId,
-                FIELD_CHAT_ROOM_ID to envelope.chatRoomId.toString(),
-                FIELD_ROOM_SEQ to envelope.roomSeq.toString(),
-                FIELD_STREAM_SHARD to envelope.streamShard.toString(),
-                FIELD_PAYLOAD to objectMapper.writeValueAsString(envelope),
-            )
-            val recordId = appendToStream(streamKey, fields)
-                ?: error("Redis Streams append returned null: $streamKey")
-
-            if (knownStreamsCache.add(streamKey)) {
-                try {
-                    redisTemplate.opsForSet().add(redisProperties.streams.knownStreamsKey, streamKey)
-                } catch (e: RuntimeException) {
-                    knownStreamsCache.remove(streamKey)
-                    throw e
-                }
-            }
-
-            outcome = OUTCOME_SUCCESS
-            recordId.value
+            // Register before accepting so an index failure cannot strand an accepted record.
+            registerStream(keyResolver.roomStreamKey(envelope.chatRoomId, envelope.streamShard))
+            val accepted = acceptance.append(envelope)
+            // A retry may target a different shard; repair discovery for the original stream too.
+            registerStream(keyResolver.roomStreamKey(accepted.chatRoomId, accepted.streamShard))
+            outcome = "success"
+            accepted
         } finally {
-            messageStreamMetrics.recordAppend(
-                streamShard = envelope.streamShard,
-                outcome = outcome,
-                durationNanos = System.nanoTime() - startedAtNanos,
-            )
+            messageStreamMetrics.recordAppend(envelope.streamShard, outcome, System.nanoTime() - startedAtNanos)
         }
     }
 
-    private fun appendToStream(streamKey: String, fields: Map<String, String>): RecordId? {
-        val streams = redisProperties.streams
-        if (streams.maxLen <= 0) {
-            return redisTemplate.opsForStream<String, String>().add(streamKey, fields)
+    private fun registerStream(streamKey: String) {
+        knownStreamsCache.computeIfAbsent(streamKey) {
+            redisTemplate.opsForSet().add(redisProperties.streams.knownStreamsKey, streamKey)
+            true
         }
-
-        val record = StreamRecords.newRecord()
-            .`in`(bytes(streamKey))
-            .ofBytes(rawFields(fields))
-        val options = RedisStreamCommands.XAddOptions.maxlen(streams.maxLen)
-            .approximateTrimming(streams.maxLenApproximate)
-
-        return redisTemplate.execute(
-            RedisCallback<RecordId> { connection ->
-                connection.streamCommands().xAdd(record, options)
-            },
-        )
-    }
-
-    private fun rawFields(fields: Map<String, String>): Map<ByteArray, ByteArray> =
-        fields.entries.associateTo(LinkedHashMap()) { (key, value) ->
-            bytes(key) to bytes(value)
-        }
-
-    private fun bytes(value: String): ByteArray = value.toByteArray(StandardCharsets.UTF_8)
-
-    private companion object {
-        const val FIELD_MESSAGE_ID = "messageId"
-        const val FIELD_CHAT_ROOM_ID = "chatRoomId"
-        const val FIELD_ROOM_SEQ = "roomSeq"
-        const val FIELD_STREAM_SHARD = "streamShard"
-        const val FIELD_PAYLOAD = "payload"
-        const val OUTCOME_FAILURE = "failure"
-        const val OUTCOME_SUCCESS = "success"
     }
 }

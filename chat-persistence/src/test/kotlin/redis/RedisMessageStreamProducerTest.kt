@@ -3,335 +3,163 @@ package com.chat.persistence.redis
 import com.chat.domain.model.MessageType
 import com.chat.persistence.config.ChatRedisProperties
 import com.chat.persistence.service.MessageStreamMetrics
-import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
-import com.fasterxml.jackson.module.kotlin.KotlinModule
-import io.micrometer.core.instrument.MeterRegistry
-import io.micrometer.core.instrument.simple.SimpleMeterRegistry
-import org.junit.jupiter.api.Assertions.assertArrayEquals
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertFalse
-import org.junit.jupiter.api.Assertions.assertTrue
+import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
-import org.mockito.ArgumentCaptor
-import org.mockito.ArgumentMatchers.eq
-import org.mockito.Mockito.mock
-import org.mockito.Mockito.times
-import org.mockito.Mockito.verify
-import org.mockito.Mockito.`when`
-import org.springframework.beans.factory.ObjectProvider
-import org.springframework.data.redis.connection.RedisConnection
-import org.springframework.data.redis.connection.RedisStreamCommands
-import org.springframework.data.redis.connection.stream.MapRecord
-import org.springframework.data.redis.connection.stream.RecordId
-import org.springframework.data.redis.core.RedisCallback
-import org.springframework.data.redis.core.RedisTemplate
-import org.springframework.data.redis.core.SetOperations
-import org.springframework.data.redis.core.StreamOperations
-import java.nio.charset.StandardCharsets
+import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable
+import org.mockito.Mockito.*
+import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory
+import org.springframework.data.redis.core.StringRedisTemplate
 import java.time.LocalDateTime
-import java.util.stream.Stream
+import java.util.UUID
+import java.util.concurrent.Callable
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
+@EnabledIfEnvironmentVariable(named = "CHAT_TEST_REDIS_PORT", matches = ".+")
 class RedisMessageStreamProducerTest {
     @Test
-    fun `메시지 envelope를 room stream shard key에 append한다`() {
-        val redisTemplate = redisTemplate()
-        val streamOperations = streamOperations()
-        val setOperations = setOperations()
-        `when`(redisTemplate.opsForStream<String, String>()).thenReturn(streamOperations)
-        `when`(redisTemplate.opsForSet()).thenReturn(setOperations)
-        `when`(streamOperations.add(eq("chat:stream:room:{42}:shard:3"), anyStringMap()))
-            .thenReturn(RecordId.of("1749790000000-0"))
-
-        val objectMapper = ObjectMapper()
-            .registerModule(JavaTimeModule())
-            .registerModule(KotlinModule.Builder().build())
-        val producer = RedisMessageStreamProducer(
-            redisTemplate = redisTemplate,
-            objectMapper = objectMapper,
-            redisProperties = unboundedRedisProperties(),
-            keyResolver = MessageStreamKeyResolver(unboundedRedisProperties()),
-        )
-
-        val recordId = producer.append(
-            MessageStreamEnvelope(
-                messageId = "msg-1",
-                clientMessageId = "client-1",
-                chatRoomId = 42L,
-                senderId = 7L,
-                senderName = "User 7",
-                messageType = MessageType.TEXT,
-                content = "hello",
-                sequenceNumber = 11L,
-                roomSeq = 11L,
-                streamShard = 3,
-                writeShard = 4,
-                fanoutShard = 5,
-                createdAt = LocalDateTime.parse("2026-06-13T12:00:00"),
-            ),
-        )
-
-        assertEquals("1749790000000-0", recordId)
-
-        val fieldsCaptor = stringMapCaptor()
-        verify(streamOperations).add(eq("chat:stream:room:{42}:shard:3"), captureStringMap(fieldsCaptor))
-        val fields = fieldsCaptor.value
-        assertEquals("msg-1", fields["messageId"])
-        assertEquals("42", fields["chatRoomId"])
-        assertEquals("11", fields["roomSeq"])
-        assertEquals("3", fields["streamShard"])
-        assertTrue(fields.getValue("payload").contains("\"messageId\":\"msg-1\""))
-        assertTrue(fields.getValue("payload").contains("\"clientMessageId\":\"client-1\""))
-        verify(setOperations).add("chat:stream:rooms", "chat:stream:room:{42}:shard:3")
-    }
-
-    @Test
-    fun `이미 등록한 stream key는 known stream set에 다시 쓰지 않는다`() {
-        val redisTemplate = redisTemplate()
-        val streamOperations = streamOperations()
-        val setOperations = setOperations()
-        `when`(redisTemplate.opsForStream<String, String>()).thenReturn(streamOperations)
-        `when`(redisTemplate.opsForSet()).thenReturn(setOperations)
-        `when`(streamOperations.add(eq("chat:stream:room:{42}:shard:3"), anyStringMap()))
-            .thenReturn(RecordId.of("1749790000000-0"), RecordId.of("1749790000000-1"))
-
-        val objectMapper = ObjectMapper()
-            .registerModule(JavaTimeModule())
-            .registerModule(KotlinModule.Builder().build())
-        val producer = RedisMessageStreamProducer(
-            redisTemplate = redisTemplate,
-            objectMapper = objectMapper,
-            redisProperties = unboundedRedisProperties(),
-            keyResolver = MessageStreamKeyResolver(unboundedRedisProperties()),
-        )
-        val envelope = MessageStreamEnvelope(
-            messageId = "msg-1",
-            clientMessageId = "client-1",
-            chatRoomId = 42L,
-            senderId = 7L,
-            senderName = "User 7",
-            messageType = MessageType.TEXT,
-            content = "hello",
-            sequenceNumber = 11L,
-            roomSeq = 11L,
-            streamShard = 3,
-            writeShard = 4,
-            fanoutShard = 5,
-            createdAt = LocalDateTime.parse("2026-06-13T12:00:00"),
-        )
-
-        producer.append(envelope)
-        producer.append(envelope.copy(messageId = "msg-2", roomSeq = 12L, sequenceNumber = 12L))
-
-        verify(setOperations, times(1)).add("chat:stream:rooms", "chat:stream:room:{42}:shard:3")
-        verify(streamOperations, times(2)).add(eq("chat:stream:room:{42}:shard:3"), anyStringMap())
-    }
-
-    @Test
-    fun `stream append latency metric은 shard와 outcome만 tag로 기록한다`() {
-        val redisTemplate = redisTemplate()
-        val streamOperations = streamOperations()
-        val setOperations = setOperations()
-        val meterRegistry = SimpleMeterRegistry()
-        `when`(redisTemplate.opsForStream<String, String>()).thenReturn(streamOperations)
-        `when`(redisTemplate.opsForSet()).thenReturn(setOperations)
-        `when`(streamOperations.add(eq("chat:stream:room:{42}:shard:3"), anyStringMap()))
-            .thenReturn(RecordId.of("1749790000000-0"))
-
-        val producer = RedisMessageStreamProducer(
-            redisTemplate = redisTemplate,
-            objectMapper = objectMapper(),
-            redisProperties = unboundedRedisProperties(),
-            keyResolver = MessageStreamKeyResolver(unboundedRedisProperties()),
-            messageStreamMetrics = MessageStreamMetrics(meterRegistryProvider(meterRegistry)),
-        )
-
-        producer.append(envelope())
-
-        val timer = meterRegistry.find("chat.redis.stream.append.latency")
-            .tag("stream_shard", "3")
-            .tag("outcome", "success")
-            .timer()
-
-        assertEquals(1, timer?.count())
-    }
-
-    @Test
-    fun `maxLen이 양수이면 XADD MAXLEN 옵션으로 bounded append한다`() {
-        val redisTemplate = redisTemplate()
-        val setOperations = setOperations()
-        val redisConnection = mock(RedisConnection::class.java)
-        val streamCommands = mock(RedisStreamCommands::class.java)
-        val recordCaptor = byteMapRecordCaptor()
-        val optionsCaptor = ArgumentCaptor.forClass(RedisStreamCommands.XAddOptions::class.java)
-        `when`(redisTemplate.opsForSet()).thenReturn(setOperations)
-        `when`(redisConnection.streamCommands()).thenReturn(streamCommands)
-        `when`(streamCommands.xAdd(captureByteMapRecord(recordCaptor), optionsCaptor.capture()))
-            .thenReturn(RecordId.of("1749790000000-0"))
-        `when`(redisTemplate.execute(anyRecordIdRedisCallback())).thenAnswer { invocation ->
-            @Suppress("UNCHECKED_CAST")
-            val callback = invocation.arguments[0] as RedisCallback<RecordId>
-            callback.doInRedis(redisConnection)
+    fun `concurrent gateways accept one envelope across different shards`() {
+        Fixture().use { fixture ->
+            val executor = Executors.newFixedThreadPool(8)
+            try {
+                val gateways = List(2) { fixture.producer() }
+                val accepted = executor.invokeAll(
+                    (0 until 24).map { index ->
+                        Callable {
+                            gateways[index % 2].append(
+                                envelope().copy(
+                                    messageId = "msg-$index",
+                                    roomSeq = 9007199254740993L + index,
+                                    sequenceNumber = 9007199254740993L + index,
+                                    streamShard = index % 4,
+                                ),
+                            )
+                        }
+                    },
+                ).map { it.get(10, TimeUnit.SECONDS) }
+                assertEquals(1, accepted.distinct().size)
+                assertEquals(1L, fixture.recordCount())
+                val original = accepted.first()
+                assertTrue(original.roomSeq > 9007199254740992L)
+                assertEquals(original, fixture.producer().append(envelope().copy(content = "retry payload")))
+                assertEquals(original, fixture.producer().findAccepted(42, 7, "client-1"))
+                assertEquals(-1L, fixture.redis.getExpire(fixture.acceptance.acceptanceKey(original)))
+                assertEquals(1L, fixture.recordCount())
+            } finally {
+                executor.shutdownNow()
+            }
         }
-        val redisProperties = ChatRedisProperties(
+    }
+
+    @Test
+    fun `idempotency is scoped to sender room and exact client key`() {
+        Fixture().use { fixture ->
+            val producer = fixture.producer()
+            val messages = listOf(envelope(), envelope().copy(senderId = 8), envelope().copy(chatRoomId = 43), envelope().copy(clientMessageId = "client-2"))
+            messages.forEach { assertEquals(it, producer.append(it)) }
+            assertEquals(4L, fixture.recordCount())
+            assertNull(producer.findAccepted(42, 7, "missing"))
+        }
+    }
+
+    @Test
+    fun `only confirmed persistence starts retention and stale completion cannot expire another acceptance`() {
+        Fixture().use { fixture ->
+            val accepted = fixture.producer().append(envelope())
+            val key = fixture.acceptance.acceptanceKey(accepted)
+            fixture.acceptance.markPersisted(accepted.copy(messageId = "wrong-message"))
+            assertEquals(-1L, fixture.redis.getExpire(key))
+            fixture.acceptance.markPersisted(accepted)
+            assertTrue(fixture.redis.getExpire(key) in 86390L..86400L)
+            assertEquals(accepted, fixture.producer().append(accepted.copy(messageId = "retry")))
+            fixture.acceptance.markPersisted(accepted.copy(clientMessageId = "missing"))
+        }
+    }
+
+    @Test
+    fun `stream maxlen supports exact approximate and unbounded modes`() {
+        for ((maxLen, approximate) in listOf(2L to false, 2L to true, 0L to false)) {
+            Fixture(maxLen, approximate).use { fixture ->
+                val producer = fixture.producer()
+                repeat(10) { index -> producer.append(envelope().copy(messageId = "msg-$index", clientMessageId = "client-$index")) }
+                val count = fixture.recordCount()
+                if (maxLen == 0L) {
+                    assertEquals(10L, count)
+                } else if (!approximate) {
+                    assertEquals(2L, count)
+                } else {
+                    assertTrue(count in 2L..10L)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `failed XADD leaves no acceptance and can be retried after recovery`() {
+        Fixture().use { fixture ->
+            val producer = fixture.producer()
+            val message = envelope()
+            val streamKey = fixture.resolver.roomStreamKey(42, 0)
+            fixture.redis.opsForValue().set(streamKey, "wrong-type")
+            assertThrows(RuntimeException::class.java) { producer.append(message) }
+            assertNull(producer.findAccepted(42, 7, "client-1"))
+            fixture.redis.delete(streamKey)
+            assertEquals(message, producer.append(message))
+            assertEquals(1L, fixture.recordCount())
+        }
+    }
+
+    @Test
+    fun `index failure rejects before append and success and failure metrics are recorded`() {
+        Fixture().use { fixture ->
+            val metrics = mock(MessageStreamMetrics::class.java)
+            val producer = fixture.producer(metrics)
+            fixture.redis.opsForValue().set(fixture.properties.streams.knownStreamsKey, "wrong-type")
+            assertThrows(RuntimeException::class.java) { producer.append(envelope()) }
+            assertNull(fixture.acceptance.findAccepted(42, 7, "client-1"))
+            fixture.redis.delete(fixture.properties.streams.knownStreamsKey)
+            assertEquals(envelope(), producer.append(envelope()))
+            val outcomes = mockingDetails(metrics).invocations.filter { it.method.name == "recordAppend" }.map { it.arguments[1] }
+            assertEquals(listOf("failure", "success"), outcomes)
+        }
+    }
+
+    private class Fixture(maxLen: Long = 0, approximate: Boolean = false) : AutoCloseable {
+        private val factory = LettuceConnectionFactory("127.0.0.1", System.getenv("CHAT_TEST_REDIS_PORT").toInt()).also {
+            it.afterPropertiesSet()
+            it.start()
+        }
+        val redis = StringRedisTemplate(factory)
+        private val prefix = "acceptance-test:${UUID.randomUUID()}:"
+        val properties = ChatRedisProperties(
             streams = ChatRedisProperties.Streams(
-                maxLen = 128,
-                maxLenApproximate = true,
+                roomStreamKeyPrefix = "${prefix}room:", knownStreamsKey = "${prefix}known", maxLen = maxLen, maxLenApproximate = approximate,
             ),
         )
-        val producer = RedisMessageStreamProducer(
-            redisTemplate = redisTemplate,
-            objectMapper = objectMapper(),
-            redisProperties = redisProperties,
-            keyResolver = MessageStreamKeyResolver(redisProperties),
-        )
+        val resolver = MessageStreamKeyResolver(properties)
+        val acceptance = RedisMessageAcceptance(redis, jacksonObjectMapper().registerModule(JavaTimeModule()), properties, resolver)
 
-        val recordId = producer.append(envelope())
+        fun producer(metrics: MessageStreamMetrics = MessageStreamMetrics.Noop): RedisMessageStreamProducer =
+            RedisMessageStreamProducer(redis, properties, resolver, acceptance, metrics)
 
-        assertEquals("1749790000000-0", recordId)
-        assertEquals(128L, optionsCaptor.value.maxlen ?: -1L)
-        assertTrue(optionsCaptor.value.isApproximateTrimming)
-        assertArrayEquals(bytes("chat:stream:room:{42}:shard:3"), recordCaptor.value.stream)
-
-        val fields = recordCaptor.value.value.entries.associate { entry ->
-            String(entry.key, StandardCharsets.UTF_8) to String(entry.value, StandardCharsets.UTF_8)
+        fun recordCount(): Long = redis.opsForSet().members(properties.streams.knownStreamsKey).orEmpty().sumOf {
+            redis.opsForStream<String, String>().size(it) ?: 0
         }
-        assertEquals("msg-1", fields["messageId"])
-        assertEquals("42", fields["chatRoomId"])
-        assertEquals("11", fields["roomSeq"])
-        assertEquals("3", fields["streamShard"])
-        assertTrue(fields.getValue("payload").contains("\"messageId\":\"msg-1\""))
-        verify(setOperations).add("chat:stream:rooms", "chat:stream:room:{42}:shard:3")
-    }
 
-    @Test
-    fun `maxLen approximate가 꺼져 있으면 exact trim 옵션으로 bounded append한다`() {
-        val redisTemplate = redisTemplate()
-        val setOperations = setOperations()
-        val redisConnection = mock(RedisConnection::class.java)
-        val streamCommands = mock(RedisStreamCommands::class.java)
-        val optionsCaptor = ArgumentCaptor.forClass(RedisStreamCommands.XAddOptions::class.java)
-        `when`(redisTemplate.opsForSet()).thenReturn(setOperations)
-        `when`(redisConnection.streamCommands()).thenReturn(streamCommands)
-        `when`(streamCommands.xAdd(anyByteMapRecord(), optionsCaptor.capture()))
-            .thenReturn(RecordId.of("1749790000000-0"))
-        `when`(redisTemplate.execute(anyRecordIdRedisCallback())).thenAnswer { invocation ->
-            @Suppress("UNCHECKED_CAST")
-            val callback = invocation.arguments[0] as RedisCallback<RecordId>
-            callback.doInRedis(redisConnection)
+        override fun close() {
+            try {
+                redis.delete(redis.keys("$prefix*"))
+            } finally {
+                factory.destroy()
+            }
         }
-        val redisProperties = ChatRedisProperties(
-            streams = ChatRedisProperties.Streams(
-                maxLen = 64,
-                maxLenApproximate = false,
-            ),
-        )
-        val producer = RedisMessageStreamProducer(
-            redisTemplate = redisTemplate,
-            objectMapper = objectMapper(),
-            redisProperties = redisProperties,
-            keyResolver = MessageStreamKeyResolver(redisProperties),
-        )
-
-        producer.append(envelope())
-
-        assertEquals(64L, optionsCaptor.value.maxlen ?: -1L)
-        assertFalse(optionsCaptor.value.isApproximateTrimming)
     }
 
-    @Suppress("UNCHECKED_CAST")
-    private fun redisTemplate(): RedisTemplate<String, String> =
-        mock(RedisTemplate::class.java) as RedisTemplate<String, String>
-
-    @Suppress("UNCHECKED_CAST")
-    private fun streamOperations(): StreamOperations<String, String, String> =
-        mock(StreamOperations::class.java) as StreamOperations<String, String, String>
-
-    @Suppress("UNCHECKED_CAST")
-    private fun setOperations(): SetOperations<String, String> =
-        mock(SetOperations::class.java) as SetOperations<String, String>
-
-    @Suppress("UNCHECKED_CAST")
-    private fun stringMapCaptor(): ArgumentCaptor<Map<String, String>> =
-        ArgumentCaptor.forClass(Map::class.java) as ArgumentCaptor<Map<String, String>>
-
-    private fun anyStringMap(): Map<String, String> {
-        org.mockito.ArgumentMatchers.anyMap<String, String>()
-        return uninitialized()
-    }
-
-    private fun captureStringMap(captor: ArgumentCaptor<Map<String, String>>): Map<String, String> {
-        captor.capture()
-        return uninitialized()
-    }
-
-    @Suppress("UNCHECKED_CAST")
-    private fun byteMapRecordCaptor(): ArgumentCaptor<MapRecord<ByteArray, ByteArray, ByteArray>> =
-        ArgumentCaptor.forClass(MapRecord::class.java) as ArgumentCaptor<MapRecord<ByteArray, ByteArray, ByteArray>>
-
-    private fun anyByteMapRecord(): MapRecord<ByteArray, ByteArray, ByteArray> {
-        org.mockito.ArgumentMatchers.any<MapRecord<ByteArray, ByteArray, ByteArray>>()
-        return uninitialized()
-    }
-
-    private fun captureByteMapRecord(
-        captor: ArgumentCaptor<MapRecord<ByteArray, ByteArray, ByteArray>>,
-    ): MapRecord<ByteArray, ByteArray, ByteArray> {
-        captor.capture()
-        return uninitialized()
-    }
-
-    private fun anyRecordIdRedisCallback(): RedisCallback<RecordId> {
-        org.mockito.ArgumentMatchers.any<RedisCallback<RecordId>>()
-        return uninitialized()
-    }
-
-    @Suppress("UNCHECKED_CAST")
-    private fun <T> uninitialized(): T = null as T
-
-    private fun unboundedRedisProperties(): ChatRedisProperties =
-        ChatRedisProperties(
-            streams = ChatRedisProperties.Streams(maxLen = 0),
-        )
-
-    private fun bytes(value: String): ByteArray = value.toByteArray(StandardCharsets.UTF_8)
-
-    private fun objectMapper(): ObjectMapper =
-        ObjectMapper()
-            .registerModule(JavaTimeModule())
-            .registerModule(KotlinModule.Builder().build())
-
-    private fun envelope(): MessageStreamEnvelope =
-        MessageStreamEnvelope(
-            messageId = "msg-1",
-            clientMessageId = "client-1",
-            chatRoomId = 42L,
-            senderId = 7L,
-            senderName = "User 7",
-            messageType = MessageType.TEXT,
-            content = "hello",
-            sequenceNumber = 11L,
-            roomSeq = 11L,
-            streamShard = 3,
-            writeShard = 4,
-            fanoutShard = 5,
-            createdAt = LocalDateTime.parse("2026-06-13T12:00:00"),
-        )
-
-    private fun meterRegistryProvider(meterRegistry: MeterRegistry): ObjectProvider<MeterRegistry> =
-        object : ObjectProvider<MeterRegistry> {
-            override fun getObject(): MeterRegistry = meterRegistry
-
-            override fun getObject(vararg args: Any?): MeterRegistry = meterRegistry
-
-            override fun getIfAvailable(): MeterRegistry = meterRegistry
-
-            override fun getIfUnique(): MeterRegistry = meterRegistry
-
-            override fun iterator(): MutableIterator<MeterRegistry> = mutableListOf(meterRegistry).iterator()
-
-            override fun stream(): Stream<MeterRegistry> = Stream.of(meterRegistry)
-
-            override fun orderedStream(): Stream<MeterRegistry> = Stream.of(meterRegistry)
-        }
+    private fun envelope(): MessageStreamEnvelope = MessageStreamEnvelope(
+        messageId = "msg-1", clientMessageId = "client-1", chatRoomId = 42, senderId = 7, senderName = "User 7",
+        messageType = MessageType.TEXT, content = "hello", sequenceNumber = 11, roomSeq = 11,
+        streamShard = 0, writeShard = 0, fanoutShard = 0, createdAt = LocalDateTime.parse("2026-06-13T12:00:00"),
+    )
 }

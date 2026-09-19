@@ -130,6 +130,8 @@ class HmacSessionTokenServiceTest {
 
         override fun isTokenRevoked(token: String): Boolean = token in revokedTokens
 
+        override fun isTokenDigestRevoked(tokenDigest: String): Boolean = revokedTokens.any { SessionTokenDigests.sha256(it) == tokenDigest }
+
         override fun userRevokedAt(userId: Long): Instant? = revokedUsers[userId]
     }
 }

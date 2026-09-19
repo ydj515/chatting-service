@@ -18,6 +18,7 @@ import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
 import java.security.SecureRandom
 import java.time.Clock
+import java.time.Duration
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneOffset
@@ -30,6 +31,7 @@ class RedisWebSocketTicketService(
     private val objectMapper: ObjectMapper,
     private val authProperties: ChatAuthProperties,
     private val clock: Clock,
+    private val ticketSessionPolicy: WebSocketTicketSessionPolicy,
     private val meterRegistryProvider: ObjectProvider<MeterRegistry>? = null,
 ) : WebSocketTicketService {
     private val logger = LoggerFactory.getLogger(javaClass)
@@ -40,10 +42,12 @@ class RedisWebSocketTicketService(
         Long::class.javaObjectType,
     )
 
-    override fun issueTicket(userId: Long, clientIp: String?): WebSocketTicketResponse? {
+    override fun issueTicket(userId: Long, clientIp: String?, sessionToken: String): WebSocketTicketResponse? {
         val startedAtNanos = System.nanoTime()
         var outcome = ISSUE_OUTCOME_FAILURE
         return try {
+            val session = ticketSessionPolicy.authenticate(userId, sessionToken)
+                ?: return null
             if (
                 !withinRateLimit(
                     key = rateLimitUserKey(userId),
@@ -70,18 +74,23 @@ class RedisWebSocketTicketService(
             }
 
             val issuedAt = clock.instant()
-            val expiresAt = issuedAt.plus(authProperties.webSocketTicket.ttl)
+            val sessionExpiresAt = session.expiresAt.toInstant(ZoneOffset.UTC)
+            val expiresAt = minOf(issuedAt.plus(authProperties.webSocketTicket.ttl), sessionExpiresAt)
+            if (!expiresAt.isAfter(issuedAt)) return null
             repeat(MAX_TICKET_GENERATION_ATTEMPTS) {
                 val ticket = newTicket()
                 val storedTicket = StoredWebSocketTicket(
                     userId = userId,
                     issuedAtEpochSecond = issuedAt.epochSecond,
                     expiresAtEpochSecond = expiresAt.epochSecond,
+                    sessionTokenDigest = SessionTokenDigests.sha256(sessionToken),
+                    sessionIssuedAtEpochSecond = session.issuedAt?.toEpochSecond(ZoneOffset.UTC),
+                    sessionExpiresAtEpochSecond = sessionExpiresAt.epochSecond,
                 )
                 val stored = redisTemplate.opsForValue().setIfAbsent(
                     ticketKey(ticket),
                     objectMapper.writeValueAsString(storedTicket),
-                    authProperties.webSocketTicket.ttl,
+                    Duration.between(issuedAt, expiresAt),
                 ) == true
                 if (stored) {
                     record("issue.success")
@@ -118,6 +127,10 @@ class RedisWebSocketTicketService(
                 return null
             }
 
+            if (!sessionStillValid(storedTicket)) {
+                record("consume.revoked")
+                return null
+            }
             record("consume.success")
             AuthenticatedWebSocketTicket(
                 userId = storedTicket.userId,
@@ -129,6 +142,9 @@ class RedisWebSocketTicketService(
             null
         }
     }
+
+    private fun sessionStillValid(ticket: StoredWebSocketTicket): Boolean =
+        ticketSessionPolicy.isValid(ticket.userId, ticket.sessionTokenDigest, ticket.sessionIssuedAtEpochSecond, ticket.sessionExpiresAtEpochSecond)
 
     private fun record(event: String) {
         meterRegistryProvider?.ifAvailable { registry ->
@@ -214,6 +230,9 @@ class RedisWebSocketTicketService(
         val userId: Long = 0,
         val issuedAtEpochSecond: Long = 0,
         val expiresAtEpochSecond: Long = 0,
+        val sessionTokenDigest: String? = null,
+        val sessionIssuedAtEpochSecond: Long? = null,
+        val sessionExpiresAtEpochSecond: Long? = null,
     )
 
     private companion object {

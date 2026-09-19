@@ -5,15 +5,49 @@ import com.chat.persistence.config.ChatWorkerProperties
 import com.chat.persistence.redis.MessageStreamConsumer
 import com.chat.persistence.redis.MessageStreamEnvelope
 import com.chat.persistence.redis.MessageStreamRecord
+import com.chat.persistence.redis.RedisMessageAcceptance
 import io.micrometer.core.instrument.MeterRegistry
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import org.mockito.Mockito.doAnswer
+import org.mockito.Mockito.mock
+import org.mockito.Mockito.verifyNoInteractions
 import org.springframework.beans.factory.ObjectProvider
 import java.time.LocalDateTime
 import java.util.stream.Stream
 
 class MessageWriterWorkerTest {
+    @Test
+    fun `retention starts after database success and before acknowledgement`() {
+        val record = streamRecord()
+        val consumer = FakeMessageStreamConsumer(listOf(record))
+        val writePort = FakeMessageWritePort()
+        val acceptance = mock(RedisMessageAcceptance::class.java)
+        var retained = false
+        doAnswer {
+            assertEquals(1, writePort.requestBatches.size)
+            assertEquals(emptyList<String>(), consumer.acked)
+            retained = true
+            Unit
+        }.`when`(acceptance).markPersisted(record.envelope)
+        val worker = workerFixture(consumer, writePort, acceptance = acceptance)
+        assertEquals(1, worker.pollAndWrite())
+        assertTrue(retained)
+        assertEquals(1, consumer.acked.size)
+    }
+
+    @Test
+    fun `failed persistence never starts acceptance expiry`() {
+        val acceptance = mock(RedisMessageAcceptance::class.java)
+        val consumer = FakeMessageStreamConsumer(listOf(streamRecord()))
+        val worker = workerFixture(consumer, FakeMessageWritePort { error("database unavailable") }, acceptance = acceptance)
+        assertEquals(0, worker.pollAndWrite())
+        verifyNoInteractions(acceptance)
+        assertEquals(emptyList<String>(), consumer.acked)
+    }
+
     @Test
     fun `writer worker는 stream record를 write port 요청으로 변환하고 저장 성공 시 ack한다`() {
         val consumer = FakeMessageStreamConsumer(
@@ -200,10 +234,12 @@ class MessageWriterWorkerTest {
         consumer: MessageStreamConsumer,
         writePort: MessageWritePort,
         messageStreamMetrics: MessageStreamMetrics = MessageStreamMetrics.Noop,
+        acceptance: RedisMessageAcceptance = mock(RedisMessageAcceptance::class.java),
     ): MessageWriterWorker =
         MessageWriterWorker(
             messageStreamConsumer = consumer,
             messageWritePort = writePort,
+            acceptance = acceptance,
             workerProperties = ChatWorkerProperties(
                 consumerName = "worker-1",
                 writer = ChatWorkerProperties.StreamConsumer(

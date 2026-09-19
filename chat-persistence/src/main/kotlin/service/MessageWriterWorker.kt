@@ -4,6 +4,7 @@ import com.chat.persistence.config.ChatWorkerProperties
 import com.chat.persistence.redis.MessageStreamConsumer
 import com.chat.persistence.redis.MessageStreamEnvelope
 import com.chat.persistence.redis.MessageStreamRecord
+import com.chat.persistence.redis.RedisMessageAcceptance
 import jakarta.annotation.PostConstruct
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
@@ -12,6 +13,7 @@ import org.springframework.stereotype.Service
 class MessageWriterWorker(
     private val messageStreamConsumer: MessageStreamConsumer,
     private val messageWritePort: MessageWritePort,
+    private val acceptance: RedisMessageAcceptance,
     private val workerProperties: ChatWorkerProperties,
     private val messageStreamMetrics: MessageStreamMetrics = MessageStreamMetrics.Noop,
 ) {
@@ -152,6 +154,7 @@ class MessageWriterWorker(
     }
 
     private fun acknowledge(record: MessageStreamRecord, consumerGroup: String) {
+        acceptance.markPersisted(record.envelope)
         messageStreamConsumer.acknowledge(
             streamKey = record.streamKey,
             consumerGroup = consumerGroup,

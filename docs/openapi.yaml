@@ -180,6 +180,9 @@ paths:
       summary: Get chat room by ID
       tags:
         - Chat Rooms
+      security:
+        - bearerAuth: []
+      description: Requires active membership in the room.
       parameters:
         - name: id
           in: path
@@ -188,6 +191,10 @@ paths:
             type: integer
             example: 1
       responses:
+        '401':
+          description: Missing or invalid session token
+        '403':
+          description: Active room membership required
         '200':
           description: Chat room details
           content:
@@ -216,6 +223,9 @@ paths:
       summary: Get chat room members
       tags:
         - Chat Rooms
+      security:
+        - bearerAuth: []
+      description: Requires active membership in the room.
       parameters:
         - name: id
           in: path
@@ -224,6 +234,10 @@ paths:
             type: integer
             example: 1
       responses:
+        '401':
+          description: Missing or invalid session token
+        '403':
+          description: Active room membership required
         '200':
           description: List of members
           content:

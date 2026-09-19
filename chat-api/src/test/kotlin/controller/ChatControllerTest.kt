@@ -129,7 +129,7 @@ class ChatControllerTest {
 
         override fun createChatRoom(request: CreateChatRoomRequest, createdBy: Long): ChatRoomDto = throw UnsupportedOperationException()
 
-        override fun getChatRoom(roomId: Long): ChatRoomDto = throw UnsupportedOperationException()
+        override fun getChatRoom(roomId: Long, userId: Long): ChatRoomDto = throw UnsupportedOperationException()
 
         override fun getChatRooms(userId: Long, pageable: Pageable): Page<ChatRoomDto> = throw UnsupportedOperationException()
 
@@ -139,7 +139,7 @@ class ChatControllerTest {
 
         override fun leaveChatRoom(roomId: Long, userId: Long): Unit = throw UnsupportedOperationException()
 
-        override fun getChatRoomMembers(roomId: Long): List<ChatRoomMemberDto> = throw UnsupportedOperationException()
+        override fun getChatRoomMembers(roomId: Long, userId: Long): List<ChatRoomMemberDto> = throw UnsupportedOperationException()
 
         override fun sendMessage(request: SendMessageRequest, senderId: Long): MessageDto = throw UnsupportedOperationException()
 

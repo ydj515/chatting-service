@@ -16,6 +16,7 @@ import com.fasterxml.jackson.module.kotlin.readValue
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import java.net.URI
+import java.nio.channels.FileChannel
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
@@ -115,6 +116,8 @@ class AdminMessageExportWorker(
                 exportedRows += chunk.size
                 cursor = chunk.last().toExportCursor()
                 val cursorToken = AdminMessageCursorCodec.encode(cursor)
+                writer.flush()
+                FileChannel.open(output, StandardOpenOption.WRITE).use { it.force(true) }
                 exportJobRepository.updateCheckpoint(
                     jobId = job.jobId,
                     cursorToken = cursorToken,

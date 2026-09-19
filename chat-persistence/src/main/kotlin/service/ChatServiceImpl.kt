@@ -24,8 +24,7 @@ class ChatServiceImpl(
     private val messageSendingService: MessageSendingService,
     private val membershipEventPublisher: MembershipEventPublisher,
 ) : ChatService {
-    // private + 자기호출(self-invocation) 이라 프록시를 거치지 않는다.
-    // 캐시는 프록시를 타는 공개 메서드(getChatRoom 등)에서만 적용한다.
+    // Sensitive room reads remain uncached so membership is checked on every request.
     private fun chatRoomToDto(
         chatRoom: ChatRoom,
         memberCount: Int = chatRoomMemberRepository.countActiveMembersInRoom(chatRoom.id).toInt(),
@@ -89,8 +88,8 @@ class ChatServiceImpl(
     }
 
     @Transactional(readOnly = true)
-    @Cacheable(value = ["chatRooms"], key = "#roomId")
-    override fun getChatRoom(roomId: Long): ChatRoomDto {
+    override fun getChatRoom(roomId: Long, userId: Long): ChatRoomDto {
+        requireMembership(roomId, userId)
         val chatRoom = chatRoomRepository.findById(roomId)
             .orElseThrow { ResourceNotFoundException("채팅방을 찾을 수 없습니다: $roomId") }
         return chatRoomToDto(chatRoom)
@@ -106,11 +105,11 @@ class ChatServiceImpl(
         return rooms.map { dtos.getValue(it.id) }
     }
 
-    private fun chatRoomsToDtos(rooms: List<ChatRoom>): List<ChatRoomDto> {
+    private fun chatRoomsToDtos(rooms: List<ChatRoom>, includeLastMessage: Boolean = true): List<ChatRoomDto> {
         if (rooms.isEmpty()) return emptyList()
         val ids = rooms.map { it.id }
         val counts = chatRoomMemberRepository.countActiveMembersByRooms(ids).associate { it.roomId to it.memberCount.toInt() }
-        val messages = messageReadPort.findLatestMessagesByRooms(ids)
+        val messages = if (includeLastMessage) messageReadPort.findLatestMessagesByRooms(ids) else emptyMap()
         return rooms.map { chatRoomToDto(it, counts[it.id] ?: 0, messages[it.id]) }
     }
 
@@ -125,7 +124,7 @@ class ChatServiceImpl(
             chatRoomRepository.findByNameContainingIgnoreCaseAndIsActiveTrueOrderByCreatedAtDesc(query)
         }
 
-        return chatRoomsToDtos(chatRooms)
+        return chatRoomsToDtos(chatRooms, includeLastMessage = false)
     }
 
     @Caching(
@@ -178,10 +177,16 @@ class ChatServiceImpl(
     }
 
     @Transactional(readOnly = true)
-    @Cacheable(value = ["chatRoomMembers"], key = "#roomId")
-    override fun getChatRoomMembers(roomId: Long): List<ChatRoomMemberDto> =
-        chatRoomMemberRepository.findByChatRoomIdAndIsActiveTrue(roomId)
-            .map { memberToDto(it) }
+    override fun getChatRoomMembers(roomId: Long, userId: Long): List<ChatRoomMemberDto> {
+        requireMembership(roomId, userId)
+        return chatRoomMemberRepository.findByChatRoomIdAndIsActiveTrue(roomId).map { memberToDto(it) }
+    }
+
+    private fun requireMembership(roomId: Long, userId: Long) {
+        if (!chatRoomMemberRepository.existsByChatRoomIdAndUserIdAndIsActiveTrue(roomId, userId)) {
+            throw ForbiddenOperationException("채팅방 멤버가 아닙니다")
+        }
+    }
 
     @Transactional(readOnly = true)
     override fun getMessages(

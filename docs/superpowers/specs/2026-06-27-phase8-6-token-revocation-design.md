@@ -306,7 +306,7 @@ mise run verify:moderation
 > - Redis revocation store를 fail-closed로 두면 Redis 장애 시 인증 실패가 늘 수 있다. 보안 우선 정책으로 선택한다.
 > - user revoke-after는 기존 token을 되살릴 수 없다. suspend 해제 후에는 새 로그인이 필요하다.
 > - legacy 3-field token은 `issuedAt`이 없으므로 user revoke marker가 있으면 보수적으로 거부한다.
-> - 이미 발급된 WebSocket one-time ticket은 별도 revoke하지 않는다. TTL이 짧고, 신규 발급은 session token revocation으로 막는다.
+> - WebSocket ticket은 원래 세션의 SHA-256 지문, 발급 시각과 만료에 연결한다. 소비 시 개별 revoke와 user revoke-after를 모두 검사하므로 이미 발급된 티켓도 철회된다. 원문 세션 토큰은 저장하지 않으며, 연결 정보가 없는 구버전 티켓은 거부하고 재발급한다.
 > - Redis pub/sub force logout은 best-effort 전달이다. 이벤트를 놓친 gateway도 이후 새 인증은 실패하지만, 이미 열린 연결 즉시 종료는 놓칠 수 있다. 운영상 더 강한 보장이 필요하면 gateway가 주기적으로 user revoke marker를 확인하는 보강이 필요하다.
 
 ## 10. 대안

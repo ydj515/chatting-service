@@ -44,7 +44,7 @@ class WebSocketTicketControllerTest {
 
     @Test
     fun `인증된 사용자는 WebSocket one-time ticket을 발급받는다`() {
-        `when`(ticketService.issueTicket(42L, "127.0.0.1")).thenReturn(
+        `when`(ticketService.issueTicket(42L, "127.0.0.1", "resolved-token")).thenReturn(
             WebSocketTicketResponse(
                 ticket = "ticket-value",
                 expiresAt = LocalDateTime.parse("2026-06-13T00:00:30"),
@@ -63,12 +63,12 @@ class WebSocketTicketControllerTest {
                 jsonPath("$.expiresAt") { value("2026-06-13T00:00:30") }
             }
 
-        verify(ticketService).issueTicket(42L, "127.0.0.1")
+        verify(ticketService).issueTicket(42L, "127.0.0.1", "resolved-token")
     }
 
     @Test
     fun `ticket 발급 rate limit 초과는 429로 응답한다`() {
-        `when`(ticketService.issueTicket(42L, "127.0.0.1")).thenReturn(null)
+        `when`(ticketService.issueTicket(42L, "127.0.0.1", "resolved-token")).thenReturn(null)
 
         mockMvc.post("/ws-tickets") {
             with { request ->

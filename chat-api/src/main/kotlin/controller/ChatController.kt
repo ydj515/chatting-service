@@ -27,8 +27,8 @@ class ChatController(
     }
 
     @GetMapping("/{id}")
-    fun getChatRoom(@PathVariable id: Long): ResponseEntity<ChatRoomDto> {
-        val chatRoom = chatService.getChatRoom(id)
+    fun getChatRoom(@PathVariable id: Long, @CurrentUserId userId: Long): ResponseEntity<ChatRoomDto> {
+        val chatRoom = chatService.getChatRoom(id, userId)
         return ResponseEntity.ok(chatRoom)
     }
 
@@ -60,8 +60,8 @@ class ChatController(
     }
 
     @GetMapping("/{id}/members")
-    fun getChatRoomMembers(@PathVariable id: Long): ResponseEntity<List<ChatRoomMemberDto>> {
-        val members = chatService.getChatRoomMembers(id)
+    fun getChatRoomMembers(@PathVariable id: Long, @CurrentUserId userId: Long): ResponseEntity<List<ChatRoomMemberDto>> {
+        val members = chatService.getChatRoomMembers(id, userId)
         return ResponseEntity.ok(members)
     }
 

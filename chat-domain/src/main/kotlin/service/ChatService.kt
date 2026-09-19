@@ -8,7 +8,7 @@ interface ChatService {
     // 채팅방 관리
     fun createChatRoom(request: CreateChatRoomRequest, createdBy: Long): ChatRoomDto
 
-    fun getChatRoom(roomId: Long): ChatRoomDto
+    fun getChatRoom(roomId: Long, userId: Long): ChatRoomDto
 
     fun getChatRooms(userId: Long, pageable: Pageable): Page<ChatRoomDto>
 
@@ -19,7 +19,7 @@ interface ChatService {
 
     fun leaveChatRoom(roomId: Long, userId: Long)
 
-    fun getChatRoomMembers(roomId: Long): List<ChatRoomMemberDto>
+    fun getChatRoomMembers(roomId: Long, userId: Long): List<ChatRoomMemberDto>
 
     // 메시지 관리
     fun sendMessage(request: SendMessageRequest, senderId: Long): MessageDto

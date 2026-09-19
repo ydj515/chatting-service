@@ -44,6 +44,28 @@ import java.util.Optional
 
 class ChatServiceImplMessageContractTest {
     @Test
+    fun `racing retries return original acceptance and count traffic once`() {
+        val producer = mock(MessageStreamProducer::class.java)
+        var original: MessageStreamEnvelope? = null
+        `when`(producer.append(anyMessageStreamEnvelope())).thenAnswer { invocation ->
+            original ?: invocation.getArgument<MessageStreamEnvelope>(0).also { original = it }
+        }
+        val traffic = RecordingRoomTrafficStatsService()
+        val fixture = chatServiceFixture(FixtureOptions(messageStreamProducer = producer, roomTrafficStatsService = traffic, sequenceValues = listOf(1, 2)))
+        val request = SendMessageRequest(10, MessageType.TEXT, "original", "client-retry")
+        val first = fixture.chatService.sendMessage(request, 7)
+        val retried = fixture.chatService.sendMessage(request.copy(content = "changed retry"), 7)
+        assertEquals(first, retried)
+        assertEquals(listOf(10L), traffic.recordedRoomIds)
+
+        `when`(producer.findAccepted(10, 7, "client-retry")).thenReturn(original)
+        assertEquals(first, fixture.chatService.sendMessage(request, 7))
+        verify(producer, times(2)).append(anyMessageStreamEnvelope())
+        verify(fixture.redisTemplate, times(2)).execute(MessageSequenceService.ALLOCATE_SEQUENCE, listOf("chat:sequence:10"))
+        assertEquals(listOf(10L), traffic.recordedRoomIds)
+    }
+
+    @Test
     fun `oversized raw client IDs fail before duplicate lookup or Redis side effects`() {
         listOf("x".repeat(129), " " + "x".repeat(128)).forEach { clientId ->
             val producer = mock(MessageStreamProducer::class.java)
@@ -107,7 +129,7 @@ class ChatServiceImplMessageContractTest {
     fun `메시지 전송은 Redis Streams append 이후 API에서 직접 fanout하지 않는다`() {
         val messageStreamProducer = mock(MessageStreamProducer::class.java)
         `when`(messageStreamProducer.append(anyMessageStreamEnvelope()))
-            .thenReturn("1749790000000-0")
+            .thenAnswer { it.getArgument<MessageStreamEnvelope>(0) }
         val fixture = chatServiceFixture(FixtureOptions(messageStreamProducer = messageStreamProducer))
         val clientMessageId = "client-message-1"
         `when`(
@@ -552,8 +574,8 @@ class ChatServiceImplMessageContractTest {
     fun `메시지 전송은 방별 shard config로 stream과 fanout shard를 roomSeq round robin으로 계산한다`() {
         val messageStreamProducer = mock(MessageStreamProducer::class.java)
         `when`(messageStreamProducer.append(anyMessageStreamEnvelope()))
-            .thenReturn("1749790000000-0")
-            .thenReturn("1749790000001-0")
+            .thenAnswer { it.getArgument<MessageStreamEnvelope>(0) }
+            .thenAnswer { it.getArgument<MessageStreamEnvelope>(0) }
         val shardReader = FixedRoomStorageConfigReader(
             RoomShardConfig(writeShardCount = 4, fanoutShardCount = 16),
         )
@@ -737,7 +759,7 @@ class ChatServiceImplMessageContractTest {
 
     private fun successfulMessageStreamProducer(): MessageStreamProducer {
         val messageStreamProducer = mock(MessageStreamProducer::class.java)
-        `when`(messageStreamProducer.append(anyMessageStreamEnvelope())).thenReturn("1749790000000-0")
+        `when`(messageStreamProducer.append(anyMessageStreamEnvelope())).thenAnswer { it.getArgument<MessageStreamEnvelope>(0) }
         return messageStreamProducer
     }
 

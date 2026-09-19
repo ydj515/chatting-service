@@ -23,6 +23,9 @@ class MessageStreamPublisher(
     private val logger = LoggerFactory.getLogger(MessageStreamPublisher::class.java)
     private val secureRandom = SecureRandom()
 
+    fun findAccepted(roomId: Long, sender: User, clientMessageId: String): MessageDto? =
+        messageStreamProducer.findAccepted(roomId, sender.id, clientMessageId)?.toDto(sender)
+
     fun publish(request: SendMessageRequest, chatRoom: ChatRoom, sender: User): MessageDto {
         val messageId = generateMessageId()
         val clientMessageId = request.clientMessageId?.trim()?.takeIf { it.isNotEmpty() } ?: "server:$messageId"
@@ -44,11 +47,31 @@ class MessageStreamPublisher(
             fanoutShard = fanoutShard(streamShard),
         )
 
-        messageStreamProducer.append(messageToStreamEnvelope(message))
-        recordAcceptedBestEffort(request.chatRoomId)
+        val accepted = messageStreamProducer.append(messageToStreamEnvelope(message))
+        if (accepted.messageId == messageId) recordAcceptedBestEffort(request.chatRoomId)
 
-        return message.toMessageDto()
+        return accepted.toDto(sender)
     }
+
+    private fun MessageStreamEnvelope.toDto(user: User): MessageDto =
+        MessageDto(
+            id = 0,
+            chatRoomId = chatRoomId,
+            sender = user.toUserDto(),
+            isEdited = false,
+            isDeleted = false,
+            editedAt = null,
+            messageId = messageId,
+            clientMessageId = clientMessageId,
+            type = messageType,
+            content = content,
+            createdAt = createdAt,
+            sequenceNumber = sequenceNumber,
+            roomSeq = roomSeq,
+            streamShard = streamShard,
+            writeShard = writeShard,
+            fanoutShard = fanoutShard,
+        )
 
     private fun recordAcceptedBestEffort(roomId: Long) {
         try {

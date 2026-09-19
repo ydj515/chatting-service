@@ -1,5 +1,6 @@
 package com.chat.api.controller
 
+import com.chat.api.security.CurrentSessionToken
 import com.chat.api.security.CurrentUserId
 import com.chat.domain.dto.WebSocketTicketResponse
 import com.chat.domain.service.WebSocketTicketService
@@ -16,9 +17,10 @@ class WebSocketTicketController(
     @PostMapping("/ws-tickets")
     fun issueTicket(
         @CurrentUserId userId: Long,
+        @CurrentSessionToken sessionToken: String,
         request: HttpServletRequest,
     ): ResponseEntity<WebSocketTicketResponse> {
-        val ticket = webSocketTicketService.issueTicket(userId, clientIp(request))
+        val ticket = webSocketTicketService.issueTicket(userId, clientIp(request), sessionToken)
             ?: return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).build()
 
         return ResponseEntity.ok(ticket)

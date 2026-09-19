@@ -147,6 +147,40 @@ docs/                          # 상세 문서
 | [API 스펙 (OpenAPI)](docs/openapi.yaml)                                             | Swagger/OpenAPI 3.0 스펙                       |
 | [고트래픽 설계서](docs/superpowers/specs/2026-06-11-high-traffic-chat-service-design.md) | 고트래픽 채팅 서비스 설계 문서                            |
 
+## 메시지 재전송과 수락 결과 보관
+
+메시지 수락은 `(roomId, senderId, clientMessageId)`를 기준으로 Redis Lua에서 중복 확인과
+Streams 추가를 함께 처리합니다. 같은 키의 재전송에는 최초 메시지 ID, 내용, 순번과 생성 시각을 반환합니다.
+중복 키와 스트림은 같은 room hash tag를 사용하므로 Redis Cluster에서도 같은 슬롯에서 처리합니다.
+동시 요청이 순번을 먼저 발급받은 경우 사용하지 않은 순번이 남을 수 있습니다.
+
+DB에 저장되지 않은 수락 결과는 만료시키지 않습니다. writer가 DB 저장 성공을 확인한 뒤
+ACK 전에 24시간 TTL을 설정하고, 이후 재전송은 primary DB의 기존 메시지 조회로 처리합니다.
+장기 pending/DLQ 메시지의 수락 키는 유지되므로 backlog와 Redis 메모리를 함께 관리해야 합니다.
+보장은 Redis의 기존 내구성·보존 정책을 전제로 합니다.
+
+전환 시 writer를 먼저 배포하고, 기존 gateway의 신규 수락을 중단한 뒤 기존 Streams backlog를
+DB에 반영하고 모든 gateway를 교체합니다. 이전 gateway는 새 중복 키를 만들지 않으므로
+혼합 실행 또는 기존 backlog가 남은 상태에서는 새 수락 경로만으로 중복 방지를 보장할 수 없습니다.
+
+## 조회 권한과 장애 처리
+
+방 상세·멤버 목록은 인증된 활성 멤버에게만 제공하고 매번 DB에서 멤버십을 확인합니다.
+검색 결과는 방 메타데이터만 제공하며 메시지 내용을 포함하지 않습니다.
+
+역직렬화할 수 없는 Streams 레코드는 `rawFields`에 원문 필드를 담아 consumer group의 DLQ로
+격리한 뒤 ACK합니다. DLQ 저장 실패 시 원본은 pending에 남고 정상 레코드는 계속 처리합니다.
+ACK 실패 후 재시도에서는 DLQ가 중복될 수 있으므로 `sourceStreamKey + sourceRecordId + consumerGroup`으로 식별합니다.
+
+read replica의 지연 0 판단은 Primary에서 읽은 WAL 위치를 replica가 재생했는지 확인합니다.
+Primary 위치 또는 replica 재생 시각을 확인할 수 없으면 최신 메시지 조회는 Primary를 사용합니다.
+지연 측정마다 Primary WAL 조회가 한 번 추가됩니다.
+
+WebSocket 티켓은 세션 지문·발급 시각·만료를 저장하고 소비 시 개별/사용자 전체 철회를 확인합니다.
+배포 시 모든 ticket 소비 gateway를 먼저 교체한 뒤 ticket 발급 API를 교체합니다.
+세션 연결 정보가 없는 구버전 티켓은 거부되므로 전환 중에는 새 티켓으로 재접속해야 합니다.
+모든 소비 gateway가 교체되기 전에는 기존 gateway가 철회 검사를 생략할 수 있습니다.
+
 ## Kotlin 정적 품질 검사
 
 참고 프로젝트의 Detekt + ktlint 구성을 전체 Kotlin 모듈에 적용합니다.

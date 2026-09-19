@@ -1,10 +1,14 @@
 package com.chat.persistence.redis
 
 import com.chat.persistence.service.MessageStreamMetrics
+import com.fasterxml.jackson.core.JsonProcessingException
 import com.fasterxml.jackson.databind.ObjectMapper
 import io.lettuce.core.RedisBusyException
+import org.slf4j.LoggerFactory
+import org.springframework.core.NestedRuntimeException
 import org.springframework.data.domain.Range
 import org.springframework.data.redis.connection.stream.Consumer
+import org.springframework.data.redis.connection.stream.MapRecord
 import org.springframework.data.redis.connection.stream.ReadOffset
 import org.springframework.data.redis.connection.stream.RecordId
 import org.springframework.data.redis.connection.stream.StreamOffset
@@ -21,6 +25,7 @@ class RedisMessageStreamConsumer(
     private val keyResolver: MessageStreamKeyResolver,
     private val messageStreamMetrics: MessageStreamMetrics = MessageStreamMetrics.Noop,
 ) : MessageStreamConsumer {
+    private val logger = LoggerFactory.getLogger(javaClass)
     private val ensuredConsumerGroups = ConcurrentHashMap.newKeySet<String>()
 
     override fun listStreamKeys(): Set<String> =
@@ -84,14 +89,7 @@ class RedisMessageStreamConsumer(
             *offsets,
         ).orEmpty()
 
-        val mappedRecords = records.mapNotNull { record ->
-            val payload = record.value[FIELD_PAYLOAD] ?: return@mapNotNull null
-            MessageStreamRecord(
-                streamKey = record.requiredStream,
-                recordId = record.id.value,
-                envelope = objectMapper.readValue(payload, MessageStreamEnvelope::class.java),
-            )
-        }
+        val mappedRecords = records.mapNotNull { decodeRecord(it, consumerGroup, 1) }
         return mappedRecords
     }
 
@@ -135,13 +133,7 @@ class RedisMessageStreamConsumer(
             )
 
             val mappedRecords = claimedRecords.mapNotNull { record ->
-                val payload = record.value[FIELD_PAYLOAD] ?: return@mapNotNull null
-                MessageStreamRecord(
-                    streamKey = record.requiredStream,
-                    recordId = record.id.value,
-                    envelope = objectMapper.readValue(payload, MessageStreamEnvelope::class.java),
-                    deliveryCount = deliveryCountsById[record.id.value] ?: 1,
-                )
+                decodeRecord(record, consumerGroup, (deliveryCountsById[record.id.value] ?: 0) + 1)
             }
             recordConsumerRecords(consumerGroup, SOURCE_PENDING_CLAIMED, mappedRecords)
             mappedRecords
@@ -169,6 +161,42 @@ class RedisMessageStreamConsumer(
             keyResolver.deadLetterStreamKey(consumerGroup),
             fields,
         )
+    }
+
+    private fun decodeRecord(record: MapRecord<String, String, String>, consumerGroup: String, deliveryCount: Long): MessageStreamRecord? {
+        val envelope = try {
+            record.value[FIELD_PAYLOAD]?.let { objectMapper.readValue(it, MessageStreamEnvelope::class.java) }
+        } catch (_: JsonProcessingException) {
+            null
+        }
+        if (envelope == null) {
+            quarantine(record, consumerGroup, deliveryCount)
+            return null
+        }
+        return MessageStreamRecord(record.requiredStream, record.id.value, envelope, deliveryCount)
+    }
+
+    private fun quarantine(record: MapRecord<String, String, String>, consumerGroup: String, deliveryCount: Long) {
+        try {
+            val fields = linkedMapOf(
+                FIELD_SOURCE_STREAM_KEY to record.requiredStream,
+                FIELD_SOURCE_RECORD_ID to record.id.value,
+                FIELD_CONSUMER_GROUP to consumerGroup,
+                FIELD_DELIVERY_COUNT to deliveryCount.toString(),
+                FIELD_REASON to "Invalid or missing message envelope",
+                "rawFields" to objectMapper.writeValueAsString(record.value),
+            )
+            val id = redisTemplate.opsForStream<String, String>().add(keyResolver.deadLetterStreamKey(consumerGroup), fields)
+            if (id == null) {
+                logger.warn("Dead letter append returned null for stream record {}", record.id.value)
+                return
+            }
+            acknowledge(record.requiredStream, consumerGroup, record.id.value)
+            messageStreamMetrics.recordDeadLetter(consumerGroup, keyResolver.parseRoomStreamKey(record.requiredStream)?.streamShard ?: 0)
+        } catch (failure: NestedRuntimeException) {
+            // Keep the raw record pending if quarantine fails, but let unrelated valid messages progress.
+            logger.warn("Failed to quarantine stream record {} in group {}", record.id.value, consumerGroup, failure)
+        }
     }
 
     private fun recordConsumerRecords(

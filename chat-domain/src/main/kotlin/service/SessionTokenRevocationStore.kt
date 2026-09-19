@@ -9,5 +9,7 @@ interface SessionTokenRevocationStore {
 
     fun isTokenRevoked(token: String): Boolean
 
+    fun isTokenDigestRevoked(tokenDigest: String): Boolean
+
     fun userRevokedAt(userId: Long): Instant?
 }

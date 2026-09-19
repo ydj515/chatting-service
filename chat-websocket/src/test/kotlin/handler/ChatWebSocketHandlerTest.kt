@@ -1,5 +1,6 @@
 package com.chat.websocket.handler
 
+import com.chat.domain.dto.ChatRoomDto
 import com.chat.domain.dto.MessageDto
 import com.chat.domain.dto.SendMessageRequest
 import com.chat.domain.dto.UserDto
@@ -22,6 +23,8 @@ import org.mockito.Mockito.verify
 import org.mockito.Mockito.verifyNoInteractions
 import org.mockito.Mockito.verifyNoMoreInteractions
 import org.mockito.Mockito.`when`
+import org.springframework.data.domain.PageImpl
+import org.springframework.data.domain.PageRequest
 import org.springframework.web.socket.PongMessage
 import org.springframework.web.socket.TextMessage
 import org.springframework.web.socket.WebSocketSession
@@ -29,6 +32,27 @@ import java.nio.ByteBuffer
 import java.time.LocalDateTime
 
 class ChatWebSocketHandlerTest {
+    @Test
+    fun `connection subscribes every page including rooms beyond the first hundred`() {
+        val manager = mock(WebSocketSessionManager::class.java)
+        val service = mock(ChatService::class.java)
+        val session = mock(WebSocketSession::class.java)
+        `when`(session.attributes).thenReturn(mutableMapOf<String, Any>("userId" to 7L))
+        val rooms = (1L..101L).map { id ->
+            mock(ChatRoomDto::class.java).also { `when`(it.id).thenReturn(id) }
+        }
+        val first = PageRequest.of(0, 100)
+        `when`(service.getChatRooms(7, first)).thenReturn(PageImpl(rooms.take(100), first, 101))
+        `when`(service.getChatRooms(7, first.next())).thenReturn(PageImpl(rooms.drop(100), first.next(), 101))
+
+        ChatWebSocketHandler(manager, service, ObjectMapper(), WebSocketProperties()).afterConnectionEstablished(session)
+
+        rooms.forEach { verify(manager).joinRoom(7, it.id) }
+        verify(service).getChatRooms(7, first)
+        verify(service).getChatRooms(7, first.next())
+        verifyNoMoreInteractions(service)
+    }
+
     @Test
     fun `application input rejection becomes format error without acknowledgement`() {
         val manager = mock(WebSocketSessionManager::class.java)

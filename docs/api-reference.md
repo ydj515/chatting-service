@@ -23,17 +23,21 @@ OpenAPI 스펙은 [`openapi.yaml`](openapi.yaml)을 참고하세요.
 | --- | --- | --- |
 | `POST` | `/api/ws-tickets` | WebSocket one-time ticket 발급. `Authorization: Bearer {sessionToken}` 필요 |
 
+티켓은 발급에 사용한 세션에 연결됩니다. 개별 로그아웃이나 사용자 전체 토큰 철회 후에는
+이미 발급된 티켓도 소비할 수 없습니다. 티켓 만료는 원래 세션 만료를 넘지 않으며, Redis에는
+세션 원문 대신 SHA-256 지문만 보관합니다. 세션 연결 정보가 없는 구버전 티켓은 재발급해야 합니다.
+
 ### 채팅방
 
 | 메서드 | 경로 | 설명 |
 | --- | --- | --- |
 | `POST` | `/api/chat-rooms` | 채팅방 생성 |
 | `GET` | `/api/chat-rooms` | 참여 중인 채팅방 목록 |
-| `GET` | `/api/chat-rooms/{id}` | 채팅방 상세 조회 |
+| `GET` | `/api/chat-rooms/{id}` | 인증된 활성 멤버만 상세 조회 가능 |
 | `POST` | `/api/chat-rooms/{id}/members` | 채팅방 참여 |
 | `DELETE` | `/api/chat-rooms/{id}/members/me` | 채팅방 퇴장 |
-| `GET` | `/api/chat-rooms/{id}/members` | 채팅방 멤버 목록 |
-| `GET` | `/api/chat-rooms/search?q=...` | 채팅방 검색 |
+| `GET` | `/api/chat-rooms/{id}/members` | 인증된 활성 멤버만 멤버 목록 조회 가능 |
+| `GET` | `/api/chat-rooms/search?q=...` | 인증된 사용자의 방 검색. 검색 결과는 메타데이터만 제공하며 `lastMessage`는 `null` |
 
 ### 메시지
 

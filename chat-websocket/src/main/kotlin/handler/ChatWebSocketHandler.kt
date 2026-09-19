@@ -107,16 +107,15 @@ class ChatWebSocketHandler(
 
     private fun loadUserChatRooms(userId: Long) {
         try {
-            val chatRooms = chatService.getChatRooms(
-                userId,
-                PageRequest.of(0, webSocketProperties.initialChatRoomPageSize),
-            )
-
-            chatRooms.content.forEach { room ->
-                sessionManager.joinRoom(userId, room.id)
-            }
-
-            logger.info("Loaded ${chatRooms.content.size} chat rooms for user: $userId")
+            var pageable = PageRequest.of(0, webSocketProperties.initialChatRoomPageSize)
+            var loaded = 0
+            do {
+                val chatRooms = chatService.getChatRooms(userId, pageable)
+                chatRooms.content.forEach { room -> sessionManager.joinRoom(userId, room.id) }
+                loaded += chatRooms.numberOfElements
+                pageable = pageable.next()
+            } while (chatRooms.hasNext())
+            logger.info("Loaded $loaded chat rooms for user: $userId")
         } catch (e: Exception) {
             logger.error("Failed to load chat rooms for user: $userId", e)
         }

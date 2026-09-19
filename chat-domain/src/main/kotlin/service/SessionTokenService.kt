@@ -16,7 +16,7 @@ interface SessionTokenService {
 }
 
 interface WebSocketTicketService {
-    fun issueTicket(userId: Long, clientIp: String?): WebSocketTicketResponse?
+    fun issueTicket(userId: Long, clientIp: String?, sessionToken: String): WebSocketTicketResponse?
 
     fun consumeTicket(ticket: String): AuthenticatedWebSocketTicket?
 }

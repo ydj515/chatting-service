@@ -11,6 +11,7 @@ class ReadReplicaLagPolicy(
     @Qualifier("messageReadJdbcTemplate")
     private val messageReadJdbcTemplate: JdbcTemplate,
     private val properties: ChatReadDataSourceProperties,
+    @Qualifier("jdbcTemplate") private val primaryJdbcTemplate: JdbcTemplate,
 ) : LatestHistoryReadRoutingPolicy {
     private val logger = LoggerFactory.getLogger(ReadReplicaLagPolicy::class.java)
 
@@ -19,7 +20,12 @@ class ReadReplicaLagPolicy(
         if (!properties.enabled) {
             return 0L
         }
-        return messageReadJdbcTemplate.queryForObject(REPLICA_LAG_MILLIS_SQL, Long::class.java) ?: 0L
+        val primaryLsn = checkNotNull(primaryJdbcTemplate.queryForObject("SELECT pg_current_wal_lsn()::text", String::class.java)) {
+            "Primary WAL position is unavailable"
+        }
+        return checkNotNull(messageReadJdbcTemplate.queryForObject(REPLICA_LAG_MILLIS_SQL, Long::class.javaObjectType, primaryLsn)) {
+            "Replica replay progress is unavailable"
+        }
     }
 
     override fun usePrimaryForLatestHistory(): Boolean {
@@ -28,7 +34,7 @@ class ReadReplicaLagPolicy(
         }
 
         return try {
-            val lagMillis = messageReadJdbcTemplate.queryForObject(REPLICA_LAG_MILLIS_SQL, Long::class.java) ?: 0L
+            val lagMillis = currentLagMillis()
             lagMillis > properties.latestHistoryMaxReplicaLag.toMillis()
         } catch (e: Exception) {
             logger.warn("Failed to measure read replica lag; latest history will use primary", e)
@@ -42,8 +48,10 @@ class ReadReplicaLagPolicy(
             SELECT CASE
                 WHEN pg_is_in_recovery()
                 THEN CASE
-                    WHEN pg_last_wal_receive_lsn() = pg_last_wal_replay_lsn() THEN 0
-                    ELSE COALESCE(EXTRACT(EPOCH FROM (now() - pg_last_xact_replay_timestamp())) * 1000, 0)::bigint
+                    WHEN pg_last_wal_replay_lsn() IS NULL THEN NULL
+                    WHEN pg_last_wal_replay_lsn() >= CAST(? AS pg_lsn) THEN 0
+                    WHEN pg_last_xact_replay_timestamp() IS NULL THEN NULL
+                    ELSE GREATEST(EXTRACT(EPOCH FROM (clock_timestamp() - pg_last_xact_replay_timestamp())) * 1000, 0)::bigint
                 END
                 ELSE 0
             END

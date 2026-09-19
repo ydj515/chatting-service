@@ -1,5 +1,8 @@
 package com.chat.persistence.service
 
+import com.chat.domain.dto.AuthenticatedSession
+import com.chat.domain.service.SessionTokenRevocationStore
+import com.chat.domain.service.SessionTokenService
 import com.chat.persistence.config.ChatAuthProperties
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
@@ -24,6 +27,7 @@ import org.springframework.data.redis.core.script.RedisScript
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
+import java.time.LocalDateTime
 import java.time.ZoneOffset
 import java.util.stream.Stream
 
@@ -41,7 +45,7 @@ class RedisWebSocketTicketServiceTest {
         val redis = redisTemplate()
         val service = ticketService(redis.template)
 
-        val issued = service.issueTicket(userId = 42L, clientIp = "127.0.0.1")
+        val issued = service.issueTicket(userId = 42L, clientIp = "127.0.0.1", sessionToken = "bound-session")
             ?: throw AssertionError("ticket should be issued")
 
         assertTrue(issued.ticket.length >= 43)
@@ -73,9 +77,9 @@ class RedisWebSocketTicketServiceTest {
             ),
         )
 
-        service.issueTicket(userId = 42L, clientIp = "127.0.0.1")
+        service.issueTicket(userId = 42L, clientIp = "127.0.0.1", sessionToken = "bound-session")
 
-        assertEquals(null, service.issueTicket(userId = 42L, clientIp = "127.0.0.1"))
+        assertEquals(null, service.issueTicket(userId = 42L, clientIp = "127.0.0.1", sessionToken = "bound-session"))
     }
 
     @Test
@@ -92,7 +96,7 @@ class RedisWebSocketTicketServiceTest {
         )
         val service = ticketService(redis.template, properties)
 
-        assertEquals(null, service.issueTicket(userId = 42L, clientIp = "127.0.0.1"))
+        assertEquals(null, service.issueTicket(userId = 42L, clientIp = "127.0.0.1", sessionToken = "bound-session"))
     }
 
     @Test
@@ -108,7 +112,7 @@ class RedisWebSocketTicketServiceTest {
         )
         val service = ticketService(redis.template, properties)
 
-        service.issueTicket(userId = 42L, clientIp = null)
+        service.issueTicket(userId = 42L, clientIp = null, sessionToken = "bound-session")
 
         org.mockito.Mockito.verify(redis.template).execute(
             anyRedisScript(),
@@ -124,7 +128,7 @@ class RedisWebSocketTicketServiceTest {
         val meterRegistry = SimpleMeterRegistry()
         val service = ticketService(redis = redis.template, meterRegistry = meterRegistry)
 
-        service.issueTicket(userId = 42L, clientIp = "127.0.0.1")
+        service.issueTicket(userId = 42L, clientIp = "127.0.0.1", sessionToken = "bound-session")
 
         assertEquals(
             1L,
@@ -149,7 +153,7 @@ class RedisWebSocketTicketServiceTest {
         val meterRegistry = SimpleMeterRegistry()
         val service = ticketService(redis = redis.template, meterRegistry = meterRegistry)
 
-        assertEquals(null, service.issueTicket(userId = 42L, clientIp = "127.0.0.1"))
+        assertEquals(null, service.issueTicket(userId = 42L, clientIp = "127.0.0.1", sessionToken = "bound-session"))
         assertEquals(
             1.0,
             meterRegistry.find("chat.websocket.ticket.rate_limit.script.failures")
@@ -170,7 +174,7 @@ class RedisWebSocketTicketServiceTest {
             ),
         )
         val issued = ticketService(redis.template, properties)
-            .issueTicket(userId = 42L, clientIp = "127.0.0.1")
+            .issueTicket(userId = 42L, clientIp = "127.0.0.1", sessionToken = "bound-session")
             ?: throw AssertionError("ticket should be issued")
         val laterClock = Clock.fixed(clock.instant().plus(Duration.ofSeconds(31)), ZoneOffset.UTC)
         val laterService = ticketService(redis.template, properties, laterClock)
@@ -196,6 +200,13 @@ class RedisWebSocketTicketServiceTest {
             objectMapper = objectMapper,
             authProperties = properties,
             clock = clock,
+            ticketSessionPolicy = WebSocketTicketSessionPolicy(
+                sessionTokenService = mock(SessionTokenService::class.java).also {
+                    `when`(it.authenticate("bound-session")).thenReturn(AuthenticatedSession(42, LocalDateTime.ofInstant(this.clock.instant().plusSeconds(3600), ZoneOffset.UTC), LocalDateTime.ofInstant(this.clock.instant(), ZoneOffset.UTC)))
+                },
+                revocationStore = mock(SessionTokenRevocationStore::class.java),
+                clock = clock,
+            ),
             meterRegistryProvider = meterRegistry?.let { meterRegistryProvider(it) },
         )
 

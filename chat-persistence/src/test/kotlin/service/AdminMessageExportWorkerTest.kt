@@ -36,6 +36,33 @@ import java.time.Instant
 
 class AdminMessageExportWorkerTest {
     @Test
+    fun `checkpoint sees complete bytes before writer closes and resume keeps those rows`(@TempDir tempDir: Path) {
+        val jobs = mock(AdminExportJobRepository::class.java)
+        val messages = mock(AdminMessageRepository::class.java)
+        val storage = RecordingObjectStoragePort()
+        val first = message()
+        val cursor = AdminMessageCursor(first.createdAt, first.roomSeq, first.messageId)
+        val token = AdminMessageCursorCodec.encode(cursor)
+        val output = tempDir.resolve("export-flush.csv")
+        val job = AdminExportJobRecord(jobId = "export-flush", actor = "admin", requestJson = """{"roomId":10}""")
+        `when`(jobs.claimNextPending("worker-1")).thenReturn(job)
+        `when`(messages.findRoomMessages(10, null, null, null, 2)).thenReturn(listOf(first))
+        var checkpointBytes = ""
+        org.mockito.Mockito.doAnswer {
+            checkpointBytes = Files.readString(output)
+            assertTrue(checkpointBytes.contains("msg-1,client-100,10,100"))
+            error("stop after checkpoint")
+        }.`when`(jobs).updateCheckpoint("export-flush", token, 1, output.toUri().toString())
+        assertEquals(0, worker(jobs, messages, tempDir, storage).pollAndExport())
+        assertTrue(checkpointBytes.isNotEmpty())
+
+        `when`(jobs.claimNextPending("worker-1")).thenReturn(job.copy(cursorToken = token, exportedRows = 1, outputUri = output.toUri().toString()))
+        `when`(messages.findRoomMessages(10, null, null, cursor, 2)).thenReturn(emptyList())
+        assertEquals(1, worker(jobs, messages, tempDir, storage).pollAndExport())
+        assertEquals(checkpointBytes, storage.uploadedContent)
+    }
+
+    @Test
     fun `export worker는 pending job을 claim하고 CSV 파일을 완료 상태로 기록한다`(
         @TempDir tempDir: Path,
     ) {

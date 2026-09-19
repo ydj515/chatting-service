@@ -31,6 +31,7 @@ data class SessionToken(
 data class AuthenticatedSession(
     val userId: Long,
     val expiresAt: LocalDateTime,
+    val issuedAt: LocalDateTime? = null,
 )
 
 data class WebSocketTicketResponse(

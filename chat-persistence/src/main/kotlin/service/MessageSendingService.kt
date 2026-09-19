@@ -46,6 +46,7 @@ class MessageSendingService(
             if (existingMessage != null) {
                 return existingMessage
             }
+            messageStreamPublisher.findAccepted(request.chatRoomId, sender, requestedClientMessageId)?.let { return it }
         }
 
         messageSendPolicy.requireAllowed(request, senderId, member.role)

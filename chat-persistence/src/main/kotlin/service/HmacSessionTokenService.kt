@@ -61,6 +61,7 @@ class HmacSessionTokenService(
         return AuthenticatedSession(
             userId = claims.userId,
             expiresAt = LocalDateTime.ofInstant(claims.expiresAt, ZoneOffset.UTC),
+            issuedAt = claims.issuedAt?.let { LocalDateTime.ofInstant(it, ZoneOffset.UTC) },
         )
     }
 
