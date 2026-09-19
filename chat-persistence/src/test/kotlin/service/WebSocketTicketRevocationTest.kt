@@ -19,6 +19,16 @@ import java.util.UUID
 @EnabledIfEnvironmentVariable(named = "CHAT_TEST_REDIS_PORT", matches = ".+")
 class WebSocketTicketRevocationTest {
     @Test
+    fun `out of order retry cannot move the user revocation cutoff backwards`() {
+        Fixture().use { f ->
+            val latest = f.clock.instant()
+            f.revocations.revokeUserTokens(7, latest)
+            f.revocations.revokeUserTokens(7, latest.minusSeconds(60))
+            assertEquals(latest, f.revocations.userRevokedAt(7))
+        }
+    }
+
+    @Test
     fun `individual logout invalidates all bound tickets without affecting another session`() {
         Fixture().use { f ->
             val first = f.tokens.issueToken(7).token
@@ -106,7 +116,7 @@ class WebSocketTicketRevocationTest {
             session = ChatAuthProperties.Session(secret = "synthetic-ticket-test-signing-key-0123456789", ttl = Duration.ofHours(1), revocationKeyPrefix = "${prefix}revoked:"),
             webSocketTicket = ChatAuthProperties.WebSocketTicket(keyPrefix = "${prefix}ticket:", rateLimitKeyPrefix = "${prefix}rate:"),
         )
-        private val revocations = RedisSessionTokenRevocationStore(redis, properties, clock)
+        val revocations = RedisSessionTokenRevocationStore(redis, properties, clock)
         val tokens = HmacSessionTokenService(properties, clock, revocations)
         val tickets = ticketService(tokens)
 

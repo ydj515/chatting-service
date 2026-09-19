@@ -215,8 +215,8 @@ fun closeSessionsForUser(userId: Long, closeStatus: CloseStatus = SESSION_REVOKE
 ## 5. 오류 처리와 운영 정책
 
 - Redis revocation 조회 실패: 인증 실패로 처리한다.
-- Redis revoke 기록 실패: logout 요청은 실패로 처리한다. suspend 후 commit된 post-commit revocation 실패는 호출자에게 실패로 노출될 수 있으나 DB sanction은 이미 유지된다.
-- Redis force logout publish 실패: suspend 후 commit된 post-commit publish 실패는 호출자에게 실패로 노출될 수 있으나 DB sanction은 이미 유지된다.
+- Redis revoke 기록 실패: logout 요청은 실패로 처리한다. suspend는 같은 DB transaction에 기록한 session_revocation_jobs를 통해 재시도한다.
+- Redis force logout publish 실패: 철회 작업을 완료하지 않고 backoff 후 재시도한다. Redis I/O는 claim/completion transaction 밖에서 실행한다.
 - 이미 만료된 token logout: 멱등 성공 응답으로 처리하되 내부 `revokeToken`은 `false`를 반환할 수 있다.
 - 이미 revoke된 token logout: 멱등 성공으로 처리한다.
 - suspend 해제: 기존 token은 복구하지 않는다.
@@ -325,3 +325,18 @@ mise run verify:moderation
 - Phase 9에서 Redis pub/sub force logout을 더 강하게 보장하려면 stream 기반 control event로 바꿀 것인가?
 - HMAC key rotation을 다중 active key id(`kid`) 구조로 확장할 시점을 언제로 둘 것인가?
 - suspend 해제 시 사용자가 자동 재로그인되게 할 것인가, 아니면 명시적 재로그인을 계속 요구할 것인가?
+
+## Durable suspension retry rollout
+
+Before deploying this version, apply `infra/postgres/session-revocation-jobs.sql` to the primary database.
+New compose databases and the primary configure task include this migration; existing databases
+require explicit operator application. No production migration is executed by code review tooling.
+The worker drains this outbox on the sanction-cache scheduler using the existing
+`chat.cache.sanction-retry.*` batch, lease, and backoff settings. At least one worker must run.
+Revocation jobs commit with sanctions and preserve their original cutoff. Redis cutoff updates are
+monotonic, so an older leased retry cannot restore a token revoked by a newer suspension.
+A crash after Redis delivery can repeat the control event; this is intentionally at-least-once.
+Control events still close all sessions for the user, including sessions opened since a delayed job;
+clients may reconnect with a valid newer token after suspension is lifted.
+Pub/sub subscriber outages remain best-effort for already-open connections; durable retries cover
+failed publications, while the stored cutoff denies subsequent authentication and ticket use.

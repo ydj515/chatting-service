@@ -41,4 +41,9 @@ if [ -f /sql/sanction-cache-invalidation.sql ]; then
     -f /sql/sanction-cache-invalidation.sql
 fi
 
+if [ -f /sql/session-revocation-jobs.sql ]; then
+  psql -v ON_ERROR_STOP=1 -h "$db_host" -p "$db_port" -U "$db_user" -d "$db_name" \
+    -f /sql/session-revocation-jobs.sql
+fi
+
 echo "PostgreSQL primary replication configuration is ready."

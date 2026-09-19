@@ -6,8 +6,6 @@ import com.chat.domain.dto.ModerationAction
 import com.chat.domain.dto.ModerationMatchType
 import com.chat.domain.dto.ModerationScopeType
 import com.chat.domain.dto.UserSanctionType
-import com.chat.domain.service.SessionControlPublisher
-import com.chat.domain.service.SessionTokenService
 import com.chat.persistence.repository.AdminAuditLogRepository
 import com.chat.persistence.repository.ModerationRuleJdbcRepository
 import com.chat.persistence.repository.ModerationRuleRecord
@@ -27,7 +25,6 @@ import org.mockito.Mockito.verify
 import org.mockito.Mockito.verifyNoInteractions
 import org.mockito.Mockito.`when`
 import org.springframework.transaction.annotation.Transactional
-import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.time.Instant
 
 class AdminModerationServiceImplTest {
@@ -168,20 +165,9 @@ class AdminModerationServiceImplTest {
             ),
         )
 
-        TransactionSynchronizationManager.initSynchronization()
-        try {
-            val response = fixture.service.createSanction("admin-local", request)
-
-            assertEquals(UserSanctionType.SUSPEND, response.type)
-            verifyNoInteractions(fixture.sessionTokenService, fixture.sessionControlPublisher)
-            TransactionSynchronizationManager.getSynchronizations().forEach { it.afterCommit() }
-        } finally {
-            if (TransactionSynchronizationManager.isSynchronizationActive()) {
-                TransactionSynchronizationManager.clearSynchronization()
-            }
-        }
-        verify(fixture.sessionTokenService).revokeUserTokens(7L)
-        verify(fixture.sessionControlPublisher).forceLogoutUser(7L, "suspended")
+        val response = fixture.service.createSanction("admin-local", request)
+        assertEquals(UserSanctionType.SUSPEND, response.type)
+        verify(fixture.revoker).revokeAfterCommit(7L)
     }
 
     @Test
@@ -199,7 +185,7 @@ class AdminModerationServiceImplTest {
         }
 
         verifyNoInteractions(fixture.sanctionRepository)
-        verifyNoInteractions(fixture.sessionTokenService, fixture.sessionControlPublisher)
+        verifyNoInteractions(fixture.revoker)
     }
 
     @Test
@@ -216,7 +202,7 @@ class AdminModerationServiceImplTest {
         }
 
         verifyNoInteractions(fixture.sanctionRepository)
-        verifyNoInteractions(fixture.sessionTokenService, fixture.sessionControlPublisher)
+        verifyNoInteractions(fixture.revoker)
     }
 
     @ParameterizedTest
@@ -237,23 +223,21 @@ class AdminModerationServiceImplTest {
         val ruleRepository = mock(ModerationRuleJdbcRepository::class.java)
         val sanctionRepository = mock(UserSanctionJdbcRepository::class.java)
         val auditRepository = mock(AdminAuditLogRepository::class.java)
-        val sessionTokenService = mock(SessionTokenService::class.java)
-        val sessionControlPublisher = mock(SessionControlPublisher::class.java)
+        val revoker = mock(SuspendedSessionRevoker::class.java)
         val invalidator = mock(SanctionCacheInvalidator::class.java)
         return Fixture(
             service = AdminModerationServiceImpl(
                 ruleRepository = ruleRepository,
                 sanctionRepository = sanctionRepository,
                 auditRecorder = AdminAuditRecorder(auditRepository, jacksonObjectMapper()),
-                suspendedSessions = SuspendedSessionRevoker(sessionTokenService, sessionControlPublisher),
+                suspendedSessions = revoker,
                 clock = clock,
                 sanctionCacheInvalidator = invalidator,
             ),
             ruleRepository = ruleRepository,
             sanctionRepository = sanctionRepository,
             auditRepository = auditRepository,
-            sessionTokenService = sessionTokenService,
-            sessionControlPublisher = sessionControlPublisher,
+            revoker = revoker,
             invalidator = invalidator,
         )
     }
@@ -263,8 +247,7 @@ class AdminModerationServiceImplTest {
         val ruleRepository: ModerationRuleJdbcRepository,
         val sanctionRepository: UserSanctionJdbcRepository,
         val auditRepository: AdminAuditLogRepository,
-        val sessionTokenService: SessionTokenService,
-        val sessionControlPublisher: SessionControlPublisher,
+        val revoker: SuspendedSessionRevoker,
         val invalidator: SanctionCacheInvalidator,
     )
 

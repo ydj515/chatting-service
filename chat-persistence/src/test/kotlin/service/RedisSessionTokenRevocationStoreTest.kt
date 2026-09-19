@@ -39,11 +39,6 @@ class RedisSessionTokenRevocationStoreTest {
         val store = store(redisTemplate.template)
 
         store.revokeUserTokens(7L, clock.instant())
-        verify(redisTemplate.valueOps).set(
-            eq("chat:auth:session:revoked:user:7"),
-            eq("1782518400"),
-            eq(Duration.ofHours(13)),
-        )
 
         `when`(redisTemplate.valueOps.get("chat:auth:session:revoked:user:7")).thenReturn("1782518400")
         assertEquals(clock.instant(), store.userRevokedAt(7L))

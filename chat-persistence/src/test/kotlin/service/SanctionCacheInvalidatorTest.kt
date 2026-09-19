@@ -164,13 +164,13 @@ class SanctionCacheInvalidatorTest {
             val start = ddl.indexOf("CREATE TABLE IF NOT EXISTS $table (")
             f.jdbc.execute(ddl.substring(start, ddl.indexOf("\n);", start) + 3))
         }
-        val tokens = org.mockito.Mockito.mock(com.chat.domain.service.SessionTokenService::class.java)
+        val tokens = org.mockito.Mockito.mock(com.chat.domain.service.SessionTokenRevocationStore::class.java)
         val logout = org.mockito.Mockito.mock(com.chat.domain.service.SessionControlPublisher::class.java)
         val service = AdminModerationServiceImpl(
             org.mockito.Mockito.mock(com.chat.persistence.repository.ModerationRuleJdbcRepository::class.java),
             com.chat.persistence.repository.UserSanctionJdbcRepository(f.jdbc),
             AdminAuditRecorder(com.chat.persistence.repository.AdminAuditLogRepository(f.jdbc), com.fasterxml.jackson.module.kotlin.jacksonObjectMapper().findAndRegisterModules()),
-            SuspendedSessionRevoker(tokens, logout), f.clock, f.invalidator,
+            SuspendedSessionRevoker(com.chat.persistence.repository.SessionRevocationJobRepository(f.jdbc), tokens, logout, f.transactionManager, f.clock, SanctionCacheRetryProperties()), f.clock, f.invalidator,
         )
         val request = com.chat.domain.dto.AdminCreateUserSanctionRequest(scopeType = ModerationScopeType.GLOBAL, userId = 7, type = UserSanctionType.SUSPEND)
         f.transaction.executeWithoutResult { status ->
@@ -185,7 +185,7 @@ class SanctionCacheInvalidatorTest {
         f.cache.unavailable = true
         val sanction = requireNotNull(f.transaction.execute { service.createSanction("admin", request) })
         assertEquals(1, f.pending())
-        org.mockito.Mockito.verify(tokens).revokeUserTokens(7)
+        org.mockito.Mockito.verify(tokens).revokeUserTokens(7, f.clock.instant())
         org.mockito.Mockito.verify(logout).forceLogoutUser(7, "suspended")
         f.cache.unavailable = false
         f.clock.advance(5_000)
@@ -207,7 +207,7 @@ class SanctionCacheInvalidatorTest {
         val clock = MutableClock()
         private val dataSource = testDataSource()
         val jdbc = JdbcTemplate(dataSource)
-        private val transactionManager = DataSourceTransactionManager(dataSource)
+        val transactionManager = DataSourceTransactionManager(dataSource)
         val transaction = TransactionTemplate(transactionManager)
         val repository = SanctionCacheInvalidationRepository(jdbc)
         val cache = FaultInjectingCache()
@@ -219,6 +219,7 @@ class SanctionCacheInvalidatorTest {
 
         init {
             Files.readString(Path.of("../infra/postgres/sanction-cache-invalidation.sql")).split(';').filter { it.isNotBlank() }.forEach(jdbc::execute)
+            Files.readString(Path.of("../infra/postgres/session-revocation-jobs.sql")).split(';').filter { it.isNotBlank() }.forEach(jdbc::execute)
             jdbc.execute("CREATE TABLE domain_changes (id INT PRIMARY KEY)")
         }
 
