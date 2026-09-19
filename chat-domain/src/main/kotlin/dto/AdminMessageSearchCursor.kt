@@ -2,6 +2,7 @@ package com.chat.domain.dto
 
 import java.nio.charset.StandardCharsets
 import java.time.Instant
+import java.time.format.DateTimeParseException
 import java.util.Base64
 
 data class AdminMessageCursor(
@@ -42,7 +43,9 @@ object AdminMessageCursorCodec {
                 roomSeq = parts[2].toLong(),
                 messageId = messageId,
             )
-        } catch (e: Exception) {
+        } catch (e: IllegalArgumentException) {
+            throw IllegalArgumentException(INVALID_CURSOR_MESSAGE, e)
+        } catch (e: DateTimeParseException) {
             throw IllegalArgumentException(INVALID_CURSOR_MESSAGE, e)
         }
     }

@@ -90,7 +90,7 @@
 | `CHAT_REDIS_STREAMS_MAX_LEN_APPROXIMATE` | `true` | Redis Streams `MAXLEN ~` approximate trim 사용 여부. `false`이면 exact trim을 사용 |
 | `CHAT_REDIS_ADMISSION_KEY_PREFIX` | `chat:admission:room:` | 메시지 수락 rate limit/slow mode Redis key prefix. 실제 key는 Redis Cluster hash tag를 포함해 `<prefix>{roomId}:...` 형태 |
 | `CHAT_REDIS_ADMISSION_RATE_LIMIT_WINDOW_TTL` | `2s` | 초당 rate limit bucket key 정리 TTL. 고정 1초 bucket을 다음 초 이후까지 보존하기 위한 값 |
-| `CHAT_AUTH_SESSION_SECRET` | `local-development-session-secret-change-me` | 로그인 session token HMAC 서명 secret. 운영 환경에서는 반드시 교체 |
+| `CHAT_AUTH_SESSION_SECRET` | 필수 | 모든 실행 환경에서 최소 32바이트의 독립적인 HMAC 서명 키. 미설정, 공백, 기존 개발 기본값은 시작 시 거부 |
 | `CHAT_AUTH_SESSION_TTL` | `12h` | 로그인 session token TTL |
 | `CHAT_AUTH_SESSION_TOKEN_QUERY_PARAM` | `token` | local/dev 호환 모드에서만 허용할 legacy session token query parameter |
 | `CHAT_AUTH_WEB_SOCKET_TICKET_TTL` | `30s` | WebSocket one-time ticket TTL |
@@ -193,3 +193,5 @@ Phase 6 owner takeover smoke는 `scripts/phase6-fanout-takeover-smoke.mjs`로 �
 | `VITE_CHAT_API_TIMEOUT_MS` | `30000` | API 요청 timeout |
 | `VITE_CHAT_WS_MAX_RECONNECT_ATTEMPTS` | `5` | WebSocket 최대 재연결 횟수 |
 | `VITE_DEV_PROXY_TARGET` | `http://localhost:80` | Vite 개발 서버 proxy target |
+
+로컬 실행 전에도 `export CHAT_AUTH_SESSION_SECRET="$(openssl rand -base64 48)"`로 키를 주입한다. 여러 서버는 동일한 키를 사용해야 한다. 키를 변경하면 기존 세션 토큰은 무효화된다. Compose는 해당 환경 변수를 애플리케이션 컨테이너에 전달한다.

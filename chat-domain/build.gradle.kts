@@ -22,3 +22,9 @@ dependencies {
     // Jackson 어노테이션 사용 (WebSocketDto에서 사용)
     implementation(libs.jackson.module.kotlin)
 }
+
+allOpen {
+    annotation("jakarta.persistence.Entity")
+    annotation("jakarta.persistence.MappedSuperclass")
+    annotation("jakarta.persistence.Embeddable")
+}

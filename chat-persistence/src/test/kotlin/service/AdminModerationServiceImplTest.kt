@@ -18,6 +18,8 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.CsvSource
 import org.mockito.ArgumentMatchers.contains
 import org.mockito.ArgumentMatchers.eq
 import org.mockito.Mockito.mock
@@ -27,6 +29,7 @@ import org.mockito.Mockito.`when`
 import org.springframework.cache.Cache
 import org.springframework.cache.CacheManager
 import org.springframework.transaction.annotation.Transactional
+import org.springframework.transaction.support.TransactionSynchronization
 import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.time.Instant
 
@@ -210,6 +213,36 @@ class AdminModerationServiceImplTest {
         verifyNoInteractions(fixture.sessionTokenService, fixture.sessionControlPublisher)
     }
 
+    @ParameterizedTest
+    @CsvSource(
+        "ROOM,false,false", "ROOM,false,true", "ROOM,true,false", "ROOM,true,true",
+        "GLOBAL,false,false", "GLOBAL,false,true", "GLOBAL,true,false", "GLOBAL,true,true",
+    )
+    fun `sanction cache eviction waits for commit and is discarded on rollback`(scope: ModerationScopeType, revoke: Boolean, commit: Boolean) {
+        val fixture = fixture()
+        val roomId = if (scope == ModerationScopeType.ROOM) 10L else null
+        val type = if (scope == ModerationScopeType.ROOM) UserSanctionType.MUTE else UserSanctionType.SUSPEND
+        val record = sanctionRecord(scope, roomId, type)
+        val request = AdminCreateUserSanctionRequest(scopeType = scope, roomId = roomId, userId = 7L, type = type)
+        `when`(fixture.sanctionRepository.create("admin-local", request)).thenReturn(record)
+        `when`(fixture.sanctionRepository.revoke("admin-local", record.id)).thenReturn(record)
+        TransactionSynchronizationManager.initSynchronization()
+        try {
+            if (revoke) fixture.service.revokeSanction("admin-local", record.id) else fixture.service.createSanction("admin-local", request)
+            verifyNoInteractions(fixture.userSanctionsCache)
+            val callbacks = TransactionSynchronizationManager.getSynchronizations()
+            if (commit) {
+                callbacks.forEach { it.afterCommit() }
+                verify(fixture.userSanctionsCache).evict(if (roomId == null) "global:7" else "10:7")
+            } else {
+                callbacks.forEach { it.afterCompletion(TransactionSynchronization.STATUS_ROLLED_BACK) }
+                verifyNoInteractions(fixture.userSanctionsCache, fixture.sessionTokenService, fixture.sessionControlPublisher)
+            }
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization()
+        }
+    }
+
     private fun fixture(): Fixture {
         val ruleRepository = mock(ModerationRuleJdbcRepository::class.java)
         val sanctionRepository = mock(UserSanctionJdbcRepository::class.java)
@@ -223,8 +256,7 @@ class AdminModerationServiceImplTest {
             service = AdminModerationServiceImpl(
                 ruleRepository = ruleRepository,
                 sanctionRepository = sanctionRepository,
-                auditLogRepository = auditRepository,
-                objectMapper = jacksonObjectMapper(),
+                auditRecorder = AdminAuditRecorder(auditRepository, jacksonObjectMapper()),
                 sessionTokenService = sessionTokenService,
                 sessionControlPublisher = sessionControlPublisher,
                 cacheManager = cacheManager,

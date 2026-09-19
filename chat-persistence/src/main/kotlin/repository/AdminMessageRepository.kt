@@ -70,16 +70,15 @@ class AdminMessageRepository(
         )
     }
 
-    fun searchMessages(
-        query: String,
-        searchMode: AdminMessageSearchMode,
-        roomId: Long?,
-        from: Instant?,
-        to: Instant?,
-        senderId: Long?,
-        cursor: AdminMessageSearchCursor?,
-        limit: Int,
-    ): List<AdminMessageDto> {
+    fun searchMessages(criteria: AdminMessageQuery): List<AdminMessageDto> {
+        val query = criteria.query
+        val searchMode = criteria.searchMode
+        val roomId = criteria.roomId
+        val from = criteria.from
+        val to = criteria.to
+        val senderId = criteria.senderId
+        val cursor = criteria.cursor
+        val limit = criteria.limit
         val normalizedQuery = query.trim()
         val where = mutableListOf<String>()
         val args = mutableListOf<Any>()
@@ -335,3 +334,14 @@ class AdminMessageRepository(
         }
     }
 }
+
+data class AdminMessageQuery(
+    val query: String,
+    val searchMode: AdminMessageSearchMode,
+    val roomId: Long?,
+    val from: Instant?,
+    val to: Instant?,
+    val senderId: Long?,
+    val cursor: AdminMessageSearchCursor?,
+    val limit: Int,
+)

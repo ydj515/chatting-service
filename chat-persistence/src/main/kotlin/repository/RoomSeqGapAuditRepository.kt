@@ -1,7 +1,7 @@
 package com.chat.persistence.repository
 
 import org.springframework.beans.factory.annotation.Qualifier
-import org.springframework.dao.EmptyResultDataAccessException
+import org.springframework.dao.support.DataAccessUtils
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.jdbc.core.RowMapper
 import org.springframework.stereotype.Repository
@@ -31,18 +31,16 @@ class RoomSeqGapAuditRepository(
 ) {
     fun auditSince(cutoff: Instant): RoomSeqGapAuditSummary {
         val cutoffTimestamp = Timestamp.from(cutoff)
-        return try {
-            messageReadJdbcTemplate.queryForObject(
+        return DataAccessUtils.singleResult(
+            messageReadJdbcTemplate.query(
                 AUDIT_SQL,
                 ROW_MAPPER,
                 cutoffTimestamp,
                 cutoffTimestamp,
                 cutoffTimestamp,
                 cutoffTimestamp,
-            ) ?: RoomSeqGapAuditSummary.ZERO
-        } catch (e: EmptyResultDataAccessException) {
-            RoomSeqGapAuditSummary.ZERO
-        }
+            ),
+        ) ?: RoomSeqGapAuditSummary.ZERO
     }
 
     private companion object {

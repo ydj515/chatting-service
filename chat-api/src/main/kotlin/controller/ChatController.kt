@@ -83,17 +83,14 @@ class ChatController(
     fun getMessagesByCursor(
         @CurrentUserId authenticatedUserId: Long,
         @PathVariable id: Long,
-        @RequestParam(required = false) cursor: Long?,
-        @RequestParam(required = false) cursorToken: String?,
-        @RequestParam(required = false) limit: Int?,
-        @RequestParam(required = false) direction: MessageDirection?,
+        @ModelAttribute parameters: MessageCursorParameters,
     ): ResponseEntity<MessagePageResponse> {
         val request = MessagePageRequest(
             chatRoomId = id,
-            cursor = cursor,
-            cursorToken = parseCursorToken(cursorToken),
-            limit = boundedMessageLimit(limit),
-            direction = direction ?: messagePaginationProperties.defaultDirection,
+            cursor = parameters.cursor,
+            cursorToken = parseCursorToken(parameters.cursorToken),
+            limit = boundedMessageLimit(parameters.limit),
+            direction = parameters.direction ?: messagePaginationProperties.defaultDirection,
         )
         val response = chatService.getMessagesByCursor(request, authenticatedUserId)
         return ResponseEntity.ok(response)
@@ -136,3 +133,10 @@ class ChatController(
         return cursorToken
     }
 }
+
+data class MessageCursorParameters(
+    val cursor: Long? = null,
+    val cursorToken: String? = null,
+    val limit: Int? = null,
+    val direction: MessageDirection? = null,
+)

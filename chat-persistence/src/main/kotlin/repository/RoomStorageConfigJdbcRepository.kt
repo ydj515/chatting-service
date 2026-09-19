@@ -6,8 +6,9 @@ import com.chat.persistence.service.RoomShardConfig
 import com.chat.persistence.service.RoomStorageConfigReader
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.cache.annotation.Cacheable
-import org.springframework.dao.EmptyResultDataAccessException
+import org.springframework.dao.support.DataAccessUtils
 import org.springframework.jdbc.core.JdbcTemplate
+import org.springframework.jdbc.core.SingleColumnRowMapper
 import org.springframework.stereotype.Repository
 
 @Repository
@@ -15,23 +16,19 @@ class RoomStorageConfigJdbcRepository(
     @Qualifier("jdbcTemplate")
     private val jdbcTemplate: JdbcTemplate,
 ) : RoomStorageConfigReader, RoomAdmissionPolicyReader {
-    // queryForObject can return SQL NULL; retain the fallback despite generic type inference.
-    @Suppress("UnnecessarySafeCall")
     override fun currentShardCount(roomId: Long): Int =
-        try {
-            jdbcTemplate.queryForObject(
+        DataAccessUtils.singleResult(
+            jdbcTemplate.query(
                 SELECT_CURRENT_SHARD_COUNT_SQL,
-                Int::class.java,
+                SingleColumnRowMapper(Int::class.java),
                 roomId,
-            )?.coerceAtLeast(MIN_SHARD_COUNT) ?: DEFAULT_SHARD_COUNT
-        } catch (e: EmptyResultDataAccessException) {
-            DEFAULT_SHARD_COUNT
-        }
+            ),
+        )?.coerceAtLeast(MIN_SHARD_COUNT) ?: DEFAULT_SHARD_COUNT
 
     @Cacheable(value = ["roomShardConfigs"], key = "#roomId")
-    override fun shardConfig(roomId: Long): RoomShardConfig =
-        try {
-            val config = jdbcTemplate.queryForObject(
+    override fun shardConfig(roomId: Long): RoomShardConfig {
+        val config = DataAccessUtils.singleResult(
+            jdbcTemplate.query(
                 SELECT_SHARD_CONFIG_SQL,
                 { rs, _ ->
                     RoomShardConfig(
@@ -40,16 +37,15 @@ class RoomStorageConfigJdbcRepository(
                     )
                 },
                 roomId,
-            ) ?: RoomShardConfig()
-            config.sanitized()
-        } catch (e: EmptyResultDataAccessException) {
-            RoomShardConfig()
-        }
+            ),
+        ) ?: RoomShardConfig()
+        return config.sanitized()
+    }
 
     @Cacheable(value = ["roomAdmissionPolicies"], key = "#roomId")
     override fun admissionPolicy(roomId: Long): RoomAdmissionPolicy =
-        try {
-            jdbcTemplate.queryForObject(
+        DataAccessUtils.singleResult(
+            jdbcTemplate.query(
                 SELECT_ADMISSION_POLICY_SQL,
                 { rs, _ ->
                     RoomAdmissionPolicy(
@@ -60,10 +56,8 @@ class RoomStorageConfigJdbcRepository(
                     )
                 },
                 roomId,
-            ) ?: RoomAdmissionPolicy()
-        } catch (e: EmptyResultDataAccessException) {
-            RoomAdmissionPolicy()
-        }
+            ),
+        ) ?: RoomAdmissionPolicy()
 
     private fun RoomShardConfig.sanitized(): RoomShardConfig =
         copy(

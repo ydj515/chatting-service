@@ -96,24 +96,34 @@ class ChatServiceImplMembershipEventTest {
 
         return ChatServiceImpl(
             chatRoomRepository = chatRoomRepository,
-            messageRepository = messageRepository,
             messageReadPort = JpaMessageReadAdapter(messageRepository),
             chatRoomMemberRepository = chatRoomMemberRepository,
             userRepository = userRepository,
-            redisMessageBroker = redisMessageBroker,
-            messageSequenceService = MessageSequenceService(
-                redisTemplate = redisTemplate,
-                redisProperties = redisProperties,
-                sequenceProperties = MessageSequenceProperties(),
+            messageSendingService = MessageSendingService(
+                chatRoomRepository = chatRoomRepository,
+                userRepository = userRepository,
+                chatRoomMemberRepository = chatRoomMemberRepository,
+                messageReadPort = JpaMessageReadAdapter(messageRepository),
+                messageSendPolicy = MessageSendPolicy(
+                    userSanctionPolicyService = UserSanctionPolicyService.Noop,
+                    messageModerationPolicyService = MessageModerationPolicyService.Noop,
+                    messageAdmissionPolicyService = MessageAdmissionPolicyService.Noop,
+                ),
+                messageStreamPublisher = MessageStreamPublisher(
+                    messageSequenceService = MessageSequenceService(
+                        redisTemplate = redisTemplate,
+                        redisProperties = redisProperties,
+                        sequenceProperties = MessageSequenceProperties(),
+                    ),
+                    roomStorageConfigReader = TestRoomStorageConfigReader,
+                    messageStreamProducer = mock(MessageStreamProducer::class.java),
+                    roomTrafficStatsService = RoomTrafficStatsService.Noop,
+                ),
             ),
-            messagePersistenceService = MessagePersistenceService(messageRepository),
-            webSocketSessionManager = webSocketSessionManager,
-            messageStreamProducer = mock(MessageStreamProducer::class.java),
-            messageAdmissionPolicyService = MessageAdmissionPolicyService.Noop,
-            roomTrafficStatsService = RoomTrafficStatsService.Noop,
-            roomStorageConfigReader = TestRoomStorageConfigReader,
-            messageModerationPolicyService = MessageModerationPolicyService.Noop,
-            userSanctionPolicyService = UserSanctionPolicyService.Noop,
+            membershipEventPublisher = MembershipEventPublisher(
+                redisMessageBroker = redisMessageBroker,
+                webSocketSessionManager = webSocketSessionManager,
+            ),
         )
     }
 

@@ -23,6 +23,14 @@ class HmacSessionTokenService(
     private val clock: Clock,
     private val revocationStore: SessionTokenRevocationStore,
 ) : SessionTokenService {
+    init {
+        require(
+            authProperties.session.secret.isNotBlank() &&
+                authProperties.session.secret.toByteArray(StandardCharsets.UTF_8).size >= 32 &&
+                authProperties.session.secret != "local-development-session-secret-change-me",
+        ) { "Configure CHAT_AUTH_SESSION_SECRET with an independent signing key of at least 32 bytes" }
+    }
+
     private val encoder = Base64.getUrlEncoder().withoutPadding()
     private val decoder = Base64.getUrlDecoder()
 
@@ -90,6 +98,10 @@ class HmacSessionTokenService(
         val payload = runCatching {
             String(decoder.decode(encodedPayload), StandardCharsets.UTF_8)
         }.getOrNull() ?: return null
+        return parseClaims(payload)
+    }
+
+    private fun parseClaims(payload: String): TokenClaims? {
         val payloadParts = payload.split(':')
         if (payloadParts.size != 3 && payloadParts.size != 4) {
             return null

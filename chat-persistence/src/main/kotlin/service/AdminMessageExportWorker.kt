@@ -9,6 +9,7 @@ import com.chat.persistence.config.ChatObjectStorageProperties
 import com.chat.persistence.config.ChatWorkerProperties
 import com.chat.persistence.repository.AdminExportJobRecord
 import com.chat.persistence.repository.AdminExportJobRepository
+import com.chat.persistence.repository.AdminMessageQuery
 import com.chat.persistence.repository.AdminMessageRepository
 import com.chat.persistence.storage.ObjectStoragePort
 import com.chat.persistence.storage.ObjectUploadRequest
@@ -73,14 +74,16 @@ class AdminMessageExportWorker(
         val query = request.query?.trim().orEmpty()
         if (query.isNotEmpty()) {
             return messageRepository.searchMessages(
-                query = query,
-                searchMode = AdminMessageSearchMode.FTS,
-                roomId = request.roomId,
-                from = request.from,
-                to = request.to,
-                senderId = request.senderId,
-                cursor = cursor,
-                limit = limit,
+                AdminMessageQuery(
+                    query = query,
+                    searchMode = AdminMessageSearchMode.FTS,
+                    roomId = request.roomId,
+                    from = request.from,
+                    to = request.to,
+                    senderId = request.senderId,
+                    cursor = cursor,
+                    limit = limit,
+                ),
             )
         }
 
@@ -105,19 +108,14 @@ class AdminMessageExportWorker(
         }
         var exportedRows = job.exportedRows.coerceAtLeast(0)
         var cursor = AdminMessageCursorCodec.decode(job.cursorToken)
-        val openOptions = if (appendToCheckpoint) {
-            arrayOf(StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.APPEND)
-        } else {
-            arrayOf(StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING)
-        }
-
-        Files.newBufferedWriter(output, StandardCharsets.UTF_8, *openOptions).use { writer ->
+        openWriter(output, appendToCheckpoint).use { writer ->
             if (!appendToCheckpoint) {
                 writer.appendLine(csvHeader())
             }
             val chunkLimit = exportChunkSize.coerceIn(1, EXPORT_MAX_ROWS)
 
-            while (exportedRows < EXPORT_MAX_ROWS) {
+            var hasMore = true
+            while (exportedRows < EXPORT_MAX_ROWS && hasMore) {
                 val limit = minOf(chunkLimit, EXPORT_MAX_ROWS - exportedRows)
                 val chunk = readMessagesChunk(request, cursor, limit)
                 if (chunk.isEmpty()) {
@@ -137,9 +135,7 @@ class AdminMessageExportWorker(
                     outputUri = outputUri,
                 )
 
-                if (chunk.size < limit) {
-                    break
-                }
+                hasMore = chunk.size == limit
             }
         }
 
@@ -149,6 +145,13 @@ class AdminMessageExportWorker(
             exportedRows = exportedRows,
         )
     }
+
+    private fun openWriter(output: Path, append: Boolean): java.io.BufferedWriter =
+        if (append) {
+            Files.newBufferedWriter(output, StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.APPEND)
+        } else {
+            Files.newBufferedWriter(output, StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING)
+        }
 
     private fun adminExportObjectKey(jobId: String): String {
         val safeJobId = jobId.replace(Regex("[^A-Za-z0-9._-]"), "_")

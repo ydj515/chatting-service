@@ -15,6 +15,8 @@ interface MessageReadPort {
 
     fun findGapMessages(roomId: Long, afterSeq: Long, limit: Int): List<MessageDto>
 
+    fun findLatestMessagesByRooms(roomIds: Collection<Long>): Map<Long, MessageDto>
+
     fun findLatestMessage(roomId: Long): MessageDto?
 
     fun findByClientMessageId(roomId: Long, senderId: Long, clientMessageId: String): MessageDto?

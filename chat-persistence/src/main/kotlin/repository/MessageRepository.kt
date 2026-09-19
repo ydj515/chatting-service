@@ -10,6 +10,19 @@ import java.util.Optional
 
 @Repository
 interface MessageRepository : JpaRepository<Message, Long> {
+    @Query(
+        """
+        SELECT m FROM Message m JOIN FETCH m.sender JOIN FETCH m.chatRoom
+        WHERE m.chatRoom.id IN :roomIds AND m.isDeleted = false AND NOT EXISTS (
+            SELECT newer.id FROM Message newer WHERE newer.chatRoom.id = m.chatRoom.id AND newer.isDeleted = false AND (
+                CASE WHEN newer.roomSeq > 0 THEN newer.roomSeq ELSE newer.sequenceNumber END > CASE WHEN m.roomSeq > 0 THEN m.roomSeq ELSE m.sequenceNumber END
+                OR (CASE WHEN newer.roomSeq > 0 THEN newer.roomSeq ELSE newer.sequenceNumber END = CASE WHEN m.roomSeq > 0 THEN m.roomSeq ELSE m.sequenceNumber END AND newer.id > m.id)
+            )
+        )
+    """,
+    )
+    fun findLatestMessagesByRooms(roomIds: Collection<Long>): List<Message>
+
     fun findByMessageId(messageId: String): Optional<Message>
 
     @Query(

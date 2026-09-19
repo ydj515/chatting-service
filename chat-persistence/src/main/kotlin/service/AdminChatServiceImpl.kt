@@ -18,6 +18,7 @@ import com.chat.domain.service.AdminChatService
 import com.chat.persistence.config.ChatObjectStorageProperties
 import com.chat.persistence.repository.AdminAuditLogRepository
 import com.chat.persistence.repository.AdminExportJobRepository
+import com.chat.persistence.repository.AdminMessageQuery
 import com.chat.persistence.repository.AdminMessageRepository
 import com.chat.persistence.storage.ObjectStoragePort
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -69,14 +70,16 @@ class AdminChatServiceImpl(
         var response: AdminMessageSearchResponse
         val elapsedNanos = measureNanoTime {
             val rows = messageRepository.searchMessages(
-                query = request.query,
-                searchMode = request.searchMode,
-                roomId = request.roomId,
-                from = request.from,
-                to = request.to,
-                senderId = request.senderId,
-                cursor = AdminMessageSearchCursorCodec.decode(request.cursor),
-                limit = request.limit + 1,
+                AdminMessageQuery(
+                    query = request.query,
+                    searchMode = request.searchMode,
+                    roomId = request.roomId,
+                    from = request.from,
+                    to = request.to,
+                    senderId = request.senderId,
+                    cursor = AdminMessageSearchCursorCodec.decode(request.cursor),
+                    limit = request.limit + 1,
+                ),
             )
             val messages = rows.take(request.limit)
             response = AdminMessageSearchResponse(

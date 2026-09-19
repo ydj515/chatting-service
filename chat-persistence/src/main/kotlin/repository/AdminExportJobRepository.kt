@@ -2,7 +2,7 @@ package com.chat.persistence.repository
 
 import com.chat.domain.dto.AdminExportJobDto
 import org.springframework.beans.factory.annotation.Qualifier
-import org.springframework.dao.EmptyResultDataAccessException
+import org.springframework.dao.support.DataAccessUtils
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.jdbc.core.RowMapper
 import org.springframework.stereotype.Repository
@@ -73,8 +73,8 @@ class AdminExportJobRepository(
     }
 
     fun claimNextPending(workerId: String): AdminExportJobRecord? =
-        try {
-            jdbcTemplate.queryForObject(
+        DataAccessUtils.singleResult(
+            jdbcTemplate.query(
                 """
                 UPDATE admin_message_export_jobs
                 SET
@@ -100,14 +100,12 @@ class AdminExportJobRepository(
                 """.trimIndent(),
                 exportJobRowMapper,
                 workerId,
-            )
-        } catch (e: EmptyResultDataAccessException) {
-            null
-        }
+            ),
+        )
 
     fun findById(jobId: String): AdminExportJobStatusRecord? =
-        try {
-            jdbcTemplate.queryForObject(
+        DataAccessUtils.singleResult(
+            jdbcTemplate.query(
                 """
                 SELECT
                     job_id,
@@ -124,10 +122,8 @@ class AdminExportJobRepository(
                 """.trimIndent(),
                 exportJobStatusRowMapper,
                 jobId,
-            )
-        } catch (e: EmptyResultDataAccessException) {
-            null
-        }
+            ),
+        )
 
     fun updateCheckpoint(
         jobId: String,

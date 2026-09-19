@@ -13,6 +13,8 @@ dependencyManagement {
 }
 
 dependencies {
+    testImplementation(libs.archunit)
+    testImplementation(project(":chat-admin"))
     // 모든 하위 모듈 포함 (조립자 역할)
     implementation(project(":chat-runtime-config"))
     implementation(project(":chat-api"))
@@ -31,3 +33,15 @@ dependencies {
     runtimeOnly(libs.postgresql)
     runtimeOnly(libs.h2)
 }
+
+val architectureTest by tasks.registering(Test::class) {
+    group = "verification"
+    description = "Checks production module boundaries and transaction ownership."
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+    useJUnitPlatform()
+    filter { includeTestsMatching("*ArchitectureTest") }
+}
+
+tasks.named<Test>("test") { exclude("**/*ArchitectureTest*") }
+tasks.named("check") { dependsOn(architectureTest) }

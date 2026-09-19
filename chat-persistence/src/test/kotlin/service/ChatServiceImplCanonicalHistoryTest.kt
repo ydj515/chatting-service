@@ -14,7 +14,6 @@ import com.chat.persistence.redis.MessageStreamProducer
 import com.chat.persistence.redis.RedisMessageBroker
 import com.chat.persistence.repository.ChatRoomMemberRepository
 import com.chat.persistence.repository.ChatRoomRepository
-import com.chat.persistence.repository.MessageRepository
 import com.chat.persistence.repository.UserRepository
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
@@ -148,7 +147,6 @@ class ChatServiceImplCanonicalHistoryTest {
             redisProperties = redisProperties,
         )
         val chatRoomMemberRepository = mock(ChatRoomMemberRepository::class.java)
-        val messageRepository = mock(MessageRepository::class.java)
         val webSocketSessionManager = WebSocketSessionManager(
             redisTemplate = redisTemplate,
             objectMapper = objectMapper,
@@ -162,24 +160,34 @@ class ChatServiceImplCanonicalHistoryTest {
         return Fixture(
             chatService = ChatServiceImpl(
                 chatRoomRepository = mock(ChatRoomRepository::class.java),
-                messageRepository = messageRepository,
                 messageReadPort = readPort,
                 chatRoomMemberRepository = chatRoomMemberRepository,
                 userRepository = mock(UserRepository::class.java),
-                redisMessageBroker = redisMessageBroker,
-                messageSequenceService = MessageSequenceService(
-                    redisTemplate = redisTemplate,
-                    redisProperties = redisProperties,
-                    sequenceProperties = MessageSequenceProperties(),
+                messageSendingService = MessageSendingService(
+                    chatRoomRepository = mock(ChatRoomRepository::class.java),
+                    userRepository = mock(UserRepository::class.java),
+                    chatRoomMemberRepository = chatRoomMemberRepository,
+                    messageReadPort = readPort,
+                    messageSendPolicy = MessageSendPolicy(
+                        userSanctionPolicyService = UserSanctionPolicyService.Noop,
+                        messageModerationPolicyService = MessageModerationPolicyService.Noop,
+                        messageAdmissionPolicyService = MessageAdmissionPolicyService.Noop,
+                    ),
+                    messageStreamPublisher = MessageStreamPublisher(
+                        messageSequenceService = MessageSequenceService(
+                            redisTemplate = redisTemplate,
+                            redisProperties = redisProperties,
+                            sequenceProperties = MessageSequenceProperties(),
+                        ),
+                        roomStorageConfigReader = TestRoomStorageConfigReader,
+                        messageStreamProducer = mock(MessageStreamProducer::class.java),
+                        roomTrafficStatsService = RoomTrafficStatsService.Noop,
+                    ),
                 ),
-                messagePersistenceService = MessagePersistenceService(messageRepository),
-                webSocketSessionManager = webSocketSessionManager,
-                messageStreamProducer = mock(MessageStreamProducer::class.java),
-                messageAdmissionPolicyService = MessageAdmissionPolicyService.Noop,
-                roomTrafficStatsService = RoomTrafficStatsService.Noop,
-                roomStorageConfigReader = TestRoomStorageConfigReader,
-                messageModerationPolicyService = MessageModerationPolicyService.Noop,
-                userSanctionPolicyService = UserSanctionPolicyService.Noop,
+                membershipEventPublisher = MembershipEventPublisher(
+                    redisMessageBroker = redisMessageBroker,
+                    webSocketSessionManager = webSocketSessionManager,
+                ),
             ),
             chatRoomMemberRepository = chatRoomMemberRepository,
         )
@@ -252,6 +260,8 @@ class ChatServiceImplCanonicalHistoryTest {
             calls += "gap:$roomId:$afterSeq:$limit"
             return gap
         }
+
+        override fun findLatestMessagesByRooms(roomIds: Collection<Long>): Map<Long, MessageDto> = emptyMap()
 
         override fun findLatestMessage(roomId: Long): MessageDto? = null
 

@@ -1,4 +1,6 @@
 [versions]
+kover = "0.9.1"
+archunit = "1.4.1"
 detekt = "1.23.8"
 ktlint = "1.5.0"
 ktlintGradle = "13.1.0"
@@ -8,6 +10,7 @@ springDependencyManagement = "1.1.6"
 awsSdk = "2.25.70"
 
 [libraries]
+archunit = { module = "com.tngtech.archunit:archunit-junit5", version.ref = "archunit" }
 # Spring Boot BOM
 spring-boot-dependencies = { group = "org.springframework.boot", name = "spring-boot-dependencies", version.ref = "springBoot" }
 
@@ -45,6 +48,7 @@ micrometer-registry-prometheus = { group = "io.micrometer", name = "micrometer-r
 junit-platform-launcher = { group = "org.junit.platform", name = "junit-platform-launcher" }
 
 [plugins]
+kover = { id = "org.jetbrains.kotlinx.kover", version.ref = "kover" }
 detekt = { id = "io.gitlab.arturbosch.detekt", version.ref = "detekt" }
 ktlint = { id = "org.jlleitschuh.gradle.ktlint", version.ref = "ktlintGradle" }
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }

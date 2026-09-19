@@ -115,7 +115,7 @@ chat:
       latest-history-max-replica-lag: ${CHAT_DATASOURCE_READ_LATEST_HISTORY_MAX_REPLICA_LAG:2s}
   auth:
     session:
-      secret: ${CHAT_AUTH_SESSION_SECRET:local-development-session-secret-change-me}
+      secret: ${CHAT_AUTH_SESSION_SECRET:}
       ttl: ${CHAT_AUTH_SESSION_TTL:12h}
       token-query-param: ${CHAT_AUTH_SESSION_TOKEN_QUERY_PARAM:token}
       revocation-key-prefix: ${CHAT_AUTH_SESSION_REVOCATION_KEY_PREFIX:chat:auth:session:revoked:}

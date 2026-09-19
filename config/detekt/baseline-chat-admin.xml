@@ -2,8 +2,6 @@
 <SmellBaseline>
   <ManuallySuppressedIssues />
   <CurrentIssues>
-    <ID>LongParameterList:AdminChatController.kt$AdminChatController$( @RequestHeader(ADMIN_TOKEN_HEADER, required = false) adminToken: String?, @PathVariable roomId: Long, @RequestParam(required = false) from: String?, @RequestParam(required = false) to: String?, @RequestParam(required = false) cursor: String?, @RequestParam(required = false) limit: Int?, )</ID>
-    <ID>LongParameterList:AdminChatController.kt$AdminChatController$( @RequestHeader(ADMIN_TOKEN_HEADER, required = false) adminToken: String?, @RequestParam("q", required = false, defaultValue = "") query: String, @RequestParam(required = false) roomId: Long?, @RequestParam(required = false) from: String?, @RequestParam(required = false) to: String?, @RequestParam(required = false) senderId: Long?, @RequestParam(required = false) mode: String?, @RequestParam(required = false) cursor: String?, @RequestParam(required = false) limit: Int?, )</ID>
     <ID>SpreadOperator:WebConfig.kt$WebConfig$(*corsProperties.allowedHeaders.toTypedArray())</ID>
     <ID>SpreadOperator:WebConfig.kt$WebConfig$(*corsProperties.allowedMethods.toTypedArray())</ID>
     <ID>SpreadOperator:WebConfig.kt$WebConfig$(*corsProperties.allowedOrigins.toTypedArray())</ID>

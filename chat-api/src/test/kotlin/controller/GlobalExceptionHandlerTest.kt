@@ -223,6 +223,8 @@ class GlobalExceptionHandlerTest {
             throw MessageModerationRejectedException("message blocked by moderation policy")
 
         @GetMapping("/test/server-error")
-        fun serverError(): String = throw RuntimeException("database password leaked in stack trace")
+        fun serverError(): String = throw TestInfrastructureException()
     }
+
+    private class TestInfrastructureException : RuntimeException("database password leaked in stack trace")
 }

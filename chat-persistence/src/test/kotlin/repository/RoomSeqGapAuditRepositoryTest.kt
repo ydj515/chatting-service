@@ -8,7 +8,6 @@ import org.mockito.ArgumentMatchers.eq
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
-import org.springframework.dao.EmptyResultDataAccessException
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.jdbc.core.RowMapper
 import java.sql.ResultSet
@@ -30,7 +29,7 @@ class RoomSeqGapAuditRepositoryTest {
         val sqlCaptor = ArgumentCaptor.forClass(String::class.java)
         val rowMapperCaptor = summaryRowMapperCaptor()
         `when`(
-            jdbcTemplate.queryForObject(
+            jdbcTemplate.query(
                 captureString(sqlCaptor),
                 captureSummaryRowMapper(rowMapperCaptor),
                 eq(Timestamp.from(cutoff)),
@@ -38,7 +37,7 @@ class RoomSeqGapAuditRepositoryTest {
                 eq(Timestamp.from(cutoff)),
                 eq(Timestamp.from(cutoff)),
             ),
-        ).thenReturn(expected)
+        ).thenReturn(listOf(expected))
 
         val summary = repository.auditSince(cutoff)
 
@@ -60,7 +59,7 @@ class RoomSeqGapAuditRepositoryTest {
         val repository = RoomSeqGapAuditRepository(jdbcTemplate)
         val sqlCaptor = ArgumentCaptor.forClass(String::class.java)
         `when`(
-            jdbcTemplate.queryForObject(
+            jdbcTemplate.query(
                 captureString(sqlCaptor),
                 anySummaryRowMapper(),
                 anyTimestamp(),
@@ -68,7 +67,7 @@ class RoomSeqGapAuditRepositoryTest {
                 anyTimestamp(),
                 anyTimestamp(),
             ),
-        ).thenReturn(RoomSeqGapAuditSummary(1, 1, 1, 1))
+        ).thenReturn(listOf(RoomSeqGapAuditSummary(1, 1, 1, 1)))
 
         repository.auditSince(Instant.parse("2026-06-27T10:15:30Z"))
 
@@ -85,7 +84,7 @@ class RoomSeqGapAuditRepositoryTest {
         val repository = RoomSeqGapAuditRepository(jdbcTemplate)
         val rowMapperCaptor = summaryRowMapperCaptor()
         `when`(
-            jdbcTemplate.queryForObject(
+            jdbcTemplate.query(
                 anyString(),
                 captureSummaryRowMapper(rowMapperCaptor),
                 anyTimestamp(),
@@ -93,7 +92,7 @@ class RoomSeqGapAuditRepositoryTest {
                 anyTimestamp(),
                 anyTimestamp(),
             ),
-        ).thenReturn(RoomSeqGapAuditSummary(0, 0, 0, 0))
+        ).thenReturn(listOf(RoomSeqGapAuditSummary(0, 0, 0, 0)))
 
         repository.auditSince(Instant.parse("2026-06-27T10:15:30Z"))
 
@@ -119,7 +118,7 @@ class RoomSeqGapAuditRepositoryTest {
         val jdbcTemplate = mock(JdbcTemplate::class.java)
         val repository = RoomSeqGapAuditRepository(jdbcTemplate)
         `when`(
-            jdbcTemplate.queryForObject(
+            jdbcTemplate.query(
                 anyString(),
                 anySummaryRowMapper(),
                 anyTimestamp(),
@@ -128,12 +127,12 @@ class RoomSeqGapAuditRepositoryTest {
                 anyTimestamp(),
             ),
         )
-            .thenThrow(EmptyResultDataAccessException(1))
+            .thenReturn(emptyList())
 
         val summary = repository.auditSince(Instant.parse("2026-06-27T10:15:30Z"))
 
         assertEquals(RoomSeqGapAuditSummary(0, 0, 0, 0), summary)
-        verify(jdbcTemplate).queryForObject(
+        verify(jdbcTemplate).query(
             anyString(),
             anySummaryRowMapper(),
             anyTimestamp(),

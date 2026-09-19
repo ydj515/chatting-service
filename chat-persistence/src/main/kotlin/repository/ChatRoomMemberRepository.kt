@@ -19,6 +19,13 @@ interface ChatRoomMemberRepository : CrudRepository<ChatRoomMember, Long> {
     @Query("SELECT COUNT(crm) FROM ChatRoomMember crm WHERE crm.chatRoom.id = :chatRoomId AND crm.isActive = true")
     fun countActiveMembersInRoom(chatRoomId: Long): Long
 
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("UPDATE ChatRoomMember m SET m.isActive = true, m.role = com.chat.domain.model.MemberRole.MEMBER, m.leftAt = null, m.joinedAt = CURRENT_TIMESTAMP WHERE m.chatRoom.id = :roomId AND m.user.id = :userId AND m.isActive = false")
+    fun reactivateMembership(roomId: Long, userId: Long): Int
+
+    @Query("SELECT m.chatRoom.id AS roomId, COUNT(m) AS memberCount FROM ChatRoomMember m WHERE m.chatRoom.id IN :roomIds AND m.isActive = true GROUP BY m.chatRoom.id")
+    fun countActiveMembersByRooms(roomIds: Collection<Long>): List<RoomMemberCount>
+
     @Modifying
     @Query(
         """
@@ -36,4 +43,9 @@ interface ChatRoomMemberRepository : CrudRepository<ChatRoomMember, Long> {
      */
 
     fun existsByChatRoomIdAndUserIdAndIsActiveTrue(chatRoomId: Long, userId: Long): Boolean
+}
+
+interface RoomMemberCount {
+    val roomId: Long
+    val memberCount: Long
 }

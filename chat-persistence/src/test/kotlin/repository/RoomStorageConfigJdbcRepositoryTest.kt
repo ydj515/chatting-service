@@ -2,11 +2,13 @@ package com.chat.persistence.repository
 
 import com.chat.persistence.service.RoomShardConfig
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentMatchers.eq
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.`when`
-import org.springframework.dao.EmptyResultDataAccessException
+import org.springframework.dao.DataAccessResourceFailureException
+import org.springframework.dao.IncorrectResultSizeDataAccessException
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.jdbc.core.RowMapper
 
@@ -15,7 +17,7 @@ class RoomStorageConfigJdbcRepositoryTest {
     fun `currentShardCount는 room_storage_configs의 current_shard_count를 반환한다`() {
         val jdbcTemplate = mock(JdbcTemplate::class.java)
         val repository = RoomStorageConfigJdbcRepository(jdbcTemplate)
-        `when`(jdbcTemplate.queryForObject(anyString(), eq(Int::class.java), eq(10L))).thenReturn(16)
+        `when`(jdbcTemplate.query(anyString(), anyIntRowMapper(), eq(10L))).thenReturn(listOf(16))
 
         val shardCount = repository.currentShardCount(10L)
 
@@ -26,8 +28,8 @@ class RoomStorageConfigJdbcRepositoryTest {
     fun `currentShardCount는 config row가 없으면 1로 fallback한다`() {
         val jdbcTemplate = mock(JdbcTemplate::class.java)
         val repository = RoomStorageConfigJdbcRepository(jdbcTemplate)
-        `when`(jdbcTemplate.queryForObject(anyString(), eq(Int::class.java), eq(10L)))
-            .thenThrow(EmptyResultDataAccessException(1))
+        `when`(jdbcTemplate.query(anyString(), anyIntRowMapper(), eq(10L)))
+            .thenReturn(emptyList())
 
         val shardCount = repository.currentShardCount(10L)
 
@@ -38,7 +40,7 @@ class RoomStorageConfigJdbcRepositoryTest {
     fun `currentShardCount는 1보다 작은 값이면 1로 보정한다`() {
         val jdbcTemplate = mock(JdbcTemplate::class.java)
         val repository = RoomStorageConfigJdbcRepository(jdbcTemplate)
-        `when`(jdbcTemplate.queryForObject(anyString(), eq(Int::class.java), eq(10L))).thenReturn(0)
+        `when`(jdbcTemplate.query(anyString(), anyIntRowMapper(), eq(10L))).thenReturn(listOf(0))
 
         val shardCount = repository.currentShardCount(10L)
 
@@ -49,8 +51,8 @@ class RoomStorageConfigJdbcRepositoryTest {
     fun `shardConfig는 current와 fanout shard count를 함께 반환한다`() {
         val jdbcTemplate = mock(JdbcTemplate::class.java)
         val repository = RoomStorageConfigJdbcRepository(jdbcTemplate)
-        `when`(jdbcTemplate.queryForObject(anyString(), anyShardConfigRowMapper(), eq(10L)))
-            .thenReturn(RoomShardConfig(writeShardCount = 16, fanoutShardCount = 64))
+        `when`(jdbcTemplate.query(anyString(), anyShardConfigRowMapper(), eq(10L)))
+            .thenReturn(listOf(RoomShardConfig(writeShardCount = 16, fanoutShardCount = 64)))
 
         val config = repository.shardConfig(10L)
 
@@ -62,8 +64,8 @@ class RoomStorageConfigJdbcRepositoryTest {
     fun `shardConfig는 config row가 없으면 1과 1로 fallback한다`() {
         val jdbcTemplate = mock(JdbcTemplate::class.java)
         val repository = RoomStorageConfigJdbcRepository(jdbcTemplate)
-        `when`(jdbcTemplate.queryForObject(anyString(), anyShardConfigRowMapper(), eq(10L)))
-            .thenThrow(EmptyResultDataAccessException(1))
+        `when`(jdbcTemplate.query(anyString(), anyShardConfigRowMapper(), eq(10L)))
+            .thenReturn(emptyList())
 
         val config = repository.shardConfig(10L)
 
@@ -75,13 +77,36 @@ class RoomStorageConfigJdbcRepositoryTest {
     fun `shardConfig는 1보다 작은 값을 1로 보정한다`() {
         val jdbcTemplate = mock(JdbcTemplate::class.java)
         val repository = RoomStorageConfigJdbcRepository(jdbcTemplate)
-        `when`(jdbcTemplate.queryForObject(anyString(), anyShardConfigRowMapper(), eq(10L)))
-            .thenReturn(RoomShardConfig(writeShardCount = 0, fanoutShardCount = -5))
+        `when`(jdbcTemplate.query(anyString(), anyShardConfigRowMapper(), eq(10L)))
+            .thenReturn(listOf(RoomShardConfig(writeShardCount = 0, fanoutShardCount = -5)))
 
         val config = repository.shardConfig(10L)
 
         assertEquals(1, config.writeShardCount)
         assertEquals(1, config.fanoutShardCount)
+    }
+
+    @Test
+    fun `duplicate configuration rows are not treated as a missing configuration`() {
+        val jdbcTemplate = mock(JdbcTemplate::class.java)
+        `when`(jdbcTemplate.query(anyString(), anyIntRowMapper(), eq(10L))).thenReturn(listOf(1, 2))
+        assertThrows(IncorrectResultSizeDataAccessException::class.java) {
+            RoomStorageConfigJdbcRepository(jdbcTemplate).currentShardCount(10L)
+        }
+    }
+
+    @Test
+    fun `database failures are not treated as a missing configuration`() {
+        val jdbcTemplate = mock(JdbcTemplate::class.java)
+        `when`(jdbcTemplate.query(anyString(), anyIntRowMapper(), eq(10L))).thenThrow(DataAccessResourceFailureException("unavailable"))
+        assertThrows(DataAccessResourceFailureException::class.java) {
+            RoomStorageConfigJdbcRepository(jdbcTemplate).currentShardCount(10L)
+        }
+    }
+
+    private fun anyIntRowMapper(): RowMapper<Int> {
+        org.mockito.ArgumentMatchers.any<RowMapper<Int>>()
+        return uninitialized()
     }
 
     private fun anyString(): String {

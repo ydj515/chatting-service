@@ -10,11 +10,9 @@ import com.chat.domain.dto.UserSanctionType
 import com.chat.domain.service.AdminModerationService
 import com.chat.domain.service.SessionControlPublisher
 import com.chat.domain.service.SessionTokenService
-import com.chat.persistence.repository.AdminAuditLogRepository
 import com.chat.persistence.repository.ModerationRuleJdbcRepository
 import com.chat.persistence.repository.UserSanctionJdbcRepository
 import com.chat.persistence.repository.UserSanctionRecord
-import com.fasterxml.jackson.databind.ObjectMapper
 import org.springframework.cache.CacheManager
 import org.springframework.cache.annotation.CacheEvict
 import org.springframework.stereotype.Service
@@ -27,8 +25,7 @@ import java.time.Instant
 class AdminModerationServiceImpl(
     private val ruleRepository: ModerationRuleJdbcRepository,
     private val sanctionRepository: UserSanctionJdbcRepository,
-    private val auditLogRepository: AdminAuditLogRepository,
-    private val objectMapper: ObjectMapper,
+    private val auditRecorder: AdminAuditRecorder,
     private val sessionTokenService: SessionTokenService,
     private val sessionControlPublisher: SessionControlPublisher,
     private val cacheManager: CacheManager,
@@ -44,7 +41,7 @@ class AdminModerationServiceImpl(
     ): AdminModerationRuleDto {
         validateRuleRequest(request.scopeType, request.roomId, request.pattern)
         val record = ruleRepository.create(actor, request)
-        audit(actor, "ADMIN_MODERATION_RULE_CREATED", "MODERATION_RULE", "rule:${record.id}", request)
+        auditRecorder.record(actor, "ADMIN_MODERATION_RULE_CREATED", "MODERATION_RULE", "rule:${record.id}", request)
         return record.toDto()
     }
 
@@ -58,7 +55,7 @@ class AdminModerationServiceImpl(
         require(request.pattern?.isBlank() != true) { "pattern must not be blank" }
 
         val record = ruleRepository.update(ruleId, request)
-        audit(actor, "ADMIN_MODERATION_RULE_UPDATED", "MODERATION_RULE", "rule:${record.id}", request)
+        auditRecorder.record(actor, "ADMIN_MODERATION_RULE_UPDATED", "MODERATION_RULE", "rule:${record.id}", request)
         return record.toDto()
     }
 
@@ -66,7 +63,7 @@ class AdminModerationServiceImpl(
     @CacheEvict(value = ["moderationRules"], allEntries = true)
     override fun disableRule(actor: String, ruleId: Long): AdminModerationRuleDto {
         val record = ruleRepository.disable(ruleId)
-        audit(
+        auditRecorder.record(
             actor,
             "ADMIN_MODERATION_RULE_DISABLED",
             "MODERATION_RULE",
@@ -83,7 +80,7 @@ class AdminModerationServiceImpl(
     override fun createSanction(actor: String, request: AdminCreateUserSanctionRequest): AdminUserSanctionDto {
         validateSanctionRequest(request)
         val record = sanctionRepository.create(actor, request)
-        audit(actor, "ADMIN_USER_SANCTION_CREATED", "USER_SANCTION", "sanction:${record.id}", request)
+        auditRecorder.record(actor, "ADMIN_USER_SANCTION_CREATED", "USER_SANCTION", "sanction:${record.id}", request)
         evictUserSanctionCache(record)
         if (record.type == UserSanctionType.SUSPEND) {
             afterCommit {
@@ -97,7 +94,7 @@ class AdminModerationServiceImpl(
     @Transactional
     override fun revokeSanction(actor: String, sanctionId: Long): AdminUserSanctionDto {
         val record = sanctionRepository.revoke(actor, sanctionId)
-        audit(
+        auditRecorder.record(
             actor,
             "ADMIN_USER_SANCTION_REVOKED",
             "USER_SANCTION",
@@ -132,18 +129,8 @@ class AdminModerationServiceImpl(
         require(expiresAt == null || expiresAt.isAfter(Instant.now())) { "expiresAt must be in the future" }
     }
 
-    private fun audit(actor: String, action: String, targetType: String, targetId: String, metadata: Any) {
-        auditLogRepository.record(
-            actor = actor,
-            action = action,
-            targetType = targetType,
-            targetId = targetId,
-            metadataJson = objectMapper.writeValueAsString(metadata),
-        )
-    }
-
-    private fun evictUserSanctionCache(record: UserSanctionRecord) {
-        val cache = cacheManager.getCache(USER_SANCTIONS_CACHE) ?: return
+    private fun evictUserSanctionCache(record: UserSanctionRecord) = afterCommit {
+        val cache = cacheManager.getCache(USER_SANCTIONS_CACHE) ?: return@afterCommit
         when (record.scopeType) {
             ModerationScopeType.GLOBAL -> cache.evict("global:${record.userId}")
             ModerationScopeType.ROOM -> record.roomId?.let { roomId -> cache.evict("$roomId:${record.userId}") }

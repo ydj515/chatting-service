@@ -40,6 +40,9 @@ class JpaMessageReadAdapter(
         messageRepository.findMessagesAfter(roomId, afterSeq, PageRequest.of(0, limit))
             .map { it.toDto() }
 
+    override fun findLatestMessagesByRooms(roomIds: Collection<Long>): Map<Long, MessageDto> =
+        if (roomIds.isEmpty()) emptyMap() else messageRepository.findLatestMessagesByRooms(roomIds).associate { it.chatRoom.id to it.toDto() }
+
     override fun findLatestMessage(roomId: Long): MessageDto? = messageRepository.findLatestMessage(roomId)?.toDto()
 
     override fun findByClientMessageId(roomId: Long, senderId: Long, clientMessageId: String): MessageDto? =

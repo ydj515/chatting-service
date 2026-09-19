@@ -38,6 +38,9 @@ class PartitionedMessageReadAdapter(
         partitionedMessageReadRepository.findGapMessages(roomId, afterSeq, limit)
             .map { it.toDto() }
 
+    override fun findLatestMessagesByRooms(roomIds: Collection<Long>): Map<Long, MessageDto> =
+        partitionedMessageReadRepository.findLatestMessagesByRooms(roomIds).associate { it.roomId to it.toDto() }
+
     override fun findLatestMessage(roomId: Long): MessageDto? =
         partitionedMessageReadRepository.findLatestMessage(roomId)?.toDto()
 

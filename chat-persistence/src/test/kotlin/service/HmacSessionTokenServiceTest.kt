@@ -4,12 +4,18 @@ import com.chat.domain.service.SessionTokenRevocationStore
 import com.chat.persistence.config.ChatAuthProperties
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import org.springframework.boot.context.properties.EnableConfigurationProperties
+import org.springframework.boot.test.context.runner.ApplicationContextRunner
+import org.springframework.context.annotation.Configuration
+import org.springframework.context.annotation.Import
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
 import java.time.ZoneOffset
+import java.util.function.Supplier
 
 class HmacSessionTokenServiceTest {
     private val clock = Clock.fixed(Instant.parse("2026-06-12T00:00:00Z"), ZoneOffset.UTC)
@@ -19,6 +25,36 @@ class HmacSessionTokenServiceTest {
             ttl = Duration.ofMinutes(30),
         ),
     )
+
+    @Test
+    fun `Spring startup rejects missing signing key and accepts an explicit key`() {
+        val runner = ApplicationContextRunner()
+            .withUserConfiguration(SigningTestConfig::class.java)
+            .withBean(Clock::class.java, Supplier { clock })
+            .withBean(SessionTokenRevocationStore::class.java, Supplier { InMemoryRevocationStore() })
+        runner.run { context -> assertTrue(context.startupFailure != null) }
+        runner.withPropertyValues("chat.auth.session.secret=${properties.session.secret}").run { context ->
+            assertNull(context.startupFailure)
+            val service = context.getBean(HmacSessionTokenService::class.java)
+            assertEquals(42L, service.authenticate(service.issueToken(42L).token)?.userId)
+        }
+    }
+
+    @Configuration(proxyBeanMethods = false)
+    @EnableConfigurationProperties(ChatAuthProperties::class)
+    @Import(HmacSessionTokenService::class)
+    class SigningTestConfig
+
+    @Test
+    fun `missing blank short and former default signing keys prevent service initialization`() {
+        listOf("", " ".repeat(40), "too-short", "local-development-session-secret-change-me").forEach { secret ->
+            val invalid = properties.copy(session = properties.session.copy(secret = secret))
+            val failure = assertThrows(IllegalArgumentException::class.java) {
+                HmacSessionTokenService(invalid, clock, InMemoryRevocationStore())
+            }
+            assertEquals("Configure CHAT_AUTH_SESSION_SECRET with an independent signing key of at least 32 bytes", failure.message)
+        }
+    }
 
     @Test
     fun `발급한 세션 토큰은 같은 서비스에서 사용자 ID로 검증된다`() {

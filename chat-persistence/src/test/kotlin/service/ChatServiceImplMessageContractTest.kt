@@ -89,7 +89,7 @@ class ChatServiceImplMessageContractTest {
         val messageStreamProducer = mock(MessageStreamProducer::class.java)
         `when`(messageStreamProducer.append(anyMessageStreamEnvelope()))
             .thenReturn("1749790000000-0")
-        val fixture = chatServiceFixture(messageStreamProducer = messageStreamProducer)
+        val fixture = chatServiceFixture(FixtureOptions(messageStreamProducer = messageStreamProducer))
         val clientMessageId = "client-message-1"
         `when`(
             fixture.messageRepository.findByChatRoomIdAndSenderIdAndClientMessageId(
@@ -133,7 +133,7 @@ class ChatServiceImplMessageContractTest {
     @Test
     fun `메시지 전송은 Streams append 성공 후 room traffic counter를 기록한다`() {
         val roomTrafficStatsService = RecordingRoomTrafficStatsService()
-        val fixture = chatServiceFixture(roomTrafficStatsService = roomTrafficStatsService)
+        val fixture = chatServiceFixture(FixtureOptions(roomTrafficStatsService = roomTrafficStatsService))
         val clientMessageId = "client-message-1"
         `when`(
             fixture.messageRepository.findByChatRoomIdAndSenderIdAndClientMessageId(
@@ -163,8 +163,10 @@ class ChatServiceImplMessageContractTest {
             .thenThrow(IllegalStateException("stream append failed"))
         val roomTrafficStatsService = RecordingRoomTrafficStatsService()
         val fixture = chatServiceFixture(
-            messageStreamProducer = messageStreamProducer,
-            roomTrafficStatsService = roomTrafficStatsService,
+            FixtureOptions(
+                messageStreamProducer = messageStreamProducer,
+                roomTrafficStatsService = roomTrafficStatsService,
+            ),
         )
         val clientMessageId = "client-message-1"
         `when`(
@@ -192,7 +194,7 @@ class ChatServiceImplMessageContractTest {
 
     @Test
     fun `room traffic counter 기록 실패는 이미 수락된 메시지 응답을 실패시키지 않는다`() {
-        val fixture = chatServiceFixture(roomTrafficStatsService = ThrowingRoomTrafficStatsService())
+        val fixture = chatServiceFixture(FixtureOptions(roomTrafficStatsService = ThrowingRoomTrafficStatsService()))
         val clientMessageId = "client-message-1"
         `when`(
             fixture.messageRepository.findByChatRoomIdAndSenderIdAndClientMessageId(
@@ -221,7 +223,7 @@ class ChatServiceImplMessageContractTest {
         val messageStreamProducer = mock(MessageStreamProducer::class.java)
         `when`(messageStreamProducer.append(anyMessageStreamEnvelope()))
             .thenThrow(IllegalStateException("stream append failed"))
-        val fixture = chatServiceFixture(messageStreamProducer = messageStreamProducer)
+        val fixture = chatServiceFixture(FixtureOptions(messageStreamProducer = messageStreamProducer))
         val clientMessageId = "client-message-1"
         `when`(
             fixture.messageRepository.findByChatRoomIdAndSenderIdAndClientMessageId(
@@ -296,8 +298,10 @@ class ChatServiceImplMessageContractTest {
         val messageStreamProducer = mock(MessageStreamProducer::class.java)
         val admissionPolicyService = RejectingMessageAdmissionPolicyService("room rate limit exceeded")
         val fixture = chatServiceFixture(
-            messageStreamProducer = messageStreamProducer,
-            messageAdmissionPolicyService = admissionPolicyService,
+            FixtureOptions(
+                messageStreamProducer = messageStreamProducer,
+                messageAdmissionPolicyService = admissionPolicyService,
+            ),
         )
         val clientMessageId = "client-message-1"
         `when`(
@@ -329,7 +333,7 @@ class ChatServiceImplMessageContractTest {
     @Test
     fun `같은 clientMessageId 재전송은 메시지 수락 정책을 다시 검사하지 않는다`() {
         val admissionPolicyService = RecordingMessageAdmissionPolicyService()
-        val fixture = chatServiceFixture(messageAdmissionPolicyService = admissionPolicyService)
+        val fixture = chatServiceFixture(FixtureOptions(messageAdmissionPolicyService = admissionPolicyService))
         val clientMessageId = "client-message-1"
         val existingMessage = Message(
             id = 101L,
@@ -371,9 +375,11 @@ class ChatServiceImplMessageContractTest {
     fun `moderation 거부 시 sequence 발급과 stream append를 수행하지 않는다`() {
         val messageStreamProducer = mock(MessageStreamProducer::class.java)
         val fixture = chatServiceFixture(
-            messageStreamProducer = messageStreamProducer,
-            messageModerationPolicyService = RejectingMessageModerationPolicyService(
-                "message blocked by moderation policy",
+            FixtureOptions(
+                messageStreamProducer = messageStreamProducer,
+                messageModerationPolicyService = RejectingMessageModerationPolicyService(
+                    "message blocked by moderation policy",
+                ),
             ),
         )
         val clientMessageId = "client-message-1"
@@ -409,10 +415,12 @@ class ChatServiceImplMessageContractTest {
         val moderationPolicyService = RecordingMessageModerationPolicyService()
         val admissionPolicyService = RecordingMessageAdmissionPolicyService()
         val fixture = chatServiceFixture(
-            messageStreamProducer = messageStreamProducer,
-            userSanctionPolicyService = RejectingUserSanctionPolicyService("user is restricted from sending messages"),
-            messageModerationPolicyService = moderationPolicyService,
-            messageAdmissionPolicyService = admissionPolicyService,
+            FixtureOptions(
+                messageStreamProducer = messageStreamProducer,
+                userSanctionPolicyService = RejectingUserSanctionPolicyService("user is restricted from sending messages"),
+                messageModerationPolicyService = moderationPolicyService,
+                messageAdmissionPolicyService = admissionPolicyService,
+            ),
         )
         val clientMessageId = "client-message-1"
         `when`(
@@ -447,8 +455,10 @@ class ChatServiceImplMessageContractTest {
         val moderationPolicyService = RecordingMessageModerationPolicyService()
         val userSanctionPolicyService = RecordingUserSanctionPolicyService()
         val fixture = chatServiceFixture(
-            messageModerationPolicyService = moderationPolicyService,
-            userSanctionPolicyService = userSanctionPolicyService,
+            FixtureOptions(
+                messageModerationPolicyService = moderationPolicyService,
+                userSanctionPolicyService = userSanctionPolicyService,
+            ),
         )
         val clientMessageId = "client-message-1"
         val existingMessage = Message(
@@ -492,8 +502,10 @@ class ChatServiceImplMessageContractTest {
     fun `메시지 수락 정책은 채팅방 멤버 역할을 함께 전달받는다`() {
         val admissionPolicyService = RecordingMessageAdmissionPolicyService()
         val fixture = chatServiceFixture(
-            messageAdmissionPolicyService = admissionPolicyService,
-            memberRole = MemberRole.ADMIN,
+            FixtureOptions(
+                messageAdmissionPolicyService = admissionPolicyService,
+                memberRole = MemberRole.ADMIN,
+            ),
         )
         val clientMessageId = "client-message-1"
         `when`(
@@ -527,9 +539,11 @@ class ChatServiceImplMessageContractTest {
             RoomShardConfig(writeShardCount = 4, fanoutShardCount = 16),
         )
         val fixture = chatServiceFixture(
-            messageStreamProducer = messageStreamProducer,
-            roomStorageConfigReader = shardReader,
-            sequenceValues = listOf(1L, 2L),
+            FixtureOptions(
+                messageStreamProducer = messageStreamProducer,
+                roomStorageConfigReader = shardReader,
+                sequenceValues = listOf(1L, 2L),
+            ),
         )
         `when`(
             fixture.messageRepository.findByChatRoomIdAndSenderIdAndClientMessageId(
@@ -576,17 +590,20 @@ class ChatServiceImplMessageContractTest {
         assertEquals(listOf(10L, 10L), shardReader.shardConfigRoomIds)
     }
 
+    private data class FixtureOptions(
+        val messageStreamProducer: MessageStreamProducer? = null,
+        val messageAdmissionPolicyService: MessageAdmissionPolicyService = MessageAdmissionPolicyService.Noop,
+        val messageModerationPolicyService: MessageModerationPolicyService = MessageModerationPolicyService.Noop,
+        val userSanctionPolicyService: UserSanctionPolicyService = UserSanctionPolicyService.Noop,
+        val roomTrafficStatsService: RoomTrafficStatsService = RoomTrafficStatsService.Noop,
+        val memberRole: MemberRole = MemberRole.MEMBER,
+        val roomStorageConfigReader: RoomStorageConfigReader = FixedRoomStorageConfigReader(RoomShardConfig()),
+        val sequenceValues: List<Long> = listOf(1L),
+    )
+
     @Suppress("UNCHECKED_CAST")
-    private fun chatServiceFixture(
-        messageStreamProducer: MessageStreamProducer = successfulMessageStreamProducer(),
-        messageAdmissionPolicyService: MessageAdmissionPolicyService = MessageAdmissionPolicyService.Noop,
-        messageModerationPolicyService: MessageModerationPolicyService = MessageModerationPolicyService.Noop,
-        userSanctionPolicyService: UserSanctionPolicyService = UserSanctionPolicyService.Noop,
-        roomTrafficStatsService: RoomTrafficStatsService = RoomTrafficStatsService.Noop,
-        memberRole: MemberRole = MemberRole.MEMBER,
-        roomStorageConfigReader: RoomStorageConfigReader = FixedRoomStorageConfigReader(RoomShardConfig()),
-        sequenceValues: List<Long> = listOf(1L),
-    ): Fixture {
+    private fun chatServiceFixture(options: FixtureOptions = FixtureOptions()): Fixture = with(options) {
+        val messageStreamProducer = messageStreamProducer ?: successfulMessageStreamProducer()
         val redisTemplate = mock(RedisTemplate::class.java) as RedisTemplate<String, String>
         val valueOperations = mock(ValueOperations::class.java) as ValueOperations<String, String>
         `when`(redisTemplate.opsForValue()).thenReturn(valueOperations)
@@ -629,27 +646,37 @@ class ChatServiceImplMessageContractTest {
             outboundExecutor = Runnable::run,
         )
 
-        return Fixture(
+        return@with Fixture(
             chatService = ChatServiceImpl(
                 chatRoomRepository = chatRoomRepository,
-                messageRepository = messageRepository,
                 messageReadPort = JpaMessageReadAdapter(messageRepository),
                 chatRoomMemberRepository = chatRoomMemberRepository,
                 userRepository = userRepository,
-                redisMessageBroker = redisMessageBroker,
-                messageSequenceService = MessageSequenceService(
-                    redisTemplate = redisTemplate,
-                    redisProperties = redisProperties,
-                    sequenceProperties = MessageSequenceProperties(),
+                messageSendingService = MessageSendingService(
+                    chatRoomRepository = chatRoomRepository,
+                    userRepository = userRepository,
+                    chatRoomMemberRepository = chatRoomMemberRepository,
+                    messageReadPort = JpaMessageReadAdapter(messageRepository),
+                    messageSendPolicy = MessageSendPolicy(
+                        userSanctionPolicyService = userSanctionPolicyService,
+                        messageModerationPolicyService = messageModerationPolicyService,
+                        messageAdmissionPolicyService = messageAdmissionPolicyService,
+                    ),
+                    messageStreamPublisher = MessageStreamPublisher(
+                        messageSequenceService = MessageSequenceService(
+                            redisTemplate = redisTemplate,
+                            redisProperties = redisProperties,
+                            sequenceProperties = MessageSequenceProperties(),
+                        ),
+                        roomStorageConfigReader = roomStorageConfigReader,
+                        messageStreamProducer = messageStreamProducer,
+                        roomTrafficStatsService = roomTrafficStatsService,
+                    ),
                 ),
-                messagePersistenceService = MessagePersistenceService(messageRepository),
-                webSocketSessionManager = webSocketSessionManager,
-                messageStreamProducer = messageStreamProducer,
-                messageAdmissionPolicyService = messageAdmissionPolicyService,
-                messageModerationPolicyService = messageModerationPolicyService,
-                userSanctionPolicyService = userSanctionPolicyService,
-                roomTrafficStatsService = roomTrafficStatsService,
-                roomStorageConfigReader = roomStorageConfigReader,
+                membershipEventPublisher = MembershipEventPublisher(
+                    redisMessageBroker = redisMessageBroker,
+                    webSocketSessionManager = webSocketSessionManager,
+                ),
             ),
             messageRepository = messageRepository,
             chatRoom = chatRoom,

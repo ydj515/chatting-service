@@ -52,19 +52,21 @@ class AdminExportJobRepositoryTest {
         val jdbcTemplate = mock(JdbcTemplate::class.java)
         val repository = AdminExportJobRepository(jdbcTemplate = jdbcTemplate)
         `when`(
-            jdbcTemplate.queryForObject(
+            jdbcTemplate.query(
                 anyString(),
                 anyExportJobRecordRowMapper(),
                 eq("worker-1"),
             ),
         ).thenReturn(
-            AdminExportJobRecord(
-                jobId = "export-1",
-                actor = "admin-local",
-                requestJson = """{"roomId":10}""",
-                cursorToken = "cursor-token",
-                exportedRows = 42,
-                outputUri = "file:///tmp/export-1.csv",
+            listOf(
+                AdminExportJobRecord(
+                    jobId = "export-1",
+                    actor = "admin-local",
+                    requestJson = """{"roomId":10}""",
+                    cursorToken = "cursor-token",
+                    exportedRows = 42,
+                    outputUri = "file:///tmp/export-1.csv",
+                ),
             ),
         )
 
@@ -76,7 +78,7 @@ class AdminExportJobRepositoryTest {
         assertEquals(42, job?.exportedRows)
         assertEquals("file:///tmp/export-1.csv", job?.outputUri)
         val sqlCaptor = ArgumentCaptor.forClass(String::class.java)
-        verify(jdbcTemplate).queryForObject(
+        verify(jdbcTemplate).query(
             sqlCaptor.capture(),
             anyExportJobRecordRowMapper(),
             eq("worker-1"),
@@ -129,22 +131,24 @@ class AdminExportJobRepositoryTest {
         val jdbcTemplate = mock(JdbcTemplate::class.java)
         val repository = AdminExportJobRepository(jdbcTemplate = jdbcTemplate)
         `when`(
-            jdbcTemplate.queryForObject(
+            jdbcTemplate.query(
                 anyString(),
                 anyExportJobStatusRowMapper(),
                 eq("export-1"),
             ),
         ).thenReturn(
-            AdminExportJobStatusRecord(
-                jobId = "export-1",
-                actor = "admin-local",
-                status = "COMPLETED",
-                outputUri = "s3://chat-archives/admin-exports/export-1.csv",
-                exportedRows = 2,
-                errorMessage = null,
-                createdAt = LocalDateTime.parse("2026-06-26T00:00:00"),
-                startedAt = LocalDateTime.parse("2026-06-26T00:00:01"),
-                completedAt = LocalDateTime.parse("2026-06-26T00:00:02"),
+            listOf(
+                AdminExportJobStatusRecord(
+                    jobId = "export-1",
+                    actor = "admin-local",
+                    status = "COMPLETED",
+                    outputUri = "s3://chat-archives/admin-exports/export-1.csv",
+                    exportedRows = 2,
+                    errorMessage = null,
+                    createdAt = LocalDateTime.parse("2026-06-26T00:00:00"),
+                    startedAt = LocalDateTime.parse("2026-06-26T00:00:01"),
+                    completedAt = LocalDateTime.parse("2026-06-26T00:00:02"),
+                ),
             ),
         )
 
@@ -158,7 +162,7 @@ class AdminExportJobRepositoryTest {
         assertEquals(LocalDateTime.parse("2026-06-26T00:00:01"), record?.startedAt)
         assertEquals(LocalDateTime.parse("2026-06-26T00:00:02"), record?.completedAt)
         val sqlCaptor = ArgumentCaptor.forClass(String::class.java)
-        verify(jdbcTemplate).queryForObject(
+        verify(jdbcTemplate).query(
             sqlCaptor.capture(),
             anyExportJobStatusRowMapper(),
             eq("export-1"),

@@ -9,6 +9,7 @@ import com.chat.persistence.config.ChatObjectStorageProperties
 import com.chat.persistence.config.ChatWorkerProperties
 import com.chat.persistence.repository.AdminExportJobRecord
 import com.chat.persistence.repository.AdminExportJobRepository
+import com.chat.persistence.repository.AdminMessageQuery
 import com.chat.persistence.repository.AdminMessageRepository
 import com.chat.persistence.storage.ObjectStoragePort
 import com.chat.persistence.storage.ObjectUploadRequest
@@ -202,14 +203,16 @@ class AdminMessageExportWorkerTest {
         )
         `when`(
             messageRepository.searchMessages(
-                query = "hello",
-                searchMode = AdminMessageSearchMode.FTS,
-                roomId = 10L,
-                from = null,
-                to = null,
-                senderId = 7L,
-                cursor = null,
-                limit = 2,
+                AdminMessageQuery(
+                    query = "hello",
+                    searchMode = AdminMessageSearchMode.FTS,
+                    roomId = 10L,
+                    from = null,
+                    to = null,
+                    senderId = 7L,
+                    cursor = null,
+                    limit = 2,
+                ),
             ),
         ).thenReturn(
             listOf(
@@ -219,22 +222,24 @@ class AdminMessageExportWorkerTest {
         )
         `when`(
             messageRepository.searchMessages(
-                query = "hello",
-                searchMode = AdminMessageSearchMode.FTS,
-                roomId = 10L,
-                from = null,
-                to = null,
-                senderId = 7L,
-                cursor = firstChunkCursor,
-                limit = 2,
+                AdminMessageQuery(
+                    query = "hello",
+                    searchMode = AdminMessageSearchMode.FTS,
+                    roomId = 10L,
+                    from = null,
+                    to = null,
+                    senderId = 7L,
+                    cursor = firstChunkCursor,
+                    limit = 2,
+                ),
             ),
         ).thenReturn(emptyList())
 
         val exportedRows = worker.pollAndExport()
 
         assertEquals(2, exportedRows)
-        verify(messageRepository).searchMessages("hello", AdminMessageSearchMode.FTS, 10L, null, null, 7L, null, 2)
-        verify(messageRepository).searchMessages("hello", AdminMessageSearchMode.FTS, 10L, null, null, 7L, firstChunkCursor, 2)
+        verify(messageRepository).searchMessages(AdminMessageQuery("hello", AdminMessageSearchMode.FTS, 10L, null, null, 7L, null, 2))
+        verify(messageRepository).searchMessages(AdminMessageQuery("hello", AdminMessageSearchMode.FTS, 10L, null, null, 7L, firstChunkCursor, 2))
         verify(exportJobRepository).updateCheckpoint(
             eqString("export-1"),
             eqString(AdminMessageCursorCodec.encode(firstChunkCursor)),

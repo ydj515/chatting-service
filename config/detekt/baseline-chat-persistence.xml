@@ -3,32 +3,20 @@
   <ManuallySuppressedIssues />
   <CurrentIssues>
     <ID>LongParameterList:AdminMessageExportWorker.kt$AdminMessageExportWorker$( private val exportJobRepository: AdminExportJobRepository, private val messageRepository: AdminMessageRepository, private val workerProperties: ChatWorkerProperties, private val objectMapper: ObjectMapper, private val objectStoragePort: ObjectStoragePort, private val objectStorageProperties: ChatObjectStorageProperties, @Value("\${chat.admin.export.directory:build/admin-exports}") private val exportDirectory: String, @Value("\${chat.admin.export.chunk-size:1000}") private val exportChunkSize: Int = DEFAULT_EXPORT_CHUNK_SIZE, )</ID>
-    <ID>LongParameterList:AdminMessageRepository.kt$AdminMessageRepository$( query: String, searchMode: AdminMessageSearchMode, roomId: Long?, from: Instant?, to: Instant?, senderId: Long?, cursor: AdminMessageSearchCursor?, limit: Int, )</ID>
-    <ID>LongParameterList:AdminModerationServiceImpl.kt$AdminModerationServiceImpl$( private val ruleRepository: ModerationRuleJdbcRepository, private val sanctionRepository: UserSanctionJdbcRepository, private val auditLogRepository: AdminAuditLogRepository, private val objectMapper: ObjectMapper, private val sessionTokenService: SessionTokenService, private val sessionControlPublisher: SessionControlPublisher, private val cacheManager: CacheManager, )</ID>
-    <ID>LongParameterList:ChatServiceImpl.kt$ChatServiceImpl$( private val chatRoomRepository: ChatRoomRepository, private val messageRepository: MessageRepository, private val messageReadPort: MessageReadPort, private val chatRoomMemberRepository: ChatRoomMemberRepository, private val userRepository: UserRepository, private val redisMessageBroker: RedisMessageBroker, private val messageSequenceService: MessageSequenceService, private val messagePersistenceService: MessagePersistenceService, private val webSocketSessionManager: WebSocketSessionManager, private val messageStreamProducer: MessageStreamProducer, private val messageAdmissionPolicyService: MessageAdmissionPolicyService, private val roomTrafficStatsService: RoomTrafficStatsService, private val roomStorageConfigReader: RoomStorageConfigReader, private val messageModerationPolicyService: MessageModerationPolicyService, private val userSanctionPolicyService: UserSanctionPolicyService, )</ID>
-    <ID>LongParameterList:ChatServiceImplCursorPaginationTest.kt$ChatServiceImplCursorPaginationTest$( chatRoom: ChatRoom, sender: User, messageId: String, clientMessageId: String, roomSeq: Long, createdAt: LocalDateTime, )</ID>
-    <ID>LongParameterList:ChatServiceImplMessageContractTest.kt$ChatServiceImplMessageContractTest$( messageStreamProducer: MessageStreamProducer = successfulMessageStreamProducer(), messageAdmissionPolicyService: MessageAdmissionPolicyService = MessageAdmissionPolicyService.Noop, messageModerationPolicyService: MessageModerationPolicyService = MessageModerationPolicyService.Noop, userSanctionPolicyService: UserSanctionPolicyService = UserSanctionPolicyService.Noop, roomTrafficStatsService: RoomTrafficStatsService = RoomTrafficStatsService.Noop, memberRole: MemberRole = MemberRole.MEMBER, roomStorageConfigReader: RoomStorageConfigReader = FixedRoomStorageConfigReader(RoomShardConfig()), sequenceValues: List&lt;Long&gt; = listOf(1L), )</ID>
-    <ID>LongParameterList:RoomHeatClassifier.kt$RoomHeatClassifier$( heatLevel: RoomHeatLevel, liveFeedMaxMessages: Int, liveFeedMaxAgeSeconds: Int, roomRateLimitPerSecond: Int?, slowModeSeconds: Int?, shardCount: Int, )</ID>
     <ID>LongParameterList:WebSocketSessionManager.kt$WebSocketSessionManager$( private val redisTemplate: RedisTemplate&lt;String, String&gt;, private val objectMapper: ObjectMapper, private val redisMessageBroker: RedisMessageBroker, private val chatRoomMemberRepository: ChatRoomMemberRepository, private val redisProperties: ChatRedisProperties, private val gatewayProperties: ChatWebSocketGatewayProperties, @Qualifier("webSocketOutboundExecutor") private val outboundExecutor: Executor, private val gatewayMetrics: WebSocketGatewayMetrics = WebSocketGatewayMetrics.Noop, private val sessionControlBroker: RedisSessionControlBroker? = null, private val clock: Clock = Clock.systemUTC(), )</ID>
-    <ID>LoopWithTooManyJumpStatements:AdminMessageExportWorker.kt$AdminMessageExportWorker$while</ID>
-    <ID>ReturnCount:HmacSessionTokenService.kt$HmacSessionTokenService$private fun parseAndVerify(token: String): TokenClaims?</ID>
-    <ID>SpreadOperator:AdminMessageExportWorker.kt$AdminMessageExportWorker$(output, StandardCharsets.UTF_8, *openOptions)</ID>
     <ID>SpreadOperator:AdminMessageRepository.kt$AdminMessageRepository$( """ $BASE_SELECT WHERE ${where.joinToString(" AND ")} ORDER BY cm.created_at DESC, cm.room_seq DESC, cm.message_id DESC LIMIT ? """.trimIndent(), messageRowMapper, *args.toTypedArray(), )</ID>
     <ID>SpreadOperator:AdminMessageRepository.kt$AdminMessageRepository$( """ $BASE_SELECT WHERE ${where.joinToString(" AND ")} ORDER BY cm.room_seq DESC, cm.created_at DESC, cm.message_id DESC LIMIT ? """.trimIndent(), messageRowMapper, *args.toTypedArray(), )</ID>
     <ID>SpreadOperator:ModerationRuleJdbcRepository.kt$ModerationRuleJdbcRepository$( """ SELECT id, scope_type, room_id, pattern, match_type, action, reason, enabled, created_by, created_at, updated_at FROM moderation_rules $where ORDER BY id DESC """.trimIndent(), ROW_MAPPER, *args.toTypedArray(), )</ID>
     <ID>SpreadOperator:RedisMessageStreamConsumer.kt$RedisMessageStreamConsumer$( Consumer.from(consumerGroup, consumerName), StreamReadOptions.empty().count(count), *offsets, )</ID>
     <ID>SpreadOperator:RedisMessageStreamConsumer.kt$RedisMessageStreamConsumer$( streamKey, consumerGroup, consumerName, Duration.ofMillis(minIdleMillis), *ids, )</ID>
     <ID>SpreadOperator:UserSanctionJdbcRepository.kt$UserSanctionJdbcRepository$( """ SELECT id, scope_type, room_id, user_id, type, reason, expires_at, active, created_by, created_at, revoked_by, revoked_at FROM user_sanctions $where ORDER BY id DESC """.trimIndent(), ROW_MAPPER, *args.toTypedArray(), )</ID>
-    <ID>SwallowedException:AdminExportJobRepository.kt$AdminExportJobRepository$e: EmptyResultDataAccessException</ID>
     <ID>SwallowedException:AdminMessageRepository.kt$AdminMessageRepository$e: EmptyResultDataAccessException</ID>
     <ID>SwallowedException:FanoutOwnerLeaseService.kt$RedisFanoutOwnerLeaseService$e: Exception</ID>
     <ID>SwallowedException:JpaMessageWriteAdapter.kt$JpaMessageWriteAdapter$e: DataIntegrityViolationException</ID>
     <ID>SwallowedException:ModerationRuleJdbcRepository.kt$ModerationRuleJdbcRepository$e: EmptyResultDataAccessException</ID>
-    <ID>SwallowedException:RoomSeqGapAuditRepository.kt$RoomSeqGapAuditRepository$e: EmptyResultDataAccessException</ID>
-    <ID>SwallowedException:RoomStorageConfigJdbcRepository.kt$RoomStorageConfigJdbcRepository$e: EmptyResultDataAccessException</ID>
     <ID>TooGenericExceptionCaught:AdminMessageExportWorker.kt$AdminMessageExportWorker$e: Exception</ID>
     <ID>TooGenericExceptionCaught:BoundedOutboundSessionQueue.kt$BoundedOutboundSessionQueue$throwable: Throwable</ID>
-    <ID>TooGenericExceptionCaught:ChatServiceImpl.kt$ChatServiceImpl$e: RuntimeException</ID>
+    <ID>TooGenericExceptionCaught:MessageStreamPublisher.kt$MessageStreamPublisher$e: RuntimeException</ID>
     <ID>TooGenericExceptionCaught:FanoutOwnerLeaseService.kt$RedisFanoutOwnerLeaseService$e: Exception</ID>
     <ID>TooGenericExceptionCaught:HotRoomFanoutWorker.kt$HotRoomFanoutWorker$e: Exception</ID>
     <ID>TooGenericExceptionCaught:MessageAdmissionPolicyService.kt$RedisMessageAdmissionPolicyService$e: Exception</ID>
@@ -45,9 +33,6 @@
     <ID>TooGenericExceptionCaught:RoomTrafficStatsService.kt$RedisRoomTrafficStatsService$e: Exception</ID>
     <ID>TooGenericExceptionCaught:WebSocketSessionManager.kt$WebSocketSessionManager$e: Exception</ID>
     <ID>TooGenericExceptionCaught:WebSocketSessionManager.kt$WebSocketSessionManager$t: Throwable</ID>
-    <ID>TooManyFunctions:ChatServiceImpl.kt$ChatServiceImpl : ChatService</ID>
     <ID>TooManyFunctions:WebSocketSessionManager.kt$WebSocketSessionManager</ID>
-    <ID>UnusedPrivateProperty:ChatServiceImpl.kt$ChatServiceImpl$private val messagePersistenceService: MessagePersistenceService</ID>
-    <ID>UnusedPrivateProperty:ChatServiceImpl.kt$ChatServiceImpl$private val messageRepository: MessageRepository</ID>
   </CurrentIssues>
 </SmellBaseline>

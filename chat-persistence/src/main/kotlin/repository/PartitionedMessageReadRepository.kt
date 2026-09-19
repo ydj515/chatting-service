@@ -8,6 +8,7 @@ import org.springframework.data.domain.PageImpl
 import org.springframework.data.domain.Pageable
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.jdbc.core.RowMapper
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate
 import org.springframework.stereotype.Repository
 import java.sql.ResultSet
 
@@ -59,6 +60,20 @@ class PartitionedMessageReadRepository(
         )
 
     fun findGapMessages(roomId: Long, afterSeq: Long, limit: Int): List<CanonicalMessageRecord> = findMessagesAfter(roomId, afterSeq, limit)
+
+    fun findLatestMessagesByRooms(roomIds: Collection<Long>): List<CanonicalMessageRecord> {
+        if (roomIds.isEmpty()) return emptyList()
+        val sql =
+            """
+            WITH latest AS (
+                SELECT cm.*, ROW_NUMBER() OVER (PARTITION BY cm.room_id ORDER BY cm.room_seq DESC, cm.created_at DESC, cm.message_id DESC) AS ranking
+                FROM chat_messages cm WHERE cm.room_id IN (:roomIds) AND cm.is_deleted = false
+            )
+            ${BASE_SELECT.replace("FROM chat_messages cm", "FROM latest cm")}
+            WHERE cm.ranking = 1
+            """.trimIndent()
+        return NamedParameterJdbcTemplate(latestHistoryTemplate()).query(sql, mapOf("roomIds" to roomIds), rowMapper)
+    }
 
     fun findLatestMessage(roomId: Long): CanonicalMessageRecord? =
         latestHistoryTemplate().query(

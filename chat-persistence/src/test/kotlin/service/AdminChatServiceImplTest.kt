@@ -17,6 +17,7 @@ import com.chat.persistence.config.ChatObjectStorageProperties
 import com.chat.persistence.repository.AdminAuditLogRepository
 import com.chat.persistence.repository.AdminExportJobRepository
 import com.chat.persistence.repository.AdminExportJobStatusRecord
+import com.chat.persistence.repository.AdminMessageQuery
 import com.chat.persistence.repository.AdminMessageRepository
 import com.chat.persistence.storage.ObjectStoragePort
 import com.chat.persistence.storage.ObjectUploadRequest
@@ -165,14 +166,16 @@ class AdminChatServiceImplTest {
         val fixture = fixture()
         `when`(
             fixture.messageRepository.searchMessages(
-                query = "hello",
-                searchMode = AdminMessageSearchMode.CONTAINS,
-                roomId = 10L,
-                from = null,
-                to = null,
-                senderId = null,
-                cursor = null,
-                limit = 2,
+                AdminMessageQuery(
+                    query = "hello",
+                    searchMode = AdminMessageSearchMode.CONTAINS,
+                    roomId = 10L,
+                    from = null,
+                    to = null,
+                    senderId = null,
+                    cursor = null,
+                    limit = 2,
+                ),
             ),
         ).thenReturn(
             listOf(
@@ -235,14 +238,16 @@ class AdminChatServiceImplTest {
         val encodedCursor = AdminMessageSearchCursorCodec.encode(cursor)
         `when`(
             fixture.messageRepository.searchMessages(
-                query = "hello",
-                searchMode = AdminMessageSearchMode.FTS,
-                roomId = null,
-                from = null,
-                to = null,
-                senderId = null,
-                cursor = cursor,
-                limit = 51,
+                AdminMessageQuery(
+                    query = "hello",
+                    searchMode = AdminMessageSearchMode.FTS,
+                    roomId = null,
+                    from = null,
+                    to = null,
+                    senderId = null,
+                    cursor = cursor,
+                    limit = 51,
+                ),
             ),
         ).thenReturn(emptyList())
 
@@ -262,14 +267,16 @@ class AdminChatServiceImplTest {
         )
 
         verify(fixture.messageRepository).searchMessages(
-            eqString("hello"),
-            eqSearchMode(AdminMessageSearchMode.FTS),
-            eq(null),
-            eq(null),
-            eq(null),
-            eq(null),
-            eq(cursor),
-            eq(51),
+            AdminMessageQuery(
+                "hello",
+                AdminMessageSearchMode.FTS,
+                null,
+                null,
+                null,
+                null,
+                cursor,
+                51,
+            ),
         )
     }
 
@@ -509,11 +516,6 @@ class AdminChatServiceImplTest {
 
     private fun containsString(value: String): String {
         contains(value)
-        return uninitialized()
-    }
-
-    private fun eqSearchMode(value: AdminMessageSearchMode): AdminMessageSearchMode {
-        eq(value)
         return uninitialized()
     }
 

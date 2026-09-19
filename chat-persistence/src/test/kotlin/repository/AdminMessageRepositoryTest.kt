@@ -118,14 +118,16 @@ class AdminMessageRepositoryTest {
         ).thenReturn(emptyList())
 
         repository.searchMessages(
-            query = "   ",
-            searchMode = AdminMessageSearchMode.FTS,
-            roomId = 10L,
-            from = null,
-            to = null,
-            senderId = null,
-            cursor = null,
-            limit = 25,
+            AdminMessageQuery(
+                query = "   ",
+                searchMode = AdminMessageSearchMode.FTS,
+                roomId = 10L,
+                from = null,
+                to = null,
+                senderId = null,
+                cursor = null,
+                limit = 25,
+            ),
         )
 
         val sqlCaptor = ArgumentCaptor.forClass(String::class.java)
@@ -146,14 +148,16 @@ class AdminMessageRepositoryTest {
         val repository = AdminMessageRepository(jdbcTemplate = jdbcTemplate, writeJdbcTemplate = jdbcTemplate)
 
         val result = repository.searchMessages(
-            query = "   ",
-            searchMode = AdminMessageSearchMode.FTS,
-            roomId = null,
-            from = null,
-            to = null,
-            senderId = null,
-            cursor = null,
-            limit = 25,
+            AdminMessageQuery(
+                query = "   ",
+                searchMode = AdminMessageSearchMode.FTS,
+                roomId = null,
+                from = null,
+                to = null,
+                senderId = null,
+                cursor = null,
+                limit = 25,
+            ),
         )
 
         assertEquals(emptyList<AdminMessageDto>(), result)
@@ -173,14 +177,16 @@ class AdminMessageRepositoryTest {
         ).thenReturn(emptyList())
 
         repository.searchMessages(
-            query = "hello",
-            searchMode = AdminMessageSearchMode.FTS,
-            roomId = 10L,
-            from = null,
-            to = null,
-            senderId = 7L,
-            cursor = null,
-            limit = 25,
+            AdminMessageQuery(
+                query = "hello",
+                searchMode = AdminMessageSearchMode.FTS,
+                roomId = 10L,
+                from = null,
+                to = null,
+                senderId = 7L,
+                cursor = null,
+                limit = 25,
+            ),
         )
 
         val sqlCaptor = ArgumentCaptor.forClass(String::class.java)
@@ -212,14 +218,16 @@ class AdminMessageRepositoryTest {
         ).thenReturn(emptyList())
 
         repository.searchMessages(
-            query = "hello",
-            searchMode = AdminMessageSearchMode.CONTAINS,
-            roomId = 10L,
-            from = null,
-            to = null,
-            senderId = null,
-            cursor = null,
-            limit = 25,
+            AdminMessageQuery(
+                query = "hello",
+                searchMode = AdminMessageSearchMode.CONTAINS,
+                roomId = 10L,
+                from = null,
+                to = null,
+                senderId = null,
+                cursor = null,
+                limit = 25,
+            ),
         )
 
         val sqlCaptor = ArgumentCaptor.forClass(String::class.java)
@@ -252,14 +260,16 @@ class AdminMessageRepositoryTest {
         ).thenReturn(emptyList())
 
         repository.searchMessages(
-            query = "hello",
-            searchMode = AdminMessageSearchMode.FTS,
-            roomId = null,
-            from = null,
-            to = null,
-            senderId = null,
-            cursor = cursor,
-            limit = 25,
+            AdminMessageQuery(
+                query = "hello",
+                searchMode = AdminMessageSearchMode.FTS,
+                roomId = null,
+                from = null,
+                to = null,
+                senderId = null,
+                cursor = cursor,
+                limit = 25,
+            ),
         )
 
         val sqlCaptor = ArgumentCaptor.forClass(String::class.java)

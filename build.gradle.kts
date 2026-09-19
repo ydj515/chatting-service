@@ -1,9 +1,11 @@
 import io.gitlab.arturbosch.detekt.Detekt
 import io.gitlab.arturbosch.detekt.extensions.DetektExtension
 import io.gitlab.arturbosch.detekt.getSupportedKotlinVersion
+import kotlinx.kover.gradle.plugin.dsl.CoverageUnit
 import org.jlleitschuh.gradle.ktlint.KtlintExtension
 
 plugins {
+    alias(libs.plugins.kover)
     base
     alias(libs.plugins.detekt) apply false
     alias(libs.plugins.ktlint)
@@ -27,6 +29,7 @@ allprojects {
 
 subprojects {
     apply(plugin = "org.jetbrains.kotlin.jvm")
+    apply(plugin = "org.jetbrains.kotlinx.kover")
     apply(plugin = "org.jetbrains.kotlin.plugin.spring")
 
     dependencies {
@@ -117,5 +120,24 @@ tasks.register("formatKotlin") {
 }
 
 tasks.named("check") {
-    dependsOn(verifyKotlinQuality, *subprojects.map { "${it.path}:check" }.toTypedArray())
+    dependsOn(verifyKotlinQuality, "koverVerify", *subprojects.map { "${it.path}:check" }.toTypedArray())
+}
+
+dependencies {
+    subprojects.forEach { kover(project(it.path)) }
+}
+
+kover {
+    reports {
+        total {
+            html { onCheck = true }
+            xml { onCheck = true }
+            verify {
+                rule {
+                    minBound(78, CoverageUnit.LINE)
+                    minBound(60, CoverageUnit.BRANCH)
+                }
+            }
+        }
+    }
 }

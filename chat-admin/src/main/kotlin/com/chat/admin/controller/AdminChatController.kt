@@ -18,13 +18,13 @@ import com.chat.domain.service.AdminChatService
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.ModelAttribute
 import org.springframework.web.bind.annotation.PatchMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestHeader
 import org.springframework.web.bind.annotation.RequestMapping
-import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.server.ResponseStatusException
 import java.time.Instant
@@ -43,20 +43,17 @@ class AdminChatController(
     fun getRoomMessages(
         @RequestHeader(ADMIN_TOKEN_HEADER, required = false) adminToken: String?,
         @PathVariable roomId: Long,
-        @RequestParam(required = false) from: String?,
-        @RequestParam(required = false) to: String?,
-        @RequestParam(required = false) cursor: String?,
-        @RequestParam(required = false) limit: Int?,
+        @ModelAttribute parameters: MessageHistoryParameters,
     ): AdminMessagePageResponse {
         val actor = adminTokenVerifier.requireActor(adminToken)
         return adminChatService.getRoomMessages(
             actor = actor,
             request = AdminMessageHistoryRequest(
                 roomId = roomId,
-                from = parseDateTime(from),
-                to = parseDateTime(to),
-                cursor = parseHistoryCursor(cursor),
-                limit = boundedLimit(limit),
+                from = parseDateTime(parameters.from),
+                to = parseDateTime(parameters.to),
+                cursor = parseHistoryCursor(parameters.cursor),
+                limit = boundedLimit(parameters.limit),
             ),
         )
     }
@@ -64,27 +61,20 @@ class AdminChatController(
     @GetMapping("/messages/search")
     fun searchMessages(
         @RequestHeader(ADMIN_TOKEN_HEADER, required = false) adminToken: String?,
-        @RequestParam("q", required = false, defaultValue = "") query: String,
-        @RequestParam(required = false) roomId: Long?,
-        @RequestParam(required = false) from: String?,
-        @RequestParam(required = false) to: String?,
-        @RequestParam(required = false) senderId: Long?,
-        @RequestParam(required = false) mode: String?,
-        @RequestParam(required = false) cursor: String?,
-        @RequestParam(required = false) limit: Int?,
+        @ModelAttribute parameters: MessageSearchParameters,
     ): AdminMessageSearchResponse {
         val actor = adminTokenVerifier.requireActor(adminToken)
         return adminChatService.searchMessages(
             actor = actor,
             request = AdminMessageSearchRequest(
-                query = query,
-                searchMode = parseSearchMode(mode),
-                roomId = roomId,
-                from = parseDateTime(from),
-                to = parseDateTime(to),
-                senderId = senderId,
-                cursor = parseSearchCursor(cursor),
-                limit = boundedLimit(limit),
+                query = parameters.q,
+                searchMode = parseSearchMode(parameters.mode),
+                roomId = parameters.roomId,
+                from = parseDateTime(parameters.from),
+                to = parseDateTime(parameters.to),
+                senderId = parameters.senderId,
+                cursor = parseSearchCursor(parameters.cursor),
+                limit = boundedLimit(parameters.limit),
             ),
         )
     }
@@ -256,3 +246,21 @@ class AdminChatController(
         val DEFAULT_TIME_ZONE: ZoneId = ZoneId.of("Asia/Seoul")
     }
 }
+
+data class MessageHistoryParameters(
+    val from: String? = null,
+    val to: String? = null,
+    val cursor: String? = null,
+    val limit: Int? = null,
+)
+
+data class MessageSearchParameters(
+    val q: String = "",
+    val roomId: Long? = null,
+    val from: String? = null,
+    val to: String? = null,
+    val senderId: Long? = null,
+    val mode: String? = null,
+    val cursor: String? = null,
+    val limit: Int? = null,
+)

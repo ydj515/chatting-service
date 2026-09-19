@@ -9,7 +9,7 @@ data class ChatAuthProperties(
     val webSocketTicket: WebSocketTicket = WebSocketTicket(),
 ) {
     data class Session(
-        val secret: String = "local-development-session-secret-change-me",
+        val secret: String = "",
         val ttl: Duration = Duration.ofHours(12),
         val tokenQueryParam: String = "token",
         val revocationKeyPrefix: String = "chat:auth:session:revoked:",

@@ -6,110 +6,54 @@ import com.chat.domain.exception.ResourceConflictException
 import com.chat.domain.exception.ResourceNotFoundException
 import com.chat.domain.model.*
 import com.chat.domain.service.ChatService
-import com.chat.persistence.redis.MessageStreamEnvelope
-import com.chat.persistence.redis.MessageStreamProducer
 import com.chat.persistence.redis.RedisMessageBroker
 import com.chat.persistence.repository.*
-import org.slf4j.LoggerFactory
 import org.springframework.cache.annotation.*
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
-import org.springframework.transaction.support.TransactionSynchronization
-import org.springframework.transaction.support.TransactionSynchronizationManager
-import java.security.SecureRandom
-import java.time.Instant
 import java.time.ZoneOffset
-import java.util.Base64
 
 @Service
 @Transactional
 class ChatServiceImpl(
     private val chatRoomRepository: ChatRoomRepository,
-    private val messageRepository: MessageRepository,
     private val messageReadPort: MessageReadPort,
     private val chatRoomMemberRepository: ChatRoomMemberRepository,
     private val userRepository: UserRepository,
-    private val redisMessageBroker: RedisMessageBroker,
-    private val messageSequenceService: MessageSequenceService,
-    private val messagePersistenceService: MessagePersistenceService,
-    private val webSocketSessionManager: WebSocketSessionManager,
-    private val messageStreamProducer: MessageStreamProducer,
-    private val messageAdmissionPolicyService: MessageAdmissionPolicyService,
-    private val roomTrafficStatsService: RoomTrafficStatsService,
-    private val roomStorageConfigReader: RoomStorageConfigReader,
-    private val messageModerationPolicyService: MessageModerationPolicyService,
-    private val userSanctionPolicyService: UserSanctionPolicyService,
+    private val messageSendingService: MessageSendingService,
+    private val membershipEventPublisher: MembershipEventPublisher,
 ) : ChatService {
-    private val logger = LoggerFactory.getLogger(ChatServiceImpl::class.java)
-    private val secureRandom = SecureRandom()
-
     // private + 자기호출(self-invocation) 이라 프록시를 거치지 않는다.
     // 캐시는 프록시를 타는 공개 메서드(getChatRoom 등)에서만 적용한다.
-    private fun chatRoomToDto(chatRoom: ChatRoom): ChatRoomDto {
-        val memberCount = chatRoomMemberRepository.countActiveMembersInRoom(chatRoom.id).toInt()
-        val lastMessage = messageReadPort.findLatestMessage(chatRoom.id)
-
-        return ChatRoomDto(
-            id = chatRoom.id,
-            name = chatRoom.name,
-            description = chatRoom.description,
-            type = chatRoom.type,
-            imageUrl = chatRoom.imageUrl,
-            isActive = chatRoom.isActive,
-            maxMembers = chatRoom.maxMembers,
-            memberCount = memberCount,
-            createdBy = userToDto(chatRoom.createdBy),
-            createdAt = chatRoom.createdAt,
-            lastMessage = lastMessage,
-        )
-    }
-
-    private fun messageToDto(message: Message): MessageDto {
-        val roomSeq = if (message.roomSeq > 0) message.roomSeq else message.sequenceNumber
-        return MessageDto(
-            id = message.id,
-            messageId = message.messageId ?: legacyMessageId(message.id),
-            clientMessageId = message.clientMessageId,
-            chatRoomId = message.chatRoom.id,
-            sender = userToDto(message.sender),
-            type = message.type,
-            content = message.content,
-            isEdited = message.isEdited,
-            isDeleted = message.isDeleted,
-            createdAt = message.createdAt,
-            editedAt = message.editedAt,
-            sequenceNumber = message.sequenceNumber,
-            roomSeq = roomSeq,
-            streamShard = message.streamShard,
-            writeShard = message.writeShard,
-            fanoutShard = message.fanoutShard,
-        )
-    }
+    private fun chatRoomToDto(
+        chatRoom: ChatRoom,
+        memberCount: Int = chatRoomMemberRepository.countActiveMembersInRoom(chatRoom.id).toInt(),
+        lastMessage: MessageDto? = messageReadPort.findLatestMessage(chatRoom.id),
+    ): ChatRoomDto = ChatRoomDto(
+        id = chatRoom.id,
+        name = chatRoom.name,
+        description = chatRoom.description,
+        type = chatRoom.type,
+        imageUrl = chatRoom.imageUrl,
+        isActive = chatRoom.isActive,
+        maxMembers = chatRoom.maxMembers,
+        memberCount = memberCount,
+        createdBy = chatRoom.createdBy.toUserDto(),
+        createdAt = chatRoom.createdAt,
+        lastMessage = lastMessage,
+    )
 
     private fun memberToDto(member: ChatRoomMember): ChatRoomMemberDto =
         ChatRoomMemberDto(
             id = member.id,
-            user = userToDto(member.user),
+            user = member.user.toUserDto(),
             role = member.role,
             isActive = member.isActive,
             lastReadMessageId = member.lastReadMessageId,
             joinedAt = member.joinedAt,
             leftAt = member.leftAt,
-        )
-
-    // 위와 동일한 이유로 캐시 애노테이션을 두지 않는다.
-    private fun userToDto(user: User): UserDto =
-        UserDto(
-            id = user.id,
-            username = user.username,
-            displayName = user.displayName,
-            profileImageUrl = user.profileImageUrl,
-            status = user.status,
-            isActive = user.isActive,
-            lastSeenAt = user.lastSeenAt,
-            createdAt = user.createdAt,
         )
 
     @CacheEvict(value = ["chatRooms"], allEntries = true)
@@ -138,7 +82,7 @@ class ChatServiceImpl(
         )
         chatRoomMemberRepository.save(ownerMember)
 
-        publishMembershipChangedAfterCommit(creator.id, savedRoom.id, RedisMessageBroker.MembershipAction.JOIN)
+        membershipEventPublisher.publishAfterCommit(creator.id, savedRoom.id, RedisMessageBroker.MembershipAction.JOIN)
 
         return chatRoomToDto(savedRoom)
     }
@@ -155,9 +99,19 @@ class ChatServiceImpl(
     override fun getChatRooms(
         userId: Long,
         pageable: Pageable,
-    ): Page<ChatRoomDto> =
-        chatRoomRepository.findUserChatRooms(userId, pageable)
-            .map { chatRoomToDto(it) }
+    ): Page<ChatRoomDto> {
+        val rooms = chatRoomRepository.findUserChatRooms(userId, pageable)
+        val dtos = chatRoomsToDtos(rooms.content).associateBy { it.id }
+        return rooms.map { dtos.getValue(it.id) }
+    }
+
+    private fun chatRoomsToDtos(rooms: List<ChatRoom>): List<ChatRoomDto> {
+        if (rooms.isEmpty()) return emptyList()
+        val ids = rooms.map { it.id }
+        val counts = chatRoomMemberRepository.countActiveMembersByRooms(ids).associate { it.roomId to it.memberCount.toInt() }
+        val messages = messageReadPort.findLatestMessagesByRooms(ids)
+        return rooms.map { chatRoomToDto(it, counts[it.id] ?: 0, messages[it.id]) }
+    }
 
     @Transactional(readOnly = true)
     override fun searchChatRooms(
@@ -170,7 +124,7 @@ class ChatServiceImpl(
             chatRoomRepository.findByNameContainingIgnoreCaseAndIsActiveTrueOrderByCreatedAtDesc(query)
         }
 
-        return chatRooms.map { chatRoomToDto(it) }
+        return chatRoomsToDtos(chatRooms)
     }
 
     @Caching(
@@ -193,14 +147,16 @@ class ChatServiceImpl(
             throw ResourceConflictException("이미 참여한 채팅방입니다")
         }
 
-        val member = ChatRoomMember(
-            chatRoom = chatRoom,
-            user = user,
-            role = MemberRole.MEMBER,
-        )
-        chatRoomMemberRepository.save(member)
+        if (chatRoomMemberRepository.reactivateMembership(roomId, userId) == 0) {
+            val member = ChatRoomMember(
+                chatRoom = chatRoom,
+                user = user,
+                role = MemberRole.MEMBER,
+            )
+            chatRoomMemberRepository.save(member)
+        }
 
-        publishMembershipChangedAfterCommit(userId, roomId, RedisMessageBroker.MembershipAction.JOIN)
+        membershipEventPublisher.publishAfterCommit(userId, roomId, RedisMessageBroker.MembershipAction.JOIN)
     }
 
     @Caching(
@@ -211,7 +167,7 @@ class ChatServiceImpl(
     )
     override fun leaveChatRoom(roomId: Long, userId: Long) {
         chatRoomMemberRepository.leaveChatRoom(roomId, userId)
-        publishMembershipChangedAfterCommit(userId, roomId, RedisMessageBroker.MembershipAction.LEAVE)
+        membershipEventPublisher.publishAfterCommit(userId, roomId, RedisMessageBroker.MembershipAction.LEAVE)
     }
 
     @Transactional(readOnly = true)
@@ -323,158 +279,5 @@ class ChatServiceImpl(
         return messageReadPort.findGapMessages(roomId, afterSeq, limit)
     }
 
-    override fun sendMessage(
-        request: SendMessageRequest,
-        senderId: Long,
-    ): MessageDto {
-        val requestedClientMessageId = normalizeClientMessageId(request.clientMessageId)
-        val chatRoom = chatRoomRepository.findById(request.chatRoomId)
-            .orElseThrow { ResourceNotFoundException("채팅방을 찾을 수 없습니다: ${request.chatRoomId}") }
-
-        val sender = userRepository.findById(senderId)
-            .orElseThrow { ResourceNotFoundException("사용자를 찾을 수 없습니다: $senderId") }
-
-        val member = chatRoomMemberRepository.findByChatRoomIdAndUserIdAndIsActiveTrue(request.chatRoomId, senderId)
-            .orElseThrow { ForbiddenOperationException("채팅방에 참여하지 않은 사용자입니다.") }
-
-        if (requestedClientMessageId != null) {
-            val existingMessage = messageReadPort.findByClientMessageId(
-                roomId = request.chatRoomId,
-                senderId = senderId,
-                clientMessageId = requestedClientMessageId,
-            )
-            if (existingMessage != null) {
-                return existingMessage
-            }
-        }
-
-        userSanctionPolicyService.requireAllowedToSend(
-            roomId = request.chatRoomId,
-            userId = senderId,
-        )
-        messageModerationPolicyService.requireAllowed(
-            roomId = request.chatRoomId,
-            senderId = senderId,
-            content = request.content,
-            messageType = request.type,
-        )
-        messageAdmissionPolicyService.requireAllowed(
-            roomId = request.chatRoomId,
-            senderId = senderId,
-            memberRole = member.role,
-        )
-
-        val messageId = generateMessageId()
-        val clientMessageId = requestedClientMessageId ?: "server:$messageId"
-        val roomSeq = messageSequenceService.getNextSequence(request.chatRoomId)
-        val shardConfig = roomStorageConfigReader.shardConfig(request.chatRoomId)
-        val streamShard = streamShard(roomSeq, shardConfig.fanoutShardCount)
-
-        val message = Message(
-            messageId = messageId,
-            clientMessageId = clientMessageId,
-            content = request.content,
-            type = request.type,
-            chatRoom = chatRoom,
-            sender = sender,
-            sequenceNumber = roomSeq,
-            roomSeq = roomSeq,
-            streamShard = streamShard,
-            writeShard = writeShard(messageId, shardConfig.writeShardCount),
-            fanoutShard = fanoutShard(streamShard),
-        )
-
-        messageStreamProducer.append(messageToStreamEnvelope(message))
-        recordAcceptedBestEffort(request.chatRoomId)
-
-        return messageToDto(message)
-    }
-
-    private fun recordAcceptedBestEffort(roomId: Long) {
-        try {
-            roomTrafficStatsService.recordAccepted(roomId)
-        } catch (e: RuntimeException) {
-            logger.warn("Failed to record accepted room traffic stats for room {}", roomId, e)
-        }
-    }
-
-    private fun messageToStreamEnvelope(message: Message): MessageStreamEnvelope {
-        val roomSeq = if (message.roomSeq > 0) message.roomSeq else message.sequenceNumber
-        return MessageStreamEnvelope(
-            messageId = message.messageId ?: legacyMessageId(message.id),
-            clientMessageId = message.clientMessageId,
-            chatRoomId = message.chatRoom.id,
-            senderId = message.sender.id,
-            senderName = message.sender.displayName,
-            messageType = message.type,
-            content = message.content,
-            sequenceNumber = message.sequenceNumber,
-            roomSeq = roomSeq,
-            streamShard = message.streamShard,
-            writeShard = message.writeShard,
-            fanoutShard = message.fanoutShard,
-            createdAt = message.createdAt,
-        )
-    }
-
-    private fun normalizeClientMessageId(clientMessageId: String?): String? =
-        clientMessageId?.trim()?.takeIf {
-            it.isNotEmpty()
-        }
-
-    private fun generateMessageId(): String {
-        val timestamp = Instant.now().toEpochMilli().toString(36).padStart(9, '0')
-        val randomBytes = ByteArray(10)
-        secureRandom.nextBytes(randomBytes)
-        val randomPart = Base64.getUrlEncoder().withoutPadding().encodeToString(randomBytes)
-        return "msg_${timestamp}_$randomPart"
-    }
-
-    private fun legacyMessageId(id: Long): String = "legacy:$id"
-
-    private fun streamShard(roomSeq: Long, shardCount: Int): Int = Math.floorMod(roomSeq - 1, shardCount.coerceAtLeast(1).toLong()).toInt()
-
-    private fun writeShard(messageId: String, shardCount: Int): Int = shard(messageId, shardCount)
-
-    private fun fanoutShard(streamShard: Int): Int = streamShard
-
-    private fun shard(value: String, shardCount: Int): Int = Math.floorMod(value.hashCode(), shardCount.coerceAtLeast(1))
-
-    private fun publishMembershipChangedAfterCommit(
-        userId: Long,
-        roomId: Long,
-        action: RedisMessageBroker.MembershipAction,
-    ) {
-        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
-            publishMembershipChanged(userId, roomId, action)
-            return
-        }
-
-        TransactionSynchronizationManager.registerSynchronization(object : TransactionSynchronization {
-            override fun afterCommit() {
-                publishMembershipChanged(userId, roomId, action)
-            }
-        })
-    }
-
-    private fun publishMembershipChanged(
-        userId: Long,
-        roomId: Long,
-        action: RedisMessageBroker.MembershipAction,
-    ) {
-        when (action) {
-            RedisMessageBroker.MembershipAction.JOIN -> {
-                if (webSocketSessionManager.isUserOnlineLocally(userId)) {
-                    webSocketSessionManager.joinRoom(userId, roomId)
-                }
-            }
-            RedisMessageBroker.MembershipAction.LEAVE -> webSocketSessionManager.leaveRoom(userId, roomId)
-        }
-
-        redisMessageBroker.publishMembershipChanged(
-            userId = userId,
-            roomId = roomId,
-            action = action,
-        )
-    }
+    override fun sendMessage(request: SendMessageRequest, senderId: Long): MessageDto = messageSendingService.sendMessage(request, senderId)
 }

@@ -36,42 +36,50 @@ class RoomHeatClassifier(
 ) {
     fun classify(snapshot: RoomTrafficSnapshot): RoomHeatPolicy =
         when {
-            snapshot.isOverload() -> snapshot.policy(
+            snapshot.isOverload() -> RoomHeatPolicy(
+                roomId = snapshot.roomId,
                 heatLevel = RoomHeatLevel.OVERLOAD,
                 liveFeedMaxMessages = properties.overloadLiveFeedMaxMessages,
                 liveFeedMaxAgeSeconds = properties.overloadLiveFeedMaxAgeSeconds,
                 roomRateLimitPerSecond = properties.overloadRoomRateLimitPerSecond,
                 slowModeSeconds = properties.overloadSlowModeSeconds,
-                shardCount = properties.veryHotShardCount,
+                writeShardCount = properties.veryHotShardCount,
+                fanoutShardCount = properties.veryHotShardCount,
             )
 
-            snapshot.isVeryHot() -> snapshot.policy(
+            snapshot.isVeryHot() -> RoomHeatPolicy(
+                roomId = snapshot.roomId,
                 heatLevel = RoomHeatLevel.VERY_HOT,
                 liveFeedMaxMessages = properties.veryHotLiveFeedMaxMessages,
                 liveFeedMaxAgeSeconds = properties.veryHotLiveFeedMaxAgeSeconds,
                 roomRateLimitPerSecond = properties.veryHotRoomRateLimitPerSecond,
                 slowModeSeconds = properties.veryHotSlowModeSeconds,
-                shardCount = properties.veryHotShardCount,
+                writeShardCount = properties.veryHotShardCount,
+                fanoutShardCount = properties.veryHotShardCount,
             )
 
-            snapshot.roomMessagesPerSecond >= properties.hotMessagesPerSecond -> snapshot.policy(
+            snapshot.roomMessagesPerSecond >= properties.hotMessagesPerSecond -> RoomHeatPolicy(
+                roomId = snapshot.roomId,
                 heatLevel = RoomHeatLevel.HOT,
                 liveFeedMaxMessages = properties.normalLiveFeedMaxMessages,
                 liveFeedMaxAgeSeconds = properties.normalLiveFeedMaxAgeSeconds,
                 roomRateLimitPerSecond = null,
                 slowModeSeconds = properties.hotSlowModeSeconds,
-                shardCount = properties.hotShardCount,
+                writeShardCount = properties.hotShardCount,
+                fanoutShardCount = properties.hotShardCount,
             )
 
-            else -> snapshot.policy(
+            else -> RoomHeatPolicy(
+                roomId = snapshot.roomId,
                 heatLevel = RoomHeatLevel.NORMAL,
                 liveFeedMaxMessages = properties.normalLiveFeedMaxMessages,
                 liveFeedMaxAgeSeconds = properties.normalLiveFeedMaxAgeSeconds,
                 roomRateLimitPerSecond = null,
                 slowModeSeconds = null,
-                shardCount = MIN_SHARD_COUNT,
+                writeShardCount = MIN_SHARD_COUNT,
+                fanoutShardCount = MIN_SHARD_COUNT,
             )
-        }
+        }.sanitized()
 
     private fun RoomTrafficSnapshot.isVeryHot(): Boolean =
         roomMessagesPerSecond >= properties.veryHotMessagesPerSecond ||
@@ -82,26 +90,10 @@ class RoomHeatClassifier(
             fanoutLagMillis > properties.overloadFanoutLagMillis ||
             gatewaySendQueueDepth > properties.overloadGatewayQueueDepth
 
-    private fun RoomTrafficSnapshot.policy(
-        heatLevel: RoomHeatLevel,
-        liveFeedMaxMessages: Int,
-        liveFeedMaxAgeSeconds: Int,
-        roomRateLimitPerSecond: Int?,
-        slowModeSeconds: Int?,
-        shardCount: Int,
-    ): RoomHeatPolicy {
-        val sanitizedShardCount = shardCount.coerceAtLeast(MIN_SHARD_COUNT)
-        return RoomHeatPolicy(
-            roomId = roomId,
-            heatLevel = heatLevel,
-            liveFeedMaxMessages = liveFeedMaxMessages,
-            liveFeedMaxAgeSeconds = liveFeedMaxAgeSeconds,
-            roomRateLimitPerSecond = roomRateLimitPerSecond,
-            slowModeSeconds = slowModeSeconds,
-            writeShardCount = sanitizedShardCount,
-            fanoutShardCount = sanitizedShardCount,
-        )
-    }
+    private fun RoomHeatPolicy.sanitized(): RoomHeatPolicy = copy(
+        writeShardCount = writeShardCount.coerceAtLeast(MIN_SHARD_COUNT),
+        fanoutShardCount = fanoutShardCount.coerceAtLeast(MIN_SHARD_COUNT),
+    )
 
     private companion object {
         const val MIN_SHARD_COUNT = 1

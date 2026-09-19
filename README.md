@@ -165,13 +165,22 @@ Java 소스가 없으므로 스타일 검사는 ktlint가 담당합니다.
 ```
 
 `check`와 PR의 `Kotlin Quality` workflow에서 위반 시 빌드를 실패시킵니다.
+`./gradlew check`는 전체 모듈 테스트, `:chat-application:architectureTest`, Kover 검증까지 실행합니다.
+ArchUnit은 실제 운영 클래스를 대상으로 모듈 의존 방향, 컨트롤러의 저장소 직접 접근,
+트랜잭션 선언 위치를 검사합니다. 현재 domain의 JPA 엔티티·Spring Data 감사 어노테이션은
+기존 통합 모델에 따라 허용하며, 도메인과 영속 모델을 분리할 때 프레임워크 독립 규칙을 추가합니다.
+
+Kover는 전체 모듈을 집계하고 운영 패키지를 제외하지 않습니다. 최초 측정값(라인 78.17%, 분기 60.85%)을
+기준으로 최소 라인 78%, 분기 60%를 적용합니다. `./gradlew koverHtmlReport koverXmlReport koverVerify`로
+별도 실행할 수 있고 보고서는 `build/reports/kover/`에 생성됩니다. CI는 정적 분석과 전체 검증을 모두 실행합니다.
+
 설정은 `.editorconfig`, `config/detekt/detekt.yml`에서 관리하며,
 리포트는 각 모듈의 `build/reports/detekt`, `build/reports/ktlint`에 생성합니다.
 루트 빌드 스크립트의 ktlint 리포트는 루트 `build/reports/ktlint`에 생성합니다.
 
 초기 baseline 정리 후 ktlint 위반은 0건이며, 모든 ktlint baseline은 비어 있습니다.
-Detekt baseline은 286건에서 72건으로 줄였습니다. 남은 항목은 긴 인자 목록과 서비스 복잡도,
-Java vararg 연동, 예외 처리 정책 등 별도 검토가 필요한 기존 부채입니다.
+Detekt baseline은 286건에서 72건, 이번 정리에서 52건으로 줄였습니다.
+유지한 항목의 사유와 재검토 조건은 [baseline 검토 기록](config/detekt/baseline-review.md)에 정리했습니다.
 기록되지 않은 위반은 빌드를 실패시킵니다. ktlint baseline은 파일·규칙 단위로 위반을
 숨길 수 있으므로 새 예외를 일괄 추가하지 않습니다.
 

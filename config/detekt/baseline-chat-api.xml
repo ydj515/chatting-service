@@ -2,10 +2,8 @@
 <SmellBaseline>
   <ManuallySuppressedIssues />
   <CurrentIssues>
-    <ID>LongParameterList:ChatController.kt$ChatController$( @CurrentUserId authenticatedUserId: Long, @PathVariable id: Long, @RequestParam(required = false) cursor: Long?, @RequestParam(required = false) cursorToken: String?, @RequestParam(required = false) limit: Int?, @RequestParam(required = false) direction: MessageDirection?, )</ID>
     <ID>SpreadOperator:WebConfig.kt$WebConfig$(*corsProperties.allowedHeaders.toTypedArray())</ID>
     <ID>SpreadOperator:WebConfig.kt$WebConfig$(*corsProperties.allowedMethods.toTypedArray())</ID>
     <ID>SpreadOperator:WebConfig.kt$WebConfig$(*corsProperties.allowedOrigins.toTypedArray())</ID>
-    <ID>TooGenericExceptionThrown:GlobalExceptionHandlerTest.kt$GlobalExceptionHandlerTest.TestErrorController$throw RuntimeException("database password leaked in stack trace")</ID>
   </CurrentIssues>
 </SmellBaseline>
