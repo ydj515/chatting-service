@@ -13,4 +13,4 @@ groups:
         annotations:
           summary: "Alertmanager PagerDuty notification delivery is failing"
           description: "Alertmanager has failed at least one PagerDuty notification request in the last 5 minutes. Check the PagerDuty Events API v2 Integration Key, network/DNS reachability, PagerDuty service status, and Alertmanager logs before relying on critical paging."
-          runbook: "docs/alertmanager_oncall_wiring.md"
+          runbook: "docs/operations/on-call.md"

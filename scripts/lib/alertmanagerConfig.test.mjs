@@ -175,18 +175,18 @@ test('readme documents required Alertmanager secret setup', () => {
   assert.match(readme, /ALERTMANAGER_SLACK_WEBHOOK_URL_FILE/);
   assert.match(readme, /ALERTMANAGER_PAGERDUTY_ROUTING_KEY_FILE/);
   assert.match(readme, /ALERTMANAGER_PAGERDUTY_ENABLED/);
-  assert.match(readme, /\[PagerDuty Events API v2 Integration Key 발급 절차\]\(docs\/pagerduty_events_api_v2_integration_key\.md\)/);
+  assert.match(readme, /\[PagerDuty Events API v2 Integration Key 발급 절차\]\(docs\/operations\/pagerduty\.md\)/);
   assert.doesNotMatch(readme, /Add integration/);
 });
 
 test('alertmanager on-call docs link to the PagerDuty Events API v2 key issuance guide', () => {
   const docs = readFileSync(
-    new URL('../../docs/alertmanager_oncall_wiring.md', import.meta.url),
+    new URL('../../docs/operations/on-call.md', import.meta.url),
     'utf8',
   );
 
   assert.match(docs, /PagerDuty Events API v2 Integration Key/);
-  assert.match(docs, /\[PagerDuty Events API v2 Integration Key 발급 절차\]\(\.\/pagerduty_events_api_v2_integration_key\.md\)/);
+  assert.match(docs, /\[PagerDuty Events API v2 Integration Key 발급 절차\]\(pagerduty\.md\)/);
   assert.match(docs, /routing_key_file/);
   assert.match(docs, /ALERTMANAGER_PAGERDUTY_ENABLED/);
   assert.match(docs, /PagerDuty를 끄면 critical/);
@@ -197,7 +197,7 @@ test('alertmanager on-call docs link to the PagerDuty Events API v2 key issuance
 
 test('pagerduty guide documents Events API v2 key issuance steps', () => {
   const docs = readFileSync(
-    new URL('../../docs/pagerduty_events_api_v2_integration_key.md', import.meta.url),
+    new URL('../../docs/operations/pagerduty.md', import.meta.url),
     'utf8',
   );
 

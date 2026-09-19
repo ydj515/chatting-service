@@ -14,7 +14,7 @@ export const ROOM_SEQ_GAP_ALERT_RULES = [
     annotations: {
       summary: 'Canonical room sequence gap detected',
       description: 'The aggregate roomSeq gap audit found missing sequence numbers for at least 2 minutes. This can indicate Redis trim/loss or a failed append after sequence allocation; triage with Redis append failures and worker lag before paging as data loss.',
-      runbook: 'docs/infrastructure.md',
+      runbook: 'docs/operations/infrastructure.md',
     },
   },
   {
@@ -30,7 +30,7 @@ export const ROOM_SEQ_GAP_ALERT_RULES = [
     annotations: {
       summary: 'Canonical room sequence gap width is elevated',
       description: 'The largest aggregate roomSeq gap width is above 100 for 5 minutes. Treat this as a sequence-hole warning and confirm whether accepted messages were lost before escalating.',
-      runbook: 'docs/infrastructure.md',
+      runbook: 'docs/operations/infrastructure.md',
     },
   },
 ];

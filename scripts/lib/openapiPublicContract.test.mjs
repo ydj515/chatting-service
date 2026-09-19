@@ -4,7 +4,7 @@ import { test } from 'node:test';
 
 const openapi = readFileSync(new URL('../../docs/openapi.yaml', import.meta.url), 'utf8');
 const migrationPolicy = readFileSync(
-  new URL('../../docs/public_history_cursor_migration.md', import.meta.url),
+  new URL('../../docs/operations/history-cursor-migration.md', import.meta.url),
   'utf8',
 );
 

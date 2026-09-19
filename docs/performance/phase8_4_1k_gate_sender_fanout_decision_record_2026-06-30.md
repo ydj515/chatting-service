@@ -5,8 +5,8 @@
 - 대상: Phase 8.4 staged release gate의 `1k` stage
 - 관련 문서:
   - `production-readiness-assessment-2026-06-28.html`
-  - `docs/superpowers/specs/2026-06-29-phase8-4-staged-release-gate-design.md`
-  - `docs/superpowers/plans/2026-06-29-phase8-4-staged-release-gate.md`
+  - `docs/testing/hot-room-release-gate.md`
+  - `docs/testing/hot-room-release-gate.md`
 
 ## 1. 목적
 

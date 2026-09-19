@@ -361,7 +361,7 @@ test('PagerDuty-off smoke CLI delegates to the reusable plan runner', () => {
 
 test('PagerDuty-off Slack smoke is documented and available as a mise task', () => {
   const docs = readFileSync(
-    new URL('../../docs/alertmanager_oncall_wiring.md', import.meta.url),
+    new URL('../../docs/operations/on-call.md', import.meta.url),
     'utf8',
   );
   const mise = readFileSync(new URL('../../mise.toml', import.meta.url), 'utf8');

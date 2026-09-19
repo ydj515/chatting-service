@@ -14,7 +14,7 @@ export const ALERTMANAGER_SMOKE_ALERT_RULES = [
     annotations: {
       summary: 'Alertmanager warning delivery smoke test',
       description: 'Synthetic warning alert used to verify Prometheus to Alertmanager to Slack-compatible webhook delivery.',
-      runbook: 'docs/alertmanager_oncall_wiring.md',
+      runbook: 'docs/operations/on-call.md',
     },
   },
   {
@@ -31,7 +31,7 @@ export const ALERTMANAGER_SMOKE_ALERT_RULES = [
     annotations: {
       summary: 'Alertmanager critical delivery smoke test',
       description: 'Synthetic critical alert used to verify Prometheus to Alertmanager to PagerDuty delivery.',
-      runbook: 'docs/alertmanager_oncall_wiring.md',
+      runbook: 'docs/operations/on-call.md',
     },
   },
 ];

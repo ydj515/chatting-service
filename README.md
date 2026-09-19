@@ -73,11 +73,11 @@ cp infra/alertmanager/secrets/alertmanager_pagerduty_routing_key_sample \
 | `infra/alertmanager/secrets/alertmanager_slack_webhook_url` | Slack-compatible webhook URL |
 | `infra/alertmanager/secrets/alertmanager_pagerduty_routing_key` | PagerDuty Events API v2 Integration Key |
 
-PagerDuty key는 [PagerDuty Events API v2 Integration Key 발급 절차](docs/pagerduty_events_api_v2_integration_key.md)를 따라 발급합니다. 현재 Alertmanager 설정은 `pagerduty_configs.routing_key_file`을 사용하므로 `Events API v2` integration type의 `Integration Key`가 필요합니다.
+PagerDuty key는 [PagerDuty Events API v2 Integration Key 발급 절차](docs/operations/pagerduty.md)를 따라 발급합니다. 현재 Alertmanager 설정은 `pagerduty_configs.routing_key_file`을 사용하므로 `Events API v2` integration type의 `Integration Key`가 필요합니다.
 
 기본 sample secret은 기동용 placeholder일 뿐 실제 알림을 보내지 않습니다. 실제 운영 secret 파일을 다른 경로에 둘 경우에도 같은 환경변수로 경로를 지정합니다.
 
-PagerDuty notification 실패는 Alertmanager 자체 metric 기반의 `AlertmanagerPagerDutyNotificationFailures` warning alert로 감지하며, PagerDuty가 아닌 Slack으로 전송합니다. 자세한 운영 절차는 [Alertmanager On-call Wiring](docs/alertmanager_oncall_wiring.md)을 참고합니다.
+PagerDuty notification 실패는 Alertmanager 자체 metric 기반의 `AlertmanagerPagerDutyNotificationFailures` warning alert로 감지하며, PagerDuty가 아닌 Slack으로 전송합니다. 자세한 운영 절차는 [Alertmanager On-call Wiring](docs/operations/on-call.md)을 참고합니다.
 
 ```bash
 mise run clean:infra   # (선택) 기존 볼륨 정리 후 깨끗하게 시작
@@ -143,9 +143,9 @@ docs/                          # 상세 문서
 |-----------------------------------------------------------------------------------|----------------------------------------------|
 | [API 레퍼런스](docs/api-reference.md)                                                 | REST API 엔드포인트 및 WebSocket 프로토콜              |
 | [환경 변수](docs/configuration.md)                                                    | Docker/Backend/Client 환경 변수 목록               |
-| [인프라 가이드](docs/infrastructure.md)                                                 | mise 태스크, PostgreSQL replica/archive, 로드 밸런싱 |
+| [인프라 가이드](docs/operations/infrastructure.md)                                                 | mise 태스크, PostgreSQL replica/archive, 로드 밸런싱 |
 | [API 스펙 (OpenAPI)](docs/openapi.yaml)                                             | Swagger/OpenAPI 3.0 스펙                       |
-| [고트래픽 설계서](docs/superpowers/specs/2026-06-11-high-traffic-chat-service-design.md) | 고트래픽 채팅 서비스 설계 문서                            |
+| [문서 안내](docs/README.md) | 설계·운영·검증·후속 과제 목차                            |
 
 ## 메시지 재전송과 수락 결과 보관
 
