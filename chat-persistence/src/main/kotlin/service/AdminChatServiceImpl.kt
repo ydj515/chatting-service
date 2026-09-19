@@ -20,6 +20,7 @@ import com.chat.persistence.repository.AdminAuditLogRepository
 import com.chat.persistence.repository.AdminExportJobRepository
 import com.chat.persistence.repository.AdminMessageQuery
 import com.chat.persistence.repository.AdminMessageRepository
+import com.chat.persistence.repository.AdminRoomMessageQuery
 import com.chat.persistence.storage.ObjectStoragePort
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.springframework.cache.annotation.CacheEvict
@@ -44,11 +45,13 @@ class AdminChatServiceImpl(
         var response: AdminMessagePageResponse
         val elapsedNanos = measureNanoTime {
             val rows = messageRepository.findRoomMessages(
-                roomId = request.roomId,
-                from = request.from,
-                to = request.to,
-                cursor = AdminMessageCursorCodec.decode(request.cursor),
-                limit = request.limit + 1,
+                AdminRoomMessageQuery(
+                    roomId = request.roomId,
+                    from = request.from,
+                    to = request.to,
+                    cursor = AdminMessageCursorCodec.decode(request.cursor),
+                    limit = request.limit + 1,
+                ),
             )
             response = rows.toMessagePage(request.limit, 0)
         }

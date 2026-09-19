@@ -19,6 +19,7 @@ import com.chat.persistence.repository.AdminExportJobRepository
 import com.chat.persistence.repository.AdminExportJobStatusRecord
 import com.chat.persistence.repository.AdminMessageQuery
 import com.chat.persistence.repository.AdminMessageRepository
+import com.chat.persistence.repository.AdminRoomMessageQuery
 import com.chat.persistence.storage.ObjectStoragePort
 import com.chat.persistence.storage.ObjectUploadRequest
 import com.chat.persistence.storage.ObjectUploadResult
@@ -77,11 +78,13 @@ class AdminChatServiceImplTest {
         val fixture = fixture()
         `when`(
             fixture.messageRepository.findRoomMessages(
-                roomId = 10L,
-                from = null,
-                to = null,
-                cursor = null,
-                limit = 3,
+                AdminRoomMessageQuery(
+                    roomId = 10L,
+                    from = null,
+                    to = null,
+                    cursor = null,
+                    limit = 3,
+                ),
             ),
         ).thenReturn(
             listOf(
@@ -133,11 +136,13 @@ class AdminChatServiceImplTest {
         val encodedCursor = AdminMessageCursorCodec.encode(cursor)
         `when`(
             fixture.messageRepository.findRoomMessages(
-                roomId = 10L,
-                from = null,
-                to = null,
-                cursor = cursor,
-                limit = 51,
+                AdminRoomMessageQuery(
+                    roomId = 10L,
+                    from = null,
+                    to = null,
+                    cursor = cursor,
+                    limit = 51,
+                ),
             ),
         ).thenReturn(emptyList())
 
@@ -152,13 +157,7 @@ class AdminChatServiceImplTest {
             ),
         )
 
-        verify(fixture.messageRepository).findRoomMessages(
-            eq(10L),
-            eq(null),
-            eq(null),
-            eq(cursor),
-            eq(51),
-        )
+        verify(fixture.messageRepository).findRoomMessages(AdminRoomMessageQuery(10L, null, null, cursor, 51))
     }
 
     @Test

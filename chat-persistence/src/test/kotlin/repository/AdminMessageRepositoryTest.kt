@@ -43,11 +43,13 @@ class AdminMessageRepositoryTest {
         ).thenReturn(emptyList())
 
         repository.findRoomMessages(
-            roomId = 10L,
-            from = Instant.parse("2026-06-14T00:00:00Z"),
-            to = Instant.parse("2026-06-15T00:00:00Z"),
-            cursor = cursor,
-            limit = 50,
+            AdminRoomMessageQuery(
+                roomId = 10L,
+                from = Instant.parse("2026-06-14T00:00:00Z"),
+                to = Instant.parse("2026-06-15T00:00:00Z"),
+                cursor = cursor,
+                limit = 50,
+            ),
         )
 
         val sqlCaptor = ArgumentCaptor.forClass(String::class.java)
@@ -88,11 +90,13 @@ class AdminMessageRepositoryTest {
         ).thenReturn(emptyList())
 
         repository.findRoomMessages(
-            roomId = 10L,
-            from = null,
-            to = null,
-            cursor = null,
-            limit = 50,
+            AdminRoomMessageQuery(
+                roomId = 10L,
+                from = null,
+                to = null,
+                cursor = null,
+                limit = 50,
+            ),
         )
 
         val sqlCaptor = ArgumentCaptor.forClass(String::class.java)

@@ -12,6 +12,7 @@ import com.chat.persistence.repository.AdminExportJobRecord
 import com.chat.persistence.repository.AdminExportJobRepository
 import com.chat.persistence.repository.AdminMessageQuery
 import com.chat.persistence.repository.AdminMessageRepository
+import com.chat.persistence.repository.AdminRoomMessageQuery
 import com.chat.persistence.storage.ObjectStoragePort
 import com.chat.persistence.storage.ObjectUploadRequest
 import com.chat.persistence.storage.ObjectUploadResult
@@ -36,6 +37,34 @@ import java.time.Instant
 
 class AdminMessageExportWorkerTest {
     @Test
+    @org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable(named = "CHAT_TEST_POSTGRES_URL", matches = ".+")
+    fun `room export filters sender across cursor chunks without requiring a search query`(@TempDir tempDir: Path) {
+        val connection = java.sql.DriverManager.getConnection(System.getenv("CHAT_TEST_POSTGRES_URL"), "postgres", System.getenv("CHAT_TEST_POSTGRES_PASSWORD").orEmpty())
+        val source = org.springframework.jdbc.datasource.SingleConnectionDataSource(connection, true)
+        try {
+            val jdbc = org.springframework.jdbc.core.JdbcTemplate(source)
+            jdbc.execute("CREATE TEMP TABLE app_users (id bigint, username text, display_name text)")
+            jdbc.execute("INSERT INTO app_users VALUES (7, 'seven', 'Seven'), (8, 'eight', 'Eight')")
+            jdbc.execute("CREATE TEMP TABLE chat_messages (message_id text, client_message_id text, room_id bigint, room_seq bigint, write_shard int, sender_id bigint, message_type text, content text, is_deleted boolean, created_at timestamptz)")
+            repeat(6) { index ->
+                jdbc.update("INSERT INTO chat_messages VALUES (?, NULL, 10, ?, 0, ?, 'TEXT', 'hello', false, '2026-06-14T00:00:00Z')", "msg-$index", index, if (index % 2 == 0) 7 else 8)
+            }
+            val messages = AdminMessageRepository(jdbc, jdbc)
+            for (senderId in listOf(7L, null)) {
+                val jobs = mock(AdminExportJobRepository::class.java)
+                val storage = RecordingObjectStoragePort()
+                `when`(jobs.claimNextPending("worker-1")).thenReturn(AdminExportJobRecord("export-$senderId", "admin", """{"roomId":10,"query":null,"senderId":$senderId}"""))
+                val count = worker(jobs, messages, tempDir, storage).pollAndExport()
+                val expected = if (senderId == null) listOf("msg-5", "msg-4", "msg-3", "msg-2", "msg-1", "msg-0") else listOf("msg-4", "msg-2", "msg-0")
+                assertEquals(expected.size, count)
+                assertEquals(expected, requireNotNull(storage.uploadedContent).lineSequence().drop(1).filter { it.isNotBlank() }.map { it.substringBefore(',') }.toList())
+            }
+        } finally {
+            source.destroy()
+        }
+    }
+
+    @Test
     fun `checkpoint sees complete bytes before writer closes and resume keeps those rows`(@TempDir tempDir: Path) {
         val jobs = mock(AdminExportJobRepository::class.java)
         val messages = mock(AdminMessageRepository::class.java)
@@ -46,7 +75,7 @@ class AdminMessageExportWorkerTest {
         val output = tempDir.resolve("export-flush.csv")
         val job = AdminExportJobRecord(jobId = "export-flush", actor = "admin", requestJson = """{"roomId":10}""")
         `when`(jobs.claimNextPending("worker-1")).thenReturn(job)
-        `when`(messages.findRoomMessages(10, null, null, null, 2)).thenReturn(listOf(first))
+        `when`(messages.findRoomMessages(AdminRoomMessageQuery(10, null, null, null, 2))).thenReturn(listOf(first))
         var checkpointBytes = ""
         org.mockito.Mockito.doAnswer {
             checkpointBytes = Files.readString(output)
@@ -57,7 +86,7 @@ class AdminMessageExportWorkerTest {
         assertTrue(checkpointBytes.isNotEmpty())
 
         `when`(jobs.claimNextPending("worker-1")).thenReturn(job.copy(cursorToken = token, exportedRows = 1, outputUri = output.toUri().toString()))
-        `when`(messages.findRoomMessages(10, null, null, cursor, 2)).thenReturn(emptyList())
+        `when`(messages.findRoomMessages(AdminRoomMessageQuery(10, null, null, cursor, 2))).thenReturn(emptyList())
         assertEquals(1, worker(jobs, messages, tempDir, storage).pollAndExport())
         assertEquals(checkpointBytes, storage.uploadedContent)
     }
@@ -79,11 +108,13 @@ class AdminMessageExportWorkerTest {
         )
         `when`(
             messageRepository.findRoomMessages(
-                roomId = 10L,
-                from = Instant.parse("2026-06-14T00:00:00Z"),
-                to = null,
-                cursor = null,
-                limit = 2,
+                AdminRoomMessageQuery(
+                    roomId = 10L,
+                    from = Instant.parse("2026-06-14T00:00:00Z"),
+                    to = null,
+                    cursor = null,
+                    limit = 2,
+                ),
             ),
         ).thenReturn(listOf(message()))
 
@@ -122,11 +153,13 @@ class AdminMessageExportWorkerTest {
         )
         `when`(
             messageRepository.findRoomMessages(
-                roomId = 10L,
-                from = null,
-                to = null,
-                cursor = null,
-                limit = 2,
+                AdminRoomMessageQuery(
+                    roomId = 10L,
+                    from = null,
+                    to = null,
+                    cursor = null,
+                    limit = 2,
+                ),
             ),
         ).thenReturn(
             listOf(
@@ -171,11 +204,13 @@ class AdminMessageExportWorkerTest {
         )
         `when`(
             messageRepository.findRoomMessages(
-                roomId = 10L,
-                from = null,
-                to = null,
-                cursor = null,
-                limit = 2,
+                AdminRoomMessageQuery(
+                    roomId = 10L,
+                    from = null,
+                    to = null,
+                    cursor = null,
+                    limit = 2,
+                ),
             ),
         ).thenReturn(
             listOf(
@@ -185,11 +220,13 @@ class AdminMessageExportWorkerTest {
         )
         `when`(
             messageRepository.findRoomMessages(
-                roomId = 10L,
-                from = null,
-                to = null,
-                cursor = firstChunkCursor,
-                limit = 2,
+                AdminRoomMessageQuery(
+                    roomId = 10L,
+                    from = null,
+                    to = null,
+                    cursor = firstChunkCursor,
+                    limit = 2,
+                ),
             ),
         ).thenReturn(
             listOf(
@@ -200,8 +237,8 @@ class AdminMessageExportWorkerTest {
         val exportedRows = worker.pollAndExport()
 
         assertEquals(3, exportedRows)
-        verify(messageRepository).findRoomMessages(10L, null, null, null, 2)
-        verify(messageRepository).findRoomMessages(10L, null, null, firstChunkCursor, 2)
+        verify(messageRepository).findRoomMessages(AdminRoomMessageQuery(10L, null, null, null, 2))
+        verify(messageRepository).findRoomMessages(AdminRoomMessageQuery(10L, null, null, firstChunkCursor, 2))
         verify(exportJobRepository).updateCheckpoint(
             eqString("export-1"),
             eqString(AdminMessageCursorCodec.encode(firstChunkCursor)),
@@ -316,11 +353,13 @@ class AdminMessageExportWorkerTest {
         )
         `when`(
             messageRepository.findRoomMessages(
-                roomId = 10L,
-                from = null,
-                to = null,
-                cursor = checkpointCursor,
-                limit = 2,
+                AdminRoomMessageQuery(
+                    roomId = 10L,
+                    from = null,
+                    to = null,
+                    cursor = checkpointCursor,
+                    limit = 2,
+                ),
             ),
         ).thenReturn(
             listOf(
@@ -336,7 +375,7 @@ class AdminMessageExportWorkerTest {
         val csv = requireNotNull(storage.uploadedContent)
         assertEquals(1, Regex("messageId,clientMessageId,roomId").findAll(csv).count())
         assertTrue(csv.contains("msg-98,client-98,10,98"))
-        verify(messageRepository).findRoomMessages(10L, null, null, checkpointCursor, 2)
+        verify(messageRepository).findRoomMessages(AdminRoomMessageQuery(10L, null, null, checkpointCursor, 2))
         verify(exportJobRepository).updateCheckpoint(
             eqString("export-1"),
             eqString(AdminMessageCursorCodec.encode(finalCursor)),
@@ -362,11 +401,13 @@ class AdminMessageExportWorkerTest {
         )
         `when`(
             messageRepository.findRoomMessages(
-                roomId = 10L,
-                from = null,
-                to = null,
-                cursor = null,
-                limit = 2,
+                AdminRoomMessageQuery(
+                    roomId = 10L,
+                    from = null,
+                    to = null,
+                    cursor = null,
+                    limit = 2,
+                ),
             ),
         ).thenReturn(listOf(message()))
 

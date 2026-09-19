@@ -23,13 +23,13 @@ class AdminMessageRepository(
     @Qualifier("jdbcTemplate")
     private val writeJdbcTemplate: JdbcTemplate,
 ) {
-    fun findRoomMessages(
-        roomId: Long,
-        from: Instant?,
-        to: Instant?,
-        cursor: AdminMessageCursor?,
-        limit: Int,
-    ): List<AdminMessageDto> {
+    fun findRoomMessages(criteria: AdminRoomMessageQuery): List<AdminMessageDto> {
+        val roomId = criteria.roomId
+        val from = criteria.from
+        val to = criteria.to
+        val cursor = criteria.cursor
+        val limit = criteria.limit
+        val senderId = criteria.senderId
         val where = mutableListOf("cm.room_id = ?")
         val args = mutableListOf<Any>(roomId)
         if (from != null) {
@@ -39,6 +39,10 @@ class AdminMessageRepository(
         if (to != null) {
             where += "cm.created_at < ?"
             args += Timestamp.from(to)
+        }
+        if (senderId != null) {
+            where += "cm.sender_id = ?"
+            args += senderId
         }
         if (cursor != null) {
             where +=
@@ -344,4 +348,13 @@ data class AdminMessageQuery(
     val senderId: Long?,
     val cursor: AdminMessageSearchCursor?,
     val limit: Int,
+)
+
+data class AdminRoomMessageQuery(
+    val roomId: Long,
+    val from: Instant?,
+    val to: Instant?,
+    val cursor: AdminMessageCursor?,
+    val limit: Int,
+    val senderId: Long? = null,
 )

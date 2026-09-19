@@ -11,6 +11,7 @@ import com.chat.persistence.repository.AdminExportJobRecord
 import com.chat.persistence.repository.AdminExportJobRepository
 import com.chat.persistence.repository.AdminMessageQuery
 import com.chat.persistence.repository.AdminMessageRepository
+import com.chat.persistence.repository.AdminRoomMessageQuery
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import org.slf4j.LoggerFactory
@@ -77,11 +78,14 @@ class AdminMessageExportWorker(
 
         val roomId = request.roomId ?: error("roomId or query is required for admin message export")
         return messageRepository.findRoomMessages(
-            roomId = roomId,
-            from = request.from,
-            to = request.to,
-            cursor = cursor,
-            limit = limit,
+            AdminRoomMessageQuery(
+                roomId = roomId,
+                from = request.from,
+                to = request.to,
+                cursor = cursor,
+                limit = limit,
+                senderId = request.senderId,
+            ),
         )
     }
 
