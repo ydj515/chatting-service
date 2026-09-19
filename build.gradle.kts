@@ -1,4 +1,12 @@
+import io.gitlab.arturbosch.detekt.Detekt
+import io.gitlab.arturbosch.detekt.extensions.DetektExtension
+import io.gitlab.arturbosch.detekt.getSupportedKotlinVersion
+import org.jlleitschuh.gradle.ktlint.KtlintExtension
+
 plugins {
+    base
+    alias(libs.plugins.detekt) apply false
+    alias(libs.plugins.ktlint)
     alias(libs.plugins.kotlin.jvm) apply false
     alias(libs.plugins.kotlin.spring) apply false
     alias(libs.plugins.spring.boot) apply false
@@ -36,4 +44,71 @@ subprojects {
     tasks.withType<Test> {
         useJUnitPlatform()
     }
+}
+
+allprojects {
+    apply(plugin = "org.jlleitschuh.gradle.ktlint")
+    extensions.configure<KtlintExtension> {
+        version.set(rootLibs.versions.ktlint.get())
+        outputToConsole.set(true)
+        baseline.set(rootProject.file("config/ktlint/baseline-${project.name}.xml"))
+        filter {
+            exclude("**/build/**", "**/.gradle/**", "**/node_modules/**")
+        }
+    }
+}
+
+subprojects {
+    apply(plugin = "io.gitlab.arturbosch.detekt")
+    // Register after Spring's dependency management resolution rules.
+    afterEvaluate {
+        configurations.named("detekt") {
+            resolutionStrategy.eachDependency {
+                if (requested.group == "org.jetbrains.kotlin") {
+                    useVersion(getSupportedKotlinVersion())
+                }
+            }
+        }
+    }
+    extensions.configure<DetektExtension> {
+        buildUponDefaultConfig = true
+        config.setFrom(rootProject.files("config/detekt/detekt.yml"))
+        baseline = rootProject.file("config/detekt/baseline-${project.name}.xml")
+        source.setFrom(files("src/main/kotlin", "src/test/kotlin"))
+    }
+    tasks.withType<Detekt>().configureEach {
+        reports {
+            html.required.set(true)
+            xml.required.set(true)
+            sarif.required.set(true)
+        }
+    }
+}
+
+val verifyDetekt by tasks.registering {
+    group = "verification"
+    description = "Checks Kotlin defects and complexity in all modules."
+    dependsOn(subprojects.map { "${it.path}:detekt" })
+}
+
+val verifyKotlinFormat by tasks.registering {
+    group = "verification"
+    description = "Checks Kotlin and Gradle Kotlin DSL formatting."
+    dependsOn(":ktlintCheck", *subprojects.map { "${it.path}:ktlintCheck" }.toTypedArray())
+}
+
+val verifyKotlinQuality by tasks.registering {
+    group = "verification"
+    description = "Checks Kotlin code quality and formatting without running tests."
+    dependsOn(verifyDetekt, verifyKotlinFormat)
+}
+
+tasks.register("formatKotlin") {
+    group = "formatting"
+    description = "Formats Kotlin and Gradle Kotlin DSL files in all modules."
+    dependsOn(":ktlintFormat", *subprojects.map { "${it.path}:ktlintFormat" }.toTypedArray())
+}
+
+tasks.named("check") {
+    dependsOn(verifyKotlinQuality, *subprojects.map { "${it.path}:check" }.toTypedArray())
 }

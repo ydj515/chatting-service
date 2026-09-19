@@ -1,0 +1,40 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues/>
+  <CurrentIssues>
+    <ID>InvalidPackageDeclaration:AdminChatService.kt$package com.chat.domain.service</ID>
+    <ID>InvalidPackageDeclaration:AdminDto.kt$package com.chat.domain.dto</ID>
+    <ID>InvalidPackageDeclaration:AdminMessageSearchCursor.kt$package com.chat.domain.dto</ID>
+    <ID>InvalidPackageDeclaration:AdminMessageSearchCursorCodecTest.kt$package com.chat.domain.dto</ID>
+    <ID>InvalidPackageDeclaration:AdminModerationDto.kt$package com.chat.domain.dto</ID>
+    <ID>InvalidPackageDeclaration:AdminModerationDtoTest.kt$package com.chat.domain.dto</ID>
+    <ID>InvalidPackageDeclaration:AdminModerationService.kt$package com.chat.domain.service</ID>
+    <ID>InvalidPackageDeclaration:ChatDto.kt$package com.chat.domain.dto</ID>
+    <ID>InvalidPackageDeclaration:ChatRoom.kt$package com.chat.domain.model</ID>
+    <ID>InvalidPackageDeclaration:ChatRoomMember.kt$package com.chat.domain.model</ID>
+    <ID>InvalidPackageDeclaration:ChatService.kt$package com.chat.domain.service</ID>
+    <ID>InvalidPackageDeclaration:ForbiddenOperationException.kt$package com.chat.domain.exception</ID>
+    <ID>InvalidPackageDeclaration:Message.kt$package com.chat.domain.model</ID>
+    <ID>InvalidPackageDeclaration:MessageAdmissionRejectedException.kt$package com.chat.domain.exception</ID>
+    <ID>InvalidPackageDeclaration:MessageModerationRejectedException.kt$package com.chat.domain.exception</ID>
+    <ID>InvalidPackageDeclaration:ResourceConflictException.kt$package com.chat.domain.exception</ID>
+    <ID>InvalidPackageDeclaration:ResourceNotFoundException.kt$package com.chat.domain.exception</ID>
+    <ID>InvalidPackageDeclaration:SessionControlPublisher.kt$package com.chat.domain.service</ID>
+    <ID>InvalidPackageDeclaration:SessionTokenRevocationStore.kt$package com.chat.domain.service</ID>
+    <ID>InvalidPackageDeclaration:SessionTokenService.kt$package com.chat.domain.service</ID>
+    <ID>InvalidPackageDeclaration:UnauthenticatedException.kt$package com.chat.domain.exception</ID>
+    <ID>InvalidPackageDeclaration:User.kt$package com.chat.domain.model</ID>
+    <ID>InvalidPackageDeclaration:UserDto.kt$package com.chat.domain.dto</ID>
+    <ID>InvalidPackageDeclaration:UserService.kt$package com.chat.domain.service</ID>
+    <ID>InvalidPackageDeclaration:Utf8ByteSize.kt$package com.chat.domain.validation</ID>
+    <ID>InvalidPackageDeclaration:WebSocketDto.kt$package com.chat.domain.dto</ID>
+    <ID>LongParameterList:ChatRoom.kt$ChatRoom$( @Id @GeneratedValue(strategy = GenerationType.IDENTITY) val id: Long = 0, @Column(nullable = false, length = 100) @NotBlank val name: String, @Column(columnDefinition = "TEXT") val description: String? = null, @Column(nullable = false, length = 20) @Enumerated(EnumType.STRING) val type: ChatRoomType = ChatRoomType.GROUP, @Column(length = 500) val imageUrl: String? = null, @Column(nullable = false) val isActive: Boolean = true, @Column(nullable = false) val maxMembers: Int = 100, @ManyToOne(fetch = FetchType.LAZY) @JoinColumn(name = "created_by", nullable = false) val createdBy: User, @CreatedDate @Column(nullable = false, updatable = false) var createdAt: LocalDateTime = LocalDateTime.now(), @LastModifiedDate @Column(nullable = false) var updatedAt: LocalDateTime = LocalDateTime.now() )</ID>
+    <ID>LongParameterList:ChatRoomMember.kt$ChatRoomMember$( @Id @GeneratedValue(strategy = GenerationType.IDENTITY) val id: Long = 0, @ManyToOne(fetch = FetchType.LAZY) @JoinColumn(name = "chat_room_id", nullable = false) val chatRoom: ChatRoom, @ManyToOne(fetch = FetchType.LAZY) @JoinColumn(name = "user_id", nullable = false) val user: User, @Column(nullable = false, length = 20) @Enumerated(EnumType.STRING) val role: MemberRole = MemberRole.MEMBER, @Column(nullable = false) val isActive: Boolean = true, @Column val lastReadMessageId: Long? = null, @Column(nullable = false) val joinedAt: LocalDateTime = LocalDateTime.now(), @Column val leftAt: LocalDateTime? = null, @CreatedDate @Column(nullable = false, updatable = false) var createdAt: LocalDateTime = LocalDateTime.now() )</ID>
+    <ID>LongParameterList:Message.kt$Message$( @Id @GeneratedValue(strategy = GenerationType.IDENTITY) val id: Long = 0, @Column(name = "message_id", length = 64) val messageId: String? = null, @Column(name = "client_message_id", length = 128) val clientMessageId: String? = null, @ManyToOne(fetch = FetchType.LAZY) @JoinColumn(name = "chat_room_id", nullable = false) val chatRoom: ChatRoom, @ManyToOne(fetch = FetchType.LAZY) @JoinColumn(name = "sender_id", nullable = false) val sender: User, @Column(nullable = false, length = 20) @Enumerated(EnumType.STRING) val type: MessageType = MessageType.TEXT, @Column(columnDefinition = "TEXT") val content: String? = null, @Column(nullable = false) val isEdited: Boolean = false, @Column(nullable = false) val isDeleted: Boolean = false, @Column(nullable = false) val sequenceNumber: Long = 0, @Column(name = "room_seq", nullable = false, columnDefinition = "bigint default 0") val roomSeq: Long = 0, @Column(name = "stream_shard", nullable = false, columnDefinition = "integer default 0") val streamShard: Int = 0, @Column(name = "write_shard", nullable = false, columnDefinition = "integer default 0") val writeShard: Int = 0, @Column(name = "fanout_shard", nullable = false, columnDefinition = "integer default 0") val fanoutShard: Int = 0, @CreatedDate @Column(nullable = false, updatable = false) var createdAt: LocalDateTime = LocalDateTime.now(), @Column val editedAt: LocalDateTime? = null )</ID>
+    <ID>LongParameterList:User.kt$User$( @Id @GeneratedValue(strategy = GenerationType.IDENTITY) val id: Long = 0, @Column(unique = true, nullable = false, length = 50) @NotBlank val username: String, @Column(nullable = false, length = 255) val password: String, @Column(nullable = false, length = 100) val displayName: String, @Column(length = 500) val profileImageUrl: String? = null, @Column(length = 50) val status: String? = null, @Column(nullable = false) val isActive: Boolean = true, @Column val lastSeenAt: LocalDateTime? = null, @CreatedDate @Column(nullable = false, updatable = false) var createdAt: LocalDateTime = LocalDateTime.now(), @LastModifiedDate @Column(nullable = false) var updatedAt: LocalDateTime = LocalDateTime.now() )</ID>
+    <ID>NewLineAtEndOfFile:ChatRoom.kt$com.chat.domain.model.ChatRoom.kt</ID>
+    <ID>NewLineAtEndOfFile:ChatRoomMember.kt$com.chat.domain.model.ChatRoomMember.kt</ID>
+    <ID>NewLineAtEndOfFile:User.kt$com.chat.domain.model.User.kt</ID>
+    <ID>TooGenericExceptionCaught:AdminMessageSearchCursor.kt$AdminMessageCursorCodec$e: Exception</ID>
+  </CurrentIssues>
+</SmellBaseline>

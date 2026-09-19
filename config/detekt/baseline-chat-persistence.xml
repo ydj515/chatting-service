@@ -1,0 +1,212 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues/>
+  <CurrentIssues>
+    <ID>InvalidPackageDeclaration:AdminAuditLogRepository.kt$package com.chat.persistence.repository</ID>
+    <ID>InvalidPackageDeclaration:AdminAuditLogRepositoryTest.kt$package com.chat.persistence.repository</ID>
+    <ID>InvalidPackageDeclaration:AdminChatServiceImpl.kt$package com.chat.persistence.service</ID>
+    <ID>InvalidPackageDeclaration:AdminChatServiceImplTest.kt$package com.chat.persistence.service</ID>
+    <ID>InvalidPackageDeclaration:AdminExportJobRepository.kt$package com.chat.persistence.repository</ID>
+    <ID>InvalidPackageDeclaration:AdminExportJobRepositoryTest.kt$package com.chat.persistence.repository</ID>
+    <ID>InvalidPackageDeclaration:AdminMessageExportWorker.kt$package com.chat.persistence.service</ID>
+    <ID>InvalidPackageDeclaration:AdminMessageExportWorkerTest.kt$package com.chat.persistence.service</ID>
+    <ID>InvalidPackageDeclaration:AdminMessageRepository.kt$package com.chat.persistence.repository</ID>
+    <ID>InvalidPackageDeclaration:AdminMessageRepositoryTest.kt$package com.chat.persistence.repository</ID>
+    <ID>InvalidPackageDeclaration:AdminModerationServiceImpl.kt$package com.chat.persistence.service</ID>
+    <ID>InvalidPackageDeclaration:AdminModerationServiceImplTest.kt$package com.chat.persistence.service</ID>
+    <ID>InvalidPackageDeclaration:AuthConfig.kt$package com.chat.persistence.config</ID>
+    <ID>InvalidPackageDeclaration:BoundedOutboundSessionQueue.kt$package com.chat.persistence.service</ID>
+    <ID>InvalidPackageDeclaration:BoundedOutboundSessionQueueTest.kt$package com.chat.persistence.service</ID>
+    <ID>InvalidPackageDeclaration:CacheConfig.kt$package com.chat.persistence.config</ID>
+    <ID>InvalidPackageDeclaration:CacheConfigTest.kt$package com.chat.persistence.config</ID>
+    <ID>InvalidPackageDeclaration:CanonicalMessageRecord.kt$package com.chat.persistence.repository</ID>
+    <ID>InvalidPackageDeclaration:ChatAuthProperties.kt$package com.chat.persistence.config</ID>
+    <ID>InvalidPackageDeclaration:ChatCacheProperties.kt$package com.chat.persistence.config</ID>
+    <ID>InvalidPackageDeclaration:ChatObjectStorageProperties.kt$package com.chat.persistence.config</ID>
+    <ID>InvalidPackageDeclaration:ChatObjectStoragePropertiesTest.kt$package com.chat.persistence.config</ID>
+    <ID>InvalidPackageDeclaration:ChatReadDataSourceProperties.kt$package com.chat.persistence.config</ID>
+    <ID>InvalidPackageDeclaration:ChatRedisProperties.kt$package com.chat.persistence.config</ID>
+    <ID>InvalidPackageDeclaration:ChatRoomMemberRepository.kt$package com.chat.persistence.repository</ID>
+    <ID>InvalidPackageDeclaration:ChatRoomPolicyProperties.kt$package com.chat.persistence.config</ID>
+    <ID>InvalidPackageDeclaration:ChatRoomPolicyPropertiesTest.kt$package com.chat.persistence.config</ID>
+    <ID>InvalidPackageDeclaration:ChatRoomRepository.kt$package com.chat.persistence.repository</ID>
+    <ID>InvalidPackageDeclaration:ChatServiceImpl.kt$package com.chat.persistence.service</ID>
+    <ID>InvalidPackageDeclaration:ChatServiceImplCanonicalHistoryTest.kt$package com.chat.persistence.service</ID>
+    <ID>InvalidPackageDeclaration:ChatServiceImplCursorPaginationTest.kt$package com.chat.persistence.service</ID>
+    <ID>InvalidPackageDeclaration:ChatServiceImplMembershipEventTest.kt$package com.chat.persistence.service</ID>
+    <ID>InvalidPackageDeclaration:ChatServiceImplMessageContractTest.kt$package com.chat.persistence.service</ID>
+    <ID>InvalidPackageDeclaration:ChatWebSocketGatewayProperties.kt$package com.chat.persistence.config</ID>
+    <ID>InvalidPackageDeclaration:ChatWebSocketGatewayPropertiesTest.kt$package com.chat.persistence.config</ID>
+    <ID>InvalidPackageDeclaration:ChatWorkerProperties.kt$package com.chat.persistence.config</ID>
+    <ID>InvalidPackageDeclaration:FanoutOwnerLeaseService.kt$package com.chat.persistence.service</ID>
+    <ID>InvalidPackageDeclaration:FanoutOwnerLeaseServiceTest.kt$package com.chat.persistence.service</ID>
+    <ID>InvalidPackageDeclaration:GatewaySendQueueRoomPolicySignalProvider.kt$package com.chat.persistence.service</ID>
+    <ID>InvalidPackageDeclaration:GatewaySendQueueRoomPolicySignalProviderTest.kt$package com.chat.persistence.service</ID>
+    <ID>InvalidPackageDeclaration:HmacSessionTokenService.kt$package com.chat.persistence.service</ID>
+    <ID>InvalidPackageDeclaration:HmacSessionTokenServiceTest.kt$package com.chat.persistence.service</ID>
+    <ID>InvalidPackageDeclaration:HotRoomFanoutWorker.kt$package com.chat.persistence.service</ID>
+    <ID>InvalidPackageDeclaration:HotRoomFanoutWorkerTest.kt$package com.chat.persistence.service</ID>
+    <ID>InvalidPackageDeclaration:JpaMessageReadAdapter.kt$package com.chat.persistence.service</ID>
+    <ID>InvalidPackageDeclaration:JpaMessageWriteAdapter.kt$package com.chat.persistence.service</ID>
+    <ID>InvalidPackageDeclaration:JpaMessageWriteAdapterTest.kt$package com.chat.persistence.service</ID>
+    <ID>InvalidPackageDeclaration:LatestHistoryReadRoutingPolicy.kt$package com.chat.persistence.service</ID>
+    <ID>InvalidPackageDeclaration:MessageAdmissionPolicyService.kt$package com.chat.persistence.service</ID>
+    <ID>InvalidPackageDeclaration:MessageModerationService.kt$package com.chat.persistence.service</ID>
+    <ID>InvalidPackageDeclaration:MessageModerationServiceTest.kt$package com.chat.persistence.service</ID>
+    <ID>InvalidPackageDeclaration:MessagePersistenceService.kt$package com.chat.persistence.service</ID>
+    <ID>InvalidPackageDeclaration:MessageReadDataSourceConfig.kt$package com.chat.persistence.config</ID>
+    <ID>InvalidPackageDeclaration:MessageReadDataSourceHolderTest.kt$package com.chat.persistence.config</ID>
+    <ID>InvalidPackageDeclaration:MessageReadPort.kt$package com.chat.persistence.service</ID>
+    <ID>InvalidPackageDeclaration:MessageRepository.kt$package com.chat.persistence.repository</ID>
+    <ID>InvalidPackageDeclaration:MessageSequenceProperties.kt$package com.chat.persistence.config</ID>
+    <ID>InvalidPackageDeclaration:MessageSequenceService.kt$package com.chat.persistence.service</ID>
+    <ID>InvalidPackageDeclaration:MessageSequenceServiceTest.kt$package com.chat.persistence.service</ID>
+    <ID>InvalidPackageDeclaration:MessageStreamConsumer.kt$package com.chat.persistence.redis</ID>
+    <ID>InvalidPackageDeclaration:MessageStreamEnvelope.kt$package com.chat.persistence.redis</ID>
+    <ID>InvalidPackageDeclaration:MessageStreamKeyResolver.kt$package com.chat.persistence.redis</ID>
+    <ID>InvalidPackageDeclaration:MessageStreamKeyResolverTest.kt$package com.chat.persistence.redis</ID>
+    <ID>InvalidPackageDeclaration:MessageStreamMetrics.kt$package com.chat.persistence.service</ID>
+    <ID>InvalidPackageDeclaration:MessageStreamMetricsTest.kt$package com.chat.persistence.service</ID>
+    <ID>InvalidPackageDeclaration:MessageStreamProducer.kt$package com.chat.persistence.redis</ID>
+    <ID>InvalidPackageDeclaration:MessageStreamRecord.kt$package com.chat.persistence.redis</ID>
+    <ID>InvalidPackageDeclaration:MessageWritePort.kt$package com.chat.persistence.service</ID>
+    <ID>InvalidPackageDeclaration:MessageWriterWorker.kt$package com.chat.persistence.service</ID>
+    <ID>InvalidPackageDeclaration:MessageWriterWorkerTest.kt$package com.chat.persistence.service</ID>
+    <ID>InvalidPackageDeclaration:ModerationRuleJdbcRepository.kt$package com.chat.persistence.repository</ID>
+    <ID>InvalidPackageDeclaration:ModerationRuleJdbcRepositoryTest.kt$package com.chat.persistence.repository</ID>
+    <ID>InvalidPackageDeclaration:ObjectStorageConfig.kt$package com.chat.persistence.config</ID>
+    <ID>InvalidPackageDeclaration:ObjectStoragePort.kt$package com.chat.persistence.storage</ID>
+    <ID>InvalidPackageDeclaration:PartitionedMessageReadAdapter.kt$package com.chat.persistence.service</ID>
+    <ID>InvalidPackageDeclaration:PartitionedMessageReadAdapterTest.kt$package com.chat.persistence.service</ID>
+    <ID>InvalidPackageDeclaration:PartitionedMessageReadRepository.kt$package com.chat.persistence.repository</ID>
+    <ID>InvalidPackageDeclaration:PartitionedMessageRepository.kt$package com.chat.persistence.repository</ID>
+    <ID>InvalidPackageDeclaration:PartitionedMessageRepositoryTest.kt$package com.chat.persistence.repository</ID>
+    <ID>InvalidPackageDeclaration:PartitionedMessageWriteAdapter.kt$package com.chat.persistence.service</ID>
+    <ID>InvalidPackageDeclaration:PartitionedMessageWriteAdapterTest.kt$package com.chat.persistence.service</ID>
+    <ID>InvalidPackageDeclaration:ReadReplicaLagPolicy.kt$package com.chat.persistence.service</ID>
+    <ID>InvalidPackageDeclaration:ReadReplicaLagPolicyTest.kt$package com.chat.persistence.service</ID>
+    <ID>InvalidPackageDeclaration:RedisConfig.kt$package com.chat.persistence.config</ID>
+    <ID>InvalidPackageDeclaration:RedisMessageAdmissionPolicyServiceTest.kt$package com.chat.persistence.service</ID>
+    <ID>InvalidPackageDeclaration:RedisMessageBroker.kt$package com.chat.persistence.redis</ID>
+    <ID>InvalidPackageDeclaration:RedisMessageStreamConsumer.kt$package com.chat.persistence.redis</ID>
+    <ID>InvalidPackageDeclaration:RedisMessageStreamConsumerTest.kt$package com.chat.persistence.redis</ID>
+    <ID>InvalidPackageDeclaration:RedisMessageStreamProducer.kt$package com.chat.persistence.redis</ID>
+    <ID>InvalidPackageDeclaration:RedisMessageStreamProducerTest.kt$package com.chat.persistence.redis</ID>
+    <ID>InvalidPackageDeclaration:RedisRoomTrafficStatsServiceTest.kt$package com.chat.persistence.service</ID>
+    <ID>InvalidPackageDeclaration:RedisSessionControlBroker.kt$package com.chat.persistence.service</ID>
+    <ID>InvalidPackageDeclaration:RedisSessionControlBrokerTest.kt$package com.chat.persistence.service</ID>
+    <ID>InvalidPackageDeclaration:RedisSessionTokenRevocationStore.kt$package com.chat.persistence.service</ID>
+    <ID>InvalidPackageDeclaration:RedisSessionTokenRevocationStoreTest.kt$package com.chat.persistence.service</ID>
+    <ID>InvalidPackageDeclaration:RedisStreamLagMonitor.kt$package com.chat.persistence.service</ID>
+    <ID>InvalidPackageDeclaration:RedisStreamLagMonitorTest.kt$package com.chat.persistence.service</ID>
+    <ID>InvalidPackageDeclaration:RedisStreamLagReader.kt$package com.chat.persistence.redis</ID>
+    <ID>InvalidPackageDeclaration:RedisStreamLagReaderTest.kt$package com.chat.persistence.redis</ID>
+    <ID>InvalidPackageDeclaration:RedisWebSocketTicketService.kt$package com.chat.persistence.service</ID>
+    <ID>InvalidPackageDeclaration:RedisWebSocketTicketServiceTest.kt$package com.chat.persistence.service</ID>
+    <ID>InvalidPackageDeclaration:ReplicaLagGaugePublisher.kt$package com.chat.persistence.service</ID>
+    <ID>InvalidPackageDeclaration:ReplicaLagGaugePublisherTest.kt$package com.chat.persistence.service</ID>
+    <ID>InvalidPackageDeclaration:RoomHeatClassifier.kt$package com.chat.persistence.service</ID>
+    <ID>InvalidPackageDeclaration:RoomHeatClassifierTest.kt$package com.chat.persistence.service</ID>
+    <ID>InvalidPackageDeclaration:RoomPolicyAutoDowngradeService.kt$package com.chat.persistence.service</ID>
+    <ID>InvalidPackageDeclaration:RoomPolicyAutoDowngradeServiceTest.kt$package com.chat.persistence.service</ID>
+    <ID>InvalidPackageDeclaration:RoomPolicyJdbcRepository.kt$package com.chat.persistence.repository</ID>
+    <ID>InvalidPackageDeclaration:RoomPolicyJdbcRepositoryTest.kt$package com.chat.persistence.repository</ID>
+    <ID>InvalidPackageDeclaration:RoomPolicyWorker.kt$package com.chat.persistence.service</ID>
+    <ID>InvalidPackageDeclaration:RoomPolicyWorkerTest.kt$package com.chat.persistence.service</ID>
+    <ID>InvalidPackageDeclaration:RoomSeqGapAuditMetrics.kt$package com.chat.persistence.service</ID>
+    <ID>InvalidPackageDeclaration:RoomSeqGapAuditMetricsTest.kt$package com.chat.persistence.service</ID>
+    <ID>InvalidPackageDeclaration:RoomSeqGapAuditRepository.kt$package com.chat.persistence.repository</ID>
+    <ID>InvalidPackageDeclaration:RoomSeqGapAuditRepositoryTest.kt$package com.chat.persistence.repository</ID>
+    <ID>InvalidPackageDeclaration:RoomSeqGapAuditWorker.kt$package com.chat.persistence.service</ID>
+    <ID>InvalidPackageDeclaration:RoomSeqGapAuditWorkerTest.kt$package com.chat.persistence.service</ID>
+    <ID>InvalidPackageDeclaration:RoomStorageConfigJdbcRepository.kt$package com.chat.persistence.repository</ID>
+    <ID>InvalidPackageDeclaration:RoomStorageConfigJdbcRepositoryTest.kt$package com.chat.persistence.repository</ID>
+    <ID>InvalidPackageDeclaration:RoomStorageConfigReader.kt$package com.chat.persistence.service</ID>
+    <ID>InvalidPackageDeclaration:RoomTrafficStatsService.kt$package com.chat.persistence.service</ID>
+    <ID>InvalidPackageDeclaration:S3ObjectStorageAdapter.kt$package com.chat.persistence.storage</ID>
+    <ID>InvalidPackageDeclaration:S3ObjectStorageAdapterTest.kt$package com.chat.persistence.storage</ID>
+    <ID>InvalidPackageDeclaration:UserRepository.kt$package com.chat.persistence.repository</ID>
+    <ID>InvalidPackageDeclaration:UserSanctionJdbcRepository.kt$package com.chat.persistence.repository</ID>
+    <ID>InvalidPackageDeclaration:UserSanctionJdbcRepositoryTest.kt$package com.chat.persistence.repository</ID>
+    <ID>InvalidPackageDeclaration:UserSanctionService.kt$package com.chat.persistence.service</ID>
+    <ID>InvalidPackageDeclaration:UserSanctionServiceTest.kt$package com.chat.persistence.service</ID>
+    <ID>InvalidPackageDeclaration:UserServiceImpl.kt$package com.chat.persistence.service</ID>
+    <ID>InvalidPackageDeclaration:UserServiceImplTest.kt$package com.chat.persistence.service</ID>
+    <ID>InvalidPackageDeclaration:WebSocketGatewayConfig.kt$package com.chat.persistence.config</ID>
+    <ID>InvalidPackageDeclaration:WebSocketGatewayMetrics.kt$package com.chat.persistence.service</ID>
+    <ID>InvalidPackageDeclaration:WebSocketGatewayMetricsTest.kt$package com.chat.persistence.service</ID>
+    <ID>InvalidPackageDeclaration:WebSocketSessionManager.kt$package com.chat.persistence.service</ID>
+    <ID>InvalidPackageDeclaration:WebSocketSessionManagerHeartbeatTest.kt$package com.chat.persistence.service</ID>
+    <ID>InvalidPackageDeclaration:WebSocketSessionManagerMetricsTest.kt$package com.chat.persistence.service</ID>
+    <ID>InvalidPackageDeclaration:WebSocketSessionManagerTest.kt$package com.chat.persistence.service</ID>
+    <ID>LongParameterList:AdminMessageExportWorker.kt$AdminMessageExportWorker$( private val exportJobRepository: AdminExportJobRepository, private val messageRepository: AdminMessageRepository, private val workerProperties: ChatWorkerProperties, private val objectMapper: ObjectMapper, private val objectStoragePort: ObjectStoragePort, private val objectStorageProperties: ChatObjectStorageProperties, @Value("\${chat.admin.export.directory:build/admin-exports}") private val exportDirectory: String, @Value("\${chat.admin.export.chunk-size:1000}") private val exportChunkSize: Int = DEFAULT_EXPORT_CHUNK_SIZE, )</ID>
+    <ID>LongParameterList:AdminMessageRepository.kt$AdminMessageRepository$( query: String, searchMode: AdminMessageSearchMode, roomId: Long?, from: Instant?, to: Instant?, senderId: Long?, cursor: AdminMessageSearchCursor?, limit: Int, )</ID>
+    <ID>LongParameterList:AdminModerationServiceImpl.kt$AdminModerationServiceImpl$( private val ruleRepository: ModerationRuleJdbcRepository, private val sanctionRepository: UserSanctionJdbcRepository, private val auditLogRepository: AdminAuditLogRepository, private val objectMapper: ObjectMapper, private val sessionTokenService: SessionTokenService, private val sessionControlPublisher: SessionControlPublisher, private val cacheManager: CacheManager, )</ID>
+    <ID>LongParameterList:ChatServiceImpl.kt$ChatServiceImpl$( private val chatRoomRepository: ChatRoomRepository, private val messageRepository: MessageRepository, private val messageReadPort: MessageReadPort, private val chatRoomMemberRepository: ChatRoomMemberRepository, private val userRepository: UserRepository, private val redisMessageBroker: RedisMessageBroker, private val messageSequenceService: MessageSequenceService, private val messagePersistenceService: MessagePersistenceService, private val webSocketSessionManager: WebSocketSessionManager, private val messageStreamProducer: MessageStreamProducer, private val messageAdmissionPolicyService: MessageAdmissionPolicyService, private val roomTrafficStatsService: RoomTrafficStatsService, private val roomStorageConfigReader: RoomStorageConfigReader, private val messageModerationPolicyService: MessageModerationPolicyService, private val userSanctionPolicyService: UserSanctionPolicyService, )</ID>
+    <ID>LongParameterList:ChatServiceImplCursorPaginationTest.kt$ChatServiceImplCursorPaginationTest$( chatRoom: ChatRoom, sender: User, messageId: String, clientMessageId: String, roomSeq: Long, createdAt: LocalDateTime, )</ID>
+    <ID>LongParameterList:ChatServiceImplMessageContractTest.kt$ChatServiceImplMessageContractTest$( messageStreamProducer: MessageStreamProducer = successfulMessageStreamProducer(), messageAdmissionPolicyService: MessageAdmissionPolicyService = MessageAdmissionPolicyService.Noop, messageModerationPolicyService: MessageModerationPolicyService = MessageModerationPolicyService.Noop, userSanctionPolicyService: UserSanctionPolicyService = UserSanctionPolicyService.Noop, roomTrafficStatsService: RoomTrafficStatsService = RoomTrafficStatsService.Noop, memberRole: MemberRole = MemberRole.MEMBER, roomStorageConfigReader: RoomStorageConfigReader = FixedRoomStorageConfigReader(RoomShardConfig()), sequenceValues: List&lt;Long&gt; = listOf(1L), )</ID>
+    <ID>LongParameterList:RoomHeatClassifier.kt$RoomHeatClassifier$( heatLevel: RoomHeatLevel, liveFeedMaxMessages: Int, liveFeedMaxAgeSeconds: Int, roomRateLimitPerSecond: Int?, slowModeSeconds: Int?, shardCount: Int, )</ID>
+    <ID>LongParameterList:WebSocketSessionManager.kt$WebSocketSessionManager$( private val redisTemplate: RedisTemplate&lt;String, String&gt;, private val objectMapper: ObjectMapper, private val redisMessageBroker: RedisMessageBroker, private val chatRoomMemberRepository: ChatRoomMemberRepository, private val redisProperties: ChatRedisProperties, private val gatewayProperties: ChatWebSocketGatewayProperties, @Qualifier("webSocketOutboundExecutor") private val outboundExecutor: Executor, private val gatewayMetrics: WebSocketGatewayMetrics = WebSocketGatewayMetrics.Noop, private val sessionControlBroker: RedisSessionControlBroker? = null, private val clock: Clock = Clock.systemUTC(), )</ID>
+    <ID>LoopWithTooManyJumpStatements:AdminMessageExportWorker.kt$AdminMessageExportWorker$while</ID>
+    <ID>NewLineAtEndOfFile:ChatRoomMemberRepository.kt$com.chat.persistence.repository.ChatRoomMemberRepository.kt</ID>
+    <ID>NewLineAtEndOfFile:ChatRoomRepository.kt$com.chat.persistence.repository.ChatRoomRepository.kt</ID>
+    <ID>ReturnCount:HmacSessionTokenService.kt$HmacSessionTokenService$private fun parseAndVerify(token: String): TokenClaims?</ID>
+    <ID>SpreadOperator:AdminMessageExportWorker.kt$AdminMessageExportWorker$(output, StandardCharsets.UTF_8, *openOptions)</ID>
+    <ID>SpreadOperator:AdminMessageRepository.kt$AdminMessageRepository$( """ $BASE_SELECT WHERE ${where.joinToString(" AND ")} ORDER BY cm.created_at DESC, cm.room_seq DESC, cm.message_id DESC LIMIT ? """.trimIndent(), messageRowMapper, *args.toTypedArray(), )</ID>
+    <ID>SpreadOperator:AdminMessageRepository.kt$AdminMessageRepository$( """ $BASE_SELECT WHERE ${where.joinToString(" AND ")} ORDER BY cm.room_seq DESC, cm.created_at DESC, cm.message_id DESC LIMIT ? """.trimIndent(), messageRowMapper, *args.toTypedArray(), )</ID>
+    <ID>SpreadOperator:ModerationRuleJdbcRepository.kt$ModerationRuleJdbcRepository$( """ SELECT id, scope_type, room_id, pattern, match_type, action, reason, enabled, created_by, created_at, updated_at FROM moderation_rules $where ORDER BY id DESC """.trimIndent(), ROW_MAPPER, *args.toTypedArray(), )</ID>
+    <ID>SpreadOperator:RedisMessageStreamConsumer.kt$RedisMessageStreamConsumer$( Consumer.from(consumerGroup, consumerName), StreamReadOptions.empty().count(count), *offsets, )</ID>
+    <ID>SpreadOperator:RedisMessageStreamConsumer.kt$RedisMessageStreamConsumer$( streamKey, consumerGroup, consumerName, Duration.ofMillis(minIdleMillis), *ids, )</ID>
+    <ID>SpreadOperator:UserSanctionJdbcRepository.kt$UserSanctionJdbcRepository$( """ SELECT id, scope_type, room_id, user_id, type, reason, expires_at, active, created_by, created_at, revoked_by, revoked_at FROM user_sanctions $where ORDER BY id DESC """.trimIndent(), ROW_MAPPER, *args.toTypedArray(), )</ID>
+    <ID>SwallowedException:AdminExportJobRepository.kt$AdminExportJobRepository$e: EmptyResultDataAccessException</ID>
+    <ID>SwallowedException:AdminMessageRepository.kt$AdminMessageRepository$e: EmptyResultDataAccessException</ID>
+    <ID>SwallowedException:FanoutOwnerLeaseService.kt$RedisFanoutOwnerLeaseService$e: Exception</ID>
+    <ID>SwallowedException:JpaMessageWriteAdapter.kt$JpaMessageWriteAdapter$e: DataIntegrityViolationException</ID>
+    <ID>SwallowedException:ModerationRuleJdbcRepository.kt$ModerationRuleJdbcRepository$e: EmptyResultDataAccessException</ID>
+    <ID>SwallowedException:RoomSeqGapAuditRepository.kt$RoomSeqGapAuditRepository$e: EmptyResultDataAccessException</ID>
+    <ID>SwallowedException:RoomStorageConfigJdbcRepository.kt$RoomStorageConfigJdbcRepository$e: EmptyResultDataAccessException</ID>
+    <ID>TooGenericExceptionCaught:AdminMessageExportWorker.kt$AdminMessageExportWorker$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:BoundedOutboundSessionQueue.kt$BoundedOutboundSessionQueue$throwable: Throwable</ID>
+    <ID>TooGenericExceptionCaught:ChatServiceImpl.kt$ChatServiceImpl$e: RuntimeException</ID>
+    <ID>TooGenericExceptionCaught:FanoutOwnerLeaseService.kt$RedisFanoutOwnerLeaseService$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:HotRoomFanoutWorker.kt$HotRoomFanoutWorker$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:MessageAdmissionPolicyService.kt$RedisMessageAdmissionPolicyService$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:MessageWriterWorker.kt$MessageWriterWorker$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:ReadReplicaLagPolicy.kt$ReadReplicaLagPolicy$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:RedisMessageBroker.kt$RedisMessageBroker$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:RedisMessageStreamConsumer.kt$RedisMessageStreamConsumer$e: RuntimeException</ID>
+    <ID>TooGenericExceptionCaught:RedisMessageStreamProducer.kt$RedisMessageStreamProducer$e: RuntimeException</ID>
+    <ID>TooGenericExceptionCaught:RedisSessionControlBroker.kt$RedisSessionControlBroker$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:RedisWebSocketTicketService.kt$RedisWebSocketTicketService$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:ReplicaLagGaugePublisher.kt$ReplicaLagGaugePublisher$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:RoomPolicyWorker.kt$RoomPolicyWorker$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:RoomSeqGapAuditWorker.kt$RoomSeqGapAuditWorker$e: RuntimeException</ID>
+    <ID>TooGenericExceptionCaught:RoomTrafficStatsService.kt$RedisRoomTrafficStatsService$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:WebSocketSessionManager.kt$WebSocketSessionManager$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:WebSocketSessionManager.kt$WebSocketSessionManager$t: Throwable</ID>
+    <ID>TooManyFunctions:ChatServiceImpl.kt$ChatServiceImpl : ChatService</ID>
+    <ID>TooManyFunctions:WebSocketSessionManager.kt$WebSocketSessionManager</ID>
+    <ID>UnusedPrivateProperty:ChatServiceImpl.kt$ChatServiceImpl$private val messagePersistenceService: MessagePersistenceService</ID>
+    <ID>UnusedPrivateProperty:ChatServiceImpl.kt$ChatServiceImpl$private val messageRepository: MessageRepository</ID>
+    <ID>UseCheckOrError:AdminExportJobRepository.kt$AdminExportJobRepository$throw IllegalStateException("Admin export job $jobId is not RUNNING or does not exist")</ID>
+    <ID>UseCheckOrError:ChatServiceImplMessageContractTest.kt$ChatServiceImplMessageContractTest.ThrowingRoomTrafficStatsService$throw IllegalStateException("traffic stats unavailable")</ID>
+    <ID>UseCheckOrError:FanoutOwnerLeaseServiceTest.kt$FanoutOwnerLeaseServiceTest$throw IllegalStateException("redis get unavailable")</ID>
+    <ID>UseCheckOrError:FanoutOwnerLeaseServiceTest.kt$FanoutOwnerLeaseServiceTest$throw IllegalStateException("redis script unavailable")</ID>
+    <ID>UseCheckOrError:GatewaySendQueueRoomPolicySignalProviderTest.kt$GatewaySendQueueRoomPolicySignalProviderTest.&lt;no name provided&gt;$throw IllegalStateException("no session manager")</ID>
+    <ID>UseCheckOrError:MessageWriterWorker.kt$MessageWriterWorker$throw IllegalStateException( "MessageWritePort returned ${result.outcomes.size} outcomes for ${records.size} records", )</ID>
+    <ID>UseCheckOrError:MessageWriterWorker.kt$MessageWriterWorker$throw IllegalStateException( "MessageWritePort returned ${result.outcomes.size} outcomes for 1 record", )</ID>
+    <ID>UseCheckOrError:MessageWriterWorkerTest.kt$MessageWriterWorkerTest$throw IllegalStateException("batch failed after partial write")</ID>
+    <ID>UseCheckOrError:MessageWriterWorkerTest.kt$MessageWriterWorkerTest$throw IllegalStateException("missing user")</ID>
+    <ID>UseCheckOrError:PartitionedMessageWriteAdapter.kt$PartitionedMessageWriteAdapter$throw IllegalStateException( "PartitionedMessageRepository returned ${inserted.size} results for ${requests.size} requests", )</ID>
+    <ID>UseCheckOrError:RedisMessageStreamProducer.kt$RedisMessageStreamProducer$throw IllegalStateException("Redis Streams append returned null: $streamKey")</ID>
+    <ID>UseCheckOrError:UserServiceImpl.kt$UserServiceImpl$throw IllegalStateException("정지된 사용자는 로그인할 수 없습니다.")</ID>
+    <ID>UseRequire:AdminModerationServiceImpl.kt$AdminModerationServiceImpl$throw IllegalArgumentException("GLOBAL rule must not have roomId")</ID>
+    <ID>UseRequire:AdminModerationServiceImpl.kt$AdminModerationServiceImpl$throw IllegalArgumentException("MUTE and BAN require ROOM scope")</ID>
+    <ID>UseRequire:AdminModerationServiceImpl.kt$AdminModerationServiceImpl$throw IllegalArgumentException("ROOM rule requires roomId")</ID>
+    <ID>UseRequire:AdminModerationServiceImpl.kt$AdminModerationServiceImpl$throw IllegalArgumentException("SUSPEND requires GLOBAL scope")</ID>
+    <ID>UseRequire:AdminModerationServiceImpl.kt$AdminModerationServiceImpl$throw IllegalArgumentException("expiresAt must be in the future")</ID>
+    <ID>UseRequire:AdminModerationServiceImpl.kt$AdminModerationServiceImpl$throw IllegalArgumentException("pattern must not be blank")</ID>
+    <ID>UseRequire:UserServiceImpl.kt$UserServiceImpl$throw IllegalArgumentException("비밀번호는 UTF-8 기준 72바이트 이하여야 합니다.")</ID>
+    <ID>UseRequire:UserServiceImpl.kt$UserServiceImpl$throw IllegalArgumentException("사용자를 찾을 수 없거나 비밀번호가 일치하지 않습니다.")</ID>
+  </CurrentIssues>
+</SmellBaseline>

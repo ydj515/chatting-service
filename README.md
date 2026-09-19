@@ -146,3 +146,37 @@ docs/                          # 상세 문서
 | [인프라 가이드](docs/infrastructure.md)                                                 | mise 태스크, PostgreSQL replica/archive, 로드 밸런싱 |
 | [API 스펙 (OpenAPI)](docs/openapi.yaml)                                             | Swagger/OpenAPI 3.0 스펙                       |
 | [고트래픽 설계서](docs/superpowers/specs/2026-06-11-high-traffic-chat-service-design.md) | 고트래픽 채팅 서비스 설계 문서                            |
+
+## Kotlin 정적 품질 검사
+
+참고 프로젝트의 Detekt + ktlint 구성을 전체 Kotlin 모듈에 적용합니다.
+Kotlin 2.0.21과 호환되는 Detekt 1.23.8, ktlint Gradle 플러그인 13.1.0,
+ktlint 엔진 1.5.0을 버전 카탈로그에서 관리합니다.
+Java 소스가 없으므로 스타일 검사는 ktlint가 담당합니다.
+
+```bash
+./gradlew verifyKotlinQuality  # Detekt + ktlint, 테스트/외부 인프라 불필요
+./gradlew verifyDetekt        # main/test Kotlin 결함·복잡도 검사
+./gradlew verifyKotlinFormat  # Kotlin 소스 및 Gradle Kotlin DSL 스타일 검사
+./gradlew formatKotlin        # 전체 Kotlin 소스 및 빌드 스크립트 자동 포맷 (파일 변경)
+./gradlew check               # 모든 모듈의 테스트 및 정적 검사
+```
+
+`check`와 PR의 `Kotlin Quality` workflow에서 위반 시 빌드를 실패시킵니다.
+설정은 `.editorconfig`, `config/detekt/detekt.yml`에서 관리하며,
+리포트는 각 모듈의 `build/reports/detekt`, `build/reports/ktlint`에 생성합니다.
+루트 빌드 스크립트의 ktlint 리포트는 루트 `build/reports/ktlint`에 생성합니다.
+
+기존 소스를 일괄 수정하지 않도록 도입 시점의 위반을 모듈별
+`config/detekt/baseline-*.xml`, `config/ktlint/baseline-*.xml`에 기록했습니다.
+기록되지 않은 위반은 실패합니다. 기존 부채는 baseline에 남아 있으므로 별도 정리가 필요합니다.
+ktlint baseline은 파일·규칙 단위 예외여서 같은 파일의 같은 규칙에 대한 신규 위반도
+가려질 수 있습니다. 파일을 정리할 때 해당 baseline 항목도 함께 제거하세요.
+Detekt의 기본 검사는 타입 해석 없이 실행하며, 타입 정보가 필요한 규칙은 별도 검사가 필요합니다.
+
+Baseline 갱신은 검토한 기존 위반을 수용할 때만 수행하며 CI에서 자동 생성하지 않습니다.
+전체 재생성은 신규 결함까지 숨길 수 있으므로 XML 변경 내용을 반드시 검토합니다.
+
+```bash
+./gradlew detektBaseline ktlintGenerateBaseline
+```

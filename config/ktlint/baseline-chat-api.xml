@@ -1,0 +1,243 @@
+<?xml version="1.0" encoding="utf-8"?>
+<baseline version="1.0">
+    <file name="build.gradle.kts">
+        <error line="9" column="47" source="standard:chain-method-continuation" />
+        <error line="9" column="53" source="standard:chain-method-continuation" />
+        <error line="27" column="1" source="standard:final-newline" />
+    </file>
+    <file name="src/main/kotlin/config/WebConfig.kt">
+        <error line="14" column="1" source="standard:no-empty-first-line-in-class-body" />
+        <error line="16" column="17" source="standard:chain-method-continuation" />
+    </file>
+    <file name="src/main/kotlin/controller/ChatController.kt">
+        <error line="20" column="1" source="standard:no-empty-first-line-in-class-body" />
+        <error line="31" column="21" source="standard:parameter-list-wrapping" />
+        <error line="31" column="21" source="standard:function-signature" />
+        <error line="31" column="43" source="standard:parameter-list-wrapping" />
+        <error line="31" column="43" source="standard:function-signature" />
+        <error line="64" column="28" source="standard:parameter-list-wrapping" />
+        <error line="64" column="28" source="standard:function-signature" />
+        <error line="64" column="50" source="standard:parameter-list-wrapping" />
+        <error line="64" column="50" source="standard:function-signature" />
+        <error line="92" column="23" source="standard:multiline-expression-wrapping" />
+        <error line="111" column="24" source="standard:multiline-expression-wrapping" />
+    </file>
+    <file name="src/main/kotlin/controller/GlobalExceptionHandler.kt">
+        <error line="26" column="1" source="standard:no-empty-first-line-in-class-body" />
+        <error line="53" column="41" source="standard:function-expression-body" />
+        <error line="65" column="41" source="standard:function-expression-body" />
+        <error line="77" column="41" source="standard:function-expression-body" />
+        <error line="89" column="41" source="standard:function-expression-body" />
+        <error line="101" column="41" source="standard:function-expression-body" />
+        <error line="113" column="41" source="standard:function-expression-body" />
+        <error line="125" column="41" source="standard:function-expression-body" />
+        <error line="137" column="41" source="standard:function-expression-body" />
+        <error line="149" column="41" source="standard:function-expression-body" />
+        <error line="176" column="41" source="standard:function-expression-body" />
+        <error line="184" column="14" source="standard:trailing-comma-on-call-site" />
+        <error line="188" column="74" source="standard:function-expression-body" />
+    </file>
+    <file name="src/main/kotlin/controller/UserController.kt">
+        <error line="17" column="41" source="standard:trailing-comma-on-declaration-site" />
+        <error line="19" column="1" source="standard:no-empty-first-line-in-class-body" />
+        <error line="21" column="18" source="standard:parameter-list-wrapping" />
+        <error line="21" column="18" source="standard:function-signature" />
+        <error line="21" column="64" source="standard:parameter-list-wrapping" />
+        <error line="21" column="64" source="standard:function-signature" />
+        <error line="27" column="15" source="standard:parameter-list-wrapping" />
+        <error line="27" column="15" source="standard:function-signature" />
+        <error line="27" column="56" source="standard:parameter-list-wrapping" />
+        <error line="27" column="56" source="standard:function-signature" />
+        <error line="33" column="16" source="standard:parameter-list-wrapping" />
+        <error line="33" column="16" source="standard:function-signature" />
+        <error line="33" column="57" source="standard:parameter-list-wrapping" />
+        <error line="33" column="57" source="standard:function-signature" />
+        <error line="39" column="17" source="standard:parameter-list-wrapping" />
+        <error line="39" column="17" source="standard:function-signature" />
+        <error line="39" column="39" source="standard:parameter-list-wrapping" />
+        <error line="39" column="39" source="standard:function-signature" />
+        <error line="45" column="24" source="standard:parameter-list-wrapping" />
+        <error line="45" column="24" source="standard:function-signature" />
+        <error line="45" column="51" source="standard:parameter-list-wrapping" />
+        <error line="45" column="51" source="standard:function-signature" />
+        <error line="53" column="55" source="standard:trailing-comma-on-declaration-site" />
+    </file>
+    <file name="src/main/kotlin/controller/WebSocketTicketController.kt">
+        <error line="16" column="1" source="standard:no-empty-first-line-in-class-body" />
+        <error line="22" column="22" source="standard:multiline-expression-wrapping" />
+        <error line="28" column="64" source="standard:function-expression-body" />
+        <error line="29" column="23" source="standard:chain-method-continuation" />
+    </file>
+    <file name="src/main/kotlin/security/AuthenticatedUserResolver.kt">
+        <error line="17" column="1" source="standard:no-empty-first-line-in-class-body" />
+        <error line="18" column="73" source="standard:function-expression-body" />
+        <error line="36" column="57" source="standard:function-expression-body" />
+        <error line="41" column="74" source="standard:function-expression-body" />
+        <error line="50" column="76" source="standard:function-expression-body" />
+        <error line="55" column="82" source="standard:function-expression-body" />
+    </file>
+    <file name="src/test/kotlin/controller/ChatControllerTest.kt">
+        <error line="3" column="1" source="standard:import-ordering" />
+        <error line="26" column="1" source="standard:no-empty-first-line-in-class-body" />
+        <error line="34" column="19" source="standard:multiline-expression-wrapping" />
+        <error line="38" column="51" source="standard:multiline-expression-wrapping" />
+        <error line="41" column="22" source="standard:trailing-comma-on-call-site" />
+        <error line="44" column="13" source="standard:chain-method-continuation" />
+        <error line="51" column="16" source="standard:chain-method-continuation" />
+        <error line="55" column="13" source="standard:chain-method-continuation" />
+        <error line="64" column="16" source="standard:chain-method-continuation" />
+        <error line="67" column="13" source="standard:chain-method-continuation" />
+        <error line="76" column="27" source="standard:multiline-expression-wrapping" />
+        <error line="84" column="16" source="standard:chain-method-continuation" />
+        <error line="89" column="13" source="standard:chain-method-continuation" />
+        <error line="99" column="16" source="standard:chain-method-continuation" />
+        <error line="102" column="13" source="standard:chain-method-continuation" />
+        <error line="113" column="42" source="standard:function-signature" />
+        <error line="113" column="71" source="standard:function-signature" />
+        <error line="113" column="83" source="standard:function-signature" />
+        <error line="126" column="37" source="standard:function-signature" />
+        <error line="126" column="51" source="standard:function-signature" />
+        <error line="126" column="65" source="standard:function-signature" />
+        <error line="126" column="81" source="standard:function-signature" />
+        <error line="126" column="91" source="standard:function-signature" />
+        <error line="131" column="37" source="standard:function-signature" />
+        <error line="131" column="69" source="standard:function-signature" />
+        <error line="131" column="84" source="standard:function-signature" />
+        <error line="131" column="99" source="standard:function-expression-body" />
+        <error line="135" column="61" source="standard:function-expression-body" />
+        <error line="139" column="35" source="standard:function-signature" />
+        <error line="139" column="49" source="standard:function-signature" />
+        <error line="139" column="67" source="standard:function-signature" />
+        <error line="139" column="88" source="standard:function-expression-body" />
+        <error line="143" column="38" source="standard:function-signature" />
+        <error line="143" column="53" source="standard:function-signature" />
+        <error line="143" column="65" source="standard:function-signature" />
+        <error line="143" column="86" source="standard:function-expression-body" />
+        <error line="147" column="35" source="standard:function-signature" />
+        <error line="147" column="49" source="standard:function-signature" />
+        <error line="147" column="61" source="standard:function-signature" />
+        <error line="147" column="63" source="standard:function-expression-body" />
+        <error line="151" column="36" source="standard:function-signature" />
+        <error line="151" column="50" source="standard:function-signature" />
+        <error line="151" column="62" source="standard:function-signature" />
+        <error line="151" column="64" source="standard:function-expression-body" />
+        <error line="155" column="80" source="standard:function-expression-body" />
+        <error line="159" column="34" source="standard:function-signature" />
+        <error line="159" column="63" source="standard:function-signature" />
+        <error line="159" column="77" source="standard:function-signature" />
+        <error line="159" column="91" source="standard:function-expression-body" />
+        <error line="163" column="34" source="standard:function-signature" />
+        <error line="163" column="48" source="standard:function-signature" />
+        <error line="163" column="62" source="standard:function-signature" />
+        <error line="163" column="80" source="standard:function-signature" />
+        <error line="163" column="100" source="standard:function-expression-body" />
+    </file>
+    <file name="src/test/kotlin/controller/GlobalExceptionHandlerTest.kt">
+        <error line="3" column="1" source="standard:import-ordering" />
+        <error line="24" column="1" source="standard:no-empty-first-line-in-class-body" />
+        <error line="29" column="19" source="standard:multiline-expression-wrapping" />
+        <error line="37" column="16" source="standard:chain-method-continuation" />
+        <error line="39" column="23" source="standard:multiline-expression-wrapping" />
+        <error line="39" column="23" source="standard:string-template-indent" />
+        <error line="45" column="13" source="standard:string-template-indent" />
+        <error line="47" column="13" source="standard:chain-method-continuation" />
+        <error line="63" column="16" source="standard:chain-method-continuation" />
+        <error line="65" column="23" source="standard:multiline-expression-wrapping" />
+        <error line="65" column="23" source="standard:string-template-indent" />
+        <error line="71" column="13" source="standard:string-template-indent" />
+        <error line="73" column="13" source="standard:chain-method-continuation" />
+        <error line="75" column="26" source="standard:argument-list-wrapping" />
+        <error line="75" column="110" source="standard:argument-list-wrapping" />
+        <error line="75" column="112" source="standard:function-literal" />
+        <error line="75" column="121" source="standard:max-line-length" />
+        <error line="75" column="123" source="standard:function-literal" />
+        <error line="81" column="16" source="standard:chain-method-continuation" />
+        <error line="83" column="23" source="standard:multiline-expression-wrapping" />
+        <error line="83" column="23" source="standard:string-template-indent" />
+        <error line="88" column="13" source="standard:string-template-indent" />
+        <error line="90" column="13" source="standard:chain-method-continuation" />
+        <error line="92" column="26" source="standard:argument-list-wrapping" />
+        <error line="92" column="110" source="standard:argument-list-wrapping" />
+        <error line="92" column="112" source="standard:function-literal" />
+        <error line="92" column="121" source="standard:max-line-length" />
+        <error line="92" column="123" source="standard:function-literal" />
+        <error line="98" column="16" source="standard:chain-method-continuation" />
+        <error line="111" column="16" source="standard:chain-method-continuation" />
+        <error line="123" column="16" source="standard:chain-method-continuation" />
+        <error line="135" column="16" source="standard:chain-method-continuation" />
+        <error line="147" column="16" source="standard:chain-method-continuation" />
+        <error line="159" column="16" source="standard:chain-method-continuation" />
+        <error line="171" column="16" source="standard:chain-method-continuation" />
+        <error line="183" column="16" source="standard:chain-method-continuation" />
+        <error line="196" column="24" source="standard:parameter-list-wrapping" />
+        <error line="196" column="24" source="standard:function-signature" />
+        <error line="196" column="70" source="standard:parameter-list-wrapping" />
+        <error line="196" column="70" source="standard:function-signature" />
+        <error line="199" column="19" source="standard:parameter-list-wrapping" />
+        <error line="199" column="19" source="standard:function-signature" />
+        <error line="199" column="60" source="standard:parameter-list-wrapping" />
+        <error line="199" column="60" source="standard:function-signature" />
+        <error line="202" column="34" source="standard:function-expression-body" />
+        <error line="207" column="32" source="standard:function-expression-body" />
+        <error line="212" column="32" source="standard:function-expression-body" />
+        <error line="217" column="40" source="standard:function-expression-body" />
+        <error line="222" column="33" source="standard:function-expression-body" />
+        <error line="227" column="48" source="standard:function-expression-body" />
+        <error line="232" column="49" source="standard:function-expression-body" />
+        <error line="237" column="35" source="standard:function-expression-body" />
+    </file>
+    <file name="src/test/kotlin/controller/UserControllerTest.kt">
+        <error line="3" column="1" source="standard:import-ordering" />
+        <error line="26" column="1" source="standard:no-empty-first-line-in-class-body" />
+        <error line="33" column="19" source="standard:multiline-expression-wrapping" />
+        <error line="36" column="41" source="standard:argument-list-wrapping" />
+        <error line="36" column="76" source="standard:argument-list-wrapping" />
+        <error line="36" column="90" source="standard:argument-list-wrapping" />
+        <error line="36" column="121" source="standard:argument-list-wrapping" />
+        <error line="36" column="121" source="standard:max-line-length" />
+        <error line="36" column="122" source="standard:argument-list-wrapping" />
+        <error line="44" column="13" source="standard:chain-method-continuation" />
+        <error line="78" column="70" source="standard:function-expression-body" />
+        <error line="82" column="66" source="standard:function-expression-body" />
+        <error line="95" column="34" source="standard:function-signature" />
+        <error line="95" column="49" source="standard:function-signature" />
+        <error line="95" column="67" source="standard:function-signature" />
+        <error line="95" column="84" source="standard:function-expression-body" />
+        <error line="99" column="60" source="standard:function-expression-body" />
+        <error line="104" column="44" source="standard:function-expression-body" />
+    </file>
+    <file name="src/test/kotlin/controller/WebSocketTicketControllerTest.kt">
+        <error line="3" column="1" source="standard:import-ordering" />
+        <error line="21" column="1" source="standard:no-empty-first-line-in-class-body" />
+        <error line="28" column="19" source="standard:multiline-expression-wrapping" />
+        <error line="34" column="13" source="standard:chain-method-continuation" />
+        <error line="43" column="13" source="standard:chain-method-continuation" />
+        <error line="55" column="16" source="standard:chain-method-continuation" />
+        <error line="61" column="13" source="standard:chain-method-continuation" />
+        <error line="74" column="16" source="standard:chain-method-continuation" />
+        <error line="80" column="13" source="standard:chain-method-continuation" />
+    </file>
+    <file name="src/test/kotlin/security/AuthenticatedUserResolverTest.kt">
+        <error line="23" column="1" source="standard:no-empty-first-line-in-class-body" />
+        <error line="30" column="19" source="standard:multiline-expression-wrapping" />
+        <error line="43" column="14" source="standard:trailing-comma-on-call-site" />
+        <error line="46" column="16" source="standard:chain-method-continuation" />
+        <error line="68" column="16" source="standard:chain-method-continuation" />
+        <error line="78" column="16" source="standard:chain-method-continuation" />
+        <error line="90" column="16" source="standard:chain-method-continuation" />
+        <error line="101" column="25" source="standard:parameter-list-wrapping" />
+        <error line="101" column="25" source="standard:function-signature" />
+        <error line="101" column="52" source="standard:parameter-list-wrapping" />
+        <error line="101" column="52" source="standard:function-signature" />
+        <error line="101" column="73" source="standard:function-expression-body" />
+        <error line="106" column="33" source="standard:parameter-list-wrapping" />
+        <error line="106" column="33" source="standard:function-signature" />
+        <error line="106" column="74" source="standard:parameter-list-wrapping" />
+        <error line="106" column="74" source="standard:function-signature" />
+        <error line="106" column="97" source="standard:function-expression-body" />
+    </file>
+    <file name="src/test/kotlin/security/FixedCurrentAuthenticationResolver.kt">
+        <error line="13" column="73" source="standard:function-expression-body" />
+        <error line="23" column="12" source="standard:function-expression-body" />
+    </file>
+</baseline>
