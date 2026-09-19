@@ -30,6 +30,7 @@ class WebSocketSessionManagerMetricsTest {
     fun `local delivery counter and connection gauge reflect gateway activity`() {
         val registry = SimpleMeterRegistry()
         val chatRoomMemberRepository = mock(ChatRoomMemberRepository::class.java)
+        `when`(chatRoomMemberRepository.findActiveUserIds(org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyList<Long>())).thenAnswer { it.getArgument<List<Long>>(1) }
         `when`(chatRoomMemberRepository.existsByChatRoomIdAndUserIdAndIsActiveTrue(10L, 7L)).thenReturn(true)
         val manager = manager(registry, chatRoomMemberRepository)
         manager.initialize()

@@ -174,3 +174,10 @@ Batch 메시지:
 ```
 
 클라이언트는 `messageId`를 기준으로 중복 제거하고, `roomSeq` 기준으로 방 안의 표시 순서를 정렬합니다. 같은 `clientMessageId`를 재전송하면 서버는 새 메시지를 저장하지 않고 기존 `messageId`, `roomSeq`를 가진 ACK를 반환합니다.
+
+### WebSocket room delivery authorization
+
+Room fan-out rechecks active membership in the primary database in one batch for local recipients.
+A missed LEAVE notification cannot authorize later deliveries: departed recipients are removed
+from local subscriptions. Database lookup failures stop that batch before enqueueing any data;
+clients can recover authorized history using the existing gap API after recovery.

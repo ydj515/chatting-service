@@ -47,6 +47,7 @@ class WebSocketSessionManagerTest {
     @Test
     fun `원격 JOIN membership event는 열린 local session을 방 인덱스에 추가한다`() {
         val chatRoomMemberRepository = mock(ChatRoomMemberRepository::class.java)
+        `when`(chatRoomMemberRepository.findActiveUserIds(org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyList<Long>())).thenAnswer { it.getArgument<List<Long>>(1) }
         `when`(chatRoomMemberRepository.existsByChatRoomIdAndUserIdAndIsActiveTrue(10L, 7L)).thenReturn(true)
         val session = session("session-local")
         val fixture = sessionManagerFixture(chatRoomMemberRepository)
@@ -93,8 +94,9 @@ class WebSocketSessionManagerTest {
     }
 
     @Test
-    fun `room fan-out은 해당 방 local session만 순회하고 DB membership을 조회하지 않는다`() {
+    fun `room fan-out authorizes only local recipients in one batch`() {
         val chatRoomMemberRepository = mock(ChatRoomMemberRepository::class.java)
+        `when`(chatRoomMemberRepository.findActiveUserIds(org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyList<Long>())).thenAnswer { it.getArgument<List<Long>>(1) }
         `when`(chatRoomMemberRepository.existsByChatRoomIdAndUserIdAndIsActiveTrue(10L, 1L)).thenReturn(true)
         `when`(chatRoomMemberRepository.existsByChatRoomIdAndUserIdAndIsActiveTrue(20L, 2L)).thenReturn(true)
         val sessionInRoom = session("session-in-room")
@@ -135,6 +137,7 @@ class WebSocketSessionManagerTest {
     @Test
     fun `force logout은 대상 user의 local session만 닫고 인덱스에서 제거한다`() {
         val chatRoomMemberRepository = mock(ChatRoomMemberRepository::class.java)
+        `when`(chatRoomMemberRepository.findActiveUserIds(org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyList<Long>())).thenAnswer { it.getArgument<List<Long>>(1) }
         val targetSession = session("target-session")
         val otherSession = session("other-session")
         val manager = sessionManager(chatRoomMemberRepository)
@@ -147,6 +150,45 @@ class WebSocketSessionManagerTest {
         verify(targetSession).close(any(CloseStatus::class.java))
         verify(otherSession, never()).close(any(CloseStatus::class.java))
         assertFalse(manager.sendTextToSession(targetSession, """{"type":"PING"}"""))
+    }
+
+    @Test
+    fun `lost leave event cannot deliver to departed user or their other sessions`() {
+        val members = mock(ChatRoomMemberRepository::class.java)
+        `when`(members.existsByChatRoomIdAndUserIdAndIsActiveTrue(10, 7)).thenReturn(true)
+        `when`(members.existsByChatRoomIdAndUserIdAndIsActiveTrue(10, 8)).thenReturn(true)
+        val manager = sessionManager(members)
+        val departed = session("departed")
+        val second = session("second")
+        val active = session("active")
+        manager.addSession(7, departed)
+        manager.addSession(7, second)
+        manager.addSession(8, active)
+        manager.joinRoom(7, 10)
+        manager.joinRoom(8, 10)
+        `when`(members.findActiveUserIds(org.mockito.ArgumentMatchers.eq(10L), org.mockito.ArgumentMatchers.anyList<Long>())).thenReturn(listOf(8))
+        val message = com.chat.domain.dto.ChatMessageBatch(chatRoomId = 10, messages = emptyList())
+        manager.sendMessageToLocalRoom(10, message)
+        manager.sendMessageToLocalRoom(10, message)
+        verify(departed, never()).sendMessage(any(TextMessage::class.java))
+        verify(second, never()).sendMessage(any(TextMessage::class.java))
+        verify(active, org.mockito.Mockito.times(2)).sendMessage(any(TextMessage::class.java))
+        verify(members).findActiveUserIds(10, listOf(8))
+    }
+
+    @Test
+    fun `membership store failure fails closed without enqueueing room data`() {
+        val members = mock(ChatRoomMemberRepository::class.java)
+        `when`(members.existsByChatRoomIdAndUserIdAndIsActiveTrue(10, 7)).thenReturn(true)
+        val manager = sessionManager(members)
+        val recipient = session("recipient")
+        manager.addSession(7, recipient)
+        manager.joinRoom(7, 10)
+        `when`(members.findActiveUserIds(10, listOf(7))).thenThrow(org.springframework.dao.DataAccessResourceFailureException("offline"))
+        org.junit.jupiter.api.Assertions.assertThrows(org.springframework.dao.DataAccessResourceFailureException::class.java) {
+            manager.sendMessageToLocalRoom(10, com.chat.domain.dto.ChatMessageBatch(chatRoomId = 10, messages = emptyList()))
+        }
+        verify(recipient, never()).sendMessage(any(TextMessage::class.java))
     }
 
     private fun session(id: String): WebSocketSession {

@@ -116,12 +116,18 @@ class WebSocketSessionManager(
     fun sendMessageToLocalRoom(roomId: Long, message: WebSocketMessage, excludeUserId: Long? = null) {
         val json = objectMapper.writerFor(com.chat.domain.dto.WebSocketMessage::class.java).writeValueAsString(message)
         val sessionIds = roomSubscriptions.sessionIds(roomId) ?: return
+        val userIds = sessionIds.mapNotNull { sessionsById[it]?.userId }.distinct()
+        if (userIds.isEmpty()) return
+        // Use the primary membership store, never the pub/sub index, as delivery authorization.
+        // A lookup failure propagates before anything is enqueued (fail closed).
+        val activeUsers = chatRoomMemberRepository.findActiveUserIds(roomId, userIds).toSet()
+        (userIds - activeUsers).forEach { leaveRoom(it, roomId) }
         // payload 크기는 루프 내내 동일하므로 1회만 계산해 세션 수만큼의 byte array 할당을 피한다.
         val outboundBytes = json.toByteArray(Charsets.UTF_8).size.toLong()
 
         sessionIds.forEach { sessionId ->
             val sessionRef = sessionsById[sessionId] ?: return@forEach
-            if (sessionRef.userId == excludeUserId) {
+            if (sessionRef.userId !in activeUsers || sessionRef.userId == excludeUserId) {
                 return@forEach
             }
 

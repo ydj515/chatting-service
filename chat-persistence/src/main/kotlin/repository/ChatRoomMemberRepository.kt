@@ -13,6 +13,9 @@ interface ChatRoomMemberRepository : CrudRepository<ChatRoomMember, Long> {
     @EntityGraph(attributePaths = ["user"])
     fun findByChatRoomIdAndIsActiveTrue(chatRoomId: Long): List<ChatRoomMember>
 
+    @Query("SELECT m.user.id FROM ChatRoomMember m WHERE m.chatRoom.id = :roomId AND m.user.id IN :userIds AND m.isActive = true")
+    fun findActiveUserIds(roomId: Long, userIds: List<Long>): List<Long>
+
     fun findByChatRoomIdAndUserIdAndIsActiveTrue(chatRoomId: Long, userId: Long): ChatRoomMember?
 
     @Query("SELECT COUNT(crm) FROM ChatRoomMember crm WHERE crm.chatRoom.id = :chatRoomId AND crm.isActive = true")
