@@ -28,6 +28,16 @@ import java.time.ZoneOffset
 
 class WebSocketSessionManagerHeartbeatTest {
     @Test
+    fun `disabled heartbeats allow maintenance polling without ping or timeout closure`() {
+        val session = session("disabled")
+        val manager = manager(Clock.fixed(Instant.EPOCH, ZoneOffset.UTC), ChatWebSocketGatewayProperties(heartbeatEnabled = false))
+        manager.addSession(7, session)
+        manager.pollHeartbeats(nowMillis = 1_000_000)
+        verify(session, never()).sendMessage(any(PingMessage::class.java))
+        verify(session, never()).close(any(CloseStatus::class.java))
+    }
+
+    @Test
     fun `heartbeat poll은 열린 세션에 ping frame을 전송한다`() {
         val session = session("session-1")
         val manager = manager(
@@ -147,14 +157,19 @@ class WebSocketSessionManagerHeartbeatTest {
         )
 
         return WebSocketSessionManager(
-            redisTemplate = redisTemplate,
             objectMapper = objectMapper,
             redisMessageBroker = broker,
             chatRoomMemberRepository = mock(ChatRoomMemberRepository::class.java),
-            redisProperties = redisProperties,
-            gatewayProperties = properties,
-            outboundExecutor = Runnable::run,
-            clock = clock,
+            roomSubscriptions = WebSocketRoomSubscriptions(
+                redisTemplate = redisTemplate,
+                redisProperties = redisProperties,
+                redisMessageBroker = broker,
+            ),
+            transport = WebSocketSessionTransport(
+                gatewayProperties = properties,
+                outboundExecutor = Runnable::run,
+                clock = clock,
+            ),
         )
     }
 

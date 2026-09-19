@@ -8,27 +8,21 @@ import com.chat.domain.dto.AdminUserSanctionDto
 import com.chat.domain.dto.ModerationScopeType
 import com.chat.domain.dto.UserSanctionType
 import com.chat.domain.service.AdminModerationService
-import com.chat.domain.service.SessionControlPublisher
-import com.chat.domain.service.SessionTokenService
 import com.chat.persistence.repository.ModerationRuleJdbcRepository
 import com.chat.persistence.repository.UserSanctionJdbcRepository
-import com.chat.persistence.repository.UserSanctionRecord
-import org.springframework.cache.CacheManager
 import org.springframework.cache.annotation.CacheEvict
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
-import org.springframework.transaction.support.TransactionSynchronization
-import org.springframework.transaction.support.TransactionSynchronizationManager
-import java.time.Instant
+import java.time.Clock
 
 @Service
 class AdminModerationServiceImpl(
     private val ruleRepository: ModerationRuleJdbcRepository,
     private val sanctionRepository: UserSanctionJdbcRepository,
     private val auditRecorder: AdminAuditRecorder,
-    private val sessionTokenService: SessionTokenService,
-    private val sessionControlPublisher: SessionControlPublisher,
-    private val cacheManager: CacheManager,
+    private val suspendedSessions: SuspendedSessionRevoker,
+    private val clock: Clock,
+    private val sanctionCacheInvalidator: SanctionCacheInvalidator,
 ) : AdminModerationService {
     @Transactional(readOnly = true)
     override fun listRules(actor: String, roomId: Long?, enabled: Boolean?): List<AdminModerationRuleDto> = ruleRepository.listRules(roomId, enabled).map { it.toDto() }
@@ -81,12 +75,9 @@ class AdminModerationServiceImpl(
         validateSanctionRequest(request)
         val record = sanctionRepository.create(actor, request)
         auditRecorder.record(actor, "ADMIN_USER_SANCTION_CREATED", "USER_SANCTION", "sanction:${record.id}", request)
-        evictUserSanctionCache(record)
+        sanctionCacheInvalidator.enqueue(record)
         if (record.type == UserSanctionType.SUSPEND) {
-            afterCommit {
-                sessionTokenService.revokeUserTokens(record.userId)
-                sessionControlPublisher.forceLogoutUser(record.userId, "suspended")
-            }
+            suspendedSessions.revokeAfterCommit(record.userId)
         }
         return record.toDto()
     }
@@ -101,7 +92,7 @@ class AdminModerationServiceImpl(
             "sanction:${record.id}",
             mapOf("sanctionId" to sanctionId),
         )
-        evictUserSanctionCache(record)
+        sanctionCacheInvalidator.enqueue(record)
         return record.toDto()
     }
 
@@ -126,33 +117,6 @@ class AdminModerationServiceImpl(
         }
         // 만료 시각이 과거/현재면 send 경로(activeSanctionsForUser)에서 절대 적용되지 않으므로 거부한다.
         val expiresAt = request.expiresAt
-        require(expiresAt == null || expiresAt.isAfter(Instant.now())) { "expiresAt must be in the future" }
-    }
-
-    private fun evictUserSanctionCache(record: UserSanctionRecord) = afterCommit {
-        val cache = cacheManager.getCache(USER_SANCTIONS_CACHE) ?: return@afterCommit
-        when (record.scopeType) {
-            ModerationScopeType.GLOBAL -> cache.evict("global:${record.userId}")
-            ModerationScopeType.ROOM -> record.roomId?.let { roomId -> cache.evict("$roomId:${record.userId}") }
-        }
-    }
-
-    private fun afterCommit(action: () -> Unit) {
-        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
-            action()
-            return
-        }
-
-        TransactionSynchronizationManager.registerSynchronization(
-            object : TransactionSynchronization {
-                override fun afterCommit() {
-                    action()
-                }
-            },
-        )
-    }
-
-    private companion object {
-        const val USER_SANCTIONS_CACHE = "userSanctions"
+        require(expiresAt == null || expiresAt.isAfter(clock.instant())) { "expiresAt must be in the future" }
     }
 }

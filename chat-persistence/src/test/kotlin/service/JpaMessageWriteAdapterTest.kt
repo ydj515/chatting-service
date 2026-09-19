@@ -18,20 +18,19 @@ import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
 import org.springframework.dao.DataIntegrityViolationException
 import java.time.LocalDateTime
-import java.util.Optional
 
 class JpaMessageWriteAdapterTest {
     @Test
     fun `jpa adapter는 신규 메시지를 compatibility table에 batch 저장한다`() {
         val fixture = adapterFixture()
-        `when`(fixture.messageRepository.findByMessageId("msg-1")).thenReturn(Optional.empty())
+        `when`(fixture.messageRepository.findByMessageId("msg-1")).thenReturn(null)
         `when`(
             fixture.messageRepository.findByChatRoomIdAndSenderIdAndClientMessageId(
                 10L,
                 7L,
                 "client-1",
             ),
-        ).thenReturn(Optional.empty())
+        ).thenReturn(null)
         `when`(fixture.chatRoomRepository.getReferenceById(10L)).thenReturn(fixture.chatRoom)
         `when`(fixture.userRepository.getReferenceById(7L)).thenReturn(fixture.sender)
         `when`(fixture.messageRepository.saveAllAndFlush(anyMessageList())).thenAnswer { invocation ->
@@ -65,7 +64,7 @@ class JpaMessageWriteAdapterTest {
     fun `jpa adapter는 이미 저장된 messageId를 duplicate outcome으로 반환한다`() {
         val fixture = adapterFixture()
         val existing = existingMessage(fixture)
-        `when`(fixture.messageRepository.findByMessageId("msg-1")).thenReturn(Optional.of(existing))
+        `when`(fixture.messageRepository.findByMessageId("msg-1")).thenReturn(existing)
 
         val result = fixture.adapter.write(listOf(writeRequest()))
 
@@ -80,15 +79,15 @@ class JpaMessageWriteAdapterTest {
         val fixture = adapterFixture()
         val existing = existingMessage(fixture)
         `when`(fixture.messageRepository.findByMessageId("msg-1"))
-            .thenReturn(Optional.empty())
-            .thenReturn(Optional.of(existing))
+            .thenReturn(null)
+            .thenReturn(existing)
         `when`(
             fixture.messageRepository.findByChatRoomIdAndSenderIdAndClientMessageId(
                 10L,
                 7L,
                 "client-1",
             ),
-        ).thenReturn(Optional.empty())
+        ).thenReturn(null)
         `when`(fixture.chatRoomRepository.getReferenceById(10L)).thenReturn(fixture.chatRoom)
         `when`(fixture.userRepository.getReferenceById(7L)).thenReturn(fixture.sender)
         `when`(fixture.messageRepository.saveAllAndFlush(anyMessageList()))

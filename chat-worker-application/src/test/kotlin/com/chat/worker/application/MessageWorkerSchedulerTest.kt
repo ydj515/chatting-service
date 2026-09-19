@@ -44,7 +44,7 @@ class MessageWorkerSchedulerTest {
     fun `admin-export role이 켜져 있으면 export worker를 poll한다`() {
         val fixture = schedulerFixture(ChatWorkerProperties(roles = setOf("admin-export")))
 
-        fixture.scheduler.pollAdminExport()
+        fixture.maintenanceScheduler.pollAdminExport()
 
         verify(fixture.exportWorker).pollAndExport()
     }
@@ -53,7 +53,7 @@ class MessageWorkerSchedulerTest {
     fun `room-policy role이 켜져 있으면 room policy worker를 poll한다`() {
         val fixture = schedulerFixture(ChatWorkerProperties(roles = setOf("room-policy")))
 
-        fixture.scheduler.pollRoomPolicy()
+        fixture.maintenanceScheduler.pollRoomPolicy()
 
         verify(fixture.roomPolicyWorker).pollAndApply()
     }
@@ -62,7 +62,7 @@ class MessageWorkerSchedulerTest {
     fun `room-policy role이 꺼져 있으면 room policy worker를 poll하지 않는다`() {
         val fixture = schedulerFixture(ChatWorkerProperties(roles = setOf("fanout")))
 
-        fixture.scheduler.pollRoomPolicy()
+        fixture.maintenanceScheduler.pollRoomPolicy()
 
         verify(fixture.roomPolicyWorker, never()).pollAndApply()
     }
@@ -71,7 +71,7 @@ class MessageWorkerSchedulerTest {
     fun `redis stream lag monitor가 켜져 있으면 direct lag gauge를 poll한다`() {
         val fixture = schedulerFixture(ChatWorkerProperties())
 
-        fixture.scheduler.pollRedisStreamLag()
+        fixture.maintenanceScheduler.pollRedisStreamLag()
 
         verify(fixture.redisStreamLagMonitor).poll()
     }
@@ -84,7 +84,7 @@ class MessageWorkerSchedulerTest {
             ),
         )
 
-        fixture.scheduler.pollRedisStreamLag()
+        fixture.maintenanceScheduler.pollRedisStreamLag()
 
         verify(fixture.redisStreamLagMonitor, never()).poll()
     }
@@ -93,7 +93,7 @@ class MessageWorkerSchedulerTest {
     fun `기본 worker roles에는 roomSeq gap audit role이 포함되어 gap audit worker를 poll한다`() {
         val fixture = schedulerFixture(ChatWorkerProperties())
 
-        fixture.scheduler.pollRoomSeqGapAudit()
+        fixture.maintenanceScheduler.pollRoomSeqGapAudit()
 
         verify(fixture.roomSeqGapAuditWorker).poll()
     }
@@ -102,7 +102,7 @@ class MessageWorkerSchedulerTest {
     fun `roomSeq gap audit role과 enabled가 모두 켜져 있으면 gap audit worker를 poll한다`() {
         val fixture = schedulerFixture(ChatWorkerProperties(roles = setOf("room-seq-gap-audit")))
 
-        fixture.scheduler.pollRoomSeqGapAudit()
+        fixture.maintenanceScheduler.pollRoomSeqGapAudit()
 
         verify(fixture.roomSeqGapAuditWorker).poll()
     }
@@ -111,7 +111,7 @@ class MessageWorkerSchedulerTest {
     fun `roomSeq gap audit role이 없으면 gap audit worker를 poll하지 않는다`() {
         val fixture = schedulerFixture(ChatWorkerProperties(roles = setOf("message-writer", "fanout")))
 
-        fixture.scheduler.pollRoomSeqGapAudit()
+        fixture.maintenanceScheduler.pollRoomSeqGapAudit()
 
         verify(fixture.roomSeqGapAuditWorker, never()).poll()
     }
@@ -125,7 +125,7 @@ class MessageWorkerSchedulerTest {
             ),
         )
 
-        fixture.scheduler.pollRoomSeqGapAudit()
+        fixture.maintenanceScheduler.pollRoomSeqGapAudit()
 
         verify(fixture.roomSeqGapAuditWorker, never()).poll()
     }
@@ -141,6 +141,9 @@ class MessageWorkerSchedulerTest {
             workerProperties = workerProperties,
             messageWriterWorker = writerWorker,
             hotRoomFanoutWorker = fanoutWorker,
+        )
+        val maintenanceScheduler = MaintenanceWorkerScheduler(
+            workerProperties = workerProperties,
             adminMessageExportWorker = exportWorker,
             roomPolicyWorker = roomPolicyWorker,
             redisStreamLagMonitor = redisStreamLagMonitor,
@@ -149,6 +152,7 @@ class MessageWorkerSchedulerTest {
 
         return SchedulerFixture(
             scheduler = scheduler,
+            maintenanceScheduler = maintenanceScheduler,
             writerWorker = writerWorker,
             fanoutWorker = fanoutWorker,
             exportWorker = exportWorker,
@@ -160,6 +164,7 @@ class MessageWorkerSchedulerTest {
 
     private data class SchedulerFixture(
         val scheduler: MessageWorkerScheduler,
+        val maintenanceScheduler: MaintenanceWorkerScheduler,
         val writerWorker: MessageWriterWorker,
         val fanoutWorker: HotRoomFanoutWorker,
         val exportWorker: AdminMessageExportWorker,

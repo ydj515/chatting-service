@@ -36,4 +36,9 @@ if [ -f /sql/message-partitions.sql ]; then
     -f /sql/message-partitions.sql
 fi
 
+if [ -f /sql/sanction-cache-invalidation.sql ]; then
+  psql -v ON_ERROR_STOP=1 -h "$db_host" -p "$db_port" -U "$db_user" -d "$db_name" \
+    -f /sql/sanction-cache-invalidation.sql
+fi
+
 echo "PostgreSQL primary replication configuration is ready."

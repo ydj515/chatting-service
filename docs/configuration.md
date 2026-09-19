@@ -124,7 +124,7 @@ Redis Cluster node의 host port는 `127.0.0.1`에만 bind한다. Cluster discove
 | `CHAT_WEBSOCKET_GATEWAY_OUTBOUND_EXECUTOR_THREADS` | `32` | WebSocket outbound queue drain executor thread 수 |
 | `CHAT_WEBSOCKET_GATEWAY_OUTBOUND_SEND_TIME_LIMIT_MILLIS` | `10000` | WebSocket session 단일 send 허용 시간 |
 | `CHAT_WEBSOCKET_GATEWAY_OUTBOUND_SEND_BUFFER_SIZE_LIMIT_BYTES` | `524288` | WebSocket session send buffer 상한 |
-| `CHAT_MESSAGE_SEQUENCE_TTL` | `24h` | Redis 메시지 시퀀스 키 TTL. `roomSeq`는 메시지마다 Redis `INCR 1`로 발급하며 block 선할당은 사용하지 않음 |
+| `CHAT_MESSAGE_SEQUENCE_TTL` | 제거 | 순번 키는 만료시키지 않는다. 기존 설정은 사용하지 않으며, 발급 시 기존 TTL도 원자적으로 제거한다. |
 | `CHAT_CACHE_ROOM_ADMISSION_POLICIES_TTL` | `10s` | `room_storage_configs`의 rate limit/slow mode 정책 캐시 TTL. admin 정책 변경 시 해당 방 캐시는 즉시 evict |
 | `CHAT_CACHE_ROOM_SHARD_CONFIGS_TTL` | `10s` | 메시지 수락 경로가 읽는 `room_storage_configs.current_shard_count/fanout_shard_count` cache TTL |
 | `CHAT_CACHE_MODERATION_RULES_TTL` | `10s` | 메시지 수락 전 `GLOBAL + ROOM` moderation rule cache TTL. admin rule 변경 시 cache를 evict |
@@ -195,3 +195,53 @@ Phase 6 owner takeover smoke는 `scripts/phase6-fanout-takeover-smoke.mjs`로 �
 | `VITE_DEV_PROXY_TARGET` | `http://localhost:80` | Vite 개발 서버 proxy target |
 
 로컬 실행 전에도 `export CHAT_AUTH_SESSION_SECRET="$(openssl rand -base64 48)"`로 키를 주입한다. 여러 서버는 동일한 키를 사용해야 한다. 키를 변경하면 기존 세션 토큰은 무효화된다. Compose는 해당 환경 변수를 애플리케이션 컨테이너에 전달한다.
+
+## 제재 캐시 무효화 재시도
+
+기존 DB에는 배포 전에 `infra/postgres/sanction-cache-invalidation.sql`을 primary에 적용해야 한다.
+신규 Docker 환경과 primary 설정 스크립트는 이 DDL을 적용한다. 제재 생성·해제와 무효화 작업은
+같은 DB 트랜잭션에 저장되며 롤백 시 함께 취소된다.
+
+커밋 직후 캐시 삭제를 시도하고 실패한 작업은 `chat-worker-application`이 재처리한다.
+worker 실행이 필요하며 `WORKER_ROLES`와 무관하게 스케줄러가 작동한다.
+통합 `chat-application`만 실행하면 주기적 재시도가 실행되지 않는다.
+Redis 호출은 작업 점유·완료용 DB 트랜잭션 밖에서 수행한다. 만료된 점유는 다른 worker가
+회수하며 삭제는 중복 실행될 수 있다. 실패 횟수에 따라 재시도 간격을 늘리고 작업을 유지한다.
+
+| 설정 (`chat.cache.sanction-retry`) | 기본값 | 의미 |
+| --- | --- | --- |
+| `poll-delay-millis` | 5000 | 완료 후 다음 조회까지 대기 |
+| `batch-size` | 100 | 한 번에 조회할 작업 수 |
+| `lease-millis` | 30000 | 작업 점유 유효 시간 |
+| `retry-delay-millis` | 5000 | 첫 실패 후 대기 |
+| `max-retry-delay-millis` | 300000 | 최대 재시도 간격 |
+
+재시도 대상은 `userSanctions` 캐시 삭제다. 토큰 폐기와 세션 로그아웃을 반복하지 않으며,
+해당 부수 효과의 내구성을 보장하는 큐는 아니다. 커밋 전에 시작한 조회가 삭제 이후 오래된 값을
+캐시에 채우는 기존 경쟁 조건은 TTL 정책의 적용을 받는다.
+
+`CHAT_TEST_POSTGRES_URL`을 설정하면 캐시 작업 테스트는 실제 PostgreSQL을 사용한다.
+사용자는 `postgres`, 비밀번호는 `CHAT_TEST_POSTGRES_PASSWORD`이며 테스트별 schema를 생성한다.
+CI는 격리된 PostgreSQL 서비스에서 이 테스트와 전체 `check`를 실행한다.
+
+## Worker 실행 자원과 순번
+
+writer, fanout, export, 유지보수, 제재 캐시 재시도는 각각 단일 스레드 scheduler를 사용한다.
+한 역할의 실행이 겹치지 않으면서 export가 다른 역할의 실행을 막지 않는다.
+종료 시 실행 중 작업을 최대 30초 기다린다. Redis listener executor는 Spring이 관리하며
+core 8, max 32, queue 1024로 제한하고 포화 시 호출 스레드가 처리한다.
+
+메시지 순번은 Redis Lua에서 `INCR`, `PERSIST`, `GET`을 원자적으로 실행한다.
+기존 키의 값은 보존하고 TTL을 제거한다. 이미 만료되거나 유실된 과거 키의 값을 복구하는
+기능은 아니다. 순번 키는 캐시 eviction 대상에서 제외하고 Redis 영속성을 유지해야 한다.
+구 버전 발급자를 중지한 뒤, 아직 살아 있는 순번 키 전체에
+`infra/redis/persist-message-sequences.sh host:port [host:port ...]`를 실행하고 새 발급자를 시작한다.
+Redis Cluster에서는 모든 primary endpoint를 전달해야 한다. 인증은 `REDISCLI_AUTH` 환경 변수로
+주입한다. 스크립트는 `CHAT_REDIS_SEQUENCE_KEY_PREFIX` 아래 숫자 room ID 키의 TTL만 제거한다.
+이 단계를 건너뛰면 유휴 방의 기존 TTL이 다음 발급 전에 만료될 수 있다.
+이미 만료된 순번은 자동으로 복원할 수 없으므로 해당 방의 저장/미처리 메시지와 대조해야 한다.
+`CHAT_TEST_REDIS_PORT`를 설정하면 격리된 Redis에서 기존 TTL 제거와 64-bit 순번을 검증한다.
+
+WebSocket의 Redis 방 인덱스 갱신 실패는 로컬 세션 정리를 중단하지 않는다.
+주기적 세션 관리에서 현재 구독 상태를 기준으로 재시도하며, heartbeat ping이 비활성화되어도
+이 재시도는 실행된다. 한 번에 최대 100개를 처리하고 Redis 장애가 지속되면 다음 주기로 넘긴다.

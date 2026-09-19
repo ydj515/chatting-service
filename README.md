@@ -179,7 +179,7 @@ Kover는 전체 모듈을 집계하고 운영 패키지를 제외하지 않습�
 루트 빌드 스크립트의 ktlint 리포트는 루트 `build/reports/ktlint`에 생성합니다.
 
 초기 baseline 정리 후 ktlint 위반은 0건이며, 모든 ktlint baseline은 비어 있습니다.
-Detekt baseline은 286건에서 72건, 이번 정리에서 52건으로 줄였습니다.
+Detekt baseline은 286건에서 72건, 이번 정리에서 48건으로 줄였습니다.
 유지한 항목의 사유와 재검토 조건은 [baseline 검토 기록](config/detekt/baseline-review.md)에 정리했습니다.
 기록되지 않은 위반은 빌드를 실패시킵니다. ktlint baseline은 파일·규칙 단위로 위반을
 숨길 수 있으므로 새 예외를 일괄 추가하지 않습니다.

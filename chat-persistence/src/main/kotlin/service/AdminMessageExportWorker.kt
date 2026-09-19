@@ -5,18 +5,15 @@ import com.chat.domain.dto.AdminMessageCursor
 import com.chat.domain.dto.AdminMessageCursorCodec
 import com.chat.domain.dto.AdminMessageDto
 import com.chat.domain.dto.AdminMessageSearchMode
-import com.chat.persistence.config.ChatObjectStorageProperties
+import com.chat.persistence.config.AdminExportProperties
 import com.chat.persistence.config.ChatWorkerProperties
 import com.chat.persistence.repository.AdminExportJobRecord
 import com.chat.persistence.repository.AdminExportJobRepository
 import com.chat.persistence.repository.AdminMessageQuery
 import com.chat.persistence.repository.AdminMessageRepository
-import com.chat.persistence.storage.ObjectStoragePort
-import com.chat.persistence.storage.ObjectUploadRequest
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import org.slf4j.LoggerFactory
-import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 import java.net.URI
 import java.nio.charset.StandardCharsets
@@ -30,12 +27,8 @@ class AdminMessageExportWorker(
     private val messageRepository: AdminMessageRepository,
     private val workerProperties: ChatWorkerProperties,
     private val objectMapper: ObjectMapper,
-    private val objectStoragePort: ObjectStoragePort,
-    private val objectStorageProperties: ChatObjectStorageProperties,
-    @Value("\${chat.admin.export.directory:build/admin-exports}")
-    private val exportDirectory: String,
-    @Value("\${chat.admin.export.chunk-size:1000}")
-    private val exportChunkSize: Int = DEFAULT_EXPORT_CHUNK_SIZE,
+    private val exportStorage: AdminExportStorage,
+    private val exportProperties: AdminExportProperties,
 ) {
     private val logger = LoggerFactory.getLogger(AdminMessageExportWorker::class.java)
 
@@ -44,13 +37,7 @@ class AdminMessageExportWorker(
         return try {
             val request = objectMapper.readValue<AdminExportMessagesRequest>(job.requestJson)
             val exportResult = writeCsv(job, request)
-            val upload = objectStoragePort.uploadFile(
-                ObjectUploadRequest(
-                    objectKey = adminExportObjectKey(job.jobId),
-                    file = exportResult.outputPath,
-                    contentType = EXPORT_CONTENT_TYPE,
-                ),
-            )
+            val upload = exportStorage.upload(job.jobId, exportResult.outputPath)
             exportJobRepository.markCompleted(job.jobId, upload.objectUri)
             // 업로드가 끝난 로컬 staging CSV는 디스크 점유/민감 데이터 잔존을 막기 위해 정리한다.
             // 정리 실패가 완료된 job을 되돌릴 이유는 없으므로 예외는 삼킨다.
@@ -98,7 +85,7 @@ class AdminMessageExportWorker(
     }
 
     private fun writeCsv(job: AdminExportJobRecord, request: AdminExportMessagesRequest): ExportResult {
-        val directory = Path.of(exportDirectory)
+        val directory = Path.of(exportProperties.directory)
         Files.createDirectories(directory)
         val output = resolveOutputPath(job, directory)
         val outputUri = output.toUri().toString()
@@ -112,7 +99,7 @@ class AdminMessageExportWorker(
             if (!appendToCheckpoint) {
                 writer.appendLine(csvHeader())
             }
-            val chunkLimit = exportChunkSize.coerceIn(1, EXPORT_MAX_ROWS)
+            val chunkLimit = exportProperties.chunkSize.coerceIn(1, EXPORT_MAX_ROWS)
 
             var hasMore = true
             while (exportedRows < EXPORT_MAX_ROWS && hasMore) {
@@ -152,12 +139,6 @@ class AdminMessageExportWorker(
         } else {
             Files.newBufferedWriter(output, StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING)
         }
-
-    private fun adminExportObjectKey(jobId: String): String {
-        val safeJobId = jobId.replace(Regex("[^A-Za-z0-9._-]"), "_")
-        val prefix = objectStorageProperties.adminExportPrefix.trim().trim('/')
-        return if (prefix.isBlank()) "$safeJobId.csv" else "$prefix/$safeJobId.csv"
-    }
 
     private fun resolveOutputPath(job: AdminExportJobRecord, directory: Path): Path {
         val outputUri = job.outputUri?.takeIf { it.isNotBlank() }
@@ -217,9 +198,7 @@ class AdminMessageExportWorker(
     private fun String.startsWithSpreadsheetFormulaPrefix(): Boolean = firstOrNull() in setOf('=', '+', '-', '@')
 
     private companion object {
-        const val DEFAULT_EXPORT_CHUNK_SIZE = 1_000
         const val EXPORT_MAX_ROWS = 10_000
-        const val EXPORT_CONTENT_TYPE = "text/csv; charset=utf-8"
     }
 
     private data class ExportResult(

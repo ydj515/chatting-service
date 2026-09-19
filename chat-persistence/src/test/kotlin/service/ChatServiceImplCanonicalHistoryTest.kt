@@ -9,7 +9,6 @@ import com.chat.domain.dto.UserDto
 import com.chat.domain.model.MessageType
 import com.chat.persistence.config.ChatRedisProperties
 import com.chat.persistence.config.ChatWebSocketGatewayProperties
-import com.chat.persistence.config.MessageSequenceProperties
 import com.chat.persistence.redis.MessageStreamProducer
 import com.chat.persistence.redis.RedisMessageBroker
 import com.chat.persistence.repository.ChatRoomMemberRepository
@@ -148,13 +147,18 @@ class ChatServiceImplCanonicalHistoryTest {
         )
         val chatRoomMemberRepository = mock(ChatRoomMemberRepository::class.java)
         val webSocketSessionManager = WebSocketSessionManager(
-            redisTemplate = redisTemplate,
             objectMapper = objectMapper,
             redisMessageBroker = redisMessageBroker,
             chatRoomMemberRepository = chatRoomMemberRepository,
-            redisProperties = redisProperties,
-            gatewayProperties = ChatWebSocketGatewayProperties(),
-            outboundExecutor = Runnable::run,
+            roomSubscriptions = WebSocketRoomSubscriptions(
+                redisTemplate = redisTemplate,
+                redisProperties = redisProperties,
+                redisMessageBroker = redisMessageBroker,
+            ),
+            transport = WebSocketSessionTransport(
+                gatewayProperties = ChatWebSocketGatewayProperties(),
+                outboundExecutor = Runnable::run,
+            ),
         )
 
         return Fixture(
@@ -177,7 +181,6 @@ class ChatServiceImplCanonicalHistoryTest {
                         messageSequenceService = MessageSequenceService(
                             redisTemplate = redisTemplate,
                             redisProperties = redisProperties,
-                            sequenceProperties = MessageSequenceProperties(),
                         ),
                         roomStorageConfigReader = TestRoomStorageConfigReader,
                         messageStreamProducer = mock(MessageStreamProducer::class.java),

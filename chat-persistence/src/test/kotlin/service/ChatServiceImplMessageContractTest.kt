@@ -11,7 +11,6 @@ import com.chat.domain.model.MessageType
 import com.chat.domain.model.User
 import com.chat.persistence.config.ChatRedisProperties
 import com.chat.persistence.config.ChatWebSocketGatewayProperties
-import com.chat.persistence.config.MessageSequenceProperties
 import com.chat.persistence.redis.MessageStreamEnvelope
 import com.chat.persistence.redis.MessageStreamProducer
 import com.chat.persistence.redis.RedisMessageBroker
@@ -45,6 +44,26 @@ import java.util.Optional
 
 class ChatServiceImplMessageContractTest {
     @Test
+    fun `oversized raw client IDs fail before duplicate lookup or Redis side effects`() {
+        listOf("x".repeat(129), " " + "x".repeat(128)).forEach { clientId ->
+            val producer = mock(MessageStreamProducer::class.java)
+            val fixture = chatServiceFixture(FixtureOptions(messageStreamProducer = producer))
+            assertThrows(IllegalArgumentException::class.java) {
+                fixture.chatService.sendMessage(SendMessageRequest(10, MessageType.TEXT, "hello", clientId), 7)
+            }
+            org.mockito.Mockito.verifyNoInteractions(producer, fixture.messageRepository)
+            verify(fixture.redisTemplate, never()).execute(MessageSequenceService.ALLOCATE_SEQUENCE, listOf("chat:sequence:10"))
+        }
+    }
+
+    @Test
+    fun `128 character client IDs remain accepted`() {
+        val fixture = chatServiceFixture()
+        val id = "x".repeat(128)
+        assertEquals(id, fixture.chatService.sendMessage(SendMessageRequest(10, MessageType.TEXT, "hello", id), 7).clientMessageId)
+    }
+
+    @Test
     fun `메시지 수락 정책과 traffic stats 의존성은 constructor default로 fail open 되지 않는다`() {
         val hasDefaultConstructorBridge = ChatServiceImpl::class.java.declaredConstructors.any { constructor ->
             constructor.parameterTypes.any { it.name == "kotlin.jvm.internal.DefaultConstructorMarker" }
@@ -63,7 +82,7 @@ class ChatServiceImplMessageContractTest {
                 7L,
                 clientMessageId,
             ),
-        ).thenReturn(Optional.empty())
+        ).thenReturn(null)
 
         val message = fixture.chatService.sendMessage(
             SendMessageRequest(
@@ -97,7 +116,7 @@ class ChatServiceImplMessageContractTest {
                 7L,
                 clientMessageId,
             ),
-        ).thenReturn(Optional.empty())
+        ).thenReturn(null)
 
         val message = fixture.chatService.sendMessage(
             SendMessageRequest(
@@ -141,7 +160,7 @@ class ChatServiceImplMessageContractTest {
                 7L,
                 clientMessageId,
             ),
-        ).thenReturn(Optional.empty())
+        ).thenReturn(null)
 
         fixture.chatService.sendMessage(
             SendMessageRequest(
@@ -175,7 +194,7 @@ class ChatServiceImplMessageContractTest {
                 7L,
                 clientMessageId,
             ),
-        ).thenReturn(Optional.empty())
+        ).thenReturn(null)
 
         assertThrows(IllegalStateException::class.java) {
             fixture.chatService.sendMessage(
@@ -202,7 +221,7 @@ class ChatServiceImplMessageContractTest {
                 7L,
                 clientMessageId,
             ),
-        ).thenReturn(Optional.empty())
+        ).thenReturn(null)
 
         val message = fixture.chatService.sendMessage(
             SendMessageRequest(
@@ -231,7 +250,7 @@ class ChatServiceImplMessageContractTest {
                 7L,
                 clientMessageId,
             ),
-        ).thenReturn(Optional.empty())
+        ).thenReturn(null)
 
         assertThrows(IllegalStateException::class.java) {
             fixture.chatService.sendMessage(
@@ -274,7 +293,7 @@ class ChatServiceImplMessageContractTest {
                 7L,
                 clientMessageId,
             ),
-        ).thenReturn(Optional.of(existingMessage))
+        ).thenReturn(existingMessage)
 
         val message = fixture.chatService.sendMessage(
             SendMessageRequest(
@@ -310,7 +329,7 @@ class ChatServiceImplMessageContractTest {
                 7L,
                 clientMessageId,
             ),
-        ).thenReturn(Optional.empty())
+        ).thenReturn(null)
 
         val exception = assertThrows(MessageAdmissionRejectedException::class.java) {
             fixture.chatService.sendMessage(
@@ -326,7 +345,7 @@ class ChatServiceImplMessageContractTest {
 
         assertEquals("room rate limit exceeded", exception.message)
         verify(messageStreamProducer, never()).append(anyMessageStreamEnvelope())
-        verify(fixture.redisTemplate.opsForValue(), never()).increment("chat:sequence:10", 1L)
+        verify(fixture.redisTemplate, never()).execute(MessageSequenceService.ALLOCATE_SEQUENCE, listOf("chat:sequence:10"))
         verify(fixture.messageRepository, never()).saveAndFlush(any(Message::class.java))
     }
 
@@ -356,7 +375,7 @@ class ChatServiceImplMessageContractTest {
                 7L,
                 clientMessageId,
             ),
-        ).thenReturn(Optional.of(existingMessage))
+        ).thenReturn(existingMessage)
 
         fixture.chatService.sendMessage(
             SendMessageRequest(
@@ -389,7 +408,7 @@ class ChatServiceImplMessageContractTest {
                 7L,
                 clientMessageId,
             ),
-        ).thenReturn(Optional.empty())
+        ).thenReturn(null)
 
         val exception = assertThrows(MessageModerationRejectedException::class.java) {
             fixture.chatService.sendMessage(
@@ -405,7 +424,7 @@ class ChatServiceImplMessageContractTest {
 
         assertEquals("message blocked by moderation policy", exception.message)
         verify(messageStreamProducer, never()).append(anyMessageStreamEnvelope())
-        verify(fixture.redisTemplate.opsForValue(), never()).increment("chat:sequence:10", 1L)
+        verify(fixture.redisTemplate, never()).execute(MessageSequenceService.ALLOCATE_SEQUENCE, listOf("chat:sequence:10"))
         verify(fixture.messageRepository, never()).saveAndFlush(any(Message::class.java))
     }
 
@@ -429,7 +448,7 @@ class ChatServiceImplMessageContractTest {
                 7L,
                 clientMessageId,
             ),
-        ).thenReturn(Optional.empty())
+        ).thenReturn(null)
 
         val exception = assertThrows(MessageModerationRejectedException::class.java) {
             fixture.chatService.sendMessage(
@@ -447,7 +466,7 @@ class ChatServiceImplMessageContractTest {
         assertEquals(0, moderationPolicyService.callCount)
         assertEquals(0, admissionPolicyService.callCount)
         verify(messageStreamProducer, never()).append(anyMessageStreamEnvelope())
-        verify(fixture.redisTemplate.opsForValue(), never()).increment("chat:sequence:10", 1L)
+        verify(fixture.redisTemplate, never()).execute(MessageSequenceService.ALLOCATE_SEQUENCE, listOf("chat:sequence:10"))
     }
 
     @Test
@@ -482,7 +501,7 @@ class ChatServiceImplMessageContractTest {
                 7L,
                 clientMessageId,
             ),
-        ).thenReturn(Optional.of(existingMessage))
+        ).thenReturn(existingMessage)
 
         fixture.chatService.sendMessage(
             SendMessageRequest(
@@ -514,7 +533,7 @@ class ChatServiceImplMessageContractTest {
                 7L,
                 clientMessageId,
             ),
-        ).thenReturn(Optional.empty())
+        ).thenReturn(null)
 
         fixture.chatService.sendMessage(
             SendMessageRequest(
@@ -551,14 +570,14 @@ class ChatServiceImplMessageContractTest {
                 7L,
                 "client-message-1",
             ),
-        ).thenReturn(Optional.empty())
+        ).thenReturn(null)
         `when`(
             fixture.messageRepository.findByChatRoomIdAndSenderIdAndClientMessageId(
                 10L,
                 7L,
                 "client-message-2",
             ),
-        ).thenReturn(Optional.empty())
+        ).thenReturn(null)
 
         fixture.chatService.sendMessage(
             SendMessageRequest(
@@ -607,8 +626,8 @@ class ChatServiceImplMessageContractTest {
         val redisTemplate = mock(RedisTemplate::class.java) as RedisTemplate<String, String>
         val valueOperations = mock(ValueOperations::class.java) as ValueOperations<String, String>
         `when`(redisTemplate.opsForValue()).thenReturn(valueOperations)
-        `when`(valueOperations.increment("chat:sequence:10", 1L))
-            .thenReturn(sequenceValues.first(), *sequenceValues.drop(1).toTypedArray())
+        `when`(redisTemplate.execute(MessageSequenceService.ALLOCATE_SEQUENCE, listOf("chat:sequence:10")))
+            .thenReturn(sequenceValues.first().toString(), *sequenceValues.drop(1).map { it.toString() }.toTypedArray())
 
         val objectMapper = ObjectMapper()
             .registerModule(JavaTimeModule())
@@ -634,16 +653,21 @@ class ChatServiceImplMessageContractTest {
         `when`(chatRoomRepository.findById(10L)).thenReturn(Optional.of(chatRoom))
         `when`(userRepository.findById(7L)).thenReturn(Optional.of(sender))
         `when`(chatRoomMemberRepository.findByChatRoomIdAndUserIdAndIsActiveTrue(10L, 7L))
-            .thenReturn(Optional.of(member))
+            .thenReturn(member)
 
         val webSocketSessionManager = WebSocketSessionManager(
-            redisTemplate = redisTemplate,
             objectMapper = objectMapper,
             redisMessageBroker = redisMessageBroker,
             chatRoomMemberRepository = chatRoomMemberRepository,
-            redisProperties = redisProperties,
-            gatewayProperties = ChatWebSocketGatewayProperties(),
-            outboundExecutor = Runnable::run,
+            roomSubscriptions = WebSocketRoomSubscriptions(
+                redisTemplate = redisTemplate,
+                redisProperties = redisProperties,
+                redisMessageBroker = redisMessageBroker,
+            ),
+            transport = WebSocketSessionTransport(
+                gatewayProperties = ChatWebSocketGatewayProperties(),
+                outboundExecutor = Runnable::run,
+            ),
         )
 
         return@with Fixture(
@@ -666,7 +690,6 @@ class ChatServiceImplMessageContractTest {
                         messageSequenceService = MessageSequenceService(
                             redisTemplate = redisTemplate,
                             redisProperties = redisProperties,
-                            sequenceProperties = MessageSequenceProperties(),
                         ),
                         roomStorageConfigReader = roomStorageConfigReader,
                         messageStreamProducer = messageStreamProducer,

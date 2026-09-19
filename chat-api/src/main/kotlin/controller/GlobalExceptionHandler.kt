@@ -178,7 +178,7 @@ class GlobalExceptionHandler {
         ApiFieldErrorResponse(
             field = field,
             message = defaultMessage ?: "유효하지 않은 값입니다.",
-            rejectedValue = rejectedValue,
+            rejectedValue = null,
         )
 }
 

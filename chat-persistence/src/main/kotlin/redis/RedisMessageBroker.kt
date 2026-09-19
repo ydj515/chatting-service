@@ -128,6 +128,7 @@ class RedisMessageBroker(
             logger.info("Broadcast to $roomId to $json")
         } catch (e: Exception) {
             logger.error("Error broadcast to $roomId", e)
+            throw e
         }
     }
 

@@ -6,7 +6,6 @@ import org.springframework.data.domain.Pageable
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Query
 import org.springframework.stereotype.Repository
-import java.util.Optional
 
 @Repository
 interface MessageRepository : JpaRepository<Message, Long> {
@@ -23,7 +22,7 @@ interface MessageRepository : JpaRepository<Message, Long> {
     )
     fun findLatestMessagesByRooms(roomIds: Collection<Long>): List<Message>
 
-    fun findByMessageId(messageId: String): Optional<Message>
+    fun findByMessageId(messageId: String): Message?
 
     @Query(
         """
@@ -39,7 +38,7 @@ interface MessageRepository : JpaRepository<Message, Long> {
         chatRoomId: Long,
         senderId: Long,
         clientMessageId: String,
-    ): Optional<Message>
+    ): Message?
 
     @Query(
         """

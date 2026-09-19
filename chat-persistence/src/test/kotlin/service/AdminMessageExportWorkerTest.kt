@@ -5,6 +5,7 @@ import com.chat.domain.dto.AdminMessageCursorCodec
 import com.chat.domain.dto.AdminMessageDto
 import com.chat.domain.dto.AdminMessageSearchMode
 import com.chat.domain.model.MessageType
+import com.chat.persistence.config.AdminExportProperties
 import com.chat.persistence.config.ChatObjectStorageProperties
 import com.chat.persistence.config.ChatWorkerProperties
 import com.chat.persistence.repository.AdminExportJobRecord
@@ -359,10 +360,8 @@ class AdminMessageExportWorkerTest {
             messageRepository = messageRepository,
             workerProperties = ChatWorkerProperties(consumerName = "worker-1"),
             objectMapper = testObjectMapper(),
-            exportDirectory = tempDir.toString(),
-            exportChunkSize = 2,
-            objectStoragePort = objectStoragePort,
-            objectStorageProperties = ChatObjectStorageProperties(),
+            exportProperties = AdminExportProperties(directory = tempDir.toString(), chunkSize = 2),
+            exportStorage = AdminExportStorage(objectStoragePort, ChatObjectStorageProperties()),
         )
 
     private class RecordingObjectStoragePort : ObjectStoragePort {

@@ -2,8 +2,6 @@
 <SmellBaseline>
   <ManuallySuppressedIssues />
   <CurrentIssues>
-    <ID>LongParameterList:AdminMessageExportWorker.kt$AdminMessageExportWorker$( private val exportJobRepository: AdminExportJobRepository, private val messageRepository: AdminMessageRepository, private val workerProperties: ChatWorkerProperties, private val objectMapper: ObjectMapper, private val objectStoragePort: ObjectStoragePort, private val objectStorageProperties: ChatObjectStorageProperties, @Value("\${chat.admin.export.directory:build/admin-exports}") private val exportDirectory: String, @Value("\${chat.admin.export.chunk-size:1000}") private val exportChunkSize: Int = DEFAULT_EXPORT_CHUNK_SIZE, )</ID>
-    <ID>LongParameterList:WebSocketSessionManager.kt$WebSocketSessionManager$( private val redisTemplate: RedisTemplate&lt;String, String&gt;, private val objectMapper: ObjectMapper, private val redisMessageBroker: RedisMessageBroker, private val chatRoomMemberRepository: ChatRoomMemberRepository, private val redisProperties: ChatRedisProperties, private val gatewayProperties: ChatWebSocketGatewayProperties, @Qualifier("webSocketOutboundExecutor") private val outboundExecutor: Executor, private val gatewayMetrics: WebSocketGatewayMetrics = WebSocketGatewayMetrics.Noop, private val sessionControlBroker: RedisSessionControlBroker? = null, private val clock: Clock = Clock.systemUTC(), )</ID>
     <ID>SpreadOperator:AdminMessageRepository.kt$AdminMessageRepository$( """ $BASE_SELECT WHERE ${where.joinToString(" AND ")} ORDER BY cm.created_at DESC, cm.room_seq DESC, cm.message_id DESC LIMIT ? """.trimIndent(), messageRowMapper, *args.toTypedArray(), )</ID>
     <ID>SpreadOperator:AdminMessageRepository.kt$AdminMessageRepository$( """ $BASE_SELECT WHERE ${where.joinToString(" AND ")} ORDER BY cm.room_seq DESC, cm.created_at DESC, cm.message_id DESC LIMIT ? """.trimIndent(), messageRowMapper, *args.toTypedArray(), )</ID>
     <ID>SpreadOperator:ModerationRuleJdbcRepository.kt$ModerationRuleJdbcRepository$( """ SELECT id, scope_type, room_id, pattern, match_type, action, reason, enabled, created_by, created_at, updated_at FROM moderation_rules $where ORDER BY id DESC """.trimIndent(), ROW_MAPPER, *args.toTypedArray(), )</ID>
@@ -31,8 +29,7 @@
     <ID>TooGenericExceptionCaught:RoomPolicyWorker.kt$RoomPolicyWorker$e: Exception</ID>
     <ID>TooGenericExceptionCaught:RoomSeqGapAuditWorker.kt$RoomSeqGapAuditWorker$e: RuntimeException</ID>
     <ID>TooGenericExceptionCaught:RoomTrafficStatsService.kt$RedisRoomTrafficStatsService$e: Exception</ID>
-    <ID>TooGenericExceptionCaught:WebSocketSessionManager.kt$WebSocketSessionManager$e: Exception</ID>
-    <ID>TooGenericExceptionCaught:WebSocketSessionManager.kt$WebSocketSessionManager$t: Throwable</ID>
-    <ID>TooManyFunctions:WebSocketSessionManager.kt$WebSocketSessionManager</ID>
+    <ID>TooGenericExceptionCaught:WebSocketSessionTransport.kt$WebSocketSessionTransport$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:WebSocketSessionTransport.kt$WebSocketSessionTransport$t: Throwable</ID>
   </CurrentIssues>
 </SmellBaseline>

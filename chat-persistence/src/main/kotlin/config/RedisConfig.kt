@@ -7,6 +7,8 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
 import com.fasterxml.jackson.module.kotlin.KotlinModule
 import io.lettuce.core.cluster.ClusterClientOptions
 import io.lettuce.core.cluster.ClusterTopologyRefreshOptions
+import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.boot.autoconfigure.data.redis.LettuceClientConfigurationBuilderCustomizer
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -15,8 +17,10 @@ import org.springframework.data.redis.connection.RedisConnectionFactory
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.data.redis.listener.RedisMessageListenerContainer
 import org.springframework.data.redis.serializer.StringRedisSerializer
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor
 import java.time.Duration
-import java.util.concurrent.Executors
+import java.util.concurrent.Executor
+import java.util.concurrent.ThreadPoolExecutor
 
 @Configuration
 class RedisConfig {
@@ -57,23 +61,27 @@ class RedisConfig {
             afterPropertiesSet()
         }
 
+    @Bean("redisListenerExecutor")
+    fun redisListenerExecutor(): ThreadPoolTaskExecutor = ThreadPoolTaskExecutor().apply {
+        corePoolSize = 8
+        maxPoolSize = 32
+        queueCapacity = 1024
+        setThreadNamePrefix("redis-listener-")
+        setRejectedExecutionHandler(ThreadPoolExecutor.CallerRunsPolicy())
+        setWaitForTasksToCompleteOnShutdown(true)
+        setAwaitTerminationSeconds(30)
+    }
+
     @Bean
     fun redisMessageListenerContainer(
         connectionFactory: RedisConnectionFactory,
+        @Qualifier("redisListenerExecutor") executor: Executor,
     ): RedisMessageListenerContainer =
         RedisMessageListenerContainer().apply {
             setConnectionFactory(connectionFactory)
-            setTaskExecutor(
-                Executors.newCachedThreadPool { runnable ->
-                    Thread(runnable).apply {
-                        name = "redis-message-listener-container-${System.currentTimeMillis()}"
-                        isDaemon = true
-                    }
-                },
-            )
+            setTaskExecutor(executor)
             setErrorHandler { t ->
-                println("Redis Message Listener Error: $t")
-                t.printStackTrace()
+                LoggerFactory.getLogger(RedisConfig::class.java).error("Redis message listener failed", t)
             }
         }
 }

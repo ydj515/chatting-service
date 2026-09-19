@@ -4,7 +4,6 @@ import com.chat.domain.model.ChatRoom
 import com.chat.domain.model.User
 import com.chat.persistence.config.ChatRedisProperties
 import com.chat.persistence.config.ChatWebSocketGatewayProperties
-import com.chat.persistence.config.MessageSequenceProperties
 import com.chat.persistence.redis.MessageStreamProducer
 import com.chat.persistence.redis.RedisMessageBroker
 import com.chat.persistence.repository.ChatRoomMemberRepository
@@ -33,7 +32,7 @@ class ChatServiceImplMembershipEventTest {
         val redisTemplate = redisTemplate()
         val chatRoom = chatRoom(id = 10L)
         val user = user(id = 7L)
-        `when`(chatRoomRepository.findById(10L)).thenReturn(Optional.of(chatRoom))
+        `when`(chatRoomRepository.findByIdForMembershipUpdate(10L)).thenReturn(chatRoom)
         `when`(userRepository.findById(7L)).thenReturn(Optional.of(user))
         `when`(chatRoomMemberRepository.existsByChatRoomIdAndUserIdAndIsActiveTrue(10L, 7L)).thenReturn(false)
         val chatService = chatService(
@@ -83,13 +82,18 @@ class ChatServiceImplMembershipEventTest {
             redisProperties = redisProperties,
         )
         val webSocketSessionManager = WebSocketSessionManager(
-            redisTemplate = redisTemplate,
             objectMapper = objectMapper,
             redisMessageBroker = redisMessageBroker,
             chatRoomMemberRepository = chatRoomMemberRepository,
-            redisProperties = redisProperties,
-            gatewayProperties = ChatWebSocketGatewayProperties(),
-            outboundExecutor = Runnable::run,
+            roomSubscriptions = WebSocketRoomSubscriptions(
+                redisTemplate = redisTemplate,
+                redisProperties = redisProperties,
+                redisMessageBroker = redisMessageBroker,
+            ),
+            transport = WebSocketSessionTransport(
+                gatewayProperties = ChatWebSocketGatewayProperties(),
+                outboundExecutor = Runnable::run,
+            ),
         )
 
         val messageRepository = mock(MessageRepository::class.java)
@@ -113,7 +117,6 @@ class ChatServiceImplMembershipEventTest {
                     messageSequenceService = MessageSequenceService(
                         redisTemplate = redisTemplate,
                         redisProperties = redisProperties,
-                        sequenceProperties = MessageSequenceProperties(),
                     ),
                     roomStorageConfigReader = TestRoomStorageConfigReader,
                     messageStreamProducer = mock(MessageStreamProducer::class.java),

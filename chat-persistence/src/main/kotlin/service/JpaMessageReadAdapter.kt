@@ -50,7 +50,7 @@ class JpaMessageReadAdapter(
             chatRoomId = roomId,
             senderId = senderId,
             clientMessageId = clientMessageId,
-        ).orElse(null)?.toDto()
+        )?.toDto()
 
     private fun Message.toDto(): MessageDto {
         val roomSeq = if (roomSeq > 0) roomSeq else sequenceNumber

@@ -46,6 +46,7 @@ class GlobalExceptionHandlerTest {
         }
             .andExpect {
                 status { isBadRequest() }
+                jsonPath("$.errors[*].rejectedValue") { doesNotExist() }
                 content { contentTypeCompatibleWith(MediaType.APPLICATION_JSON) }
                 jsonPath("$.status") { value(400) }
                 jsonPath("$.error") { value("BAD_REQUEST") }
@@ -73,6 +74,7 @@ class GlobalExceptionHandlerTest {
         }
             .andExpect {
                 status { isBadRequest() }
+                jsonPath("$.errors[*].rejectedValue") { doesNotExist() }
                 jsonPath("$.errors[?(@.field == 'password' && @.message == '비밀번호는 UTF-8 기준 72바이트 이하여야 합니다')]") { exists() }
             }
     }
@@ -91,6 +93,7 @@ class GlobalExceptionHandlerTest {
         }
             .andExpect {
                 status { isBadRequest() }
+                jsonPath("$.errors[*].rejectedValue") { doesNotExist() }
                 jsonPath("$.errors[?(@.field == 'password' && @.message == '비밀번호는 UTF-8 기준 72바이트 이하여야 합니다')]") { exists() }
             }
     }
@@ -100,6 +103,7 @@ class GlobalExceptionHandlerTest {
         mockMvc.get("/test/bad-request")
             .andExpect {
                 status { isBadRequest() }
+                jsonPath("$.errors[*].rejectedValue") { doesNotExist() }
                 jsonPath("$.status") { value(400) }
                 jsonPath("$.error") { value("BAD_REQUEST") }
                 jsonPath("$.message") { value("잘못된 요청입니다.") }

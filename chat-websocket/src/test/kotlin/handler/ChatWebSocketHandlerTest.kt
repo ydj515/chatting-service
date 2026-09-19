@@ -30,6 +30,23 @@ import java.time.LocalDateTime
 
 class ChatWebSocketHandlerTest {
     @Test
+    fun `application input rejection becomes format error without acknowledgement`() {
+        val manager = mock(WebSocketSessionManager::class.java)
+        val service = mock(ChatService::class.java)
+        org.mockito.Mockito.doThrow(IllegalArgumentException("clientMessageId must be at most 128 characters"))
+            .`when`(service).sendMessage(SendMessageRequest(10, MessageType.TEXT, null, "x".repeat(129)), 7)
+        val mapper = ObjectMapper().registerModule(JavaTimeModule()).registerModule(KotlinModule.Builder().build()).disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+        val handler = ChatWebSocketHandler(manager, service, mapper, WebSocketProperties())
+        val session = mock(WebSocketSession::class.java)
+        `when`(session.attributes).thenReturn(mutableMapOf<String, Any>("userId" to 7L))
+        handler.handleMessage(session, TextMessage("""{"type":"SEND_MESSAGE","chatRoomId":10,"messageType":"TEXT","clientMessageId":"${"x".repeat(129)}"}"""))
+        val replies = mockingDetails(manager).invocations.filter { it.method.name == "sendTextToSession" }.map { it.arguments[1].toString() }
+        org.junit.jupiter.api.Assertions.assertEquals(1, replies.size)
+        assertTrue(replies.single().contains("INVALID_MESSAGE_FORMAT"))
+        org.junit.jupiter.api.Assertions.assertFalse(replies.single().contains("MESSAGE_ACCEPTED"))
+    }
+
+    @Test
     fun `PONG frame은 세션 activity로 기록하고 비즈니스 메시지로 처리하지 않는다`() {
         val sessionManager = mock(WebSocketSessionManager::class.java)
         val chatService = mock(ChatService::class.java)

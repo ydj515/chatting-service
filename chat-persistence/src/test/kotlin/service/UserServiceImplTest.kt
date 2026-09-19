@@ -38,6 +38,18 @@ class UserServiceImplTest {
     private val passwordEncoder: PasswordEncoder = BCryptPasswordEncoder(4)
 
     @Test
+    fun `last seen uses the same injected clock as authentication`() {
+        val repository = mock(UserRepository::class.java)
+        val user = User(id = 7, username = "tester", password = "unused", displayName = "Tester")
+        `when`(repository.findById(7)).thenReturn(java.util.Optional.of(user))
+        val service = userService(repository, mock(SessionTokenService::class.java), mock(UserSanctionJdbcRepository::class.java))
+        val result = service.updateLastSeen(7)
+        val expected = LocalDateTime.ofInstant(clock.instant(), ZoneOffset.UTC)
+        assertEquals(expected, result.lastSeenAt)
+        verify(repository).updateLastSeenAt(7, expected)
+    }
+
+    @Test
     fun `이미 존재하는 사용자명은 상태 충돌 예외로 처리한다`() {
         val userRepository = mock(UserRepository::class.java)
         val sessionTokenService = mock(SessionTokenService::class.java)

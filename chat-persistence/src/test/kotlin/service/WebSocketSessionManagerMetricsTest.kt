@@ -87,14 +87,19 @@ class WebSocketSessionManagerMetricsTest {
             redisProperties = redisProperties,
         )
         return WebSocketSessionManager(
-            redisTemplate = redisTemplate,
             objectMapper = objectMapper,
             redisMessageBroker = broker,
             chatRoomMemberRepository = repo,
-            redisProperties = redisProperties,
-            gatewayProperties = ChatWebSocketGatewayProperties(outboundQueueMaxPendingMessages = 128),
-            outboundExecutor = Runnable::run,
-            gatewayMetrics = WebSocketGatewayMetrics("default", provider(registry)),
+            roomSubscriptions = WebSocketRoomSubscriptions(
+                redisTemplate = redisTemplate,
+                redisProperties = redisProperties,
+                redisMessageBroker = broker,
+            ),
+            transport = WebSocketSessionTransport(
+                gatewayProperties = ChatWebSocketGatewayProperties(outboundQueueMaxPendingMessages = 128),
+                outboundExecutor = Runnable::run,
+                gatewayMetrics = WebSocketGatewayMetrics("default", provider(registry)),
+            ),
         )
     }
 

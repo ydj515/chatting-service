@@ -82,7 +82,7 @@ class JpaMessageWriteAdapter(
         }
 
     private fun messageForWrite(request: MessageWriteRequest): Message? {
-        if (messageRepository.findByMessageId(request.messageId).isPresent) {
+        if (messageRepository.findByMessageId(request.messageId) != null) {
             return null
         }
 
@@ -92,7 +92,7 @@ class JpaMessageWriteAdapter(
                 senderId = request.senderId,
                 clientMessageId = request.clientMessageId,
             )
-            if (existingMessage.isPresent) {
+            if (existingMessage != null) {
                 return null
             }
         }
@@ -114,7 +114,7 @@ class JpaMessageWriteAdapter(
     }
 
     private fun isDuplicate(request: MessageWriteRequest): Boolean {
-        if (messageRepository.findByMessageId(request.messageId).isPresent) {
+        if (messageRepository.findByMessageId(request.messageId) != null) {
             return true
         }
 
@@ -126,7 +126,7 @@ class JpaMessageWriteAdapter(
             chatRoomId = request.chatRoomId,
             senderId = request.senderId,
             clientMessageId = request.clientMessageId,
-        ).isPresent
+        ) != null
     }
 
     private fun MutableList<MessageWriteOutcome?>.toResult(): MessageWriteResult =

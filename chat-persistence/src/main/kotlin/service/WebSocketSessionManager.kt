@@ -2,46 +2,29 @@ package com.chat.persistence.service
 
 import com.chat.domain.dto.ChatMessageBatch
 import com.chat.domain.dto.WebSocketMessage
-import com.chat.persistence.config.ChatRedisProperties
-import com.chat.persistence.config.ChatWebSocketGatewayProperties
 import com.chat.persistence.redis.RedisMessageBroker
 import com.chat.persistence.repository.ChatRoomMemberRepository
 import com.fasterxml.jackson.databind.ObjectMapper
 import jakarta.annotation.PostConstruct
 import org.slf4j.LoggerFactory
-import org.springframework.beans.factory.annotation.Qualifier
-import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.stereotype.Service
 import org.springframework.web.socket.CloseStatus
-import org.springframework.web.socket.PingMessage
-import org.springframework.web.socket.TextMessage
 import org.springframework.web.socket.WebSocketSession
-import org.springframework.web.socket.handler.ConcurrentWebSocketSessionDecorator
-import java.nio.ByteBuffer
-import java.time.Clock
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.Executor
-import java.util.concurrent.atomic.AtomicLong
 
 @Service
 class WebSocketSessionManager(
-    private val redisTemplate: RedisTemplate<String, String>,
     private val objectMapper: ObjectMapper,
     private val redisMessageBroker: RedisMessageBroker,
     private val chatRoomMemberRepository: ChatRoomMemberRepository,
-    private val redisProperties: ChatRedisProperties,
-    private val gatewayProperties: ChatWebSocketGatewayProperties,
-    @Qualifier("webSocketOutboundExecutor")
-    private val outboundExecutor: Executor,
-    private val gatewayMetrics: WebSocketGatewayMetrics = WebSocketGatewayMetrics.Noop,
+    private val roomSubscriptions: WebSocketRoomSubscriptions,
+    private val transport: WebSocketSessionTransport,
     private val sessionControlBroker: RedisSessionControlBroker? = null,
-    private val clock: Clock = Clock.systemUTC(),
 ) {
     private val logger = LoggerFactory.getLogger(WebSocketSessionManager::class.java)
 
-    private val sessionsById = ConcurrentHashMap<String, SessionRef>()
+    private val sessionsById = ConcurrentHashMap<String, ManagedWebSocketSession>()
     private val sessionIdsByUserId = ConcurrentHashMap<Long, MutableSet<String>>()
-    private val sessionIdsByRoomId = ConcurrentHashMap<Long, MutableSet<String>>()
 
     @PostConstruct
     fun initialize() {
@@ -62,18 +45,16 @@ class WebSocketSessionManager(
             closeSessionsForUser(userId)
         }
 
-        gatewayMetrics.registerGauges(
+        transport.registerGauges(
             connectionCount = { sessionsById.size },
             // 방 개수가 아니라 (room, session) 구독 쌍 합계로 실제 구독 부하를 센다.
-            roomSubscriptionCount = { sessionIdsByRoomId.values.sumOf { ids -> ids.size } },
-            sendQueueDepth = { totalPendingSize() },
+            roomSubscriptionCount = { roomSubscriptions.subscriptionCount() },
+            sendQueueDepth = { currentSendQueueDepth() },
         )
     }
 
     // RoomPolicy OVERLOAD 판정 입력으로 노출하는 현재 Gateway pending depth 합계.
-    fun currentSendQueueDepth(): Int = totalPendingSize()
-
-    private fun totalPendingSize(): Int =
+    fun currentSendQueueDepth(): Int =
         sessionsById.values.sumOf { it.outboundQueue.pendingSize() }
 
     fun addSession(userId: Long, session: WebSocketSession) {
@@ -81,83 +62,22 @@ class WebSocketSessionManager(
         sessionsById[session.id]?.let { existing ->
             removeSession(existing.userId, existing.session)
         }
-        val outboundSession = ConcurrentWebSocketSessionDecorator(
-            session,
-            gatewayProperties.outboundSendTimeLimitMillis,
-            gatewayProperties.outboundSendBufferSizeLimitBytes,
-        )
-        val nowMillis = clock.millis()
-
-        val sessionRef = SessionRef(
-            userId = userId,
-            session = outboundSession,
-            roomIds = ConcurrentHashMap.newKeySet(),
-            lastActivityAtMillis = AtomicLong(nowMillis),
-            lastHeartbeatSentAtMillis = AtomicLong(nowMillis),
-            outboundQueue = BoundedOutboundSessionQueue(
-                maxPendingMessages = gatewayProperties.outboundQueueMaxPendingMessages,
-                executor = outboundExecutor,
-                sender = { payload ->
-                    val startNanos = System.nanoTime()
-                    try {
-                        outboundSession.sendMessage(TextMessage(payload))
-                        gatewayMetrics.recordWriteLatency(System.nanoTime() - startNanos, "success")
-                    } catch (t: Throwable) {
-                        gatewayMetrics.recordWriteLatency(System.nanoTime() - startNanos, "failure")
-                        throw t
-                    }
-                },
-                onOverflow = {
-                    logger.warn("Closing session ${session.id} because outbound queue is full")
-                    gatewayMetrics.recordSlowClientDisconnect()
-                    closeSession(session, OUTBOUND_QUEUE_FULL_STATUS)
-                    removeSession(userId, session)
-                },
-                onFailure = { throwable ->
-                    logger.error("Failed to send WebSocket message to ${session.id}", throwable)
-                    removeSession(userId, session)
-                },
-            ),
-        )
+        val sessionRef = transport.create(userId, session, ::removeSession)
         sessionsById[session.id] = sessionRef
         addSessionIdToUser(userId, session.id)
     }
 
-    fun recordSessionActivity(session: WebSocketSession) {
-        recordSessionActivity(session, clock.millis())
-    }
+    fun recordSessionActivity(session: WebSocketSession) = recordSessionActivity(session, transport.nowMillis())
 
     fun recordSessionActivity(session: WebSocketSession, nowMillis: Long) {
         sessionsById[session.id]?.lastActivityAtMillis?.set(nowMillis)
     }
 
-    fun pollHeartbeats() {
-        pollHeartbeats(clock.millis())
-    }
+    fun pollHeartbeats() = pollHeartbeats(transport.nowMillis())
 
     fun pollHeartbeats(nowMillis: Long) {
-        if (!gatewayProperties.heartbeatEnabled) {
-            return
-        }
-
-        sessionsById.values.forEach { sessionRef ->
-            val session = sessionRef.session
-            if (!session.isOpen) {
-                removeSession(sessionRef.userId, session)
-                return@forEach
-            }
-
-            if (nowMillis - sessionRef.lastActivityAtMillis.get() > gatewayProperties.heartbeatTimeoutMillis) {
-                logger.warn("Closing session ${session.id} because heartbeat timed out")
-                closeSession(session, HEARTBEAT_TIMEOUT_STATUS)
-                removeSession(sessionRef.userId, session)
-                return@forEach
-            }
-
-            if (nowMillis - sessionRef.lastHeartbeatSentAtMillis.get() >= gatewayProperties.heartbeatIntervalMillis) {
-                sendHeartbeat(sessionRef, nowMillis)
-            }
-        }
+        transport.pollHeartbeats(sessionsById.values, nowMillis, ::removeSession)
+        roomSubscriptions.retryIndexUpdates()
     }
 
     fun removeSession(userId: Long, session: WebSocketSession) {
@@ -168,14 +88,10 @@ class WebSocketSessionManager(
         sessionRef.roomIds.toList().forEach { roomId ->
             removeSessionFromRoom(sessionRef, roomId)
         }
-
-        if (sessionsById.isEmpty()) {
-            redisTemplate.delete(serverRoomKey(redisMessageBroker.getServerId()))
-        }
     }
 
     fun joinRoom(userId: Long, roomId: Long) {
-        val sessionRefs = openSessionRefsForUser(userId)
+        val sessionRefs = openManagedWebSocketSessionsForUser(userId)
         if (sessionRefs.isEmpty()) {
             return
         }
@@ -192,14 +108,14 @@ class WebSocketSessionManager(
     }
 
     fun leaveRoom(userId: Long, roomId: Long) {
-        openSessionRefsForUser(userId).forEach { sessionRef ->
+        openManagedWebSocketSessionsForUser(userId).forEach { sessionRef ->
             removeSessionFromRoom(sessionRef, roomId)
         }
     }
 
     fun sendMessageToLocalRoom(roomId: Long, message: WebSocketMessage, excludeUserId: Long? = null) {
         val json = objectMapper.writerFor(com.chat.domain.dto.WebSocketMessage::class.java).writeValueAsString(message)
-        val sessionIds = sessionIdsByRoomId[roomId]?.toList() ?: return
+        val sessionIds = roomSubscriptions.sessionIds(roomId) ?: return
         // payload 크기는 루프 내내 동일하므로 1회만 계산해 세션 수만큼의 byte array 할당을 피한다.
         val outboundBytes = json.toByteArray(Charsets.UTF_8).size.toLong()
 
@@ -216,12 +132,11 @@ class WebSocketSessionManager(
             }
 
             if (sessionRef.outboundQueue.enqueue(json)) {
-                gatewayMetrics.recordLocalDelivery(1)
-                gatewayMetrics.recordOutboundBytes(outboundBytes)
+                transport.recordDelivery(outboundBytes)
             }
         }
         if (message is ChatMessageBatch) {
-            gatewayMetrics.recordBatchFrame()
+            transport.recordBatchFrame()
         }
     }
 
@@ -236,18 +151,18 @@ class WebSocketSessionManager(
         return sessionRef.outboundQueue.enqueue(payload, priority = priority)
     }
 
-    fun isUserOnlineLocally(userId: Long): Boolean = openSessionRefsForUser(userId).isNotEmpty()
+    fun isUserOnlineLocally(userId: Long): Boolean = openManagedWebSocketSessionsForUser(userId).isNotEmpty()
 
     fun closeSessionsForUser(userId: Long, closeStatus: CloseStatus = SESSION_REVOKED_STATUS) {
-        openSessionRefsForUser(userId).forEach { sessionRef ->
-            closeSession(sessionRef.session, closeStatus)
+        openManagedWebSocketSessionsForUser(userId).forEach { sessionRef ->
+            transport.closeSession(sessionRef.session, closeStatus)
             removeSession(sessionRef.userId, sessionRef.session)
         }
     }
 
-    private fun openSessionRefsForUser(userId: Long): List<SessionRef> {
+    private fun openManagedWebSocketSessionsForUser(userId: Long): List<ManagedWebSocketSession> {
         val sessionIds = sessionIdsByUserId[userId]?.toList() ?: return emptyList()
-        val sessionRefs = mutableListOf<SessionRef>()
+        val sessionRefs = mutableListOf<ManagedWebSocketSession>()
 
         sessionIds.forEach { sessionId ->
             val sessionRef = sessionsById[sessionId]
@@ -263,20 +178,20 @@ class WebSocketSessionManager(
         return sessionRefs
     }
 
-    private fun addSessionToRoom(sessionRef: SessionRef, roomId: Long) {
+    private fun addSessionToRoom(sessionRef: ManagedWebSocketSession, roomId: Long) {
         if (sessionRef.roomIds.add(roomId)) {
-            addSessionIdToRoom(roomId, sessionRef.session.id)
+            roomSubscriptions.addSessionIdToRoom(roomId, sessionRef.session.id)
 
             logger.info("Joined $roomId for ${sessionRef.userId} ${redisMessageBroker.getServerId()}")
         }
     }
 
-    private fun removeSessionFromRoom(sessionRef: SessionRef, roomId: Long) {
+    private fun removeSessionFromRoom(sessionRef: ManagedWebSocketSession, roomId: Long) {
         if (!sessionRef.roomIds.remove(roomId)) {
             return
         }
 
-        removeSessionIdFromRoom(roomId, sessionRef.session.id)
+        roomSubscriptions.removeSessionIdFromRoom(roomId, sessionRef.session.id)
     }
 
     private fun addSessionIdToUser(userId: Long, sessionId: String) {
@@ -294,67 +209,7 @@ class WebSocketSessionManager(
         }
     }
 
-    private fun addSessionIdToRoom(roomId: Long, sessionId: String) {
-        sessionIdsByRoomId.compute(roomId) { _, sessionIds ->
-            val nextSessionIds = sessionIds ?: ConcurrentHashMap.newKeySet()
-            val wasEmpty = nextSessionIds.isEmpty()
-            nextSessionIds.add(sessionId)
-            if (wasEmpty) {
-                redisMessageBroker.subscribeToRoom(roomId)
-                redisTemplate.opsForSet().add(serverRoomKey(redisMessageBroker.getServerId()), roomId.toString())
-            }
-            nextSessionIds
-        }
-    }
-
-    private fun removeSessionIdFromRoom(roomId: Long, sessionId: String) {
-        sessionIdsByRoomId.computeIfPresent(roomId) { _, sessionIds ->
-            sessionIds.remove(sessionId)
-            if (sessionIds.isEmpty()) {
-                redisMessageBroker.unsubscribeFromRoom(roomId)
-                redisTemplate.opsForSet().remove(serverRoomKey(redisMessageBroker.getServerId()), roomId.toString())
-                null
-            } else {
-                sessionIds
-            }
-        }
-    }
-
-    private data class SessionRef(
-        val userId: Long,
-        val session: WebSocketSession,
-        val roomIds: MutableSet<Long>,
-        val lastActivityAtMillis: AtomicLong,
-        val lastHeartbeatSentAtMillis: AtomicLong,
-        val outboundQueue: BoundedOutboundSessionQueue,
-    )
-
-    private fun sendHeartbeat(sessionRef: SessionRef, nowMillis: Long) {
-        try {
-            sessionRef.session.sendMessage(PingMessage(ByteBuffer.allocate(0)))
-            sessionRef.lastHeartbeatSentAtMillis.set(nowMillis)
-        } catch (e: Exception) {
-            logger.debug("Failed to send heartbeat ping to WebSocket session ${sessionRef.session.id}", e)
-            closeSession(sessionRef.session, HEARTBEAT_TIMEOUT_STATUS)
-            removeSession(sessionRef.userId, sessionRef.session)
-        }
-    }
-
-    private fun serverRoomKey(serverId: String): String = "${redisProperties.serverRoomsKeyPrefix}$serverId"
-
-    private fun closeSession(session: WebSocketSession, closeStatus: CloseStatus) {
-        try {
-            if (session.isOpen) {
-                session.close(closeStatus)
-            }
-        } catch (e: Exception) {
-            logger.debug("Failed to close WebSocket session ${session.id}", e)
-        }
-    }
-
     private companion object {
-        val OUTBOUND_QUEUE_FULL_STATUS = CloseStatus(1013, "Outbound queue full")
         val SESSION_REVOKED_STATUS = CloseStatus(4003, "Session revoked")
-        val HEARTBEAT_TIMEOUT_STATUS = CloseStatus(4004, "Heartbeat timeout")
     }
 }

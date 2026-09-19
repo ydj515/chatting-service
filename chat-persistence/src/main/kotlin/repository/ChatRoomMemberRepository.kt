@@ -6,7 +6,6 @@ import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.CrudRepository
 import org.springframework.stereotype.Repository
-import java.util.Optional
 
 @Repository
 interface ChatRoomMemberRepository : CrudRepository<ChatRoomMember, Long> {
@@ -14,7 +13,7 @@ interface ChatRoomMemberRepository : CrudRepository<ChatRoomMember, Long> {
     @EntityGraph(attributePaths = ["user"])
     fun findByChatRoomIdAndIsActiveTrue(chatRoomId: Long): List<ChatRoomMember>
 
-    fun findByChatRoomIdAndUserIdAndIsActiveTrue(chatRoomId: Long, userId: Long): Optional<ChatRoomMember>
+    fun findByChatRoomIdAndUserIdAndIsActiveTrue(chatRoomId: Long, userId: Long): ChatRoomMember?
 
     @Query("SELECT COUNT(crm) FROM ChatRoomMember crm WHERE crm.chatRoom.id = :chatRoomId AND crm.isActive = true")
     fun countActiveMembersInRoom(chatRoomId: Long): Long

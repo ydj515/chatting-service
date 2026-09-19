@@ -30,6 +30,21 @@ import java.time.LocalDateTime
 
 class WebSocketSessionManagerTest {
     @Test
+    fun `closing the last session never bulk deletes new room registrations`() {
+        val members = mock(ChatRoomMemberRepository::class.java)
+        `when`(members.existsByChatRoomIdAndUserIdAndIsActiveTrue(10, 7)).thenReturn(true)
+        val fixture = sessionManagerFixture(members)
+        val previous = session("old")
+        val current = session("new")
+        fixture.manager.addSession(7, previous)
+        fixture.manager.joinRoom(7, 10)
+        fixture.manager.removeSession(7, previous)
+        fixture.manager.addSession(7, current)
+        fixture.manager.joinRoom(7, 10)
+        verify(fixture.redisTemplate, never()).delete(anyString())
+    }
+
+    @Test
     fun `원격 JOIN membership event는 열린 local session을 방 인덱스에 추가한다`() {
         val chatRoomMemberRepository = mock(ChatRoomMemberRepository::class.java)
         `when`(chatRoomMemberRepository.existsByChatRoomIdAndUserIdAndIsActiveTrue(10L, 7L)).thenReturn(true)
@@ -167,16 +182,22 @@ class WebSocketSessionManagerTest {
         )
 
         val manager = WebSocketSessionManager(
-            redisTemplate = redisTemplate,
             objectMapper = objectMapper,
             redisMessageBroker = redisMessageBroker,
             chatRoomMemberRepository = chatRoomMemberRepository,
-            redisProperties = redisProperties,
-            gatewayProperties = ChatWebSocketGatewayProperties(outboundQueueMaxPendingMessages = 128),
-            outboundExecutor = Runnable::run,
+            roomSubscriptions = WebSocketRoomSubscriptions(
+                redisTemplate = redisTemplate,
+                redisProperties = redisProperties,
+                redisMessageBroker = redisMessageBroker,
+            ),
+            transport = WebSocketSessionTransport(
+                gatewayProperties = ChatWebSocketGatewayProperties(outboundQueueMaxPendingMessages = 128),
+                outboundExecutor = Runnable::run,
+            ),
         )
 
         return SessionManagerFixture(
+            redisTemplate = redisTemplate,
             manager = manager,
             redisMessageBroker = redisMessageBroker,
             objectMapper = objectMapper,
@@ -184,6 +205,7 @@ class WebSocketSessionManagerTest {
     }
 
     private data class SessionManagerFixture(
+        val redisTemplate: RedisTemplate<String, String>,
         val manager: WebSocketSessionManager,
         val redisMessageBroker: RedisMessageBroker,
         val objectMapper: ObjectMapper,

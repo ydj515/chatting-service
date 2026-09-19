@@ -89,7 +89,7 @@ class UserServiceImpl(
         val user = userRepository.findById(userId)
             .orElseThrow { ResourceNotFoundException("사용자를 찾을 수 없습니다: $userId") }
 
-        val now = LocalDateTime.now()
+        val now = LocalDateTime.now(clock)
         userRepository.updateLastSeenAt(userId, now)
 
         // 엔티티는 더 이상 data class 가 아니므로 값 객체인 DTO 에서 copy 한다.

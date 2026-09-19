@@ -21,6 +21,20 @@ import java.util.stream.Stream
 
 class HotRoomFanoutWorkerTest {
     @Test
+    fun `real broker publish failure leaves records pending without success metrics`() {
+        val consumer = FakeMessageStreamConsumer(records = listOf(streamRecord("1-0", 1)))
+
+        @Suppress("UNCHECKED_CAST")
+        val redis = mock(org.springframework.data.redis.core.RedisTemplate::class.java) as org.springframework.data.redis.core.RedisTemplate<String, String>
+        org.mockito.Mockito.doThrow(org.springframework.data.redis.RedisConnectionFailureException("unavailable"))
+            .`when`(redis).convertAndSend(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.any())
+        val broker = RedisMessageBroker(redis, mock(org.springframework.data.redis.listener.RedisMessageListenerContainer::class.java), com.chat.persistence.config.RedisConfig().distributedObjectMapper(), com.chat.persistence.config.ChatRedisProperties())
+        val worker = HotRoomFanoutWorker(consumer, broker, ChatWorkerProperties())
+        assertEquals(0, worker.pollAndFanout())
+        assertEquals(emptyList<String>(), consumer.acked)
+    }
+
+    @Test
     fun `fanout worker는 stream 메시지를 방별 batch로 묶어 broadcast하고 ack한다`() {
         val consumer = FakeMessageStreamConsumer(
             records = listOf(

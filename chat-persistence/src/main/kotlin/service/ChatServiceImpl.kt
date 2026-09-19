@@ -16,7 +16,6 @@ import org.springframework.transaction.annotation.Transactional
 import java.time.ZoneOffset
 
 @Service
-@Transactional
 class ChatServiceImpl(
     private val chatRoomRepository: ChatRoomRepository,
     private val messageReadPort: MessageReadPort,
@@ -57,10 +56,12 @@ class ChatServiceImpl(
         )
 
     @CacheEvict(value = ["chatRooms"], allEntries = true)
+    @Transactional
     override fun createChatRoom(
         request: CreateChatRoomRequest,
         createdBy: Long,
     ): ChatRoomDto {
+        require(request.maxMembers >= 1) { "maxMembers must be positive" }
         val creator = userRepository.findById(createdBy)
             .orElseThrow { ResourceNotFoundException("사용자를 찾을 수 없습니다: $createdBy") }
 
@@ -133,10 +134,11 @@ class ChatServiceImpl(
             CacheEvict(value = ["chatRooms"], key = "#roomId"),
         ],
     )
+    @Transactional
     override fun joinChatRoom(roomId: Long, userId: Long) {
         // 채팅방 확인
-        val chatRoom = chatRoomRepository.findById(roomId)
-            .orElseThrow { ResourceNotFoundException("채팅방을 찾을 수 없습니다: $roomId") }
+        val chatRoom = chatRoomRepository.findByIdForMembershipUpdate(roomId)
+            ?: throw ResourceNotFoundException("채팅방을 찾을 수 없습니다: $roomId")
 
         // 사용자 확인
         val user = userRepository.findById(userId)
@@ -145,6 +147,10 @@ class ChatServiceImpl(
         // 이미 참여중인지 확인
         if (chatRoomMemberRepository.existsByChatRoomIdAndUserIdAndIsActiveTrue(roomId, userId)) {
             throw ResourceConflictException("이미 참여한 채팅방입니다")
+        }
+
+        if (chatRoomMemberRepository.countActiveMembersInRoom(roomId) >= chatRoom.maxMembers) {
+            throw ResourceConflictException("Chat room is full")
         }
 
         if (chatRoomMemberRepository.reactivateMembership(roomId, userId) == 0) {
@@ -165,6 +171,7 @@ class ChatServiceImpl(
             CacheEvict(value = ["chatRooms"], key = "#roomId"),
         ],
     )
+    @Transactional
     override fun leaveChatRoom(roomId: Long, userId: Long) {
         chatRoomMemberRepository.leaveChatRoom(roomId, userId)
         membershipEventPublisher.publishAfterCommit(userId, roomId, RedisMessageBroker.MembershipAction.LEAVE)

@@ -14,7 +14,6 @@ import com.chat.domain.model.MessageType
 import com.chat.domain.model.User
 import com.chat.persistence.config.ChatRedisProperties
 import com.chat.persistence.config.ChatWebSocketGatewayProperties
-import com.chat.persistence.config.MessageSequenceProperties
 import com.chat.persistence.redis.MessageStreamProducer
 import com.chat.persistence.redis.RedisMessageBroker
 import com.chat.persistence.repository.ChatRoomMemberRepository
@@ -75,7 +74,7 @@ class ChatServiceImplCursorPaginationTest {
         chatService().joinChatRoom(room.id, creator.id)
         entityManager.flush()
         entityManager.clear()
-        val member = chatRoomMemberRepository.findByChatRoomIdAndUserIdAndIsActiveTrue(room.id, creator.id).orElseThrow()
+        val member = requireNotNull(chatRoomMemberRepository.findByChatRoomIdAndUserIdAndIsActiveTrue(room.id, creator.id))
         assertEquals(MemberRole.MEMBER, member.role)
     }
 
@@ -115,14 +114,14 @@ class ChatServiceImplCursorPaginationTest {
         val service = chatService()
         service.joinChatRoom(room.id, creator.id)
         entityManager.flush()
-        val original = chatRoomMemberRepository.findByChatRoomIdAndUserIdAndIsActiveTrue(room.id, creator.id).orElseThrow()
+        val original = requireNotNull(chatRoomMemberRepository.findByChatRoomIdAndUserIdAndIsActiveTrue(room.id, creator.id))
         service.leaveChatRoom(room.id, creator.id)
         entityManager.flush()
         entityManager.clear()
         service.joinChatRoom(room.id, creator.id)
         entityManager.flush()
         entityManager.clear()
-        val restored = chatRoomMemberRepository.findByChatRoomIdAndUserIdAndIsActiveTrue(room.id, creator.id).orElseThrow()
+        val restored = requireNotNull(chatRoomMemberRepository.findByChatRoomIdAndUserIdAndIsActiveTrue(room.id, creator.id))
         assertEquals(original.id, restored.id)
         assertEquals(null, restored.leftAt)
         assertEquals(1L, chatRoomMemberRepository.countActiveMembersInRoom(room.id))
@@ -241,13 +240,18 @@ class ChatServiceImplCursorPaginationTest {
             redisProperties = redisProperties,
         )
         val webSocketSessionManager = WebSocketSessionManager(
-            redisTemplate = redisTemplate,
             objectMapper = objectMapper,
             redisMessageBroker = redisMessageBroker,
             chatRoomMemberRepository = chatRoomMemberRepository,
-            redisProperties = redisProperties,
-            gatewayProperties = ChatWebSocketGatewayProperties(),
-            outboundExecutor = Runnable::run,
+            roomSubscriptions = WebSocketRoomSubscriptions(
+                redisTemplate = redisTemplate,
+                redisProperties = redisProperties,
+                redisMessageBroker = redisMessageBroker,
+            ),
+            transport = WebSocketSessionTransport(
+                gatewayProperties = ChatWebSocketGatewayProperties(),
+                outboundExecutor = Runnable::run,
+            ),
         )
 
         return ChatServiceImpl(
@@ -269,7 +273,6 @@ class ChatServiceImplCursorPaginationTest {
                     messageSequenceService = MessageSequenceService(
                         redisTemplate = redisTemplate,
                         redisProperties = redisProperties,
-                        sequenceProperties = MessageSequenceProperties(),
                     ),
                     roomStorageConfigReader = TestRoomStorageConfigReader,
                     messageStreamProducer = mock(MessageStreamProducer::class.java),
