@@ -31,7 +31,7 @@ const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
       />
       {selectedChatRoom && sessionToken ? (
         <ChatWindow
-          key={selectedChatRoom.id}
+          key={`${currentUser.id}:${selectedChatRoom.id}`}
           chatRoom={selectedChatRoom}
           currentUser={currentUser}
           sessionToken={sessionToken}

@@ -8,6 +8,8 @@ import { setSessionToken as setApiSessionToken } from '@/services/api.ts';
 import { appConfig } from '@/config/appConfig.ts';
 import { useServerHealth } from '@/hooks/useServerHealth.ts';
 import { useChatStore } from '@/stores/chatStore.ts';
+import { queryClient } from '@/lib/queryClient.ts';
+import { clearAuthQueries } from '@/utils/authCache.ts';
 import { isApiSessionReady } from '@/utils/authSession.ts';
 
 function ChatPage() {
@@ -103,6 +105,7 @@ function ChatPage() {
 
   const handleLogin = useCallback(
     (response: LoginResponse) => {
+      clearAuthQueries(queryClient);
       setApiSessionToken(response.sessionToken);
       setSyncedSessionToken(response.sessionToken);
       login(response, localStorage);
@@ -112,6 +115,7 @@ function ChatPage() {
   );
 
   const handleLogout = useCallback(() => {
+    clearAuthQueries(queryClient);
     setApiSessionToken(null);
     setSyncedSessionToken(null);
     logout(localStorage);

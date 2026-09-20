@@ -10,6 +10,7 @@ import {
   mergeMessages,
   messageRenderKey,
 } from '@/utils/messageEvents.ts';
+import { roomMessagesQueryKey } from '@/utils/authCache.ts';
 import { Copy, Check } from 'lucide-react';
 
 interface ChatWindowProps {
@@ -35,7 +36,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   const typingTimeoutRef = useRef<number>();
   const copyResetRef = useRef<number>();
   const queryClient = useQueryClient();
-  const messagesQueryKey = useMemo(() => ['messages', chatRoom.id] as const, [chatRoom.id]);
+  const messagesQueryKey = useMemo(() => roomMessagesQueryKey(currentUser.id, chatRoom.id), [currentUser.id, chatRoom.id]);
 
   // 채팅방 ID 복사 — 클립보드에 쓰고 토스트 + 아이콘을 잠시 체크로 전환
   const handleCopyRoomId = async () => {
