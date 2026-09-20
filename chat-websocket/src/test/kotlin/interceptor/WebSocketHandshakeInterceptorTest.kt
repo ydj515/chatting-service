@@ -41,6 +41,8 @@ class WebSocketHandshakeInterceptorTest {
             AuthenticatedWebSocketTicket(
                 userId = 42L,
                 expiresAt = LocalDateTime.parse("2026-06-12T12:30:00"),
+                sessionTokenDigest = "digest",
+                parentSession = AuthenticatedSession(42, LocalDateTime.parse("2026-06-12T23:59:00")),
             ),
         )
         val interceptor = interceptor(sessionTokenService, ticketService)

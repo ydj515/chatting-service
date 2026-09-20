@@ -233,6 +233,7 @@ class WebSocketSessionManagerTest {
                 redisMessageBroker = redisMessageBroker,
             ),
             transport = WebSocketSessionTransport(
+                authorization = org.mockito.Mockito.mock(WebSocketSessionAuthorization::class.java),
                 gatewayProperties = ChatWebSocketGatewayProperties(outboundQueueMaxPendingMessages = 128),
                 outboundExecutor = Runnable::run,
             ),

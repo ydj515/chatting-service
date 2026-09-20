@@ -30,6 +30,7 @@ class ChatWebSocketHandler(
     private val logger = LoggerFactory.getLogger(javaClass)
 
     override fun afterConnectionEstablished(session: WebSocketSession) {
+        if (sessionManager.rejectUnauthorizedSession(session)) return
         val userId = getUserIdFromSession(session)
 
         if (userId != null) {
@@ -49,6 +50,7 @@ class ChatWebSocketHandler(
         message: WebSocketMessage<*>,
     ) {
         val userId = getUserIdFromSession(session) ?: return
+        if (sessionManager.rejectUnauthorizedSession(session)) return
 
         try {
             sessionManager.recordSessionActivity(session)

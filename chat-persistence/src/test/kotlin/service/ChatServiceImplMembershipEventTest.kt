@@ -91,6 +91,7 @@ class ChatServiceImplMembershipEventTest {
                 redisMessageBroker = redisMessageBroker,
             ),
             transport = WebSocketSessionTransport(
+                authorization = org.mockito.Mockito.mock(WebSocketSessionAuthorization::class.java),
                 gatewayProperties = ChatWebSocketGatewayProperties(),
                 outboundExecutor = Runnable::run,
             ),

@@ -18,6 +18,7 @@ import java.util.concurrent.atomic.AtomicLong
 @Service
 class WebSocketSessionTransport(
     private val gatewayProperties: ChatWebSocketGatewayProperties,
+    private val authorization: WebSocketSessionAuthorization,
     @Qualifier("webSocketOutboundExecutor") private val outboundExecutor: Executor,
     private val gatewayMetrics: WebSocketGatewayMetrics = WebSocketGatewayMetrics.Noop,
     private val clock: Clock = Clock.systemUTC(),
@@ -59,6 +60,7 @@ class WebSocketSessionTransport(
                 sender = { payload ->
                     val startNanos = System.nanoTime()
                     try {
+                        check(!rejectUnauthorizedSession(outboundSession)) { "WebSocket session authorization expired or revoked" }
                         outboundSession.sendMessage(TextMessage(payload))
                         gatewayMetrics.recordWriteLatency(System.nanoTime() - startNanos, "success")
                     } catch (t: Throwable) {
@@ -81,16 +83,14 @@ class WebSocketSessionTransport(
     }
 
     internal fun pollHeartbeats(sessions: Collection<ManagedWebSocketSession>, nowMillis: Long, onRemove: (Long, WebSocketSession) -> Unit) {
-        if (!gatewayProperties.heartbeatEnabled) {
-            return
-        }
-
         sessions.forEach { sessionRef ->
             val session = sessionRef.session
-            if (!session.isOpen) {
+            if (rejectUnauthorizedSession(session) || !session.isOpen) {
                 onRemove(sessionRef.userId, session)
                 return@forEach
             }
+
+            if (!gatewayProperties.heartbeatEnabled) return@forEach
 
             if (nowMillis - sessionRef.lastActivityAtMillis.get() > gatewayProperties.heartbeatTimeoutMillis) {
                 logger.warn("Closing session ${session.id} because heartbeat timed out")
@@ -114,6 +114,12 @@ class WebSocketSessionTransport(
             closeSession(sessionRef.session, HEARTBEAT_TIMEOUT_STATUS)
             onRemove(sessionRef.userId, sessionRef.session)
         }
+    }
+
+    fun rejectUnauthorizedSession(session: WebSocketSession): Boolean {
+        if (!authorization.isInvalid(session)) return false
+        closeSession(session, CloseStatus(4003, "Session expired or revoked"))
+        return true
     }
 
     fun closeSession(session: WebSocketSession, closeStatus: CloseStatus) {

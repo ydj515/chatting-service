@@ -42,6 +42,8 @@ data class WebSocketTicketResponse(
 data class AuthenticatedWebSocketTicket(
     val userId: Long,
     val expiresAt: LocalDateTime,
+    val sessionTokenDigest: String? = null,
+    val parentSession: AuthenticatedSession? = null,
 )
 
 data class CreateUserRequest(

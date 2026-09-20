@@ -64,7 +64,17 @@ class WebSocketSessionManager(
         }
         val sessionRef = transport.create(userId, session, ::removeSession)
         sessionsById[session.id] = sessionRef
-        addSessionIdToUser(userId, session.id)
+        sessionIdsByUserId.compute(userId) { _, sessionIds ->
+            val nextSessionIds = sessionIds ?: ConcurrentHashMap.newKeySet()
+            nextSessionIds.add(session.id)
+            nextSessionIds
+        }
+    }
+
+    fun rejectUnauthorizedSession(session: WebSocketSession): Boolean {
+        if (!transport.rejectUnauthorizedSession(session)) return false
+        sessionsById[session.id]?.let { removeSession(it.userId, session) }
+        return true
     }
 
     fun recordSessionActivity(session: WebSocketSession) = recordSessionActivity(session, transport.nowMillis())
@@ -198,14 +208,6 @@ class WebSocketSessionManager(
         }
 
         roomSubscriptions.removeSessionIdFromRoom(roomId, sessionRef.session.id)
-    }
-
-    private fun addSessionIdToUser(userId: Long, sessionId: String) {
-        sessionIdsByUserId.compute(userId) { _, sessionIds ->
-            val nextSessionIds = sessionIds ?: ConcurrentHashMap.newKeySet()
-            nextSessionIds.add(sessionId)
-            nextSessionIds
-        }
     }
 
     private fun removeSessionIdFromUser(userId: Long, sessionId: String) {

@@ -3,6 +3,7 @@ package com.chat.websocket.interceptor
 import com.chat.domain.service.SessionTokenService
 import com.chat.domain.service.WebSocketTicketService
 import com.chat.persistence.config.ChatAuthProperties
+import com.chat.persistence.service.WebSocketSessionIdentity
 import com.chat.websocket.config.WebSocketProperties
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpHeaders
@@ -33,7 +34,10 @@ class WebSocketHandshakeInterceptor(
             val ticket = extractQueryParam(request, authProperties.webSocketTicket.ticketQueryParam)
             val ticketSession = ticket?.let { webSocketTicketService.consumeTicket(it) }
             if (ticketSession != null) {
-                attributes[webSocketProperties.userIdAttribute] = ticketSession.userId
+                val parent = checkNotNull(ticketSession.parentSession) { "Ticket parent session is required" }
+                val digest = checkNotNull(ticketSession.sessionTokenDigest) { "Ticket session digest is required" }
+                attributes[WebSocketSessionIdentity.ATTRIBUTE] = WebSocketSessionIdentity.from(parent, digest)
+                attributes[webSocketProperties.userIdAttribute] = parent.userId
                 return true
             }
 
@@ -49,6 +53,7 @@ class WebSocketHandshakeInterceptor(
                 response.setStatusCode(HttpStatus.UNAUTHORIZED)
                 false
             } else {
+                attributes[WebSocketSessionIdentity.ATTRIBUTE] = WebSocketSessionIdentity.fromToken(authenticated, checkNotNull(token))
                 attributes[webSocketProperties.userIdAttribute] = authenticated.userId
                 true
             }

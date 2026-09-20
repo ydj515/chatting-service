@@ -166,6 +166,7 @@ class WebSocketSessionManagerHeartbeatTest {
                 redisMessageBroker = broker,
             ),
             transport = WebSocketSessionTransport(
+                authorization = org.mockito.Mockito.mock(WebSocketSessionAuthorization::class.java),
                 gatewayProperties = properties,
                 outboundExecutor = Runnable::run,
                 clock = clock,

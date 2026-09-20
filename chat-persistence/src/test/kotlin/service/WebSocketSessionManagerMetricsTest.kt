@@ -97,6 +97,7 @@ class WebSocketSessionManagerMetricsTest {
                 redisMessageBroker = broker,
             ),
             transport = WebSocketSessionTransport(
+                authorization = org.mockito.Mockito.mock(WebSocketSessionAuthorization::class.java),
                 gatewayProperties = ChatWebSocketGatewayProperties(outboundQueueMaxPendingMessages = 128),
                 outboundExecutor = Runnable::run,
                 gatewayMetrics = WebSocketGatewayMetrics("default", provider(registry)),

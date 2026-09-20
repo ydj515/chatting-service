@@ -33,6 +33,18 @@ import java.time.LocalDateTime
 
 class ChatWebSocketHandlerTest {
     @Test
+    fun `revoked connection cannot dispatch a message`() {
+        val manager = mock(WebSocketSessionManager::class.java)
+        val service = mock(ChatService::class.java)
+        val session = mock(WebSocketSession::class.java)
+        `when`(session.attributes).thenReturn(mutableMapOf<String, Any>("userId" to 7L))
+        `when`(manager.rejectUnauthorizedSession(session)).thenReturn(true)
+        ChatWebSocketHandler(manager, service, ObjectMapper(), WebSocketProperties())
+            .handleMessage(session, TextMessage("{}"))
+        verifyNoInteractions(service)
+    }
+
+    @Test
     fun `connection subscribes every page including rooms beyond the first hundred`() {
         val manager = mock(WebSocketSessionManager::class.java)
         val service = mock(ChatService::class.java)
@@ -91,6 +103,7 @@ class ChatWebSocketHandlerTest {
         handler.handleMessage(session, PongMessage(ByteBuffer.allocate(0)))
 
         verify(sessionManager).recordSessionActivity(session)
+        verify(sessionManager).rejectUnauthorizedSession(session)
         verifyNoMoreInteractions(sessionManager)
         verifyNoInteractions(chatService)
     }

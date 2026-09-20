@@ -28,6 +28,6 @@ GLOBAL SUSPEND는 로그인·발신을 막고 같은 DB transaction에서 `sessi
 
 Redis 철회 기록과 force-logout publish가 성공해야 job을 완료한다. Redis 장애·worker crash·lease 만료 이후에도 재시도할 수 있다. 재시도는 sanction의 원래 발생 시각을 사용한다.
 
-Force logout은 at-least-once이며 현재 연결된 사용자 세션 전체를 닫는다. 지연된 재시도가 더 최근 연결까지 닫을 수 있다. Pub/Sub를 놓친 Gateway의 기존 연결 종료까지 내구성 있게 보장하지는 않는다. Redis cutoff는 새 인증과 티켓 소비를 차단한다.
+Force logout은 at-least-once이며 현재 연결된 사용자 세션 전체를 닫는다. 지연된 재시도가 더 최근 연결까지 닫을 수 있다. Gateway는 부모 세션 digest·issuedAt·expiry를 연결에 보관하고, 수신 메시지 처리 전과 대기열 전송 직전에 Redis 철회 상태와 만료를 재검사한다. 기본 10초 주기 점검에서도 검사하며 heartbeat 비활성화와 무관하게 실행한다. Pub/Sub를 놓쳐도 이 검사에서 기존 연결을 종료한다. Redis 조회 오류와 인증 정보 누락에는 연결을 닫는다. 이 검사는 전송량에 비례하는 Redis 조회 비용을 추가한다.
 
 필수 DB 준비와 티켓 전환 순서는 [마이그레이션](../operations/migrations.md)에 있다. Key rotation·refresh 정책과 관리자 SSO/RBAC는 [남은 과제](../operations/backlog.md)다.

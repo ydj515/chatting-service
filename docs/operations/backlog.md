@@ -12,7 +12,7 @@
 | 보안 운영 | 로컬 HTTP/Compose 설정은 운영 TLS·IAM 증거 아님 | TLS/wss, Redis AUTH/TLS, secret 배포·HMAC rotation/refresh 정책 확인 |
 | 관리자 인증 | 공유 admin token | 사용자별 감사·권한이 필요한 배포에서 SSO/RBAC 구현·검증 |
 | DR/PITR | Archive/chaos가 복원 절차를 대신하지 않음 | PostgreSQL PITR, Redis backup/restore, Object Storage 복원 훈련과 RTO/RPO 기록 |
-| Pub/Sub 제어 이벤트 | JOIN 및 force logout 구독 유실 가능 | 필요 시 내구성 있는 이벤트/reconciliation; DB 전달 권한 확인은 유지 |
+| Pub/Sub 제어 이벤트 | JOIN 구독 유실 가능 | 필요 시 내구성 있는 이벤트/reconciliation; 전달 멤버십 및 연결 세션 재검사는 유지 |
 | 지연 철회 | 재시도 force logout이 새 연결도 닫을 수 있음 | 세션 발급 시각별 연결 종료 정책이 필요하면 protocol 확장·검증 |
 | 정책 확장 | substring 금칙어와 기본 제재만 구현 | 구독자 검증, 정규화/도배 규칙은 요구사항과 오탐 기준부터 확정 |
 | Ticket UX 계측 | 정상 reconnect cohort·overcount 세부 지표 부족 | [발급 제한 기준](../architecture/authentication.md#발급-제한)을 계산할 분모와 bounded 지표 확보 |

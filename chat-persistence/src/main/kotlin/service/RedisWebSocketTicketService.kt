@@ -135,6 +135,12 @@ class RedisWebSocketTicketService(
             AuthenticatedWebSocketTicket(
                 userId = storedTicket.userId,
                 expiresAt = LocalDateTime.ofInstant(expiresAt, ZoneOffset.UTC),
+                sessionTokenDigest = storedTicket.sessionTokenDigest,
+                parentSession = com.chat.domain.dto.AuthenticatedSession(
+                    userId = storedTicket.userId,
+                    expiresAt = LocalDateTime.ofInstant(Instant.ofEpochSecond(checkNotNull(storedTicket.sessionExpiresAtEpochSecond)), ZoneOffset.UTC),
+                    issuedAt = storedTicket.sessionIssuedAtEpochSecond?.let { LocalDateTime.ofInstant(Instant.ofEpochSecond(it), ZoneOffset.UTC) },
+                ),
             )
         } catch (e: Exception) {
             record("consume.failure")
