@@ -193,6 +193,10 @@ export const chatRoomApi = {
 
 // 메시지 관련 API
 export const messageApi = {
+  getGap: async (roomId: number, afterSeq: number, limit = 100): Promise<Message[]> => {
+    const response = await api.get<Message[]>(`/chat-rooms/${roomId}/messages/gap`, { params: { afterSeq, limit } });
+    return response.data;
+  },
   // 메시지 목록 조회 (페이지네이션)
   getMessages: async (
     chatRoomId: number,

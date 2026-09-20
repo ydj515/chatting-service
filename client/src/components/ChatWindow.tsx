@@ -10,6 +10,7 @@ import {
   mergeMessages,
   messageRenderKey,
 } from '@/utils/messageEvents.ts';
+import { recoverMessages } from '@/utils/messageRecovery.ts';
 import { roomMessagesQueryKey } from '@/utils/authCache.ts';
 import { Copy, Check } from 'lucide-react';
 
@@ -29,6 +30,8 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   onSuccess,
 }) => {
   const [messages, setMessages] = useState<Message[]>([]);
+  const messagesRef = useRef<Message[]>([]);
+  messagesRef.current = messages;
   const [messageInput, setMessageInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -96,6 +99,31 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
     staleTime: Infinity,
   });
   
+  // Reconcile after every connection and periodically while connected: persistence can lag fanout.
+  useEffect(() => {
+    if (!isConnected) return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const recover = async () => {
+      try {
+        const incoming = await recoverMessages(
+          messagesRef.current,
+          async () => (await messageApi.getMessagesByCursor(chatRoom.id, undefined, 1000)).messages,
+          (afterSeq, limit) => messageApi.getGap(chatRoom.id, afterSeq, limit),
+        );
+        if (!cancelled) {
+          setMessages(previous => mergeMessages(previous, incoming));
+        }
+      } catch {
+        // Keep the last visible feed and retry; do not advance a cursor on a failed read.
+      } finally {
+        if (!cancelled) timer = setTimeout(recover, 3000);
+      }
+    };
+    void recover();
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [isConnected, chatRoom.id]);
+
   // WebSocket 메시지 도착 시 처리
   useEffect(() => {
     if (!lastMessage) return;
