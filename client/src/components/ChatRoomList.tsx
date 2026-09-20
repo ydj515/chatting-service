@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { User, ChatRoom, CreateChatRoomRequest } from '@/types/index.ts';
+import { loadRoomPages } from '@/utils/roomPages.ts';
 import { chatRoomApi } from '@/services/api.ts';
 import Button from '@/components/ui/Button.tsx';
 import Input from '@/components/ui/Input.tsx';
@@ -43,7 +44,7 @@ const ChatRoomList: React.FC<ChatRoomListProps> = ({
 
   const chatRoomsQuery = useQuery({
     queryKey: ['chat-rooms', currentUser.id],
-    queryFn: () => chatRoomApi.getChatRooms(),
+    queryFn: ({ signal }) => loadRoomPages(page => chatRoomApi.getChatRooms(page, 100, signal)),
   });
 
   const createRoomMutation = useMutation({
@@ -122,7 +123,7 @@ const ChatRoomList: React.FC<ChatRoomListProps> = ({
     createRoomMutation.mutate(newRoomData);
   };
 
-  const chatRooms = chatRoomsQuery.data?.content ?? [];
+  const chatRooms = chatRoomsQuery.data ?? [];
   const filteredChatRooms = chatRooms.filter(room =>
     room.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     room.description?.toLowerCase().includes(searchQuery.toLowerCase())

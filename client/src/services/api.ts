@@ -143,9 +143,10 @@ export const chatRoomApi = {
   },
 
   // 채팅방 목록 조회 (페이지네이션)
-  getChatRooms: async (page = 0, size = 20): Promise<PageResponse<ChatRoom>> => {
+  getChatRooms: async (page = 0, size = 20, signal?: AbortSignal): Promise<PageResponse<ChatRoom>> => {
     const response: AxiosResponse<PageResponse<ChatRoom>> = await api.get(
-      `/chat-rooms?page=${page}&size=${size}&sort=createdAt,desc`
+      `/chat-rooms?page=${page}&size=${size}&sort=createdAt,desc&sort=id,desc`,
+      { signal }
     );
     return response.data;
   },
