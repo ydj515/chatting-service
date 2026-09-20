@@ -74,7 +74,12 @@ api.interceptors.response.use(
 // 사용자 관련 API
 export const userApi = {
   logout: async (): Promise<void> => {
-    await api.post('/users/logout');
+    try {
+      await api.post('/users/logout');
+    } catch (error) {
+      // An expired or already-revoked session is already logged out on the server.
+      if (!axios.isAxiosError(error) || error.response?.status !== 401) throw error;
+    }
   },
   // 사용자 등록
   register: async (data: RegisterRequest): Promise<User> => {
