@@ -170,7 +170,10 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
         clientMessageId: createClientMessageId(),
       };
 
-      sendWebSocketMessage(wsMessage);
+      if (!sendWebSocketMessage(wsMessage)) {
+        onError('메시지를 보내지 못했습니다. 연결 후 다시 시도해주세요.');
+        return;
+      }
       setMessageInput('');
 
     } catch (error) {
