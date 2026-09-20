@@ -73,6 +73,9 @@ api.interceptors.response.use(
 
 // 사용자 관련 API
 export const userApi = {
+  logout: async (): Promise<void> => {
+    await api.post('/users/logout');
+  },
   // 사용자 등록
   register: async (data: RegisterRequest): Promise<User> => {
     const response: AxiosResponse<User> = await api.post('/users/register', data);

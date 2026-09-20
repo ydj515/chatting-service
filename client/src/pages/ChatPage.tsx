@@ -4,11 +4,12 @@ import Layout from '@/components/layout/Layout.tsx';
 import AuthGate from '@/components/AuthGate.tsx';
 import ChatWorkspace from '@/components/ChatWorkspace.tsx';
 import LoadingScreen from '@/components/LoadingScreen.tsx';
-import { setSessionToken as setApiSessionToken } from '@/services/api.ts';
+import { userApi, setSessionToken as setApiSessionToken } from '@/services/api.ts';
 import { appConfig } from '@/config/appConfig.ts';
 import { useServerHealth } from '@/hooks/useServerHealth.ts';
 import { useChatStore } from '@/stores/chatStore.ts';
 import { queryClient } from '@/lib/queryClient.ts';
+import { logoutSession } from '@/utils/logoutSession.ts';
 import { clearAuthQueries } from '@/utils/authCache.ts';
 import { isApiSessionReady } from '@/utils/authSession.ts';
 
@@ -114,13 +115,19 @@ function ChatPage() {
     [handleSuccess, login],
   );
 
-  const handleLogout = useCallback(() => {
-    clearAuthQueries(queryClient);
-    setApiSessionToken(null);
-    setSyncedSessionToken(null);
-    logout(localStorage);
-    handleSuccess('로그아웃되었습니다.');
-  }, [handleSuccess, logout]);
+  const handleLogout = useCallback(async () => {
+    try {
+      await logoutSession(userApi.logout, () => {
+        clearAuthQueries(queryClient);
+        setApiSessionToken(null);
+        setSyncedSessionToken(null);
+        logout(localStorage);
+      });
+      handleSuccess('로그아웃되었습니다.');
+    } catch {
+      handleError('서버 로그아웃에 실패했습니다. 다시 시도해주세요.');
+    }
+  }, [handleError, handleSuccess, logout]);
 
   const handleChatRoomSelect = useCallback(
     (chatRoom: ChatRoom) => {
