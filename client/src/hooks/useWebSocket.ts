@@ -145,7 +145,6 @@ export const useWebSocket = ({
             return;
           }
 
-          console.log('🔌 WebSocket message received:', event.data);
           try {
             const message: WebSocketMessage = JSON.parse(event.data);
             setLastMessage(message);

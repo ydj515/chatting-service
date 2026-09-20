@@ -125,7 +125,7 @@ class RedisMessageBroker(
             val json = objectMapper.writeValueAsString(distributedMessage)
             redisTemplate.convertAndSend(roomTopic(roomId), json)
 
-            logger.info("Broadcast to $roomId to $json")
+            logger.debug("Broadcast message {} to room {}", distributedMessage.id, roomId)
         } catch (e: Exception) {
             logger.error("Error broadcast to $roomId", e)
             throw e
@@ -150,7 +150,7 @@ class RedisMessageBroker(
             }
 
             if (processedMessages.containsKey(distributedMessage.id)) {
-                logger.error("processedMessages $distributedMessage")
+                logger.debug("Ignoring duplicate distributed message {}", distributedMessage.id)
                 return
             }
 
