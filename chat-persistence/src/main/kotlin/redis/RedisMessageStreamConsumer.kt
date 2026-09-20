@@ -147,7 +147,7 @@ class RedisMessageStreamConsumer(
     private fun <T> withConsumerGroup(streamKeys: Set<String>, consumerGroup: String, operation: () -> T): T =
         try {
             operation()
-        } catch (failure: RuntimeException) {
+        } catch (failure: NestedRuntimeException) {
             if (!generateSequence<Throwable>(failure) { it.cause }.any { it.message?.contains("NOGROUP", ignoreCase = true) == true }) {
                 throw failure
             }
