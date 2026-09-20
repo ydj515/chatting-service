@@ -85,6 +85,43 @@ class RedisMessageStreamConsumerTest {
         assertEquals(emptyList<MessageStreamRecord>(), records)
     }
 
+    @Test
+    fun `lost group is recreated before retrying new records`() {
+        val redis = redisTemplate()
+        val streams = streamOperations()
+        `when`(redis.opsForStream<String, String>()).thenReturn(streams)
+        val consumer = RedisMessageStreamConsumer(redis, ObjectMapper(), MessageStreamKeyResolver(ChatRedisProperties()))
+        val key = "chat:stream:room:{10}:shard:0"
+        val group = "message-writer"
+        val reader = org.springframework.data.redis.connection.stream.Consumer.from(group, "worker")
+        val options = org.springframework.data.redis.connection.stream.StreamReadOptions.empty().count(10)
+        val offset = org.springframework.data.redis.connection.stream.StreamOffset.create(key, ReadOffset.lastConsumed())
+        consumer.ensureConsumerGroup(key, group)
+        `when`(streams.read(reader, options, offset))
+            .thenThrow(RedisSystemException("execution", IllegalStateException("NOGROUP missing group")))
+            .thenReturn(emptyList())
+        assertEquals(emptyList<MessageStreamRecord>(), consumer.readNew(group, "worker", setOf(key), 10))
+        verify(streams, times(2)).createGroup(key, ReadOffset.from("0-0"), group)
+        verify(streams, times(2)).read(reader, options, offset)
+    }
+
+    @Test
+    fun `lost pending group is recreated without an unbounded retry`() {
+        val redis = redisTemplate()
+        val streams = streamOperations()
+        `when`(redis.opsForStream<String, String>()).thenReturn(streams)
+        val consumer = RedisMessageStreamConsumer(redis, ObjectMapper(), MessageStreamKeyResolver(ChatRedisProperties()))
+        val key = "chat:stream:room:{10}:shard:0"
+        consumer.ensureConsumerGroup(key, "fanout")
+        `when`(streams.pending(key, "fanout", Range.unbounded<String>(), 10))
+            .thenThrow(RedisSystemException("NOGROUP", null))
+        org.junit.jupiter.api.Assertions.assertThrows(RedisSystemException::class.java) {
+            consumer.claimPending("fanout", "worker", setOf(key), 10, 30_000)
+        }
+        verify(streams, times(2)).createGroup(key, ReadOffset.from("0-0"), "fanout")
+        verify(streams, times(2)).pending(key, "fanout", Range.unbounded<String>(), 10)
+    }
+
     @Suppress("UNCHECKED_CAST")
     private fun redisTemplate(): RedisTemplate<String, String> =
         mock(RedisTemplate::class.java) as RedisTemplate<String, String>

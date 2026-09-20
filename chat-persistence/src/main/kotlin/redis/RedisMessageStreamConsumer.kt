@@ -83,11 +83,13 @@ class RedisMessageStreamConsumer(
         val offsets = streamKeys
             .map { StreamOffset.create(it, ReadOffset.lastConsumed()) }
             .toTypedArray()
-        val records = redisTemplate.opsForStream<String, String>().read(
-            Consumer.from(consumerGroup, consumerName),
-            StreamReadOptions.empty().count(count),
-            *offsets,
-        ).orEmpty()
+        val records = withConsumerGroup(streamKeys, consumerGroup) {
+            redisTemplate.opsForStream<String, String>().read(
+                Consumer.from(consumerGroup, consumerName),
+                StreamReadOptions.empty().count(count),
+                *offsets,
+            ).orEmpty()
+        }
 
         val mappedRecords = records.mapNotNull { decodeRecord(it, consumerGroup, 1) }
         return mappedRecords
@@ -107,8 +109,10 @@ class RedisMessageStreamConsumer(
         }
 
         return streamKeys.flatMap { streamKey ->
-            val pendingMessages = redisTemplate.opsForStream<String, String>()
-                .pending(streamKey, consumerGroup, Range.unbounded<String>(), count)
+            val pendingMessages = withConsumerGroup(setOf(streamKey), consumerGroup) {
+                redisTemplate.opsForStream<String, String>()
+                    .pending(streamKey, consumerGroup, Range.unbounded<String>(), count)
+            }
             val pendingList = pendingMessages?.toList().orEmpty()
             messageStreamMetrics.recordConsumerRecords(
                 consumerGroup = consumerGroup,
@@ -139,6 +143,21 @@ class RedisMessageStreamConsumer(
             mappedRecords
         }
     }
+
+    private fun <T> withConsumerGroup(streamKeys: Set<String>, consumerGroup: String, operation: () -> T): T =
+        try {
+            operation()
+        } catch (failure: RuntimeException) {
+            if (!generateSequence<Throwable>(failure) { it.cause }.any { it.message?.contains("NOGROUP", ignoreCase = true) == true }) {
+                throw failure
+            }
+            streamKeys.forEach { streamKey ->
+                ensuredConsumerGroups.remove("$streamKey:$consumerGroup")
+                ensureConsumerGroup(streamKey, consumerGroup)
+            }
+            // Retry once; a continuing Redis failure must propagate to the next scheduled poll.
+            operation()
+        }
 
     override fun acknowledge(streamKey: String, consumerGroup: String, recordId: String) {
         redisTemplate.opsForStream<String, String>().acknowledge(streamKey, consumerGroup, recordId)
