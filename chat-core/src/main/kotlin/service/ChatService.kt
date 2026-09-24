@@ -1,12 +1,14 @@
 package com.chat.core.service
 
 import com.chat.core.dto.*
+import com.chat.core.message.command.SendMessageCommand
+import com.chat.core.room.command.CreateChatRoomCommand
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 
 interface ChatService {
     // 채팅방 관리
-    fun createChatRoom(request: CreateChatRoomRequest, createdBy: Long): ChatRoomDto
+    fun createChatRoom(request: CreateChatRoomCommand, createdBy: Long): ChatRoomDto
 
     fun getChatRoom(roomId: Long, userId: Long): ChatRoomDto
 
@@ -22,7 +24,7 @@ interface ChatService {
     fun getChatRoomMembers(roomId: Long, userId: Long): List<ChatRoomMemberDto>
 
     // 메시지 관리
-    fun sendMessage(request: SendMessageRequest, senderId: Long): MessageDto
+    fun sendMessage(request: SendMessageCommand, senderId: Long): MessageDto
 
     fun getMessages(roomId: Long, userId: Long, pageable: Pageable): Page<MessageDto>
 

@@ -2,8 +2,8 @@ package com.chat.websocket.handler
 
 import com.chat.core.dto.ChatRoomDto
 import com.chat.core.dto.MessageDto
-import com.chat.core.dto.SendMessageRequest
 import com.chat.core.dto.UserDto
+import com.chat.core.message.command.SendMessageCommand
 import com.chat.core.service.ChatService
 import com.chat.domain.exception.MessageAdmissionRejectedException
 import com.chat.domain.exception.MessageModerationRejectedException
@@ -70,7 +70,7 @@ class ChatWebSocketHandlerTest {
         val manager = mock(WebSocketSessionManager::class.java)
         val service = mock(ChatService::class.java)
         org.mockito.Mockito.doThrow(IllegalArgumentException("clientMessageId must be at most 128 characters"))
-            .`when`(service).sendMessage(SendMessageRequest(10, MessageType.TEXT, null, "x".repeat(129)), 7)
+            .`when`(service).sendMessage(SendMessageCommand(10, MessageType.TEXT, null, "x".repeat(129)), 7)
         val mapper = ObjectMapper().registerModule(JavaTimeModule()).registerModule(KotlinModule.Builder().build()).disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
         val handler = ChatWebSocketHandler(manager, service, mapper, WebSocketProperties())
         val session = mock(WebSocketSession::class.java)
@@ -127,7 +127,7 @@ class ChatWebSocketHandlerTest {
         `when`(session.attributes).thenReturn(mutableMapOf<String, Any>("userId" to 7L))
         `when`(
             chatService.sendMessage(
-                SendMessageRequest(
+                SendMessageCommand(
                     chatRoomId = 10L,
                     type = MessageType.TEXT,
                     content = "hello",
@@ -180,7 +180,7 @@ class ChatWebSocketHandlerTest {
         `when`(session.attributes).thenReturn(mutableMapOf<String, Any>("userId" to 7L))
         `when`(
             chatService.sendMessage(
-                SendMessageRequest(
+                SendMessageCommand(
                     chatRoomId = 10L,
                     type = MessageType.TEXT,
                     content = "hello",
@@ -235,7 +235,7 @@ class ChatWebSocketHandlerTest {
         `when`(session.attributes).thenReturn(mutableMapOf<String, Any>("userId" to 7L))
         `when`(
             chatService.sendMessage(
-                SendMessageRequest(
+                SendMessageCommand(
                     chatRoomId = 10L,
                     type = MessageType.TEXT,
                     content = "blocked",

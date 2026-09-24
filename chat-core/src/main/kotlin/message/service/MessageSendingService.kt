@@ -1,7 +1,7 @@
 package com.chat.core.message.service
 
 import com.chat.core.dto.MessageDto
-import com.chat.core.dto.SendMessageRequest
+import com.chat.core.message.command.SendMessageCommand
 import com.chat.core.message.port.MessageAcceptance
 import com.chat.core.message.port.MessageReadPort
 import com.chat.core.room.port.ChatMembershipStore
@@ -24,7 +24,7 @@ class MessageSendingService(
 ) {
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     fun sendMessage(
-        request: SendMessageRequest,
+        request: SendMessageCommand,
         senderId: Long,
     ): MessageDto {
         val rawClientMessageId = request.clientMessageId

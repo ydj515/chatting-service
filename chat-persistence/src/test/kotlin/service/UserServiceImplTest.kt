@@ -1,11 +1,11 @@
 package com.chat.persistence.service
 
-import com.chat.core.dto.CreateUserRequest
-import com.chat.core.dto.LoginRequest
 import com.chat.core.dto.ModerationScopeType
 import com.chat.core.dto.SessionToken
 import com.chat.core.dto.UserSanctionType
 import com.chat.core.service.SessionTokenService
+import com.chat.core.user.command.CreateUserCommand
+import com.chat.core.user.command.LoginCommand
 import com.chat.core.user.service.UserServiceImpl
 import com.chat.domain.exception.ResourceConflictException
 import com.chat.domain.model.User
@@ -63,7 +63,7 @@ class UserServiceImplTest {
 
         val exception = assertThrows(ResourceConflictException::class.java) {
             userService.createUser(
-                CreateUserRequest(
+                CreateUserCommand(
                     username = "tester",
                     password = "abc",
                     displayName = "테스터",
@@ -84,7 +84,7 @@ class UserServiceImplTest {
         val userService = userService(userRepository, sessionTokenService, userSanctionRepository)
 
         userService.createUser(
-            CreateUserRequest(
+            CreateUserCommand(
                 username = "tester",
                 password = "password",
                 displayName = "테스터",
@@ -113,8 +113,8 @@ class UserServiceImplTest {
         `when`(userRepository.save(any(User::class.java))).thenAnswer { invocation -> invocation.arguments[0] as User }
         val userService = userService(userRepository, sessionTokenService, userSanctionRepository)
 
-        userService.createUser(CreateUserRequest("tester1", "same-password", "테스터1"))
-        userService.createUser(CreateUserRequest("tester2", "same-password", "테스터2"))
+        userService.createUser(CreateUserCommand("tester1", "same-password", "테스터1"))
+        userService.createUser(CreateUserCommand("tester2", "same-password", "테스터2"))
 
         val captor = ArgumentCaptor.forClass(User::class.java)
         verify(userRepository, times(2)).save(captor.capture())
@@ -142,7 +142,7 @@ class UserServiceImplTest {
         `when`(sessionTokenService.issueToken(7L)).thenReturn(SessionToken("session-token-7", expiresAt))
         val userService = userService(userRepository, sessionTokenService, userSanctionRepository)
 
-        val response = userService.login(LoginRequest(username = "tester", password = "password"))
+        val response = userService.login(LoginCommand(username = "tester", password = "password"))
 
         assertEquals(7L, response.user.id)
         assertEquals("session-token-7", response.sessionToken)
@@ -169,7 +169,7 @@ class UserServiceImplTest {
         `when`(sessionTokenService.issueToken(7L)).thenReturn(SessionToken("session-token-7", expiresAt))
         val userService = userService(userRepository, sessionTokenService, userSanctionRepository)
 
-        val response = userService.login(LoginRequest(username = "tester", password = "password"))
+        val response = userService.login(LoginCommand(username = "tester", password = "password"))
 
         val passwordCaptor = ArgumentCaptor.forClass(String::class.java)
         verify(userRepository).updatePassword(eq(7L), passwordCaptor.capture().orEmpty())
@@ -194,7 +194,7 @@ class UserServiceImplTest {
         val userService = userService(userRepository, sessionTokenService, userSanctionRepository)
 
         assertThrows(IllegalArgumentException::class.java) {
-            userService.login(LoginRequest(username = "tester", password = "a".repeat(73)))
+            userService.login(LoginCommand(username = "tester", password = "a".repeat(73)))
         }
 
         verify(userSanctionRepository, never()).activeGlobalSanctionsForUser(7L)
@@ -233,7 +233,7 @@ class UserServiceImplTest {
         val userService = userService(userRepository, sessionTokenService, userSanctionRepository)
 
         val exception = assertThrows(IllegalStateException::class.java) {
-            userService.login(LoginRequest(username = "tester", password = "password"))
+            userService.login(LoginCommand(username = "tester", password = "password"))
         }
 
         assertEquals("정지된 사용자는 로그인할 수 없습니다.", exception.message)

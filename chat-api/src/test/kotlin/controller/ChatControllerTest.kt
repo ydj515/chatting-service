@@ -4,13 +4,13 @@ import com.chat.api.config.MessagePaginationProperties
 import com.chat.api.security.FixedCurrentAuthenticationResolver
 import com.chat.core.dto.ChatRoomDto
 import com.chat.core.dto.ChatRoomMemberDto
-import com.chat.core.dto.CreateChatRoomRequest
 import com.chat.core.dto.MessageDto
 import com.chat.core.dto.MessageHistoryCursor
 import com.chat.core.dto.MessageHistoryCursorCodec
 import com.chat.core.dto.MessagePageRequest
 import com.chat.core.dto.MessagePageResponse
-import com.chat.core.dto.SendMessageRequest
+import com.chat.core.message.command.SendMessageCommand
+import com.chat.core.room.command.CreateChatRoomCommand
 import com.chat.core.service.ChatService
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
@@ -127,7 +127,7 @@ class ChatControllerTest {
             return emptyList()
         }
 
-        override fun createChatRoom(request: CreateChatRoomRequest, createdBy: Long): ChatRoomDto = throw UnsupportedOperationException()
+        override fun createChatRoom(request: CreateChatRoomCommand, createdBy: Long): ChatRoomDto = throw UnsupportedOperationException()
 
         override fun getChatRoom(roomId: Long, userId: Long): ChatRoomDto = throw UnsupportedOperationException()
 
@@ -141,7 +141,7 @@ class ChatControllerTest {
 
         override fun getChatRoomMembers(roomId: Long, userId: Long): List<ChatRoomMemberDto> = throw UnsupportedOperationException()
 
-        override fun sendMessage(request: SendMessageRequest, senderId: Long): MessageDto = throw UnsupportedOperationException()
+        override fun sendMessage(request: SendMessageCommand, senderId: Long): MessageDto = throw UnsupportedOperationException()
 
         override fun getMessages(roomId: Long, userId: Long, pageable: Pageable): Page<MessageDto> = throw UnsupportedOperationException()
     }

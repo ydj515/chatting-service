@@ -1,11 +1,11 @@
 package com.chat.api.controller
 
 import com.chat.api.security.FixedCurrentAuthenticationResolver
-import com.chat.core.dto.CreateUserRequest
-import com.chat.core.dto.LoginRequest
 import com.chat.core.dto.LoginResponse
 import com.chat.core.dto.UserDto
 import com.chat.core.service.UserService
+import com.chat.core.user.command.CreateUserCommand
+import com.chat.core.user.command.LoginCommand
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.SerializationFeature
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
@@ -74,9 +74,9 @@ class UserControllerTest {
         var requestedUserId: Long? = null
         var userToReturn: UserDto? = null
 
-        override fun createUser(request: CreateUserRequest): UserDto = throw UnsupportedOperationException()
+        override fun createUser(request: CreateUserCommand): UserDto = throw UnsupportedOperationException()
 
-        override fun login(request: LoginRequest): LoginResponse = throw UnsupportedOperationException()
+        override fun login(request: LoginCommand): LoginResponse = throw UnsupportedOperationException()
 
         override fun logout(sessionToken: String) {
             logoutToken = sessionToken

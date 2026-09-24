@@ -1,6 +1,6 @@
 package com.chat.core.message.service
 
-import com.chat.core.dto.SendMessageRequest
+import com.chat.core.message.command.SendMessageCommand
 import com.chat.core.message.port.MessageAdmissionPolicyService
 import com.chat.core.message.port.MessageModerationPolicyService
 import com.chat.core.message.port.UserSanctionPolicyService
@@ -13,7 +13,7 @@ class MessageSendPolicy(
     private val messageModerationPolicyService: MessageModerationPolicyService,
     private val messageAdmissionPolicyService: MessageAdmissionPolicyService,
 ) {
-    fun requireAllowed(request: SendMessageRequest, senderId: Long, memberRole: MemberRole) {
+    fun requireAllowed(request: SendMessageCommand, senderId: Long, memberRole: MemberRole) {
         userSanctionPolicyService.requireAllowedToSend(
             roomId = request.chatRoomId,
             userId = senderId,

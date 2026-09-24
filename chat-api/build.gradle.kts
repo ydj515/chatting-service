@@ -17,6 +17,7 @@ dependencies {
 
     // REST API 기능
     implementation(libs.spring.boot.starter.web)
+    implementation(libs.jackson.module.kotlin)
 
     // 입력 데이터 검증
     implementation(libs.spring.boot.starter.validation)

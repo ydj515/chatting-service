@@ -52,6 +52,12 @@ flowchart LR
 
 실행 모듈인 `chat-application`과 내부 계약 모듈인 `chat-core`는 별개다.
 `chat-core → chat-domain` 방향만 허용하며 API·관리자·Gateway와 persistence는 core를 사용한다.
+회원가입·로그인·방 생성의 HTTP 요청 DTO와 Bean Validation은 `chat-api`가 소유하고,
+controller가 core의 `CreateUserCommand`, `LoginCommand`, `CreateChatRoomCommand`로
+변환한다. WebSocket 발신도 `SendMessageCommand`를 사용한다. core에는 Jakarta Validation
+의존을 허용하지 않는다. 사용자명·표시 이름·비밀번호와 방 이름·정원의 필수 제약은 유스케이스에서
+확인하므로 HTTP를 거치지 않는 호출도 저장·암호화·토큰 발급 전에 거부한다. 조회 결과와 paging
+계약은 의미가 같은 경우 공유하며 전송 타입을 없애기 위한 기계적인 복제는 하지 않는다.
 사용자 생성·로그인·조회·상태 갱신은 `chat-core/user/service`가 수행하고 트랜잭션을 소유한다.
 사용자 저장, 로그인 제재 조회, 비밀번호 검증 계약은 `chat-core/user/port`에 있으며
 persistence adapter가 JPA/JDBC와 BCrypt·기존 SHA-256 호환을 처리한다. 로그아웃은

@@ -1,5 +1,8 @@
 package com.chat.api.controller
 
+import com.chat.api.dto.CreateUserRequest
+import com.chat.api.dto.LoginRequest
+import com.chat.api.dto.toCommand
 import com.chat.api.security.CurrentSessionToken
 import com.chat.api.security.CurrentUserId
 import com.chat.core.dto.*
@@ -18,13 +21,13 @@ class UserController(
 ) {
     @PostMapping("/register")
     fun register(@Valid @RequestBody request: CreateUserRequest): ResponseEntity<UserDto> {
-        val user = userService.createUser(request)
+        val user = userService.createUser(request.toCommand())
         return ResponseEntity.ok(user)
     }
 
     @PostMapping("/login")
     fun login(@Valid @RequestBody request: LoginRequest): ResponseEntity<LoginResponse> {
-        val response = userService.login(request)
+        val response = userService.login(request.toCommand())
         return ResponseEntity.ok(response)
     }
 

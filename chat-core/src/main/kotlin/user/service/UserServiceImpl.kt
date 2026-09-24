@@ -1,13 +1,13 @@
 package com.chat.core.user.service
 
-import com.chat.core.dto.CreateUserRequest
-import com.chat.core.dto.LoginRequest
 import com.chat.core.dto.LoginResponse
 import com.chat.core.dto.UserDto
 import com.chat.core.dto.UserSanctionType
 import com.chat.core.mapping.toUserDto
 import com.chat.core.service.SessionTokenService
 import com.chat.core.service.UserService
+import com.chat.core.user.command.CreateUserCommand
+import com.chat.core.user.command.LoginCommand
 import com.chat.core.user.port.LoginSanctionReader
 import com.chat.core.user.port.PasswordHashing
 import com.chat.core.user.port.UserStore
@@ -31,7 +31,11 @@ class UserServiceImpl(
     private val clock: Clock,
     private val passwordHashing: PasswordHashing,
 ) : UserService {
-    override fun createUser(request: CreateUserRequest): UserDto {
+    override fun createUser(request: CreateUserCommand): UserDto {
+        require(request.username.isNotBlank() && request.username.length in 3..20) { "username must contain 3 to 20 characters" }
+        require(request.displayName.isNotBlank() && request.displayName.length <= 50) { "displayName must contain 1 to 50 characters" }
+        require(request.password.length >= 3) { "password must contain at least 3 characters" }
+        requireValidCredentials(request.username, request.password)
         // 이미 존재하는 사용자인지 확인
         if (userRepository.existsByUsername(request.username)) {
             throw ResourceConflictException("이미 존재하는 사용자명입니다: ${request.username}")
@@ -47,7 +51,8 @@ class UserServiceImpl(
         return savedUser.toUserDto()
     }
 
-    override fun login(request: LoginRequest): LoginResponse {
+    override fun login(request: LoginCommand): LoginResponse {
+        requireValidCredentials(request.username, request.password)
         val user = userRepository.findByUsername(request.username)
             ?: throw IllegalArgumentException("사용자를 찾을 수 없거나 비밀번호가 일치하지 않습니다.")
 
@@ -94,6 +99,11 @@ class UserServiceImpl(
         userRepository.updateLastSeenAt(userId, now)
 
         return user.toUserDto().copy(lastSeenAt = now)
+    }
+
+    private fun requireValidCredentials(username: String, password: String) {
+        require(username.isNotBlank()) { "username must not be blank" }
+        require(password.isNotBlank() && password.toByteArray(Charsets.UTF_8).size <= 72) { "password must contain 1 to 72 UTF-8 bytes" }
     }
 
     private fun requireNotSuspended(userId: Long) {

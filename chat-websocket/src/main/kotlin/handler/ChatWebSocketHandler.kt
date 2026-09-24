@@ -2,7 +2,7 @@ package com.chat.websocket.handler
 
 import com.chat.core.dto.ErrorMessage
 import com.chat.core.dto.MessageAccepted
-import com.chat.core.dto.SendMessageRequest
+import com.chat.core.message.command.SendMessageCommand
 import com.chat.core.service.ChatService
 import com.chat.domain.exception.MessageAdmissionRejectedException
 import com.chat.domain.exception.MessageModerationRejectedException
@@ -171,7 +171,7 @@ class ChatWebSocketHandler(
 
         val savedMessage = try {
             chatService.sendMessage(
-                SendMessageRequest(
+                SendMessageCommand(
                     chatRoomId = chatRoomId,
                     type = messageType,
                     content = request.content,

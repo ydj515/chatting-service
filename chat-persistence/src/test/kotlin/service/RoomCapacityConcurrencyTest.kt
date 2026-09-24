@@ -1,8 +1,8 @@
 package com.chat.persistence.service
 
-import com.chat.core.dto.CreateChatRoomRequest
 import com.chat.core.message.port.MessageReadPort
 import com.chat.core.message.service.MessageSendingService
+import com.chat.core.room.command.CreateChatRoomCommand
 import com.chat.core.room.service.ChatServiceImpl
 import com.chat.domain.exception.ResourceConflictException
 import com.chat.domain.model.ChatRoom
@@ -80,7 +80,7 @@ class RoomCapacityConcurrencyTest {
     @Test
     fun `non HTTP room creation cannot bypass positive capacity validation`() {
         assertThrows(IllegalArgumentException::class.java) {
-            service().createChatRoom(CreateChatRoomRequest("room", null, ChatRoomType.GROUP, null, 0), 1)
+            service().createChatRoom(CreateChatRoomCommand("room", null, ChatRoomType.GROUP, null, 0), 1)
         }
     }
 

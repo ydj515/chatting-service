@@ -3,10 +3,6 @@ package com.chat.core.dto
 import com.chat.domain.model.ChatRoomType
 import com.chat.domain.model.MemberRole
 import com.chat.domain.model.MessageType
-import jakarta.validation.constraints.Min
-import jakarta.validation.constraints.NotBlank
-import jakarta.validation.constraints.NotNull
-import jakarta.validation.constraints.Size
 import java.time.LocalDateTime
 
 data class ChatRoomDto(
@@ -21,20 +17,6 @@ data class ChatRoomDto(
     val createdBy: UserDto,
     val createdAt: LocalDateTime,
     val lastMessage: MessageDto?,
-)
-
-data class CreateChatRoomRequest(
-    // {"name": ""}
-    @field:NotBlank(message = "채팅방 이름은 필수입니다")
-    @field:Size(min = 1, max = 100, message = "채팅방 이름은 1-100자 사이여야 합니다")
-    val name: String,
-    val description: String?,
-    // {"type" :null}
-    @field:NotNull(message = "채팅방 타입은 필수입니다")
-    val type: ChatRoomType,
-    val imageUrl: String?,
-    @field:Min(1)
-    val maxMembers: Int = 100,
 )
 
 data class MessageDto(
@@ -54,16 +36,6 @@ data class MessageDto(
     val streamShard: Int = 0,
     val writeShard: Int = 0,
     val fanoutShard: Int = 0,
-)
-
-data class SendMessageRequest(
-    @field:NotNull(message = "채팅방 ID는 필수입니다")
-    val chatRoomId: Long,
-    @field:NotNull(message = "메시지 타입은 필수입니다")
-    val type: MessageType,
-    val content: String?,
-    @field:Size(max = 128, message = "clientMessageId는 128자 이하여야 합니다")
-    val clientMessageId: String? = null,
 )
 
 // 커서 기반 페이지네이션을 위한 DTO

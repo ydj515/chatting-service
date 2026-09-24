@@ -1,14 +1,16 @@
 package com.chat.core.service
 
 import com.chat.core.dto.*
+import com.chat.core.user.command.CreateUserCommand
+import com.chat.core.user.command.LoginCommand
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 
 interface UserService {
     // 사용자 관리
-    fun createUser(request: CreateUserRequest): UserDto
+    fun createUser(request: CreateUserCommand): UserDto
 
-    fun login(request: LoginRequest): LoginResponse
+    fun login(request: LoginCommand): LoginResponse
 
     fun logout(sessionToken: String)
 

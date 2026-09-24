@@ -1,9 +1,10 @@
 package com.chat.core.user.service
 
-import com.chat.core.dto.LoginRequest
 import com.chat.core.dto.SessionToken
 import com.chat.core.dto.UserSanctionType
 import com.chat.core.service.SessionTokenService
+import com.chat.core.user.command.CreateUserCommand
+import com.chat.core.user.command.LoginCommand
 import com.chat.core.user.port.LoginSanction
 import com.chat.core.user.port.LoginSanctionReader
 import com.chat.core.user.port.PasswordHashing
@@ -32,10 +33,29 @@ class UserServiceImplTest {
     private val user = User(id = 7, username = "tester", password = "stored", displayName = "Tester")
 
     @Test
+    fun `invalid registration cannot reach persistence or password hashing`() {
+        val valid = CreateUserCommand("tester", "password", "Tester")
+        listOf(
+            valid.copy(username = " "), valid.copy(username = "a".repeat(21)),
+            valid.copy(displayName = " "), valid.copy(displayName = "a".repeat(51)),
+            valid.copy(password = "ab"), valid.copy(password = "   "), valid.copy(password = "가".repeat(25)),
+        ).forEach { input -> assertThrows(IllegalArgumentException::class.java) { service.createUser(input) } }
+        verifyNoInteractions(users, passwords, sessions, sanctions)
+    }
+
+    @Test
+    fun `invalid login cannot reach password verification or token issuance`() {
+        listOf(LoginCommand(" ", "password"), LoginCommand("tester", " "), LoginCommand("tester", "가".repeat(25))).forEach { input ->
+            assertThrows(IllegalArgumentException::class.java) { service.login(input) }
+        }
+        verifyNoInteractions(users, passwords, sessions, sanctions)
+    }
+
+    @Test
     fun `failed password verification cannot inspect sanctions or issue sessions`() {
         `when`(users.findByUsername("tester")).thenReturn(user)
         `when`(passwords.verify("wrong", "stored")).thenReturn(PasswordVerification(false, false))
-        assertThrows(IllegalArgumentException::class.java) { service.login(LoginRequest("tester", "wrong")) }
+        assertThrows(IllegalArgumentException::class.java) { service.login(LoginCommand("tester", "wrong")) }
         verifyNoInteractions(sanctions, sessions)
         verify(users, never()).updatePassword(anyLong(), anyString())
     }
@@ -48,7 +68,7 @@ class UserServiceImplTest {
         `when`(sanctions.activeGlobalSanctionsForUser(7)).thenReturn(listOf(LoginSanction(UserSanctionType.SUSPEND, clock.instant())))
         `when`(sessions.issueToken(7)).thenReturn(SessionToken("token", LocalDateTime.now(clock).plusHours(1)))
 
-        val response = service.login(LoginRequest("tester", "password"))
+        val response = service.login(LoginCommand("tester", "password"))
 
         assertEquals(7L, response.user.id)
         assertEquals("token", response.sessionToken)
@@ -64,7 +84,7 @@ class UserServiceImplTest {
         `when`(passwords.verify("password", "stored")).thenReturn(PasswordVerification(true, true))
         `when`(sanctions.activeGlobalSanctionsForUser(7)).thenReturn(listOf(LoginSanction(UserSanctionType.SUSPEND, null)))
 
-        assertThrows(IllegalStateException::class.java) { service.login(LoginRequest("tester", "password")) }
+        assertThrows(IllegalStateException::class.java) { service.login(LoginCommand("tester", "password")) }
         verifyNoInteractions(sessions)
         verify(passwords, never()).encode(anyString())
         verify(users, never()).updatePassword(anyLong(), anyString())

@@ -1,7 +1,7 @@
 package com.chat.core.message.service
 
 import com.chat.core.dto.MessageDto
-import com.chat.core.dto.SendMessageRequest
+import com.chat.core.message.command.SendMessageCommand
 import com.chat.core.message.port.MessageAcceptance
 import com.chat.core.message.port.MessageReadPort
 import com.chat.core.room.port.ChatMembershipStore
@@ -25,7 +25,7 @@ class MessageSendingServiceTest {
     private val service = MessageSendingService(rooms, users, members, messages, policy, acceptance)
     private val sender = User(id = 7, username = "tester", password = "unused", displayName = "Tester")
     private val room = ChatRoom(id = 10, name = "room", createdBy = sender)
-    private val request = SendMessageRequest(10, MessageType.TEXT, "hello", " client-id ")
+    private val request = SendMessageCommand(10, MessageType.TEXT, "hello", " client-id ")
 
     @Test
     fun `persisted duplicate does not consume policy or acceptance again`() {

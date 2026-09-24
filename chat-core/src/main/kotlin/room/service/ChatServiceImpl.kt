@@ -2,8 +2,10 @@ package com.chat.core.room.service
 
 import com.chat.core.dto.*
 import com.chat.core.mapping.toUserDto
+import com.chat.core.message.command.SendMessageCommand
 import com.chat.core.message.port.MessageReadPort
 import com.chat.core.message.service.MessageSendingService
+import com.chat.core.room.command.CreateChatRoomCommand
 import com.chat.core.room.port.ChatMembershipStore
 import com.chat.core.room.port.ChatRoomStore
 import com.chat.core.room.port.MembershipEvents
@@ -62,9 +64,10 @@ class ChatServiceImpl(
     @CacheEvict(value = ["chatRooms"], allEntries = true)
     @Transactional
     override fun createChatRoom(
-        request: CreateChatRoomRequest,
+        request: CreateChatRoomCommand,
         createdBy: Long,
     ): ChatRoomDto {
+        require(request.name.isNotBlank() && request.name.length <= 100) { "room name must contain 1 to 100 characters" }
         require(request.maxMembers >= 1) { "maxMembers must be positive" }
         val creator = userRepository.findById(createdBy)
             ?: throw ResourceNotFoundException("사용자를 찾을 수 없습니다: $createdBy")
@@ -296,5 +299,5 @@ class ChatServiceImpl(
         return messageReadPort.findGapMessages(roomId, afterSeq, limit)
     }
 
-    override fun sendMessage(request: SendMessageRequest, senderId: Long): MessageDto = messageSendingService.sendMessage(request, senderId)
+    override fun sendMessage(request: SendMessageCommand, senderId: Long): MessageDto = messageSendingService.sendMessage(request, senderId)
 }

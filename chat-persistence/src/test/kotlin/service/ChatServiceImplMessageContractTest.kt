@@ -1,6 +1,6 @@
 package com.chat.persistence.service
 
-import com.chat.core.dto.SendMessageRequest
+import com.chat.core.message.command.SendMessageCommand
 import com.chat.core.message.port.MessageAdmissionPolicyService
 import com.chat.core.message.port.MessageModerationPolicyService
 import com.chat.core.message.port.UserSanctionPolicyService
@@ -60,7 +60,7 @@ class ChatServiceImplMessageContractTest {
         }
         val traffic = RecordingRoomTrafficStatsService()
         val fixture = chatServiceFixture(FixtureOptions(messageStreamProducer = producer, roomTrafficStatsService = traffic, sequenceValues = listOf(1, 2)))
-        val request = SendMessageRequest(10, MessageType.TEXT, "original", "client-retry")
+        val request = SendMessageCommand(10, MessageType.TEXT, "original", "client-retry")
         val first = fixture.chatService.sendMessage(request, 7)
         val retried = fixture.chatService.sendMessage(request.copy(content = "changed retry"), 7)
         assertEquals(first, retried)
@@ -79,7 +79,7 @@ class ChatServiceImplMessageContractTest {
             val producer = mock(MessageStreamProducer::class.java)
             val fixture = chatServiceFixture(FixtureOptions(messageStreamProducer = producer))
             assertThrows(IllegalArgumentException::class.java) {
-                fixture.chatService.sendMessage(SendMessageRequest(10, MessageType.TEXT, "hello", clientId), 7)
+                fixture.chatService.sendMessage(SendMessageCommand(10, MessageType.TEXT, "hello", clientId), 7)
             }
             org.mockito.Mockito.verifyNoInteractions(producer, fixture.messageRepository)
             verify(fixture.redisTemplate, never()).execute(MessageSequenceService.ALLOCATE_SEQUENCE, listOf("chat:sequence:10"))
@@ -90,7 +90,7 @@ class ChatServiceImplMessageContractTest {
     fun `128 character client IDs remain accepted`() {
         val fixture = chatServiceFixture()
         val id = "x".repeat(128)
-        assertEquals(id, fixture.chatService.sendMessage(SendMessageRequest(10, MessageType.TEXT, "hello", id), 7).clientMessageId)
+        assertEquals(id, fixture.chatService.sendMessage(SendMessageCommand(10, MessageType.TEXT, "hello", id), 7).clientMessageId)
     }
 
     @Test
@@ -115,7 +115,7 @@ class ChatServiceImplMessageContractTest {
         ).thenReturn(null)
 
         val message = fixture.chatService.sendMessage(
-            SendMessageRequest(
+            SendMessageCommand(
                 chatRoomId = 10L,
                 type = MessageType.TEXT,
                 content = "hello",
@@ -149,7 +149,7 @@ class ChatServiceImplMessageContractTest {
         ).thenReturn(null)
 
         val message = fixture.chatService.sendMessage(
-            SendMessageRequest(
+            SendMessageCommand(
                 chatRoomId = 10L,
                 type = MessageType.TEXT,
                 content = "hello",
@@ -193,7 +193,7 @@ class ChatServiceImplMessageContractTest {
         ).thenReturn(null)
 
         fixture.chatService.sendMessage(
-            SendMessageRequest(
+            SendMessageCommand(
                 chatRoomId = 10L,
                 type = MessageType.TEXT,
                 content = "hello",
@@ -228,7 +228,7 @@ class ChatServiceImplMessageContractTest {
 
         assertThrows(IllegalStateException::class.java) {
             fixture.chatService.sendMessage(
-                SendMessageRequest(
+                SendMessageCommand(
                     chatRoomId = 10L,
                     type = MessageType.TEXT,
                     content = "hello",
@@ -254,7 +254,7 @@ class ChatServiceImplMessageContractTest {
         ).thenReturn(null)
 
         val message = fixture.chatService.sendMessage(
-            SendMessageRequest(
+            SendMessageCommand(
                 chatRoomId = 10L,
                 type = MessageType.TEXT,
                 content = "hello",
@@ -284,7 +284,7 @@ class ChatServiceImplMessageContractTest {
 
         assertThrows(IllegalStateException::class.java) {
             fixture.chatService.sendMessage(
-                SendMessageRequest(
+                SendMessageCommand(
                     chatRoomId = 10L,
                     type = MessageType.TEXT,
                     content = "hello",
@@ -326,7 +326,7 @@ class ChatServiceImplMessageContractTest {
         ).thenReturn(existingMessage)
 
         val message = fixture.chatService.sendMessage(
-            SendMessageRequest(
+            SendMessageCommand(
                 chatRoomId = 10L,
                 type = MessageType.TEXT,
                 content = "hello",
@@ -363,7 +363,7 @@ class ChatServiceImplMessageContractTest {
 
         val exception = assertThrows(MessageAdmissionRejectedException::class.java) {
             fixture.chatService.sendMessage(
-                SendMessageRequest(
+                SendMessageCommand(
                     chatRoomId = 10L,
                     type = MessageType.TEXT,
                     content = "hello",
@@ -408,7 +408,7 @@ class ChatServiceImplMessageContractTest {
         ).thenReturn(existingMessage)
 
         fixture.chatService.sendMessage(
-            SendMessageRequest(
+            SendMessageCommand(
                 chatRoomId = 10L,
                 type = MessageType.TEXT,
                 content = "hello",
@@ -442,7 +442,7 @@ class ChatServiceImplMessageContractTest {
 
         val exception = assertThrows(MessageModerationRejectedException::class.java) {
             fixture.chatService.sendMessage(
-                SendMessageRequest(
+                SendMessageCommand(
                     chatRoomId = 10L,
                     type = MessageType.TEXT,
                     content = "blocked",
@@ -482,7 +482,7 @@ class ChatServiceImplMessageContractTest {
 
         val exception = assertThrows(MessageModerationRejectedException::class.java) {
             fixture.chatService.sendMessage(
-                SendMessageRequest(
+                SendMessageCommand(
                     chatRoomId = 10L,
                     type = MessageType.TEXT,
                     content = "hello",
@@ -534,7 +534,7 @@ class ChatServiceImplMessageContractTest {
         ).thenReturn(existingMessage)
 
         fixture.chatService.sendMessage(
-            SendMessageRequest(
+            SendMessageCommand(
                 chatRoomId = 10L,
                 type = MessageType.TEXT,
                 content = "hello",
@@ -566,7 +566,7 @@ class ChatServiceImplMessageContractTest {
         ).thenReturn(null)
 
         fixture.chatService.sendMessage(
-            SendMessageRequest(
+            SendMessageCommand(
                 chatRoomId = 10L,
                 type = MessageType.TEXT,
                 content = "hello",
@@ -610,7 +610,7 @@ class ChatServiceImplMessageContractTest {
         ).thenReturn(null)
 
         fixture.chatService.sendMessage(
-            SendMessageRequest(
+            SendMessageCommand(
                 chatRoomId = 10L,
                 type = MessageType.TEXT,
                 content = "hello-1",
@@ -619,7 +619,7 @@ class ChatServiceImplMessageContractTest {
             senderId = 7L,
         )
         fixture.chatService.sendMessage(
-            SendMessageRequest(
+            SendMessageCommand(
                 chatRoomId = 10L,
                 type = MessageType.TEXT,
                 content = "hello-2",

@@ -1,6 +1,8 @@
 package com.chat.api.controller
 
 import com.chat.api.config.MessagePaginationProperties
+import com.chat.api.dto.CreateChatRoomRequest
+import com.chat.api.dto.toCommand
 import com.chat.api.security.CurrentUserId
 import com.chat.core.dto.*
 import com.chat.core.service.ChatService
@@ -22,7 +24,7 @@ class ChatController(
         @CurrentUserId userId: Long,
         @Valid @RequestBody request: CreateChatRoomRequest,
     ): ResponseEntity<ChatRoomDto> {
-        val chatRoom = chatService.createChatRoom(request, userId)
+        val chatRoom = chatService.createChatRoom(request.toCommand(), userId)
         return ResponseEntity.ok(chatRoom)
     }
 

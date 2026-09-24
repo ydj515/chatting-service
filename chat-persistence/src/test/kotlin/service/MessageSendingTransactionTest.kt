@@ -1,6 +1,6 @@
 package com.chat.persistence.service
 
-import com.chat.core.dto.SendMessageRequest
+import com.chat.core.message.command.SendMessageCommand
 import com.chat.core.message.port.MessageReadPort
 import com.chat.core.message.service.MessageSendPolicy
 import com.chat.core.message.service.MessageSendingService
@@ -41,7 +41,7 @@ class MessageSendingTransactionTest {
         }.proxy as MessageSendingService
         TransactionTemplate(manager).executeWithoutResult {
             assertTrue(TransactionSynchronizationManager.isActualTransactionActive())
-            assertThrows(ResourceNotFoundException::class.java) { proxy.sendMessage(SendMessageRequest(10, MessageType.TEXT, "hello"), 7) }
+            assertThrows(ResourceNotFoundException::class.java) { proxy.sendMessage(SendMessageCommand(10, MessageType.TEXT, "hello"), 7) }
             assertTrue(TransactionSynchronizationManager.isActualTransactionActive())
         }
         verify(rooms).findById(10)

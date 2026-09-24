@@ -2,12 +2,14 @@ package com.chat.core.room.service
 
 import com.chat.core.message.port.MessageReadPort
 import com.chat.core.message.service.MessageSendingService
+import com.chat.core.room.command.CreateChatRoomCommand
 import com.chat.core.room.port.ChatMembershipStore
 import com.chat.core.room.port.ChatRoomStore
 import com.chat.core.room.port.MembershipEvents
 import com.chat.core.user.port.UserStore
 import com.chat.domain.exception.ResourceConflictException
 import com.chat.domain.model.ChatRoom
+import com.chat.domain.model.ChatRoomType
 import com.chat.domain.model.User
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
@@ -21,6 +23,15 @@ class ChatRoomMembershipTest {
     private val service = ChatServiceImpl(rooms, mock(MessageReadPort::class.java), members, users, mock(MessageSendingService::class.java), events)
     private val user = User(id = 7, username = "tester", password = "unused", displayName = "Tester")
     private val room = ChatRoom(id = 10, name = "room", maxMembers = 2, createdBy = user)
+
+    @Test
+    fun `invalid room command cannot read users save rooms or publish membership`() {
+        val valid = CreateChatRoomCommand("Room", null, ChatRoomType.GROUP, null)
+        listOf(valid.copy(name = " "), valid.copy(name = "a".repeat(101)), valid.copy(maxMembers = 0)).forEach { command ->
+            assertThrows(IllegalArgumentException::class.java) { service.createChatRoom(command, 7) }
+        }
+        verifyNoInteractions(rooms, members, users, events)
+    }
 
     @Test
     fun `reactivation locks the room before checking capacity and publishing membership`() {

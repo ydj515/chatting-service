@@ -32,6 +32,7 @@ spring-security-crypto = { group = "org.springframework.security", name = "sprin
 
 # Spring transaction API (already provided by the persistence stack)
 spring-tx = { group = "org.springframework", name = "spring-tx" }
+spring-context = { group = "org.springframework", name = "spring-context" }
 
 # Spring Data / Commons
 spring-data-commons = { group = "org.springframework.data", name = "spring-data-commons" }
