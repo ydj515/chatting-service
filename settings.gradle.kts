@@ -13,6 +13,7 @@ include(
     "chat-admin",
     "chat-domain",
     "chat-core",
+    "chat-protocol",
     "chat-persistence",
     "chat-websocket",
     "chat-api",

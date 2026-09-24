@@ -1,12 +1,12 @@
 package com.chat.websocket.service
 
-import com.chat.core.dto.ChatMessageBatch
-import com.chat.core.dto.WebSocketMessage
 import com.chat.core.gateway.port.GatewayMemberships
-import com.chat.core.gateway.port.GatewayRoomTransport
 import com.chat.core.gateway.port.LocalGateway
-import com.chat.core.gateway.port.MembershipAction
 import com.chat.core.gateway.port.SessionControlEvents
+import com.chat.protocol.gateway.GatewayRoomTransport
+import com.chat.protocol.gateway.MembershipAction
+import com.chat.protocol.websocket.ChatMessageBatch
+import com.chat.protocol.websocket.WebSocketMessage
 import com.fasterxml.jackson.databind.ObjectMapper
 import jakarta.annotation.PostConstruct
 import jakarta.annotation.PreDestroy
@@ -131,7 +131,7 @@ class WebSocketSessionManager(
     }
 
     fun sendMessageToLocalRoom(roomId: Long, message: WebSocketMessage, excludeUserId: Long? = null) {
-        val json = objectMapper.writerFor(com.chat.core.dto.WebSocketMessage::class.java).writeValueAsString(message)
+        val json = objectMapper.writerFor(com.chat.protocol.websocket.WebSocketMessage::class.java).writeValueAsString(message)
         val sessionIds = roomSubscriptions.sessionIds(roomId) ?: return
         val userIds = sessionIds.mapNotNull { sessionsById[it]?.userId }.distinct()
         if (userIds.isEmpty()) return

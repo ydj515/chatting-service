@@ -1,6 +1,6 @@
 package com.chat.websocket.service
 
-import com.chat.core.gateway.port.GatewayRoomTransport
+import com.chat.protocol.gateway.GatewayRoomTransport
 import org.springframework.stereotype.Service
 import java.util.concurrent.ConcurrentHashMap
 

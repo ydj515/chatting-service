@@ -14,6 +14,7 @@ dependencies {
     // 업무 타입과 애플리케이션 계약
     implementation(project(":chat-domain"))
     implementation(project(":chat-core"))
+    implementation(project(":chat-protocol"))
 
     // WebSocket 기능
     implementation(libs.spring.boot.starter.websocket)

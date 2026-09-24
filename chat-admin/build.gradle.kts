@@ -15,6 +15,7 @@ dependencies {
     implementation(project(":chat-core"))
 
     implementation(libs.spring.boot.starter.web)
+    implementation(libs.jackson.module.kotlin)
     implementation(libs.spring.boot.starter.validation)
     implementation(libs.spring.data.commons)
     implementation(libs.spring.boot.starter.actuator)

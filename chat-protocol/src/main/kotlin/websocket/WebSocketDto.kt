@@ -1,19 +1,9 @@
-package com.chat.core.dto
+package com.chat.protocol.websocket
 
 import com.chat.domain.model.MessageType
 import com.fasterxml.jackson.annotation.JsonSubTypes
 import com.fasterxml.jackson.annotation.JsonTypeInfo
 import java.time.LocalDateTime
-
-/*
-    JSON은 기본적으로 Map<String, Any>로 저장이 되는 단순한 자료구조
-
-    sealed class Animal
-
-    data class Dog(val name: String) : Animal()
-    data class Cat(val age: Int) : Animal()
-
- */
 
 @JsonTypeInfo(
     use = JsonTypeInfo.Id.NAME,

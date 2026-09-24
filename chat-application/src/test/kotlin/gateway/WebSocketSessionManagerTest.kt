@@ -1,12 +1,12 @@
 package com.chat.application.gateway
 
-import com.chat.core.dto.ChatMessage
 import com.chat.domain.model.MessageType
 import com.chat.persistence.config.ChatRedisProperties
 import com.chat.persistence.redis.RedisGatewayRoomTransport
 import com.chat.persistence.redis.RedisMessageBroker
 import com.chat.persistence.repository.ChatRoomMemberRepository
 import com.chat.persistence.repository.GatewayMembershipsAdapter
+import com.chat.protocol.websocket.ChatMessage
 import com.chat.websocket.config.ChatWebSocketGatewayProperties
 import com.chat.websocket.service.WebSocketRoomSubscriptions
 import com.chat.websocket.service.WebSocketSessionAuthorization
@@ -173,7 +173,7 @@ class WebSocketSessionManagerTest {
         manager.joinRoom(7, 10)
         manager.joinRoom(8, 10)
         `when`(members.findActiveUserIds(org.mockito.ArgumentMatchers.eq(10L), org.mockito.ArgumentMatchers.anyList<Long>())).thenReturn(listOf(8))
-        val message = com.chat.core.dto.ChatMessageBatch(chatRoomId = 10, messages = emptyList())
+        val message = com.chat.protocol.websocket.ChatMessageBatch(chatRoomId = 10, messages = emptyList())
         manager.sendMessageToLocalRoom(10, message)
         manager.sendMessageToLocalRoom(10, message)
         verify(departed, never()).sendMessage(any(TextMessage::class.java))
@@ -192,7 +192,7 @@ class WebSocketSessionManagerTest {
         manager.joinRoom(7, 10)
         `when`(members.findActiveUserIds(10, listOf(7))).thenThrow(org.springframework.dao.DataAccessResourceFailureException("offline"))
         org.junit.jupiter.api.Assertions.assertThrows(org.springframework.dao.DataAccessResourceFailureException::class.java) {
-            manager.sendMessageToLocalRoom(10, com.chat.core.dto.ChatMessageBatch(chatRoomId = 10, messages = emptyList()))
+            manager.sendMessageToLocalRoom(10, com.chat.protocol.websocket.ChatMessageBatch(chatRoomId = 10, messages = emptyList()))
         }
         verify(recipient, never()).sendMessage(any(TextMessage::class.java))
     }

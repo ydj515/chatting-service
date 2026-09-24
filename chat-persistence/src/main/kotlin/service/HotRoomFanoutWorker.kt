@@ -1,7 +1,5 @@
 package com.chat.persistence.service
 
-import com.chat.core.dto.ChatMessage
-import com.chat.core.dto.ChatMessageBatch
 import com.chat.persistence.config.ChatRedisProperties
 import com.chat.persistence.config.ChatWorkerProperties
 import com.chat.persistence.redis.MessageStreamConsumer
@@ -9,6 +7,8 @@ import com.chat.persistence.redis.MessageStreamEnvelope
 import com.chat.persistence.redis.MessageStreamKeyResolver
 import com.chat.persistence.redis.MessageStreamRecord
 import com.chat.persistence.redis.RedisMessageBroker
+import com.chat.protocol.websocket.ChatMessage
+import com.chat.protocol.websocket.ChatMessageBatch
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 

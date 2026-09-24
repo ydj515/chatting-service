@@ -1,6 +1,5 @@
 plugins {
     alias(libs.plugins.kotlin.jvm)
-    alias(libs.plugins.kotlin.spring)
     alias(libs.plugins.spring.dependency.management)
 }
 
@@ -12,7 +11,6 @@ dependencyManagement {
 
 dependencies {
     implementation(project(":chat-domain"))
-    implementation(libs.spring.data.commons)
-    implementation(libs.spring.tx)
-    implementation(libs.spring.context)
+    implementation(libs.jackson.module.kotlin)
+    testImplementation(libs.jackson.datatype.jsr310)
 }

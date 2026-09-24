@@ -1,0 +1,4 @@
+naming:
+  InvalidPackageDeclaration:
+    rootPackage: 'com.chat.protocol'
+    requireRootInDeclaration: true

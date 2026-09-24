@@ -1,12 +1,12 @@
 package com.chat.persistence.service
 
-import com.chat.core.dto.ChatMessageBatch
 import com.chat.domain.model.MessageType
 import com.chat.persistence.config.ChatWorkerProperties
 import com.chat.persistence.redis.MessageStreamConsumer
 import com.chat.persistence.redis.MessageStreamEnvelope
 import com.chat.persistence.redis.MessageStreamRecord
 import com.chat.persistence.redis.RedisMessageBroker
+import com.chat.protocol.websocket.ChatMessageBatch
 import io.micrometer.core.instrument.MeterRegistry
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.junit.jupiter.api.Assertions.assertEquals

@@ -1,6 +1,6 @@
-package com.chat.core.gateway.port
+package com.chat.protocol.gateway
 
-import com.chat.core.dto.WebSocketMessage
+import com.chat.protocol.websocket.WebSocketMessage
 
 interface GatewayRoomTransport {
     fun getServerId(): String

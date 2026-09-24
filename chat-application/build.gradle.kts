@@ -14,6 +14,7 @@ dependencyManagement {
 
 dependencies {
     testImplementation(libs.archunit)
+    testImplementation(project(":chat-protocol"))
     testImplementation(libs.spring.boot.starter.websocket)
     testImplementation(libs.spring.boot.starter.data.redis)
     testImplementation(libs.jackson.module.kotlin)

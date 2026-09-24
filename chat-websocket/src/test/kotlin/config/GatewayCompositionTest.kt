@@ -2,9 +2,9 @@ package com.chat.websocket.config
 
 import com.chat.core.auth.service.WebSocketTicketSessionPolicy
 import com.chat.core.gateway.port.GatewayMemberships
-import com.chat.core.gateway.port.GatewayRoomTransport
 import com.chat.core.gateway.port.LocalGateway
 import com.chat.core.gateway.port.SessionControlEvents
+import com.chat.protocol.gateway.GatewayRoomTransport
 import com.chat.websocket.service.WebSocketRoomSubscriptions
 import com.chat.websocket.service.WebSocketSessionAuthorization
 import com.chat.websocket.service.WebSocketSessionManager

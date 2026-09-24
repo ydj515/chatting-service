@@ -1,12 +1,12 @@
 package com.chat.application.gateway
 
-import com.chat.core.dto.ChatMessage
 import com.chat.domain.model.MessageType
 import com.chat.persistence.config.ChatRedisProperties
 import com.chat.persistence.redis.RedisGatewayRoomTransport
 import com.chat.persistence.redis.RedisMessageBroker
 import com.chat.persistence.repository.ChatRoomMemberRepository
 import com.chat.persistence.repository.GatewayMembershipsAdapter
+import com.chat.protocol.websocket.ChatMessage
 import com.chat.websocket.config.ChatWebSocketGatewayProperties
 import com.chat.websocket.service.WebSocketGatewayMetrics
 import com.chat.websocket.service.WebSocketRoomSubscriptions

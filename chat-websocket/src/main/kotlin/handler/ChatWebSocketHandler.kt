@@ -1,12 +1,12 @@
 package com.chat.websocket.handler
 
-import com.chat.core.dto.ErrorMessage
-import com.chat.core.dto.MessageAccepted
 import com.chat.core.message.command.SendMessageCommand
 import com.chat.core.service.ChatService
 import com.chat.domain.exception.MessageAdmissionRejectedException
 import com.chat.domain.exception.MessageModerationRejectedException
 import com.chat.domain.model.MessageType
+import com.chat.protocol.websocket.ErrorMessage
+import com.chat.protocol.websocket.MessageAccepted
 import com.chat.websocket.config.WebSocketProperties
 import com.chat.websocket.service.WebSocketSessionManager
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -236,6 +236,6 @@ class ChatWebSocketHandler(
         MESSAGE_MODERATION_REJECTED,
     }
 
-    private fun writeWebSocketMessage(message: com.chat.core.dto.WebSocketMessage): String =
-        objectMapper.writerFor(com.chat.core.dto.WebSocketMessage::class.java).writeValueAsString(message)
+    private fun writeWebSocketMessage(message: com.chat.protocol.websocket.WebSocketMessage): String =
+        objectMapper.writerFor(com.chat.protocol.websocket.WebSocketMessage::class.java).writeValueAsString(message)
 }

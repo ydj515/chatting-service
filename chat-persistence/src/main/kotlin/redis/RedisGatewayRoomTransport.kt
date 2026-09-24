@@ -1,10 +1,10 @@
 package com.chat.persistence.redis
 
-import com.chat.core.dto.WebSocketMessage
-import com.chat.core.gateway.port.GatewayRoomTransport
-import com.chat.core.gateway.port.MembershipAction
-import com.chat.core.gateway.port.MembershipChange
 import com.chat.persistence.config.ChatRedisProperties
+import com.chat.protocol.gateway.GatewayRoomTransport
+import com.chat.protocol.gateway.MembershipAction
+import com.chat.protocol.gateway.MembershipChange
+import com.chat.protocol.websocket.WebSocketMessage
 import org.slf4j.LoggerFactory
 import org.springframework.core.NestedRuntimeException
 import org.springframework.data.redis.core.RedisTemplate

@@ -47,7 +47,8 @@ flowchart LR
 | `chat-admin` | 관리자 REST controller와 인증 경계 | core의 서비스 계약 사용 |
 | `chat-websocket` | handshake, inbound handler, 연결·구독·전송 큐·heartbeat·Gateway metrics | core 포트 사용; persistence·JPA·Redis 직접 의존 금지 |
 | `chat-domain` | JPA 통합 모델과 업무 예외 | core·delivery·infrastructure로 향하는 의존 금지 |
-| `chat-core` | 사용자·채팅·관리자 유스케이스, 공유 서비스 계약, 입출력 타입과 저장소 포트 | concrete DB·Redis·HTTP adapter 의존 금지; 전송 전용 DTO 분리는 후속 단계 |
+| `chat-core` | 사용자·채팅·관리자 유스케이스, command·조회 결과와 저장소 포트 | concrete adapter·전송 프로토콜·Jackson·Bean Validation 의존 금지 |
+| `chat-protocol` | Redis fanout과 Gateway가 공유하는 WebSocket wire DTO·Gateway transport 계약 | 어댑터 사이의 전송 계약; core·Spring·저장소 구현 의존 금지 |
 | `chat-persistence` | DB·Redis·S3 adapter, Worker·정책 구현 | Gateway 상태·전송 책임은 제거; Worker·정책 책임 분리는 추가 점검 |
 
 실행 모듈인 `chat-application`과 내부 계약 모듈인 `chat-core`는 별개다.
@@ -74,8 +75,14 @@ JSON 직렬화는 adapter가 처리하고, 제재 변경·감사·내구성 있�
 장애나 서명 처리 중 DB 트랜잭션을 유지하지 않는다. 실행 중인 worker의 로컬 파일 경로는
 상태 응답으로 노출하지 않는다.
 
+`chat-protocol`은 Redis Pub/Sub payload와 WebSocket 응답의 동일한 wire schema를
+두 어댑터가 공유하기 위한 계약 모듈이다. `CHAT_MESSAGE`, `CHAT_MESSAGE_BATCH`,
+`MESSAGE_ACCEPTED`, `ERROR` discriminator와 기존 JSON 필드를 유지한다. core는 이
+모듈을 참조하지 않으며 Jackson도 의존하지 않는다. protocol의 방 transport 계약은
+서버 간 구독과 JSON 메시지 전달을 위한 것으로 업무 저장소 포트와 구분한다.
+
 WebSocket 연결·로컬 구독·전송 큐·executor·metrics는 `chat-websocket`이 소유한다.
-`GatewayMemberships`는 primary DB를 통한 전달 권한 확인, `GatewayRoomTransport`는
+core의 `GatewayMemberships`는 primary DB를 통한 전달 권한 확인, protocol의 `GatewayRoomTransport`는
 서버 간 이벤트 수신·방 구독·advisory index 갱신, `SessionControlEvents`는 세션 철회
 알림을 담당한다. 저장소 장애는 adapter가 index 갱신 실패로 변환하고 Gateway가 현재
 로컬 구독 상태를 기준으로 재시도한다. delivery에는 Redis template이나 repository를 노출하지 않는다.

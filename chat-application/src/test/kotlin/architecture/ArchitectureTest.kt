@@ -25,7 +25,7 @@ class ArchitectureTest {
 
     @Test
     fun `production modules are present in the architecture test classpath`() {
-        listOf("domain", "core", "persistence", "api", "admin", "websocket", "worker", "application").forEach { module ->
+        listOf("domain", "core", "protocol", "persistence", "api", "admin", "websocket", "worker", "application").forEach { module ->
             assertTrue(classes.any { it.packageName.startsWith("com.chat.$module") }, "Missing production module: $module")
         }
     }
@@ -62,7 +62,7 @@ class ArchitectureTest {
     @Test
     fun `domain does not depend on infrastructure or delivery modules`() {
         noClasses().that().resideInAPackage("com.chat.domain..")
-            .should().dependOnClassesThat().resideInAnyPackage("com.chat.core..", "com.chat.persistence..", "com.chat.api..", "com.chat.admin..", "com.chat.websocket..")
+            .should().dependOnClassesThat().resideInAnyPackage("com.chat.core..", "com.chat.protocol..", "com.chat.persistence..", "com.chat.api..", "com.chat.admin..", "com.chat.websocket..")
             .check(classes)
     }
 
@@ -73,6 +73,16 @@ class ArchitectureTest {
                 "com.chat.persistence..", "com.chat.api..", "com.chat.admin..", "com.chat.websocket..",
                 "org.springframework.data.jpa..", "org.springframework.jdbc..", "org.springframework.data.redis..",
                 "org.springframework.web..", "software.amazon.awssdk..", "jakarta.validation..",
+                "com.chat.protocol..", "com.fasterxml.jackson..",
+            ).check(classes)
+    }
+
+    @Test
+    fun `shared wire contracts do not depend on application or adapters`() {
+        noClasses().that().resideInAPackage("com.chat.protocol..")
+            .should().dependOnClassesThat().resideInAnyPackage(
+                "com.chat.core..", "com.chat.persistence..", "com.chat.api..", "com.chat.admin..", "com.chat.websocket..",
+                "org.springframework..", "jakarta.persistence..", "jakarta.validation..",
             ).check(classes)
     }
 
