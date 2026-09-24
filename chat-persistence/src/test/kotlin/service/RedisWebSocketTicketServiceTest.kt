@@ -1,5 +1,6 @@
 package com.chat.persistence.service
 
+import com.chat.core.auth.service.WebSocketTicketSessionPolicy
 import com.chat.core.dto.AuthenticatedSession
 import com.chat.core.service.SessionTokenRevocationStore
 import com.chat.core.service.SessionTokenService

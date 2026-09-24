@@ -1,5 +1,6 @@
 package com.chat.persistence.service
 
+import com.chat.core.auth.service.WebSocketTicketSessionPolicy
 import com.chat.core.dto.AuthenticatedSession
 import org.springframework.stereotype.Service
 import org.springframework.web.socket.WebSocketSession

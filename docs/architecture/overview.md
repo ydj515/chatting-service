@@ -68,6 +68,10 @@ JSON 직렬화는 adapter가 처리하고, 제재 변경·감사·내구성 있�
 장애나 서명 처리 중 DB 트랜잭션을 유지하지 않는다. 실행 중인 worker의 로컬 파일 경로는
 상태 응답으로 노출하지 않는다.
 
+WebSocket 부모 세션의 만료·개별 철회·사용자 전체 철회 기준은 core의
+`WebSocketTicketSessionPolicy`가 소유한다. Redis 티켓 adapter와 연결 전송 adapter는
+같은 정책을 호출하며, Redis 조회와 WebSocket 종료 처리는 각 adapter에 남긴다.
+
 `@Transactional`의 infrastructure 예외는 `PartitionedMessageWriteAdapter.write` 하나다.
 이 메서드는 저장소 포트의 한 batch 시도를 원자적으로 보장하며 worker는 성공 이후의 ACK와
 재시도 순서를 소유한다. 여러 저장소 변경을 하나의 업무 트랜잭션으로 묶는 요구가 생기면

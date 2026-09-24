@@ -1,4 +1,4 @@
-package com.chat.persistence.service
+package com.chat.core.auth.service
 
 import com.chat.core.dto.AuthenticatedSession
 import com.chat.core.service.SessionTokenRevocationStore
