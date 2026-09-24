@@ -2,6 +2,7 @@ package com.chat.websocket.config
 
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler
 import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.ThreadFactory
@@ -13,6 +14,15 @@ import java.util.concurrent.atomic.AtomicLong
 class WebSocketGatewayConfig(
     private val gatewayProperties: ChatWebSocketGatewayProperties,
 ) {
+    @Bean("webSocketHeartbeatExecutor")
+    fun webSocketHeartbeatScheduler(): ThreadPoolTaskScheduler = ThreadPoolTaskScheduler().apply {
+        poolSize = 1
+        setThreadNamePrefix("websocket-heartbeat-")
+        setRemoveOnCancelPolicy(true)
+        setContinueExistingPeriodicTasksAfterShutdownPolicy(false)
+        setExecuteExistingDelayedTasksAfterShutdownPolicy(false)
+    }
+
     @Bean("webSocketOutboundExecutor", destroyMethod = "shutdownNow")
     fun webSocketOutboundExecutor(): ExecutorService {
         val threads = gatewayProperties.outboundExecutorThreads

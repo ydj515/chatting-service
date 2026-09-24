@@ -154,6 +154,8 @@ class WebSocketSessionManagerHeartbeatTest {
             broker = ChatRedisProperties.Broker(serverId = "test-server"),
         )
         val broker = RedisMessageBroker(
+            cleanupScheduler = mock(org.springframework.scheduling.TaskScheduler::class.java),
+            clock = java.time.Clock.systemUTC(),
             redisTemplate = redisTemplate,
             messageListenerContainer = mock(RedisMessageListenerContainer::class.java),
             objectMapper = objectMapper,

@@ -18,6 +18,7 @@ import org.mockito.Mockito.mockingDetails
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
 import org.springframework.context.annotation.AnnotationConfigApplicationContext
+import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler
 import org.springframework.web.socket.CloseStatus
 import org.springframework.web.socket.WebSocketSession
 import java.util.concurrent.ExecutorService
@@ -26,6 +27,7 @@ class GatewayCompositionTest {
     @Test
     fun `gateway composes with core ports and no persistence implementation`() {
         lateinit var executor: ExecutorService
+        lateinit var heartbeat: ThreadPoolTaskScheduler
         val socket = mock(WebSocketSession::class.java)
         `when`(socket.id).thenReturn("connection")
         `when`(socket.isOpen).thenReturn(true)
@@ -44,11 +46,13 @@ class GatewayCompositionTest {
             context.refresh()
             val manager = context.getBean(WebSocketSessionManager::class.java)
             executor = context.getBean("webSocketOutboundExecutor", ExecutorService::class.java)
+            heartbeat = context.getBean("webSocketHeartbeatExecutor", ThreadPoolTaskScheduler::class.java)
             manager.addSession(7, socket)
             assertSame(manager, context.getBean(LocalGateway::class.java))
             assertTrue(mockingDetails(controls).invocations.any { it.method.name == "setLocalForceLogoutHandler" })
         }
         verify(socket).close(CloseStatus.GOING_AWAY)
         assertTrue(executor.isShutdown)
+        assertTrue(heartbeat.scheduledThreadPoolExecutor.isShutdown)
     }
 }

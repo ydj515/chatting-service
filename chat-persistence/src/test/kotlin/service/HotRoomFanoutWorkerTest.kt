@@ -30,7 +30,7 @@ class HotRoomFanoutWorkerTest {
         val redis = mock(org.springframework.data.redis.core.RedisTemplate::class.java) as org.springframework.data.redis.core.RedisTemplate<String, String>
         org.mockito.Mockito.doThrow(org.springframework.data.redis.RedisConnectionFailureException("unavailable"))
             .`when`(redis).convertAndSend(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.any())
-        val broker = RedisMessageBroker(redis, mock(org.springframework.data.redis.listener.RedisMessageListenerContainer::class.java), com.chat.persistence.config.RedisConfig().distributedObjectMapper(), com.chat.persistence.config.ChatRedisProperties())
+        val broker = RedisMessageBroker(redis, mock(org.springframework.data.redis.listener.RedisMessageListenerContainer::class.java), com.chat.persistence.config.RedisConfig().distributedObjectMapper(), com.chat.persistence.config.ChatRedisProperties(), mock(org.springframework.scheduling.TaskScheduler::class.java), java.time.Clock.systemUTC())
         val worker = HotRoomFanoutWorker(consumer, broker, ChatWorkerProperties(), MessageStreamKeyResolver(ChatRedisProperties()), FanoutOwnerLeaseService.Noop)
         assertEquals(0, worker.pollAndFanout())
         assertEquals(emptyList<String>(), consumer.acked)

@@ -7,14 +7,18 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import jakarta.annotation.PostConstruct
 import jakarta.annotation.PreDestroy
 import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.data.redis.connection.Message
 import org.springframework.data.redis.connection.MessageListener
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.data.redis.listener.ChannelTopic
 import org.springframework.data.redis.listener.RedisMessageListenerContainer
+import org.springframework.scheduling.TaskScheduler
 import org.springframework.stereotype.Service
+import java.time.Clock
 import java.time.LocalDateTime
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ScheduledFuture
 
 @Service
 class RedisMessageBroker(
@@ -22,11 +26,14 @@ class RedisMessageBroker(
     private val messageListenerContainer: RedisMessageListenerContainer,
     private val objectMapper: ObjectMapper,
     private val redisProperties: ChatRedisProperties,
+    @Qualifier("redisBrokerCleanupScheduler") private val cleanupScheduler: TaskScheduler,
+    private val clock: Clock,
 ) : MessageListener {
     private val logger = LoggerFactory.getLogger(RedisMessageBroker::class.java)
     private val serverId = redisProperties.broker.serverId
         ?.takeIf { it.isNotBlank() }
         ?: "server-${System.currentTimeMillis()}"
+    private var cleanupTask: ScheduledFuture<*>? = null
     private val processedMessages = ConcurrentHashMap<String, Long>()
     private val subscribeRooms = ConcurrentHashMap.newKeySet<Long>()
     private var localMessageHandler: ((Long, WebSocketMessage) -> Unit)? = null
@@ -40,22 +47,16 @@ class RedisMessageBroker(
         messageListenerContainer.addMessageListener(this, ChannelTopic(redisProperties.membershipTopic))
         logger.info("Subscribed to membership topic ${redisProperties.membershipTopic}")
 
-        Thread {
-            try {
-                Thread.sleep(redisProperties.broker.cleanupInitialDelay.toMillis())
-                cleanUpProcessedMessages()
-            } catch (e: Exception) {
-                logger.error("Error in initializing RedisMessageListenerContainer", e)
-            }
-        }.apply {
-            isDaemon = true
-            name = "redis-broker-cleanup"
-            start()
-        }
+        cleanupTask = cleanupScheduler.scheduleWithFixedDelay(
+            ::cleanUpProcessedMessages,
+            clock.instant().plus(redisProperties.broker.cleanupInitialDelay),
+            redisProperties.broker.processedMessageTtl,
+        )
     }
 
     @PreDestroy
     fun cleanup() {
+        cleanupTask?.cancel(false)
         messageListenerContainer.removeMessageListener(this, ChannelTopic(redisProperties.membershipTopic))
         subscribeRooms.forEach { roomId ->
             unsubscribeFromRoom(roomId)
@@ -156,7 +157,7 @@ class RedisMessageBroker(
 
             localMessageHandler?.invoke(distributedMessage.roomId, distributedMessage.payload)
 
-            processedMessages[distributedMessage.id] = System.currentTimeMillis()
+            processedMessages[distributedMessage.id] = clock.millis()
 
             val maxProcessedMessageSize = redisProperties.broker.processedMessageMaxSize.coerceAtLeast(1)
             if (processedMessages.size > maxProcessedMessageSize) {
@@ -185,16 +186,16 @@ class RedisMessageBroker(
     }
 
     private fun cleanUpProcessedMessages() {
-        val now = System.currentTimeMillis()
+        val now = clock.millis()
         val ttlMillis = redisProperties.broker.processedMessageTtl.toMillis()
-        val expiredKeys = processedMessages.filter { (_, time) ->
-            now - time > ttlMillis
-        }.keys
+        val expiredEntries = processedMessages.filter { (_, time) ->
+            now - time >= ttlMillis
+        }
 
-        expiredKeys.forEach { processedMessages.remove(it) }
+        expiredEntries.forEach { (id, timestamp) -> processedMessages.remove(id, timestamp) }
 
-        if (expiredKeys.isNotEmpty()) {
-            logger.info("Removed ${processedMessages.size} messages from Redis")
+        if (expiredEntries.isNotEmpty()) {
+            logger.debug("Removed {} expired message deduplication entries", expiredEntries.size)
         }
     }
 

@@ -18,7 +18,12 @@ data class ChatRedisProperties(
         val cleanupInitialDelay: Duration = Duration.ofSeconds(30),
         val processedMessageTtl: Duration = Duration.ofMinutes(1),
         val processedMessageMaxSize: Int = 10_000,
-    )
+    ) {
+        init {
+            require(!cleanupInitialDelay.isNegative) { "cleanupInitialDelay must not be negative" }
+            require(processedMessageTtl.toMillis() > 0) { "processedMessageTtl must be at least one millisecond" }
+        }
+    }
 
     data class Streams(
         val roomStreamKeyPrefix: String = "chat:stream:room:",

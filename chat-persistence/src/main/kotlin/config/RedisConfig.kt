@@ -18,6 +18,7 @@ import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.data.redis.listener.RedisMessageListenerContainer
 import org.springframework.data.redis.serializer.StringRedisSerializer
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor
+import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler
 import java.time.Duration
 import java.util.concurrent.Executor
 import java.util.concurrent.ThreadPoolExecutor
@@ -60,6 +61,15 @@ class RedisConfig {
             hashValueSerializer = StringRedisSerializer()
             afterPropertiesSet()
         }
+
+    @Bean("redisBrokerCleanupScheduler")
+    fun redisBrokerCleanupScheduler(): ThreadPoolTaskScheduler = ThreadPoolTaskScheduler().apply {
+        poolSize = 1
+        setThreadNamePrefix("redis-broker-cleanup-")
+        setRemoveOnCancelPolicy(true)
+        setContinueExistingPeriodicTasksAfterShutdownPolicy(false)
+        setExecuteExistingDelayedTasksAfterShutdownPolicy(false)
+    }
 
     @Bean("redisListenerExecutor")
     fun redisListenerExecutor(): ThreadPoolTaskExecutor = ThreadPoolTaskExecutor().apply {
