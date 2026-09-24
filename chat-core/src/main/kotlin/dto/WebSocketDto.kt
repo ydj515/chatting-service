@@ -1,4 +1,4 @@
-package com.chat.domain.dto
+package com.chat.core.dto
 
 import com.chat.domain.model.MessageType
 import com.fasterxml.jackson.annotation.JsonSubTypes

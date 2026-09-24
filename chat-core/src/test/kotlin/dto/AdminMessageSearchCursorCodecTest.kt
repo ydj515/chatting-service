@@ -1,4 +1,4 @@
-package com.chat.domain.dto
+package com.chat.core.dto
 
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotEquals

@@ -1,7 +1,7 @@
 package com.chat.persistence.repository
 
-import com.chat.domain.dto.ModerationScopeType
-import com.chat.domain.dto.UserSanctionType
+import com.chat.core.dto.ModerationScopeType
+import com.chat.core.dto.UserSanctionType
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Test

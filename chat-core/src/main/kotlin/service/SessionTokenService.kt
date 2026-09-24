@@ -1,9 +1,9 @@
-package com.chat.domain.service
+package com.chat.core.service
 
-import com.chat.domain.dto.AuthenticatedSession
-import com.chat.domain.dto.AuthenticatedWebSocketTicket
-import com.chat.domain.dto.SessionToken
-import com.chat.domain.dto.WebSocketTicketResponse
+import com.chat.core.dto.AuthenticatedSession
+import com.chat.core.dto.AuthenticatedWebSocketTicket
+import com.chat.core.dto.SessionToken
+import com.chat.core.dto.WebSocketTicketResponse
 
 interface SessionTokenService {
     fun issueToken(userId: Long): SessionToken

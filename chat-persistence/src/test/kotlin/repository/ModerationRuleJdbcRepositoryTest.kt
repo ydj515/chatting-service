@@ -1,8 +1,8 @@
 package com.chat.persistence.repository
 
-import com.chat.domain.dto.ModerationAction
-import com.chat.domain.dto.ModerationMatchType
-import com.chat.domain.dto.ModerationScopeType
+import com.chat.core.dto.ModerationAction
+import com.chat.core.dto.ModerationMatchType
+import com.chat.core.dto.ModerationScopeType
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentMatchers.any

@@ -1,8 +1,8 @@
 package com.chat.api.security
 
 import com.chat.api.controller.GlobalExceptionHandler
-import com.chat.domain.dto.AuthenticatedSession
-import com.chat.domain.service.SessionTokenService
+import com.chat.core.dto.AuthenticatedSession
+import com.chat.core.service.SessionTokenService
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.mock

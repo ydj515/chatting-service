@@ -1,8 +1,8 @@
 package com.chat.persistence.service
 
-import com.chat.domain.dto.AuthenticatedWebSocketTicket
-import com.chat.domain.dto.WebSocketTicketResponse
-import com.chat.domain.service.WebSocketTicketService
+import com.chat.core.dto.AuthenticatedWebSocketTicket
+import com.chat.core.dto.WebSocketTicketResponse
+import com.chat.core.service.WebSocketTicketService
 import com.chat.persistence.config.ChatAuthProperties
 import com.fasterxml.jackson.databind.ObjectMapper
 import io.micrometer.core.instrument.Counter
@@ -136,7 +136,7 @@ class RedisWebSocketTicketService(
                 userId = storedTicket.userId,
                 expiresAt = LocalDateTime.ofInstant(expiresAt, ZoneOffset.UTC),
                 sessionTokenDigest = storedTicket.sessionTokenDigest,
-                parentSession = com.chat.domain.dto.AuthenticatedSession(
+                parentSession = com.chat.core.dto.AuthenticatedSession(
                     userId = storedTicket.userId,
                     expiresAt = LocalDateTime.ofInstant(Instant.ofEpochSecond(checkNotNull(storedTicket.sessionExpiresAtEpochSecond)), ZoneOffset.UTC),
                     issuedAt = storedTicket.sessionIssuedAtEpochSecond?.let { LocalDateTime.ofInstant(Instant.ofEpochSecond(it), ZoneOffset.UTC) },

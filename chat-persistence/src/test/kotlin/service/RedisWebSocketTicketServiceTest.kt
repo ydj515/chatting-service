@@ -1,8 +1,8 @@
 package com.chat.persistence.service
 
-import com.chat.domain.dto.AuthenticatedSession
-import com.chat.domain.service.SessionTokenRevocationStore
-import com.chat.domain.service.SessionTokenService
+import com.chat.core.dto.AuthenticatedSession
+import com.chat.core.service.SessionTokenRevocationStore
+import com.chat.core.service.SessionTokenService
 import com.chat.persistence.config.ChatAuthProperties
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule

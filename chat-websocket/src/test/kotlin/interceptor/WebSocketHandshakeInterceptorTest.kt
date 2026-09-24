@@ -1,9 +1,9 @@
 package com.chat.websocket.interceptor
 
-import com.chat.domain.dto.AuthenticatedSession
-import com.chat.domain.dto.AuthenticatedWebSocketTicket
-import com.chat.domain.service.SessionTokenService
-import com.chat.domain.service.WebSocketTicketService
+import com.chat.core.dto.AuthenticatedSession
+import com.chat.core.dto.AuthenticatedWebSocketTicket
+import com.chat.core.service.SessionTokenService
+import com.chat.core.service.WebSocketTicketService
 import com.chat.persistence.config.ChatAuthProperties
 import com.chat.websocket.config.WebSocketProperties
 import org.junit.jupiter.api.Assertions.assertEquals

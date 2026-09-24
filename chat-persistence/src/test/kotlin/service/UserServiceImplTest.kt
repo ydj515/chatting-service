@@ -1,13 +1,13 @@
 package com.chat.persistence.service
 
-import com.chat.domain.dto.CreateUserRequest
-import com.chat.domain.dto.LoginRequest
-import com.chat.domain.dto.ModerationScopeType
-import com.chat.domain.dto.SessionToken
-import com.chat.domain.dto.UserSanctionType
+import com.chat.core.dto.CreateUserRequest
+import com.chat.core.dto.LoginRequest
+import com.chat.core.dto.ModerationScopeType
+import com.chat.core.dto.SessionToken
+import com.chat.core.dto.UserSanctionType
+import com.chat.core.service.SessionTokenService
 import com.chat.domain.exception.ResourceConflictException
 import com.chat.domain.model.User
-import com.chat.domain.service.SessionTokenService
 import com.chat.persistence.repository.UserRepository
 import com.chat.persistence.repository.UserSanctionJdbcRepository
 import com.chat.persistence.repository.UserSanctionRecord

@@ -1,10 +1,10 @@
 package com.chat.persistence.service
 
-import com.chat.domain.dto.AdminExportMessagesRequest
-import com.chat.domain.dto.AdminMessageCursor
-import com.chat.domain.dto.AdminMessageCursorCodec
-import com.chat.domain.dto.AdminMessageDto
-import com.chat.domain.dto.AdminMessageSearchMode
+import com.chat.core.dto.AdminExportMessagesRequest
+import com.chat.core.dto.AdminMessageCursor
+import com.chat.core.dto.AdminMessageCursorCodec
+import com.chat.core.dto.AdminMessageDto
+import com.chat.core.dto.AdminMessageSearchMode
 import com.chat.persistence.config.AdminExportProperties
 import com.chat.persistence.config.ChatWorkerProperties
 import com.chat.persistence.repository.AdminExportJobRecord

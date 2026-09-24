@@ -21,7 +21,7 @@ class ArchitectureTest {
 
     @Test
     fun `production modules are present in the architecture test classpath`() {
-        listOf("domain", "persistence", "api", "admin", "websocket", "worker", "application").forEach { module ->
+        listOf("domain", "core", "persistence", "api", "admin", "websocket", "worker", "application").forEach { module ->
             assertTrue(classes.any { it.packageName.startsWith("com.chat.$module") }, "Missing production module: $module")
         }
     }
@@ -56,8 +56,18 @@ class ArchitectureTest {
     @Test
     fun `domain does not depend on infrastructure or delivery modules`() {
         noClasses().that().resideInAPackage("com.chat.domain..")
-            .should().dependOnClassesThat().resideInAnyPackage("com.chat.persistence..", "com.chat.api..", "com.chat.admin..", "com.chat.websocket..")
+            .should().dependOnClassesThat().resideInAnyPackage("com.chat.core..", "com.chat.persistence..", "com.chat.api..", "com.chat.admin..", "com.chat.websocket..")
             .check(classes)
+    }
+
+    @Test
+    fun `core does not depend on concrete adapters or delivery`() {
+        noClasses().that().resideInAPackage("com.chat.core..")
+            .should().dependOnClassesThat().resideInAnyPackage(
+                "com.chat.persistence..", "com.chat.api..", "com.chat.admin..", "com.chat.websocket..",
+                "org.springframework.data.jpa..", "org.springframework.jdbc..", "org.springframework.data.redis..",
+                "org.springframework.web..", "software.amazon.awssdk..",
+            ).check(classes)
     }
 
     @Test

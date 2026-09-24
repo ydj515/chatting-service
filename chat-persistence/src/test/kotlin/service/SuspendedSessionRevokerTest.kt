@@ -1,7 +1,7 @@
 package com.chat.persistence.service
 
-import com.chat.domain.service.SessionControlPublisher
-import com.chat.domain.service.SessionTokenRevocationStore
+import com.chat.core.service.SessionControlPublisher
+import com.chat.core.service.SessionTokenRevocationStore
 import com.chat.persistence.config.SanctionCacheRetryProperties
 import com.chat.persistence.repository.SessionRevocationJobRepository
 import org.junit.jupiter.api.Assertions.*

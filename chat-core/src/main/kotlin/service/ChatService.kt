@@ -1,6 +1,6 @@
-package com.chat.domain.service
+package com.chat.core.service
 
-import com.chat.domain.dto.*
+import com.chat.core.dto.*
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 

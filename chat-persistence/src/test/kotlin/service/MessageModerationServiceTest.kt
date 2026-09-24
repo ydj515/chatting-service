@@ -1,8 +1,8 @@
 package com.chat.persistence.service
 
-import com.chat.domain.dto.ModerationAction
-import com.chat.domain.dto.ModerationMatchType
-import com.chat.domain.dto.ModerationScopeType
+import com.chat.core.dto.ModerationAction
+import com.chat.core.dto.ModerationMatchType
+import com.chat.core.dto.ModerationScopeType
 import com.chat.domain.exception.MessageModerationRejectedException
 import com.chat.domain.model.MessageType
 import com.chat.persistence.repository.ModerationRuleJdbcRepository

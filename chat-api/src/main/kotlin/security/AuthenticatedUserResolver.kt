@@ -1,7 +1,7 @@
 package com.chat.api.security
 
+import com.chat.core.service.SessionTokenService
 import com.chat.domain.exception.UnauthenticatedException
-import com.chat.domain.service.SessionTokenService
 import org.springframework.core.MethodParameter
 import org.springframework.http.HttpHeaders
 import org.springframework.stereotype.Component

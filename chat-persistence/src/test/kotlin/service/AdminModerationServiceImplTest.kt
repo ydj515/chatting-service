@@ -1,11 +1,11 @@
 package com.chat.persistence.service
 
-import com.chat.domain.dto.AdminCreateModerationRuleRequest
-import com.chat.domain.dto.AdminCreateUserSanctionRequest
-import com.chat.domain.dto.ModerationAction
-import com.chat.domain.dto.ModerationMatchType
-import com.chat.domain.dto.ModerationScopeType
-import com.chat.domain.dto.UserSanctionType
+import com.chat.core.dto.AdminCreateModerationRuleRequest
+import com.chat.core.dto.AdminCreateUserSanctionRequest
+import com.chat.core.dto.ModerationAction
+import com.chat.core.dto.ModerationMatchType
+import com.chat.core.dto.ModerationScopeType
+import com.chat.core.dto.UserSanctionType
 import com.chat.persistence.repository.AdminAuditLogRepository
 import com.chat.persistence.repository.ModerationRuleJdbcRepository
 import com.chat.persistence.repository.ModerationRuleRecord

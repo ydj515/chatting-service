@@ -1,13 +1,13 @@
 package com.chat.persistence.service
 
-import com.chat.domain.dto.AdminCreateModerationRuleRequest
-import com.chat.domain.dto.AdminCreateUserSanctionRequest
-import com.chat.domain.dto.AdminModerationRuleDto
-import com.chat.domain.dto.AdminUpdateModerationRuleRequest
-import com.chat.domain.dto.AdminUserSanctionDto
-import com.chat.domain.dto.ModerationScopeType
-import com.chat.domain.dto.UserSanctionType
-import com.chat.domain.service.AdminModerationService
+import com.chat.core.dto.AdminCreateModerationRuleRequest
+import com.chat.core.dto.AdminCreateUserSanctionRequest
+import com.chat.core.dto.AdminModerationRuleDto
+import com.chat.core.dto.AdminUpdateModerationRuleRequest
+import com.chat.core.dto.AdminUserSanctionDto
+import com.chat.core.dto.ModerationScopeType
+import com.chat.core.dto.UserSanctionType
+import com.chat.core.service.AdminModerationService
 import com.chat.persistence.repository.ModerationRuleJdbcRepository
 import com.chat.persistence.repository.UserSanctionJdbcRepository
 import org.springframework.cache.annotation.CacheEvict

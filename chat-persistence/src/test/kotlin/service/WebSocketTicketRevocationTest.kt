@@ -1,6 +1,6 @@
 package com.chat.persistence.service
 
-import com.chat.domain.service.SessionTokenService
+import com.chat.core.service.SessionTokenService
 import com.chat.persistence.config.ChatAuthProperties
 import com.chat.persistence.config.RedisConfig
 import org.junit.jupiter.api.Assertions.*

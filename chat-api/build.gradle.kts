@@ -13,6 +13,7 @@ dependencyManagement {
 dependencies {
     // 도메인 모듈 의존성 (DTO와 서비스 인터페이스 사용)
     implementation(project(":chat-domain"))
+    implementation(project(":chat-core"))
 
     // REST API 기능
     implementation(libs.spring.boot.starter.web)

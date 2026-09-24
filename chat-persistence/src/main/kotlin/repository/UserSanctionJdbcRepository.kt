@@ -1,9 +1,9 @@
 package com.chat.persistence.repository
 
-import com.chat.domain.dto.AdminCreateUserSanctionRequest
-import com.chat.domain.dto.AdminUserSanctionDto
-import com.chat.domain.dto.ModerationScopeType
-import com.chat.domain.dto.UserSanctionType
+import com.chat.core.dto.AdminCreateUserSanctionRequest
+import com.chat.core.dto.AdminUserSanctionDto
+import com.chat.core.dto.ModerationScopeType
+import com.chat.core.dto.UserSanctionType
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.cache.annotation.Cacheable
 import org.springframework.jdbc.core.JdbcTemplate

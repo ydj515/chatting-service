@@ -1,10 +1,10 @@
-package com.chat.domain.service
+package com.chat.core.service
 
-import com.chat.domain.dto.AdminCreateModerationRuleRequest
-import com.chat.domain.dto.AdminCreateUserSanctionRequest
-import com.chat.domain.dto.AdminModerationRuleDto
-import com.chat.domain.dto.AdminUpdateModerationRuleRequest
-import com.chat.domain.dto.AdminUserSanctionDto
+import com.chat.core.dto.AdminCreateModerationRuleRequest
+import com.chat.core.dto.AdminCreateUserSanctionRequest
+import com.chat.core.dto.AdminModerationRuleDto
+import com.chat.core.dto.AdminUpdateModerationRuleRequest
+import com.chat.core.dto.AdminUserSanctionDto
 
 interface AdminModerationService {
     fun listRules(actor: String, roomId: Long?, enabled: Boolean?): List<AdminModerationRuleDto>

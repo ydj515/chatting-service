@@ -1,13 +1,13 @@
 package com.chat.websocket.handler
 
-import com.chat.domain.dto.ChatRoomDto
-import com.chat.domain.dto.MessageDto
-import com.chat.domain.dto.SendMessageRequest
-import com.chat.domain.dto.UserDto
+import com.chat.core.dto.ChatRoomDto
+import com.chat.core.dto.MessageDto
+import com.chat.core.dto.SendMessageRequest
+import com.chat.core.dto.UserDto
+import com.chat.core.service.ChatService
 import com.chat.domain.exception.MessageAdmissionRejectedException
 import com.chat.domain.exception.MessageModerationRejectedException
 import com.chat.domain.model.MessageType
-import com.chat.domain.service.ChatService
 import com.chat.persistence.service.WebSocketSessionManager
 import com.chat.websocket.config.WebSocketProperties
 import com.fasterxml.jackson.databind.DeserializationFeature

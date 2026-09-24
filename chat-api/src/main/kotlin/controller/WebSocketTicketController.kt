@@ -2,8 +2,8 @@ package com.chat.api.controller
 
 import com.chat.api.security.CurrentSessionToken
 import com.chat.api.security.CurrentUserId
-import com.chat.domain.dto.WebSocketTicketResponse
-import com.chat.domain.service.WebSocketTicketService
+import com.chat.core.dto.WebSocketTicketResponse
+import com.chat.core.service.WebSocketTicketService
 import jakarta.servlet.http.HttpServletRequest
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity

@@ -1,6 +1,6 @@
 package com.chat.persistence.repository
 
-import com.chat.domain.dto.AdminExportJobDto
+import com.chat.core.dto.AdminExportJobDto
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.dao.support.DataAccessUtils
 import org.springframework.jdbc.core.JdbcTemplate

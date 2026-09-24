@@ -1,5 +1,9 @@
 package com.chat.persistence.service
 
+import com.chat.core.message.port.MessageWriteOutcome
+import com.chat.core.message.port.MessageWritePort
+import com.chat.core.message.port.MessageWriteRequest
+import com.chat.core.message.port.MessageWriteResult
 import com.chat.domain.model.Message
 import com.chat.persistence.repository.ChatRoomRepository
 import com.chat.persistence.repository.MessageRepository
@@ -86,11 +90,12 @@ class JpaMessageWriteAdapter(
             return null
         }
 
-        if (request.clientMessageId != null) {
+        val clientMessageId = request.clientMessageId
+        if (clientMessageId != null) {
             val existingMessage = messageRepository.findByChatRoomIdAndSenderIdAndClientMessageId(
                 chatRoomId = request.chatRoomId,
                 senderId = request.senderId,
-                clientMessageId = request.clientMessageId,
+                clientMessageId = clientMessageId,
             )
             if (existingMessage != null) {
                 return null
@@ -118,14 +123,12 @@ class JpaMessageWriteAdapter(
             return true
         }
 
-        if (request.clientMessageId == null) {
-            return false
-        }
+        val clientMessageId = request.clientMessageId ?: return false
 
         return messageRepository.findByChatRoomIdAndSenderIdAndClientMessageId(
             chatRoomId = request.chatRoomId,
             senderId = request.senderId,
-            clientMessageId = request.clientMessageId,
+            clientMessageId = clientMessageId,
         ) != null
     }
 

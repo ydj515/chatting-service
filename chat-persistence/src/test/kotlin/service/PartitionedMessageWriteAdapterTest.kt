@@ -1,5 +1,7 @@
 package com.chat.persistence.service
 
+import com.chat.core.message.port.MessageWriteOutcome
+import com.chat.core.message.port.MessageWriteRequest
 import com.chat.domain.model.MessageType
 import com.chat.persistence.repository.PartitionedMessageRepository
 import org.junit.jupiter.api.Assertions.assertEquals

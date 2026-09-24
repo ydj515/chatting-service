@@ -1,6 +1,6 @@
-package com.chat.domain.dto
+package com.chat.core.dto
 
-import com.chat.domain.validation.Utf8ByteSize
+import com.chat.core.validation.Utf8ByteSize
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Size
 import java.time.LocalDateTime

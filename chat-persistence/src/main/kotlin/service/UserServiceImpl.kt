@@ -1,15 +1,15 @@
 package com.chat.persistence.service
 
-import com.chat.domain.dto.CreateUserRequest
-import com.chat.domain.dto.LoginRequest
-import com.chat.domain.dto.LoginResponse
-import com.chat.domain.dto.UserDto
-import com.chat.domain.dto.UserSanctionType
+import com.chat.core.dto.CreateUserRequest
+import com.chat.core.dto.LoginRequest
+import com.chat.core.dto.LoginResponse
+import com.chat.core.dto.UserDto
+import com.chat.core.dto.UserSanctionType
+import com.chat.core.service.SessionTokenService
+import com.chat.core.service.UserService
 import com.chat.domain.exception.ResourceConflictException
 import com.chat.domain.exception.ResourceNotFoundException
 import com.chat.domain.model.User
-import com.chat.domain.service.SessionTokenService
-import com.chat.domain.service.UserService
 import com.chat.persistence.repository.UserRepository
 import com.chat.persistence.repository.UserSanctionJdbcRepository
 import org.springframework.data.domain.Page

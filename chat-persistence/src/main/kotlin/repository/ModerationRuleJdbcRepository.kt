@@ -1,11 +1,11 @@
 package com.chat.persistence.repository
 
-import com.chat.domain.dto.AdminCreateModerationRuleRequest
-import com.chat.domain.dto.AdminModerationRuleDto
-import com.chat.domain.dto.AdminUpdateModerationRuleRequest
-import com.chat.domain.dto.ModerationAction
-import com.chat.domain.dto.ModerationMatchType
-import com.chat.domain.dto.ModerationScopeType
+import com.chat.core.dto.AdminCreateModerationRuleRequest
+import com.chat.core.dto.AdminModerationRuleDto
+import com.chat.core.dto.AdminUpdateModerationRuleRequest
+import com.chat.core.dto.ModerationAction
+import com.chat.core.dto.ModerationMatchType
+import com.chat.core.dto.ModerationScopeType
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.cache.annotation.Cacheable
 import org.springframework.dao.EmptyResultDataAccessException

@@ -43,11 +43,18 @@ flowchart LR
 | `chat-worker-application` | Worker 실행, 역할별 scheduler와 executor 조립 | scheduler가 persistence의 concrete worker를 호출 |
 | `chat-admin-application` | 관리자 API 실행과 JPA·설정 조립 | 실행 역할 분리 |
 | `chat-runtime-config` | 공통 Spring profile YAML 리소스 | 코드와 외부 의존성 없는 resource JAR |
-| `chat-api` | 사용자·방 REST controller와 인증 경계 | domain에 있는 서비스 계약 사용 |
-| `chat-admin` | 관리자 REST controller와 인증 경계 | domain에 있는 서비스 계약 사용 |
+| `chat-api` | 사용자·방 REST controller와 인증 경계 | core의 서비스 계약 사용 |
+| `chat-admin` | 관리자 REST controller와 인증 경계 | core의 서비스 계약 사용 |
 | `chat-websocket` | handshake, inbound handler, heartbeat 진입점 | persistence의 세션 관리 구현과 설정에 직접 의존 |
-| `chat-domain` | JPA 통합 모델, DTO, 서비스 계약과 예외 | transport DTO와 Spring Data 계약이 섞여 있어 순수 domain 경계가 아님 |
+| `chat-domain` | JPA 통합 모델과 업무 예외 | core·delivery·infrastructure로 향하는 의존 금지 |
+| `chat-core` | 공유 서비스 계약, 입출력 타입, 메시지 저장소 포트와 커서 규칙 | concrete DB·Redis·HTTP adapter 의존 금지; 전송 전용 DTO 분리는 후속 단계 |
 | `chat-persistence` | DB·Redis·S3 adapter, 유스케이스, Gateway 상태 관리 | 저장소 모듈 이름보다 책임이 넓으며 유스케이스 분리가 필요 |
+
+실행 모듈인 `chat-application`과 내부 계약 모듈인 `chat-core`는 별개다.
+`chat-core → chat-domain` 방향만 허용하며 API·관리자·Gateway와 persistence는 core를 사용한다.
+JPA annotation·auditing은 기존 통합 모델의 의도적인 예외다. ORM 제약이 업무 API를
+왜곡하면 별도 persistence 모델로 분리한다. `Page`/`Pageable`은 기존 paging·정렬 의미와
+응답 호환성을 유지하기 위해 core 계약에 한정해 허용하고 domain 서비스 계약은 제거했다.
 
 현재는 실행 역할 분리가 계층 분리보다 앞서 있다. 모듈 간 순환 의존성이 없다는 사실만으로
 layered-clean 구조가 완성됐다고 평가하지 않는다. 유스케이스와 output port의 소유권,

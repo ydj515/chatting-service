@@ -2,13 +2,13 @@ package com.chat.admin.controller
 
 import com.chat.admin.config.AdminProperties
 import com.chat.admin.security.AdminTokenVerifier
-import com.chat.domain.dto.AdminCreateModerationRuleRequest
-import com.chat.domain.dto.AdminCreateUserSanctionRequest
-import com.chat.domain.dto.AdminModerationRuleDto
-import com.chat.domain.dto.AdminUpdateModerationRuleRequest
-import com.chat.domain.dto.AdminUserSanctionDto
-import com.chat.domain.dto.UserSanctionType
-import com.chat.domain.service.AdminModerationService
+import com.chat.core.dto.AdminCreateModerationRuleRequest
+import com.chat.core.dto.AdminCreateUserSanctionRequest
+import com.chat.core.dto.AdminModerationRuleDto
+import com.chat.core.dto.AdminUpdateModerationRuleRequest
+import com.chat.core.dto.AdminUserSanctionDto
+import com.chat.core.dto.UserSanctionType
+import com.chat.core.service.AdminModerationService
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test

@@ -1,6 +1,6 @@
 package com.chat.persistence.repository
 
-import com.chat.persistence.service.MessageWriteRequest
+import com.chat.core.message.port.MessageWriteRequest
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.jdbc.core.BatchPreparedStatementSetter
 import org.springframework.jdbc.core.JdbcTemplate

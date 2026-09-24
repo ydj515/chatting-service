@@ -1,8 +1,8 @@
 package com.chat.persistence.service
 
-import com.chat.domain.dto.AuthenticatedSession
-import com.chat.domain.service.SessionTokenRevocationStore
-import com.chat.domain.service.SessionTokenService
+import com.chat.core.dto.AuthenticatedSession
+import com.chat.core.service.SessionTokenRevocationStore
+import com.chat.core.service.SessionTokenService
 import org.springframework.stereotype.Service
 import java.time.Clock
 

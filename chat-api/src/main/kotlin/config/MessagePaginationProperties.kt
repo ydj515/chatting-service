@@ -1,6 +1,6 @@
 package com.chat.api.config
 
-import com.chat.domain.dto.MessageDirection
+import com.chat.core.dto.MessageDirection
 import org.springframework.boot.context.properties.ConfigurationProperties
 
 @ConfigurationProperties(prefix = "chat.message.pagination")

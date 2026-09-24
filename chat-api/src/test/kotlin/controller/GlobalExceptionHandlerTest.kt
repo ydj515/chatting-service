@@ -1,7 +1,7 @@
 package com.chat.api.controller
 
-import com.chat.domain.dto.CreateUserRequest
-import com.chat.domain.dto.LoginRequest
+import com.chat.core.dto.CreateUserRequest
+import com.chat.core.dto.LoginRequest
 import com.chat.domain.exception.ForbiddenOperationException
 import com.chat.domain.exception.MessageAdmissionRejectedException
 import com.chat.domain.exception.MessageModerationRejectedException

@@ -23,6 +23,7 @@ dependencies {
     implementation(project(":chat-runtime-config"))
     implementation(project(":chat-api"))
     implementation(project(":chat-domain"))
+    implementation(project(":chat-core"))
     implementation(project(":chat-persistence"))
     implementation(project(":chat-websocket"))
 

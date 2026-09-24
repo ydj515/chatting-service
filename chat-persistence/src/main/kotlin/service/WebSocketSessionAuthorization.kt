@@ -1,6 +1,6 @@
 package com.chat.persistence.service
 
-import com.chat.domain.dto.AuthenticatedSession
+import com.chat.core.dto.AuthenticatedSession
 import org.springframework.stereotype.Service
 import org.springframework.web.socket.WebSocketSession
 import java.time.ZoneOffset

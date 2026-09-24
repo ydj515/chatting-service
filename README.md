@@ -124,7 +124,8 @@ mise run stop
 chat-application/              # 통합 실행 fallback / 로컬 bootstrap
 chat-api/                      # 사용자 REST API 기능 모듈
 chat-admin/                    # 관리자 API 기능 모듈
-chat-domain/                   # 도메인/DTO/서비스 인터페이스
+chat-domain/                   # JPA 통합 업무 모델과 예외
+chat-core/                     # 공유 서비스 계약/입출력 타입/메시지 저장소 포트
 chat-persistence/              # JPA/Redis/서비스 구현
 chat-websocket/                # WebSocket 핸들러/설정
 chat-api-application/          # API 실행 모듈

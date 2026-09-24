@@ -13,6 +13,7 @@ dependencyManagement {
 dependencies {
     // 도메인 모듈 의존성 (DTO와 서비스 인터페이스 사용)
     implementation(project(":chat-domain"))
+    implementation(project(":chat-core"))
 
     // persistence 모듈 의존성 (WebSocketSessionManager, RedisMessageBroker 사용)
     implementation(project(":chat-persistence"))

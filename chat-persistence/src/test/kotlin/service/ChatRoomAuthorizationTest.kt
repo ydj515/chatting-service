@@ -1,5 +1,6 @@
 package com.chat.persistence.service
 
+import com.chat.core.message.port.MessageReadPort
 import com.chat.domain.exception.ForbiddenOperationException
 import com.chat.domain.model.ChatRoom
 import com.chat.domain.model.User
@@ -41,7 +42,7 @@ class ChatRoomAuthorizationTest {
             afterPropertiesSet()
             afterSingletonsInstantiated()
         }
-        val proxy = ProxyFactory(service).apply { addAdvice(advice) }.proxy as com.chat.domain.service.ChatService
+        val proxy = ProxyFactory(service).apply { addAdvice(advice) }.proxy as com.chat.core.service.ChatService
         `when`(members.existsByChatRoomIdAndUserIdAndIsActiveTrue(10, 7)).thenReturn(false)
         assertThrows(ForbiddenOperationException::class.java) { proxy.getChatRoom(10, 7) }
         assertThrows(ForbiddenOperationException::class.java) { proxy.getChatRoomMembers(10, 7) }

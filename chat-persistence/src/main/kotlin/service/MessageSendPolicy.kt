@@ -1,6 +1,6 @@
 package com.chat.persistence.service
 
-import com.chat.domain.dto.SendMessageRequest
+import com.chat.core.dto.SendMessageRequest
 import com.chat.domain.model.MemberRole
 import org.springframework.stereotype.Service
 

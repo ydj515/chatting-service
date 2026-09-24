@@ -2,10 +2,10 @@ package com.chat.api.controller
 
 import com.chat.api.config.MessagePaginationProperties
 import com.chat.api.security.AuthenticatedUserResolver
-import com.chat.domain.dto.AuthenticatedSession
+import com.chat.core.dto.AuthenticatedSession
+import com.chat.core.service.ChatService
+import com.chat.core.service.SessionTokenService
 import com.chat.domain.exception.ForbiddenOperationException
-import com.chat.domain.service.ChatService
-import com.chat.domain.service.SessionTokenService
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.*
 import org.springframework.test.web.servlet.get

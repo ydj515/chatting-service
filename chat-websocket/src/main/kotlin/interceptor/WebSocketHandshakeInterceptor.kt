@@ -1,7 +1,7 @@
 package com.chat.websocket.interceptor
 
-import com.chat.domain.service.SessionTokenService
-import com.chat.domain.service.WebSocketTicketService
+import com.chat.core.service.SessionTokenService
+import com.chat.core.service.WebSocketTicketService
 import com.chat.persistence.config.ChatAuthProperties
 import com.chat.persistence.service.WebSocketSessionIdentity
 import com.chat.websocket.config.WebSocketProperties

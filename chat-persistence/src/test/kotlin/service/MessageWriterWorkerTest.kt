@@ -1,5 +1,9 @@
 package com.chat.persistence.service
 
+import com.chat.core.message.port.MessageWriteOutcome
+import com.chat.core.message.port.MessageWritePort
+import com.chat.core.message.port.MessageWriteRequest
+import com.chat.core.message.port.MessageWriteResult
 import com.chat.domain.model.MessageType
 import com.chat.persistence.config.ChatWorkerProperties
 import com.chat.persistence.redis.MessageStreamConsumer

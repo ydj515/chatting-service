@@ -1,9 +1,9 @@
 package com.chat.persistence.service
 
-import com.chat.domain.dto.AuthenticatedSession
-import com.chat.domain.dto.SessionToken
-import com.chat.domain.service.SessionTokenRevocationStore
-import com.chat.domain.service.SessionTokenService
+import com.chat.core.dto.AuthenticatedSession
+import com.chat.core.dto.SessionToken
+import com.chat.core.service.SessionTokenRevocationStore
+import com.chat.core.service.SessionTokenService
 import com.chat.persistence.config.ChatAuthProperties
 import org.springframework.stereotype.Service
 import java.nio.charset.StandardCharsets

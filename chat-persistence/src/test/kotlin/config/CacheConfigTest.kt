@@ -1,8 +1,8 @@
 package com.chat.persistence.config
 
-import com.chat.domain.dto.ModerationAction
-import com.chat.domain.dto.ModerationMatchType
-import com.chat.domain.dto.ModerationScopeType
+import com.chat.core.dto.ModerationAction
+import com.chat.core.dto.ModerationMatchType
+import com.chat.core.dto.ModerationScopeType
 import com.chat.persistence.repository.ModerationRuleRecord
 import com.chat.persistence.service.RoomAdmissionPolicy
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -46,7 +46,9 @@ class CacheConfigTest {
             ),
         )
 
-        val restored = serializer.deserialize(serializer.serialize(rules))
+        val serialized = serializer.serialize(rules)
+        assertTrue(!String(serialized, Charsets.UTF_8).contains("com.chat.core"), "Shared contract packages must not leak into persisted cache type IDs")
+        val restored = serializer.deserialize(serialized)
 
         assertTrue(restored is List<*>)
         assertEquals(rules, restored)

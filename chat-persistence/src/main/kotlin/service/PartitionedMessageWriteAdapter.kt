@@ -1,5 +1,9 @@
 package com.chat.persistence.service
 
+import com.chat.core.message.port.MessageWriteOutcome
+import com.chat.core.message.port.MessageWritePort
+import com.chat.core.message.port.MessageWriteRequest
+import com.chat.core.message.port.MessageWriteResult
 import com.chat.persistence.repository.PartitionedMessageRepository
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.stereotype.Service

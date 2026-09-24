@@ -1,14 +1,14 @@
-package com.chat.domain.service
+package com.chat.core.service
 
-import com.chat.domain.dto.AdminExportJobDto
-import com.chat.domain.dto.AdminExportJobStatusDto
-import com.chat.domain.dto.AdminExportMessagesRequest
-import com.chat.domain.dto.AdminMessageHistoryRequest
-import com.chat.domain.dto.AdminMessagePageResponse
-import com.chat.domain.dto.AdminMessageSearchRequest
-import com.chat.domain.dto.AdminMessageSearchResponse
-import com.chat.domain.dto.AdminRoomPolicyUpdateRequest
-import com.chat.domain.dto.AdminRoomStatusDto
+import com.chat.core.dto.AdminExportJobDto
+import com.chat.core.dto.AdminExportJobStatusDto
+import com.chat.core.dto.AdminExportMessagesRequest
+import com.chat.core.dto.AdminMessageHistoryRequest
+import com.chat.core.dto.AdminMessagePageResponse
+import com.chat.core.dto.AdminMessageSearchRequest
+import com.chat.core.dto.AdminMessageSearchResponse
+import com.chat.core.dto.AdminRoomPolicyUpdateRequest
+import com.chat.core.dto.AdminRoomStatusDto
 
 interface AdminChatService {
     fun getRoomMessages(actor: String, request: AdminMessageHistoryRequest): AdminMessagePageResponse

@@ -39,7 +39,6 @@ configure(kotlinModules) {
         val testRuntimeOnly by configurations
 
         implementation(rootLibs.kotlin.reflect)
-        implementation(rootLibs.jackson.module.kotlin)
         testImplementation(rootLibs.spring.boot.starter.test)
         testImplementation(rootLibs.kotlin.test.junit5)
         testRuntimeOnly(rootLibs.junit.platform.launcher)

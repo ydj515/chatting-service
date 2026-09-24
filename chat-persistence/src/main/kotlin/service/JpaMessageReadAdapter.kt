@@ -1,7 +1,8 @@
 package com.chat.persistence.service
 
-import com.chat.domain.dto.MessageDto
-import com.chat.domain.dto.UserDto
+import com.chat.core.dto.MessageDto
+import com.chat.core.dto.UserDto
+import com.chat.core.message.port.MessageReadPort
 import com.chat.domain.model.Message
 import com.chat.persistence.repository.MessageRepository
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty

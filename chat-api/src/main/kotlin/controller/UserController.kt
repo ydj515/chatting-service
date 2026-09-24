@@ -2,8 +2,8 @@ package com.chat.api.controller
 
 import com.chat.api.security.CurrentSessionToken
 import com.chat.api.security.CurrentUserId
-import com.chat.domain.dto.*
-import com.chat.domain.service.UserService
+import com.chat.core.dto.*
+import com.chat.core.service.UserService
 import jakarta.validation.Valid
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable

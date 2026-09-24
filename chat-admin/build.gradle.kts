@@ -12,6 +12,7 @@ dependencyManagement {
 
 dependencies {
     implementation(project(":chat-domain"))
+    implementation(project(":chat-core"))
 
     implementation(libs.spring.boot.starter.web)
     implementation(libs.spring.boot.starter.validation)

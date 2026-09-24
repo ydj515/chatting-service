@@ -1,6 +1,6 @@
 package com.chat.persistence.service
 
-import com.chat.domain.dto.ChatMessageBatch
+import com.chat.core.dto.ChatMessageBatch
 import com.chat.domain.model.MessageType
 import com.chat.persistence.config.ChatWorkerProperties
 import com.chat.persistence.redis.MessageStreamConsumer

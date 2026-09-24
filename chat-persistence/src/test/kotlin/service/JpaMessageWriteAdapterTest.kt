@@ -1,5 +1,6 @@
 package com.chat.persistence.service
 
+import com.chat.core.message.port.MessageWriteRequest
 import com.chat.domain.model.ChatRoom
 import com.chat.domain.model.Message
 import com.chat.domain.model.MessageType

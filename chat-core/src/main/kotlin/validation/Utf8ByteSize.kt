@@ -1,4 +1,4 @@
-package com.chat.domain.validation
+package com.chat.core.validation
 
 import jakarta.validation.Constraint
 import jakarta.validation.ConstraintValidator

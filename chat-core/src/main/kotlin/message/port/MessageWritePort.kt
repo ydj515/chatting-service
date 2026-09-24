@@ -1,4 +1,4 @@
-package com.chat.persistence.service
+package com.chat.core.message.port
 
 import com.chat.domain.model.MessageType
 import java.time.LocalDateTime

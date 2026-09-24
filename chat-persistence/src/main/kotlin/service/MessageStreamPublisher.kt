@@ -1,7 +1,7 @@
 package com.chat.persistence.service
 
-import com.chat.domain.dto.MessageDto
-import com.chat.domain.dto.SendMessageRequest
+import com.chat.core.dto.MessageDto
+import com.chat.core.dto.SendMessageRequest
 import com.chat.domain.model.ChatRoom
 import com.chat.domain.model.Message
 import com.chat.domain.model.User

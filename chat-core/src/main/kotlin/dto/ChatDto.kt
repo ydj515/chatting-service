@@ -1,4 +1,4 @@
-package com.chat.domain.dto
+package com.chat.core.dto
 
 import com.chat.domain.model.ChatRoomType
 import com.chat.domain.model.MemberRole

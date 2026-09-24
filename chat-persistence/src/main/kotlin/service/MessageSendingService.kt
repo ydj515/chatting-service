@@ -1,7 +1,8 @@
 package com.chat.persistence.service
 
-import com.chat.domain.dto.MessageDto
-import com.chat.domain.dto.SendMessageRequest
+import com.chat.core.dto.MessageDto
+import com.chat.core.dto.SendMessageRequest
+import com.chat.core.message.port.MessageReadPort
 import com.chat.domain.exception.ForbiddenOperationException
 import com.chat.domain.exception.ResourceNotFoundException
 import com.chat.persistence.repository.ChatRoomMemberRepository

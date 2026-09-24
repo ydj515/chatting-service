@@ -1,8 +1,8 @@
 package com.chat.api.controller
 
 import com.chat.api.security.FixedCurrentAuthenticationResolver
-import com.chat.domain.dto.WebSocketTicketResponse
-import com.chat.domain.service.WebSocketTicketService
+import com.chat.core.dto.WebSocketTicketResponse
+import com.chat.core.service.WebSocketTicketService
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.SerializationFeature
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule

@@ -1,6 +1,6 @@
 package com.chat.persistence.service
 
-import com.chat.domain.dto.*
+import com.chat.core.dto.*
 import com.chat.domain.model.*
 
 internal fun Message.toMessageDto(): MessageDto {

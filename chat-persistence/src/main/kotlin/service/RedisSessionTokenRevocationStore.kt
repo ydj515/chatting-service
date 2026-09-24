@@ -1,6 +1,6 @@
 package com.chat.persistence.service
 
-import com.chat.domain.service.SessionTokenRevocationStore
+import com.chat.core.service.SessionTokenRevocationStore
 import com.chat.persistence.config.ChatAuthProperties
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.data.redis.core.script.DefaultRedisScript

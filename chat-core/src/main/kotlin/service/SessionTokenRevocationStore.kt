@@ -1,4 +1,4 @@
-package com.chat.domain.service
+package com.chat.core.service
 
 import java.time.Instant
 

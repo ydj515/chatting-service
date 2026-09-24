@@ -1,11 +1,12 @@
 package com.chat.persistence.service
 
-import com.chat.domain.dto.MessageDirection
-import com.chat.domain.dto.MessageDto
-import com.chat.domain.dto.MessageHistoryCursor
-import com.chat.domain.dto.MessageHistoryCursorCodec
-import com.chat.domain.dto.MessagePageRequest
-import com.chat.domain.dto.UserDto
+import com.chat.core.dto.MessageDirection
+import com.chat.core.dto.MessageDto
+import com.chat.core.dto.MessageHistoryCursor
+import com.chat.core.dto.MessageHistoryCursorCodec
+import com.chat.core.dto.MessagePageRequest
+import com.chat.core.dto.UserDto
+import com.chat.core.message.port.MessageReadPort
 import com.chat.domain.model.MessageType
 import com.chat.persistence.config.ChatRedisProperties
 import com.chat.persistence.config.ChatWebSocketGatewayProperties

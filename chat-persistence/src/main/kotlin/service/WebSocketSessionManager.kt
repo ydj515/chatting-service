@@ -1,7 +1,7 @@
 package com.chat.persistence.service
 
-import com.chat.domain.dto.ChatMessageBatch
-import com.chat.domain.dto.WebSocketMessage
+import com.chat.core.dto.ChatMessageBatch
+import com.chat.core.dto.WebSocketMessage
 import com.chat.persistence.redis.RedisMessageBroker
 import com.chat.persistence.repository.ChatRoomMemberRepository
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -124,7 +124,7 @@ class WebSocketSessionManager(
     }
 
     fun sendMessageToLocalRoom(roomId: Long, message: WebSocketMessage, excludeUserId: Long? = null) {
-        val json = objectMapper.writerFor(com.chat.domain.dto.WebSocketMessage::class.java).writeValueAsString(message)
+        val json = objectMapper.writerFor(com.chat.core.dto.WebSocketMessage::class.java).writeValueAsString(message)
         val sessionIds = roomSubscriptions.sessionIds(roomId) ?: return
         val userIds = sessionIds.mapNotNull { sessionsById[it]?.userId }.distinct()
         if (userIds.isEmpty()) return

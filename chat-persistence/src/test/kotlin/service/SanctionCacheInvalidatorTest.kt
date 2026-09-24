@@ -1,7 +1,7 @@
 package com.chat.persistence.service
 
-import com.chat.domain.dto.ModerationScopeType
-import com.chat.domain.dto.UserSanctionType
+import com.chat.core.dto.ModerationScopeType
+import com.chat.core.dto.UserSanctionType
 import com.chat.persistence.config.SanctionCacheRetryProperties
 import com.chat.persistence.repository.SanctionCacheInvalidationRepository
 import com.chat.persistence.repository.UserSanctionRecord
@@ -164,15 +164,15 @@ class SanctionCacheInvalidatorTest {
             val start = ddl.indexOf("CREATE TABLE IF NOT EXISTS $table (")
             f.jdbc.execute(ddl.substring(start, ddl.indexOf("\n);", start) + 3))
         }
-        val tokens = org.mockito.Mockito.mock(com.chat.domain.service.SessionTokenRevocationStore::class.java)
-        val logout = org.mockito.Mockito.mock(com.chat.domain.service.SessionControlPublisher::class.java)
+        val tokens = org.mockito.Mockito.mock(com.chat.core.service.SessionTokenRevocationStore::class.java)
+        val logout = org.mockito.Mockito.mock(com.chat.core.service.SessionControlPublisher::class.java)
         val service = AdminModerationServiceImpl(
             org.mockito.Mockito.mock(com.chat.persistence.repository.ModerationRuleJdbcRepository::class.java),
             com.chat.persistence.repository.UserSanctionJdbcRepository(f.jdbc),
             AdminAuditRecorder(com.chat.persistence.repository.AdminAuditLogRepository(f.jdbc), com.fasterxml.jackson.module.kotlin.jacksonObjectMapper().findAndRegisterModules()),
             SuspendedSessionRevoker(com.chat.persistence.repository.SessionRevocationJobRepository(f.jdbc), tokens, logout, f.transactionManager, f.clock, SanctionCacheRetryProperties()), f.clock, f.invalidator,
         )
-        val request = com.chat.domain.dto.AdminCreateUserSanctionRequest(scopeType = ModerationScopeType.GLOBAL, userId = 7, type = UserSanctionType.SUSPEND)
+        val request = com.chat.core.dto.AdminCreateUserSanctionRequest(scopeType = ModerationScopeType.GLOBAL, userId = 7, type = UserSanctionType.SUSPEND)
         f.transaction.executeWithoutResult { status ->
             service.createSanction("admin", request)
             assertEquals(1, f.pending())

@@ -1,11 +1,12 @@
 package com.chat.persistence.service
 
-import com.chat.domain.dto.*
+import com.chat.core.dto.*
+import com.chat.core.message.port.MessageReadPort
+import com.chat.core.service.ChatService
 import com.chat.domain.exception.ForbiddenOperationException
 import com.chat.domain.exception.ResourceConflictException
 import com.chat.domain.exception.ResourceNotFoundException
 import com.chat.domain.model.*
-import com.chat.domain.service.ChatService
 import com.chat.persistence.redis.RedisMessageBroker
 import com.chat.persistence.repository.*
 import org.springframework.cache.annotation.*

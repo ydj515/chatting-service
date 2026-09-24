@@ -14,6 +14,7 @@ dependencyManagement {
 dependencies {
     // 도메인 모듈 의존성
     implementation(project(":chat-domain"))
+    implementation(project(":chat-core"))
 
     // 데이터 접근을 위한 JPA
     implementation(libs.spring.boot.starter.data.jpa)

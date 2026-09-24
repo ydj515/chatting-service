@@ -2,16 +2,16 @@ package com.chat.api.controller
 
 import com.chat.api.config.MessagePaginationProperties
 import com.chat.api.security.FixedCurrentAuthenticationResolver
-import com.chat.domain.dto.ChatRoomDto
-import com.chat.domain.dto.ChatRoomMemberDto
-import com.chat.domain.dto.CreateChatRoomRequest
-import com.chat.domain.dto.MessageDto
-import com.chat.domain.dto.MessageHistoryCursor
-import com.chat.domain.dto.MessageHistoryCursorCodec
-import com.chat.domain.dto.MessagePageRequest
-import com.chat.domain.dto.MessagePageResponse
-import com.chat.domain.dto.SendMessageRequest
-import com.chat.domain.service.ChatService
+import com.chat.core.dto.ChatRoomDto
+import com.chat.core.dto.ChatRoomMemberDto
+import com.chat.core.dto.CreateChatRoomRequest
+import com.chat.core.dto.MessageDto
+import com.chat.core.dto.MessageHistoryCursor
+import com.chat.core.dto.MessageHistoryCursorCodec
+import com.chat.core.dto.MessagePageRequest
+import com.chat.core.dto.MessagePageResponse
+import com.chat.core.dto.SendMessageRequest
+import com.chat.core.service.ChatService
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test

@@ -1,6 +1,6 @@
-package com.chat.persistence.service
+package com.chat.core.message.port
 
-import com.chat.domain.dto.MessageDto
+import com.chat.core.dto.MessageDto
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 

@@ -1,11 +1,11 @@
 package com.chat.api.controller
 
 import com.chat.api.security.FixedCurrentAuthenticationResolver
-import com.chat.domain.dto.CreateUserRequest
-import com.chat.domain.dto.LoginRequest
-import com.chat.domain.dto.LoginResponse
-import com.chat.domain.dto.UserDto
-import com.chat.domain.service.UserService
+import com.chat.core.dto.CreateUserRequest
+import com.chat.core.dto.LoginRequest
+import com.chat.core.dto.LoginResponse
+import com.chat.core.dto.UserDto
+import com.chat.core.service.UserService
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.SerializationFeature
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule

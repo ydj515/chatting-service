@@ -1,4 +1,4 @@
-package com.chat.domain.service
+package com.chat.core.service
 
 interface SessionControlPublisher {
     fun forceLogoutUser(userId: Long, reason: String)

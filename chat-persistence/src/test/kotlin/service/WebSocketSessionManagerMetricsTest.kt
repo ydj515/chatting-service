@@ -1,6 +1,6 @@
 package com.chat.persistence.service
 
-import com.chat.domain.dto.ChatMessage
+import com.chat.core.dto.ChatMessage
 import com.chat.domain.model.MessageType
 import com.chat.persistence.config.ChatRedisProperties
 import com.chat.persistence.config.ChatWebSocketGatewayProperties

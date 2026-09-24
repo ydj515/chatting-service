@@ -12,6 +12,7 @@ include(
     "chat-admin-application",
     "chat-admin",
     "chat-domain",
+    "chat-core",
     "chat-persistence",
     "chat-websocket",
     "chat-api",

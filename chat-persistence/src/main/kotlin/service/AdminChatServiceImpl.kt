@@ -1,20 +1,20 @@
 package com.chat.persistence.service
 
-import com.chat.domain.dto.AdminExportJobDto
-import com.chat.domain.dto.AdminExportJobStatusDto
-import com.chat.domain.dto.AdminExportMessagesRequest
-import com.chat.domain.dto.AdminMessageCursor
-import com.chat.domain.dto.AdminMessageCursorCodec
-import com.chat.domain.dto.AdminMessageDto
-import com.chat.domain.dto.AdminMessageHistoryRequest
-import com.chat.domain.dto.AdminMessagePageResponse
-import com.chat.domain.dto.AdminMessageSearchCursor
-import com.chat.domain.dto.AdminMessageSearchCursorCodec
-import com.chat.domain.dto.AdminMessageSearchRequest
-import com.chat.domain.dto.AdminMessageSearchResponse
-import com.chat.domain.dto.AdminRoomPolicyUpdateRequest
-import com.chat.domain.dto.AdminRoomStatusDto
-import com.chat.domain.service.AdminChatService
+import com.chat.core.dto.AdminExportJobDto
+import com.chat.core.dto.AdminExportJobStatusDto
+import com.chat.core.dto.AdminExportMessagesRequest
+import com.chat.core.dto.AdminMessageCursor
+import com.chat.core.dto.AdminMessageCursorCodec
+import com.chat.core.dto.AdminMessageDto
+import com.chat.core.dto.AdminMessageHistoryRequest
+import com.chat.core.dto.AdminMessagePageResponse
+import com.chat.core.dto.AdminMessageSearchCursor
+import com.chat.core.dto.AdminMessageSearchCursorCodec
+import com.chat.core.dto.AdminMessageSearchRequest
+import com.chat.core.dto.AdminMessageSearchResponse
+import com.chat.core.dto.AdminRoomPolicyUpdateRequest
+import com.chat.core.dto.AdminRoomStatusDto
+import com.chat.core.service.AdminChatService
 import com.chat.persistence.config.ChatObjectStorageProperties
 import com.chat.persistence.repository.AdminAuditLogRepository
 import com.chat.persistence.repository.AdminExportJobRepository
@@ -195,7 +195,7 @@ class AdminChatServiceImpl(
         )
     }
 
-    private fun List<com.chat.domain.dto.AdminMessageDto>.toMessagePage(
+    private fun List<com.chat.core.dto.AdminMessageDto>.toMessagePage(
         limit: Int,
         latencyMs: Long,
     ): AdminMessagePageResponse {

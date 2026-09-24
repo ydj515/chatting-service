@@ -1,6 +1,6 @@
 package com.chat.persistence.service
 
-import com.chat.domain.service.SessionControlPublisher
+import com.chat.core.service.SessionControlPublisher
 import com.chat.persistence.config.ChatAuthProperties
 import com.chat.persistence.config.ChatRedisProperties
 import com.fasterxml.jackson.databind.ObjectMapper

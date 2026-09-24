@@ -16,6 +16,7 @@ dependencies {
     implementation(project(":chat-runtime-config"))
     implementation(project(":chat-admin"))
     implementation(project(":chat-domain"))
+    implementation(project(":chat-core"))
     implementation(project(":chat-persistence"))
 
     implementation(libs.spring.boot.starter)

@@ -1,6 +1,6 @@
 package com.chat.persistence.redis
 
-import com.chat.domain.dto.WebSocketMessage
+import com.chat.core.dto.WebSocketMessage
 import com.chat.persistence.config.ChatRedisProperties
 import com.fasterxml.jackson.annotation.JsonAlias
 import com.fasterxml.jackson.databind.ObjectMapper

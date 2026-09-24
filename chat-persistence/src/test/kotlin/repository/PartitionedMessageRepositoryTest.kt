@@ -1,7 +1,7 @@
 package com.chat.persistence.repository
 
+import com.chat.core.message.port.MessageWriteRequest
 import com.chat.domain.model.MessageType
-import com.chat.persistence.service.MessageWriteRequest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test

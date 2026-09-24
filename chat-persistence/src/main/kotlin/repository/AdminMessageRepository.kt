@@ -1,11 +1,11 @@
 package com.chat.persistence.repository
 
-import com.chat.domain.dto.AdminMessageCursor
-import com.chat.domain.dto.AdminMessageDto
-import com.chat.domain.dto.AdminMessageSearchCursor
-import com.chat.domain.dto.AdminMessageSearchMode
-import com.chat.domain.dto.AdminRoomPolicyUpdateRequest
-import com.chat.domain.dto.AdminRoomStatusDto
+import com.chat.core.dto.AdminMessageCursor
+import com.chat.core.dto.AdminMessageDto
+import com.chat.core.dto.AdminMessageSearchCursor
+import com.chat.core.dto.AdminMessageSearchMode
+import com.chat.core.dto.AdminRoomPolicyUpdateRequest
+import com.chat.core.dto.AdminRoomStatusDto
 import com.chat.domain.model.MessageType
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.dao.EmptyResultDataAccessException

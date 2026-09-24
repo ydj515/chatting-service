@@ -1,6 +1,7 @@
 package com.chat.persistence.service
 
-import com.chat.domain.dto.CreateChatRoomRequest
+import com.chat.core.dto.CreateChatRoomRequest
+import com.chat.core.message.port.MessageReadPort
 import com.chat.domain.exception.ResourceConflictException
 import com.chat.domain.model.ChatRoom
 import com.chat.domain.model.ChatRoomMember

@@ -1,6 +1,6 @@
 package com.chat.persistence.service
 
-import com.chat.domain.dto.ModerationScopeType
+import com.chat.core.dto.ModerationScopeType
 import com.chat.persistence.config.SanctionCacheRetryProperties
 import com.chat.persistence.repository.SanctionCacheInvalidationRepository
 import com.chat.persistence.repository.UserSanctionRecord
