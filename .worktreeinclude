@@ -1,4 +1,4 @@
-# Ignored local setup files copied into Codex-managed worktrees.
+# Ignored local setup files copied into Agent-managed worktrees (Codex, Claude Code).
 # Only matching Git-ignored files are copied; file contents stay untracked.
 
 # Backend and Docker Compose environment.
