@@ -49,7 +49,7 @@ flowchart LR
 | `chat-domain` | JPA 통합 모델과 업무 예외 | core·delivery·infrastructure로 향하는 의존 금지 |
 | `chat-core` | 사용자·채팅·관리자 유스케이스, command·조회 결과와 저장소 포트 | concrete adapter·전송 프로토콜·Jackson·Bean Validation 의존 금지 |
 | `chat-protocol` | Redis fanout과 Gateway가 공유하는 WebSocket wire DTO·Gateway transport 계약 | 어댑터 사이의 전송 계약; core·Spring·저장소 구현 의존 금지 |
-| `chat-persistence` | DB·Redis·S3 adapter, Worker·정책 구현 | Gateway 상태·전송 책임은 제거; Worker·정책 책임 분리는 추가 점검 |
+| `chat-persistence` | DB·Redis·S3 adapter와 기술적 Worker | 업무 정책은 core에 두고 stream·파일·lease 조정은 adapter에 유지 |
 
 실행 모듈인 `chat-application`과 내부 계약 모듈인 `chat-core`는 별개다.
 `chat-core → chat-domain` 방향만 허용하며 API·관리자·Gateway와 persistence는 core를 사용한다.
@@ -136,6 +136,28 @@ transport DTO, concrete adapter 의존성은 별도로 점검한다.
 일반 코드에서 실행 모듈로 향하는 의존성을 검사한다. 이 검사는 실제 Spring context
 기동이나 역할별 bean graph 검증을 대체하지 않는다. `chat-runtime-config`는 class가 없는
 리소스 모듈이므로 Kotlin 분석과 Kover 집계에서 제외하고 Gradle Kotlin DSL 형식 검사는 유지한다.
+
+실행 JAR 검증에서는 다섯 composition root를 각각 별도 JVM으로 기동·종료한다.
+검증용 PostgreSQL 17.9와 standalone Redis, `docker` profile, loopback 임의 HTTP 포트를
+사용하고 `spring.jpa.hibernate.ddl-auto=none`으로 자동 DDL을 금지한다. read replica와
+object storage는 비활성화하고 Worker의 업무 역할은 비워 둔다. 자동 제재 재시도에 필요한
+테이블은 검증 DB에만 준비한다. 이 조건으로 다섯 JAR의 기동·종료를 확인했으며,
+Redis Cluster·S3·read replica와 실제 작업 처리는 별도 통합 검증 대상이다.
+Gateway Redis adapter는 Boot의 `stringRedisTemplate`과 공존하므로 `redisTemplate`을
+명시적으로 선택한다. 동일 타입 빈이 두 개 있는 구성은 별도 Spring 테스트로 고정한다.
+
+## Worker 책임 평가
+
+`MessageWriterWorker`는 stream 수신·재시도·DLQ·ACK를 조정하고 실제 저장은 core의
+`MessageWritePort`를 호출한다. `HotRoomFanoutWorker`의 lease 확인·전송·ACK는 Redis
+전달 프로토콜의 책임이다. 이 두 흐름에 업무 정책을 추가할 때는 core 유스케이스를 호출한다.
+`AdminMessageExportWorker`의 CSV escaping·파일 flush·checkpoint·업로드는 export adapter의
+작업이다. export 요청의 권한과 입력 검증, 작업 생성·상태 조회는 core가 담당한다.
+`RoomSeqGapAuditWorker`는 DB 진단 결과를 metric으로 노출하는 운영 adapter이며,
+방의 heat 판정과 자동 정책 적용은 core의 `RoomPolicyWorker`로 분리한다.
+DB lease를 사용하는 캐시 무효화·세션 철회 재시도는 업무 트랜잭션에 작업을 등록한 뒤
+외부 처리를 재시도하는 기술적 전달 구현이다. 이런 기술 흐름마다 동일한 포트를 추가해
+core에 재배치하지 않는다.
 
 ## 보장 범위
 
