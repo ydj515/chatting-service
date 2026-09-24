@@ -3,6 +3,7 @@ package com.chat.persistence.service
 import com.chat.core.dto.ModerationAction
 import com.chat.core.dto.ModerationMatchType
 import com.chat.core.dto.ModerationScopeType
+import com.chat.core.message.port.MessageModerationPolicyService
 import com.chat.domain.exception.MessageModerationRejectedException
 import com.chat.domain.model.MessageType
 import com.chat.persistence.repository.ModerationRuleJdbcRepository
@@ -11,14 +12,6 @@ import io.micrometer.core.instrument.Counter
 import io.micrometer.core.instrument.MeterRegistry
 import org.springframework.beans.factory.ObjectProvider
 import org.springframework.stereotype.Service
-
-interface MessageModerationPolicyService {
-    fun requireAllowed(roomId: Long, senderId: Long, content: String?, messageType: MessageType)
-
-    object Noop : MessageModerationPolicyService {
-        override fun requireAllowed(roomId: Long, senderId: Long, content: String?, messageType: MessageType) = Unit
-    }
-}
 
 @Service
 class MessageModerationService(

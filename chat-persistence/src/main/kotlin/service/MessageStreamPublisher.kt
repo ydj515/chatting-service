@@ -2,6 +2,8 @@ package com.chat.persistence.service
 
 import com.chat.core.dto.MessageDto
 import com.chat.core.dto.SendMessageRequest
+import com.chat.core.mapping.toUserDto
+import com.chat.core.message.port.MessageAcceptance
 import com.chat.domain.model.ChatRoom
 import com.chat.domain.model.Message
 import com.chat.domain.model.User
@@ -19,14 +21,14 @@ class MessageStreamPublisher(
     private val roomStorageConfigReader: RoomStorageConfigReader,
     private val messageStreamProducer: MessageStreamProducer,
     private val roomTrafficStatsService: RoomTrafficStatsService,
-) {
+) : MessageAcceptance {
     private val logger = LoggerFactory.getLogger(MessageStreamPublisher::class.java)
     private val secureRandom = SecureRandom()
 
-    fun findAccepted(roomId: Long, sender: User, clientMessageId: String): MessageDto? =
+    override fun findAccepted(roomId: Long, sender: User, clientMessageId: String): MessageDto? =
         messageStreamProducer.findAccepted(roomId, sender.id, clientMessageId)?.toDto(sender)
 
-    fun publish(request: SendMessageRequest, chatRoom: ChatRoom, sender: User): MessageDto {
+    override fun publish(request: SendMessageRequest, chatRoom: ChatRoom, sender: User): MessageDto {
         val messageId = generateMessageId()
         val clientMessageId = request.clientMessageId?.trim()?.takeIf { it.isNotEmpty() } ?: "server:$messageId"
         val roomSeq = messageSequenceService.getNextSequence(request.chatRoomId)

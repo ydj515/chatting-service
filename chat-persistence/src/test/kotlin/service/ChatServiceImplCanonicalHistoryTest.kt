@@ -6,15 +6,24 @@ import com.chat.core.dto.MessageHistoryCursor
 import com.chat.core.dto.MessageHistoryCursorCodec
 import com.chat.core.dto.MessagePageRequest
 import com.chat.core.dto.UserDto
+import com.chat.core.message.port.MessageAdmissionPolicyService
+import com.chat.core.message.port.MessageModerationPolicyService
 import com.chat.core.message.port.MessageReadPort
+import com.chat.core.message.port.UserSanctionPolicyService
+import com.chat.core.message.service.MessageSendPolicy
+import com.chat.core.message.service.MessageSendingService
+import com.chat.core.room.service.ChatServiceImpl
 import com.chat.domain.model.MessageType
 import com.chat.persistence.config.ChatRedisProperties
 import com.chat.persistence.config.ChatWebSocketGatewayProperties
 import com.chat.persistence.redis.MessageStreamProducer
 import com.chat.persistence.redis.RedisMessageBroker
+import com.chat.persistence.repository.ChatMembershipStoreAdapter
 import com.chat.persistence.repository.ChatRoomMemberRepository
 import com.chat.persistence.repository.ChatRoomRepository
+import com.chat.persistence.repository.ChatRoomStoreAdapter
 import com.chat.persistence.repository.UserRepository
+import com.chat.persistence.repository.UserStoreAdapter
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
 import com.fasterxml.jackson.module.kotlin.KotlinModule
@@ -165,14 +174,14 @@ class ChatServiceImplCanonicalHistoryTest {
 
         return Fixture(
             chatService = ChatServiceImpl(
-                chatRoomRepository = mock(ChatRoomRepository::class.java),
+                chatRoomRepository = ChatRoomStoreAdapter(mock(ChatRoomRepository::class.java)),
                 messageReadPort = readPort,
-                chatRoomMemberRepository = chatRoomMemberRepository,
-                userRepository = mock(UserRepository::class.java),
+                chatRoomMemberRepository = ChatMembershipStoreAdapter(chatRoomMemberRepository),
+                userRepository = UserStoreAdapter(mock(UserRepository::class.java)),
                 messageSendingService = MessageSendingService(
-                    chatRoomRepository = mock(ChatRoomRepository::class.java),
-                    userRepository = mock(UserRepository::class.java),
-                    chatRoomMemberRepository = chatRoomMemberRepository,
+                    chatRoomRepository = ChatRoomStoreAdapter(mock(ChatRoomRepository::class.java)),
+                    userRepository = UserStoreAdapter(mock(UserRepository::class.java)),
+                    chatRoomMemberRepository = ChatMembershipStoreAdapter(chatRoomMemberRepository),
                     messageReadPort = readPort,
                     messageSendPolicy = MessageSendPolicy(
                         userSanctionPolicyService = UserSanctionPolicyService.Noop,

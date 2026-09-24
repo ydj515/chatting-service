@@ -2,12 +2,17 @@ package com.chat.persistence.service
 
 import com.chat.core.dto.SendMessageRequest
 import com.chat.core.message.port.MessageReadPort
+import com.chat.core.message.service.MessageSendPolicy
+import com.chat.core.message.service.MessageSendingService
 import com.chat.domain.exception.ResourceNotFoundException
 import com.chat.domain.model.ChatRoom
 import com.chat.domain.model.MessageType
+import com.chat.persistence.repository.ChatMembershipStoreAdapter
 import com.chat.persistence.repository.ChatRoomMemberRepository
 import com.chat.persistence.repository.ChatRoomRepository
+import com.chat.persistence.repository.ChatRoomStoreAdapter
 import com.chat.persistence.repository.UserRepository
+import com.chat.persistence.repository.UserStoreAdapter
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.*
@@ -29,7 +34,7 @@ class MessageSendingTransactionTest {
             assertFalse(TransactionSynchronizationManager.isActualTransactionActive())
             Optional.empty<ChatRoom>()
         }
-        val target = MessageSendingService(rooms, mock(UserRepository::class.java), mock(ChatRoomMemberRepository::class.java), mock(MessageReadPort::class.java), mock(MessageSendPolicy::class.java), mock(MessageStreamPublisher::class.java))
+        val target = MessageSendingService(ChatRoomStoreAdapter(rooms), UserStoreAdapter(mock(UserRepository::class.java)), ChatMembershipStoreAdapter(mock(ChatRoomMemberRepository::class.java)), mock(MessageReadPort::class.java), mock(MessageSendPolicy::class.java), mock(MessageStreamPublisher::class.java))
         val manager = DataSourceTransactionManager(DriverManagerDataSource("jdbc:h2:mem:${UUID.randomUUID()}", "sa", ""))
         val proxy = ProxyFactory(target).apply {
             addAdvice(TransactionInterceptor(manager, AnnotationTransactionAttributeSource()))

@@ -5,6 +5,7 @@ import com.chat.core.dto.LoginRequest
 import com.chat.core.dto.LoginResponse
 import com.chat.core.dto.UserDto
 import com.chat.core.dto.UserSanctionType
+import com.chat.core.mapping.toUserDto
 import com.chat.core.service.SessionTokenService
 import com.chat.core.service.UserService
 import com.chat.core.user.port.LoginSanctionReader
@@ -43,7 +44,7 @@ class UserServiceImpl(
         )
 
         val savedUser = userRepository.save(user)
-        return userToDto(savedUser)
+        return savedUser.toUserDto()
     }
 
     override fun login(request: LoginRequest): LoginResponse {
@@ -61,7 +62,7 @@ class UserServiceImpl(
 
         val sessionToken = sessionTokenService.issueToken(user.id)
         return LoginResponse(
-            user = userToDto(user),
+            user = user.toUserDto(),
             sessionToken = sessionToken.token,
             expiresAt = sessionToken.expiresAt,
         )
@@ -76,14 +77,14 @@ class UserServiceImpl(
     override fun getUserById(userId: Long): UserDto {
         val user = userRepository.findById(userId)
             ?: throw ResourceNotFoundException("사용자를 찾을 수 없습니다: $userId")
-        return userToDto(user)
+        return user.toUserDto()
     }
 
     @Transactional(readOnly = true)
     override fun searchUsers(
         query: String,
         pageable: Pageable,
-    ): Page<UserDto> = userRepository.searchUsers(query, pageable).map { userToDto(it) }
+    ): Page<UserDto> = userRepository.searchUsers(query, pageable).map { it.toUserDto() }
 
     override fun updateLastSeen(userId: Long): UserDto {
         val user = userRepository.findById(userId)
@@ -92,7 +93,7 @@ class UserServiceImpl(
         val now = LocalDateTime.now(clock)
         userRepository.updateLastSeenAt(userId, now)
 
-        return userToDto(user).copy(lastSeenAt = now)
+        return user.toUserDto().copy(lastSeenAt = now)
     }
 
     private fun requireNotSuspended(userId: Long) {
@@ -104,16 +105,4 @@ class UserServiceImpl(
             }
         check(!suspended) { "정지된 사용자는 로그인할 수 없습니다." }
     }
-
-    private fun userToDto(user: User): UserDto =
-        UserDto(
-            id = user.id,
-            username = user.username,
-            displayName = user.displayName,
-            profileImageUrl = user.profileImageUrl,
-            status = user.status,
-            isActive = user.isActive,
-            lastSeenAt = user.lastSeenAt,
-            createdAt = user.createdAt,
-        )
 }

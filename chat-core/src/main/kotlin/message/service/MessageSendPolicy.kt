@@ -1,6 +1,9 @@
-package com.chat.persistence.service
+package com.chat.core.message.service
 
 import com.chat.core.dto.SendMessageRequest
+import com.chat.core.message.port.MessageAdmissionPolicyService
+import com.chat.core.message.port.MessageModerationPolicyService
+import com.chat.core.message.port.UserSanctionPolicyService
 import com.chat.domain.model.MemberRole
 import org.springframework.stereotype.Service
 

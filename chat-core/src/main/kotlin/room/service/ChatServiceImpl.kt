@@ -1,14 +1,18 @@
-package com.chat.persistence.service
+package com.chat.core.room.service
 
 import com.chat.core.dto.*
+import com.chat.core.mapping.toUserDto
 import com.chat.core.message.port.MessageReadPort
+import com.chat.core.message.service.MessageSendingService
+import com.chat.core.room.port.ChatMembershipStore
+import com.chat.core.room.port.ChatRoomStore
+import com.chat.core.room.port.MembershipEvents
 import com.chat.core.service.ChatService
+import com.chat.core.user.port.UserStore
 import com.chat.domain.exception.ForbiddenOperationException
 import com.chat.domain.exception.ResourceConflictException
 import com.chat.domain.exception.ResourceNotFoundException
 import com.chat.domain.model.*
-import com.chat.persistence.redis.RedisMessageBroker
-import com.chat.persistence.repository.*
 import org.springframework.cache.annotation.*
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
@@ -18,12 +22,12 @@ import java.time.ZoneOffset
 
 @Service
 class ChatServiceImpl(
-    private val chatRoomRepository: ChatRoomRepository,
+    private val chatRoomRepository: ChatRoomStore,
     private val messageReadPort: MessageReadPort,
-    private val chatRoomMemberRepository: ChatRoomMemberRepository,
-    private val userRepository: UserRepository,
+    private val chatRoomMemberRepository: ChatMembershipStore,
+    private val userRepository: UserStore,
     private val messageSendingService: MessageSendingService,
-    private val membershipEventPublisher: MembershipEventPublisher,
+    private val membershipEventPublisher: MembershipEvents,
 ) : ChatService {
     // Sensitive room reads remain uncached so membership is checked on every request.
     private fun chatRoomToDto(
@@ -63,7 +67,7 @@ class ChatServiceImpl(
     ): ChatRoomDto {
         require(request.maxMembers >= 1) { "maxMembers must be positive" }
         val creator = userRepository.findById(createdBy)
-            .orElseThrow { ResourceNotFoundException("사용자를 찾을 수 없습니다: $createdBy") }
+            ?: throw ResourceNotFoundException("사용자를 찾을 수 없습니다: $createdBy")
 
         val chatRoom = ChatRoom(
             name = request.name,
@@ -83,7 +87,7 @@ class ChatServiceImpl(
         )
         chatRoomMemberRepository.save(ownerMember)
 
-        membershipEventPublisher.publishAfterCommit(creator.id, savedRoom.id, RedisMessageBroker.MembershipAction.JOIN)
+        membershipEventPublisher.joinedAfterCommit(creator.id, savedRoom.id)
 
         return chatRoomToDto(savedRoom)
     }
@@ -92,7 +96,7 @@ class ChatServiceImpl(
     override fun getChatRoom(roomId: Long, userId: Long): ChatRoomDto {
         requireMembership(roomId, userId)
         val chatRoom = chatRoomRepository.findById(roomId)
-            .orElseThrow { ResourceNotFoundException("채팅방을 찾을 수 없습니다: $roomId") }
+            ?: throw ResourceNotFoundException("채팅방을 찾을 수 없습니다: $roomId")
         return chatRoomToDto(chatRoom)
     }
 
@@ -109,7 +113,7 @@ class ChatServiceImpl(
     private fun chatRoomsToDtos(rooms: List<ChatRoom>, includeLastMessage: Boolean = true): List<ChatRoomDto> {
         if (rooms.isEmpty()) return emptyList()
         val ids = rooms.map { it.id }
-        val counts = chatRoomMemberRepository.countActiveMembersByRooms(ids).associate { it.roomId to it.memberCount.toInt() }
+        val counts = chatRoomMemberRepository.countActiveMembersByRooms(ids).mapValues { it.value.toInt() }
         val messages = if (includeLastMessage) messageReadPort.findLatestMessagesByRooms(ids) else emptyMap()
         return rooms.map { chatRoomToDto(it, counts[it.id] ?: 0, messages[it.id]) }
     }
@@ -142,7 +146,7 @@ class ChatServiceImpl(
 
         // 사용자 확인
         val user = userRepository.findById(userId)
-            .orElseThrow { ResourceNotFoundException("사용자를 찾을 수 없습니다: $userId") }
+            ?: throw ResourceNotFoundException("사용자를 찾을 수 없습니다: $userId")
 
         // 이미 참여중인지 확인
         if (chatRoomMemberRepository.existsByChatRoomIdAndUserIdAndIsActiveTrue(roomId, userId)) {
@@ -162,7 +166,7 @@ class ChatServiceImpl(
             chatRoomMemberRepository.save(member)
         }
 
-        membershipEventPublisher.publishAfterCommit(userId, roomId, RedisMessageBroker.MembershipAction.JOIN)
+        membershipEventPublisher.joinedAfterCommit(userId, roomId)
     }
 
     @Caching(
@@ -174,7 +178,7 @@ class ChatServiceImpl(
     @Transactional
     override fun leaveChatRoom(roomId: Long, userId: Long) {
         chatRoomMemberRepository.leaveChatRoom(roomId, userId)
-        membershipEventPublisher.publishAfterCommit(userId, roomId, RedisMessageBroker.MembershipAction.LEAVE)
+        membershipEventPublisher.leftAfterCommit(userId, roomId)
     }
 
     @Transactional(readOnly = true)

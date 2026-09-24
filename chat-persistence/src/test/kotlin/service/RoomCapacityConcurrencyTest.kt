@@ -2,14 +2,19 @@ package com.chat.persistence.service
 
 import com.chat.core.dto.CreateChatRoomRequest
 import com.chat.core.message.port.MessageReadPort
+import com.chat.core.message.service.MessageSendingService
+import com.chat.core.room.service.ChatServiceImpl
 import com.chat.domain.exception.ResourceConflictException
 import com.chat.domain.model.ChatRoom
 import com.chat.domain.model.ChatRoomMember
 import com.chat.domain.model.ChatRoomType
 import com.chat.domain.model.User
+import com.chat.persistence.repository.ChatMembershipStoreAdapter
 import com.chat.persistence.repository.ChatRoomMemberRepository
 import com.chat.persistence.repository.ChatRoomRepository
+import com.chat.persistence.repository.ChatRoomStoreAdapter
 import com.chat.persistence.repository.UserRepository
+import com.chat.persistence.repository.UserStoreAdapter
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.mock
@@ -79,7 +84,7 @@ class RoomCapacityConcurrencyTest {
         }
     }
 
-    private fun service() = ChatServiceImpl(rooms, mock(MessageReadPort::class.java), members, users, mock(MessageSendingService::class.java), mock(MembershipEventPublisher::class.java))
+    private fun service() = ChatServiceImpl(ChatRoomStoreAdapter(rooms), mock(MessageReadPort::class.java), ChatMembershipStoreAdapter(members), UserStoreAdapter(users), mock(MessageSendingService::class.java), mock(MembershipEventPublisher::class.java))
 
     companion object {
         @JvmStatic

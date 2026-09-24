@@ -1,6 +1,7 @@
 package com.chat.persistence.service
 
 import com.chat.core.dto.UserSanctionType
+import com.chat.core.message.port.UserSanctionPolicyService
 import com.chat.domain.exception.MessageModerationRejectedException
 import com.chat.persistence.repository.UserSanctionJdbcRepository
 import com.chat.persistence.repository.UserSanctionRecord
@@ -9,14 +10,6 @@ import io.micrometer.core.instrument.MeterRegistry
 import org.springframework.beans.factory.ObjectProvider
 import org.springframework.stereotype.Service
 import java.time.Clock
-
-interface UserSanctionPolicyService {
-    fun requireAllowedToSend(roomId: Long, userId: Long)
-
-    object Noop : UserSanctionPolicyService {
-        override fun requireAllowedToSend(roomId: Long, userId: Long) = Unit
-    }
-}
 
 @Service
 class UserSanctionService(

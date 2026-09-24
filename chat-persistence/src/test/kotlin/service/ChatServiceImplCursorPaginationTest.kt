@@ -5,6 +5,12 @@ import com.chat.core.dto.MessageDto
 import com.chat.core.dto.MessageHistoryCursor
 import com.chat.core.dto.MessageHistoryCursorCodec
 import com.chat.core.dto.MessagePageRequest
+import com.chat.core.message.port.MessageAdmissionPolicyService
+import com.chat.core.message.port.MessageModerationPolicyService
+import com.chat.core.message.port.UserSanctionPolicyService
+import com.chat.core.message.service.MessageSendPolicy
+import com.chat.core.message.service.MessageSendingService
+import com.chat.core.room.service.ChatServiceImpl
 import com.chat.domain.exception.ResourceConflictException
 import com.chat.domain.model.ChatRoom
 import com.chat.domain.model.ChatRoomMember
@@ -16,10 +22,13 @@ import com.chat.persistence.config.ChatRedisProperties
 import com.chat.persistence.config.ChatWebSocketGatewayProperties
 import com.chat.persistence.redis.MessageStreamProducer
 import com.chat.persistence.redis.RedisMessageBroker
+import com.chat.persistence.repository.ChatMembershipStoreAdapter
 import com.chat.persistence.repository.ChatRoomMemberRepository
 import com.chat.persistence.repository.ChatRoomRepository
+import com.chat.persistence.repository.ChatRoomStoreAdapter
 import com.chat.persistence.repository.MessageRepository
 import com.chat.persistence.repository.UserRepository
+import com.chat.persistence.repository.UserStoreAdapter
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
 import com.fasterxml.jackson.module.kotlin.KotlinModule
@@ -256,14 +265,14 @@ class ChatServiceImplCursorPaginationTest {
         )
 
         return ChatServiceImpl(
-            chatRoomRepository = chatRoomRepository,
+            chatRoomRepository = ChatRoomStoreAdapter(chatRoomRepository),
             messageReadPort = JpaMessageReadAdapter(messageRepository),
-            chatRoomMemberRepository = chatRoomMemberRepository,
-            userRepository = userRepository,
+            chatRoomMemberRepository = ChatMembershipStoreAdapter(chatRoomMemberRepository),
+            userRepository = UserStoreAdapter(userRepository),
             messageSendingService = MessageSendingService(
-                chatRoomRepository = chatRoomRepository,
-                userRepository = userRepository,
-                chatRoomMemberRepository = chatRoomMemberRepository,
+                chatRoomRepository = ChatRoomStoreAdapter(chatRoomRepository),
+                userRepository = UserStoreAdapter(userRepository),
+                chatRoomMemberRepository = ChatMembershipStoreAdapter(chatRoomMemberRepository),
                 messageReadPort = JpaMessageReadAdapter(messageRepository),
                 messageSendPolicy = MessageSendPolicy(
                     userSanctionPolicyService = UserSanctionPolicyService.Noop,

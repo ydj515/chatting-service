@@ -1,6 +1,8 @@
 package com.chat.persistence.service
 
 import com.chat.core.message.port.MessageReadPort
+import com.chat.core.message.service.MessageSendingService
+import com.chat.core.room.service.ChatServiceImpl
 import com.chat.domain.exception.ForbiddenOperationException
 import com.chat.domain.model.ChatRoom
 import com.chat.domain.model.User
@@ -19,7 +21,7 @@ class ChatRoomAuthorizationTest {
     private val members = mock(ChatRoomMemberRepository::class.java)
     private val messages = mock(MessageReadPort::class.java)
     private val room = ChatRoom(id = 10, name = "room", createdBy = User(id = 7, username = "owner", password = "synthetic", displayName = "Owner"))
-    private val service = ChatServiceImpl(rooms, messages, members, mock(UserRepository::class.java), mock(MessageSendingService::class.java), mock(MembershipEventPublisher::class.java))
+    private val service = ChatServiceImpl(ChatRoomStoreAdapter(rooms), messages, ChatMembershipStoreAdapter(members), UserStoreAdapter(mock(UserRepository::class.java)), mock(MessageSendingService::class.java), mock(MembershipEventPublisher::class.java))
 
     @Test
     fun `nonmembers cannot read room details or membership`() {

@@ -1,5 +1,6 @@
 package com.chat.persistence.service
 
+import com.chat.core.message.port.MessageAdmissionPolicyService
 import com.chat.domain.exception.MessageAdmissionRejectedException
 import com.chat.domain.model.MemberRole
 import com.chat.persistence.config.ChatRedisProperties
@@ -12,14 +13,6 @@ import org.springframework.data.redis.core.script.DefaultRedisScript
 import org.springframework.data.redis.core.script.RedisScript
 import org.springframework.stereotype.Service
 import java.time.Clock
-
-interface MessageAdmissionPolicyService {
-    fun requireAllowed(roomId: Long, senderId: Long, memberRole: MemberRole = MemberRole.MEMBER)
-
-    object Noop : MessageAdmissionPolicyService {
-        override fun requireAllowed(roomId: Long, senderId: Long, memberRole: MemberRole) = Unit
-    }
-}
 
 data class RoomAdmissionPolicy(
     val roomRateLimitPerSecond: Int? = null,

@@ -1,9 +1,9 @@
-package com.chat.persistence.service
+package com.chat.core.mapping
 
 import com.chat.core.dto.*
 import com.chat.domain.model.*
 
-internal fun Message.toMessageDto(): MessageDto {
+fun Message.toMessageDto(): MessageDto {
     val roomSeq = if (this.roomSeq > 0) this.roomSeq else this.sequenceNumber
     return MessageDto(
         id = this.id,
@@ -25,7 +25,7 @@ internal fun Message.toMessageDto(): MessageDto {
     )
 }
 
-internal fun User.toUserDto(): UserDto =
+fun User.toUserDto(): UserDto =
     UserDto(
         id = this.id,
         username = this.username,
