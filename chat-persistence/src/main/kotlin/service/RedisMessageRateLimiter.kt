@@ -1,61 +1,29 @@
 package com.chat.persistence.service
 
-import com.chat.core.message.port.MessageAdmissionPolicyService
-import com.chat.domain.exception.MessageAdmissionRejectedException
-import com.chat.domain.model.MemberRole
+import com.chat.core.message.policy.AdmissionPolicy
+import com.chat.core.message.port.AdmissionDecision
+import com.chat.core.message.port.MessageRateLimiter
 import com.chat.persistence.config.ChatRedisProperties
-import io.micrometer.core.instrument.Counter
-import io.micrometer.core.instrument.MeterRegistry
 import org.slf4j.LoggerFactory
-import org.springframework.beans.factory.ObjectProvider
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.data.redis.core.script.DefaultRedisScript
 import org.springframework.data.redis.core.script.RedisScript
 import org.springframework.stereotype.Service
 import java.time.Clock
 
-data class RoomAdmissionPolicy(
-    val roomRateLimitPerSecond: Int? = null,
-    val userRateLimitPerSecond: Int? = null,
-    val slowModeSeconds: Int? = null,
-    val moderatorPriority: Boolean = true,
-) {
-    fun hasLimit(): Boolean =
-        positive(roomRateLimitPerSecond) ||
-            positive(userRateLimitPerSecond) ||
-            positive(slowModeSeconds)
-
-    private fun positive(value: Int?): Boolean = value != null && value > 0
-}
-
-interface RoomAdmissionPolicyReader {
-    fun admissionPolicy(roomId: Long): RoomAdmissionPolicy
-}
-
 @Service
-class RedisMessageAdmissionPolicyService(
+class RedisMessageRateLimiter(
     private val redisTemplate: RedisTemplate<String, String>,
     private val redisProperties: ChatRedisProperties,
-    private val roomAdmissionPolicyReader: RoomAdmissionPolicyReader,
     private val clock: Clock,
-    private val meterRegistryProvider: ObjectProvider<MeterRegistry>? = null,
-) : MessageAdmissionPolicyService {
+) : MessageRateLimiter {
     private val logger = LoggerFactory.getLogger(javaClass)
     private val script: RedisScript<Long> = DefaultRedisScript(
         ADMISSION_SCRIPT,
         Long::class.javaObjectType,
     )
 
-    override fun requireAllowed(roomId: Long, senderId: Long, memberRole: MemberRole) {
-        val policy = roomAdmissionPolicyReader.admissionPolicy(roomId)
-        if (policy.moderatorPriority && memberRole.priorityBypassesAdmission()) {
-            return
-        }
-
-        if (!policy.hasLimit()) {
-            return
-        }
-
+    override fun acquire(roomId: Long, senderId: Long, policy: AdmissionPolicy): AdmissionDecision {
         val epochSecond = clock.instant().epochSecond
         val roomRateLimit = policy.roomRateLimitPerSecond.positiveOrZero()
         val userRateLimit = policy.userRateLimitPerSecond.positiveOrZero()
@@ -77,34 +45,16 @@ class RedisMessageAdmissionPolicyService(
                 senderId.toString(),
             )
         } catch (e: Exception) {
-            recordRejected(REASON_REDIS_ERROR)
             logger.warn("Failed to evaluate message admission policy roomId={} senderId={}", roomId, senderId, e)
-            throw MessageAdmissionRejectedException("message admission policy unavailable", e)
+            return AdmissionDecision.Unavailable(e)
         }
 
-        when (result) {
-            RESULT_ALLOWED -> return
-            RESULT_ROOM_RATE_LIMITED -> reject("room rate limit exceeded", REASON_ROOM_RATE_LIMITED)
-            RESULT_USER_RATE_LIMITED -> reject("user rate limit exceeded", REASON_USER_RATE_LIMITED)
-            RESULT_SLOW_MODE_ACTIVE -> reject("slow mode active", REASON_SLOW_MODE_ACTIVE)
-            else -> {
-                recordRejected(REASON_SCRIPT_ERROR)
-                throw MessageAdmissionRejectedException("message admission policy unavailable")
-            }
-        }
-    }
-
-    private fun reject(message: String, reason: String): Nothing {
-        recordRejected(reason)
-        throw MessageAdmissionRejectedException(message)
-    }
-
-    private fun recordRejected(reason: String) {
-        meterRegistryProvider?.ifAvailable { registry ->
-            Counter.builder("chat.message.admission.rejected")
-                .tag("reason", reason)
-                .register(registry)
-                .increment()
+        return when (result) {
+            RESULT_ALLOWED -> AdmissionDecision.Allowed
+            RESULT_ROOM_RATE_LIMITED -> AdmissionDecision.RoomRateLimited
+            RESULT_USER_RATE_LIMITED -> AdmissionDecision.UserRateLimited
+            RESULT_SLOW_MODE_ACTIVE -> AdmissionDecision.SlowModeActive
+            else -> AdmissionDecision.Unavailable()
         }
     }
 
@@ -116,19 +66,12 @@ class RedisMessageAdmissionPolicyService(
 
     private fun Int?.positiveOrZero(): Int = this?.takeIf { it > 0 } ?: 0
 
-    private fun MemberRole.priorityBypassesAdmission(): Boolean = this == MemberRole.OWNER || this == MemberRole.ADMIN
-
     private companion object {
         const val MILLIS_PER_SECOND = 1_000L
         const val RESULT_ALLOWED = 0L
         const val RESULT_ROOM_RATE_LIMITED = 1L
         const val RESULT_USER_RATE_LIMITED = 2L
         const val RESULT_SLOW_MODE_ACTIVE = 3L
-        const val REASON_ROOM_RATE_LIMITED = "room_rate_limited"
-        const val REASON_USER_RATE_LIMITED = "user_rate_limited"
-        const val REASON_SLOW_MODE_ACTIVE = "slow_mode_active"
-        const val REASON_REDIS_ERROR = "redis_error"
-        const val REASON_SCRIPT_ERROR = "script_error"
         const val ADMISSION_SCRIPT = """
             local windowMillis = tonumber(ARGV[1])
             local roomLimit = tonumber(ARGV[2])

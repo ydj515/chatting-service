@@ -21,7 +21,10 @@ class CacheConfigTest {
             moderatorPriority = false,
         )
 
-        val restored = serializer.deserialize(serializer.serialize(policy))
+        val serialized = serializer.serialize(policy)
+        assertTrue(String(serialized, Charsets.UTF_8).contains("com.chat.persistence.service.RoomAdmissionPolicy"))
+        assertTrue(!String(serialized, Charsets.UTF_8).contains("com.chat.core"))
+        val restored = serializer.deserialize(serialized)
 
         assertTrue(restored is RoomAdmissionPolicy)
         assertEquals(policy, restored)

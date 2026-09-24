@@ -3,10 +3,14 @@ package com.chat.persistence.service
 import com.chat.core.dto.ModerationAction
 import com.chat.core.dto.ModerationMatchType
 import com.chat.core.dto.ModerationScopeType
+import com.chat.core.message.port.MessagePolicyMetrics
+import com.chat.core.message.service.MessageModerationService
 import com.chat.domain.exception.MessageModerationRejectedException
 import com.chat.domain.model.MessageType
+import com.chat.persistence.repository.MessagePolicyReadAdapter
 import com.chat.persistence.repository.ModerationRuleJdbcRepository
 import com.chat.persistence.repository.ModerationRuleRecord
+import com.chat.persistence.repository.UserSanctionJdbcRepository
 import io.micrometer.core.instrument.MeterRegistry
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -27,7 +31,7 @@ class MessageModerationServiceTest {
             listOf(rule(scopeType = ModerationScopeType.GLOBAL, roomId = null, pattern = "blocked")),
         )
         val meterRegistry = SimpleMeterRegistry()
-        val service = MessageModerationService(repository, meterRegistryProvider(meterRegistry))
+        val service = MessageModerationService(MessagePolicyReadAdapter(mock(UserSanctionJdbcRepository::class.java), repository, mock(RoomAdmissionPolicyReader::class.java)), MicrometerMessagePolicyMetrics(meterRegistryProvider(meterRegistry)))
 
         val exception = assertThrows(MessageModerationRejectedException::class.java) {
             service.requireAllowed(
@@ -59,7 +63,7 @@ class MessageModerationServiceTest {
         `when`(repository.activeRulesForRoom(10L)).thenReturn(
             listOf(rule(scopeType = ModerationScopeType.ROOM, roomId = 10L, pattern = "blocked")),
         )
-        val service = MessageModerationService(repository, null)
+        val service = MessageModerationService(MessagePolicyReadAdapter(mock(UserSanctionJdbcRepository::class.java), repository, mock(RoomAdmissionPolicyReader::class.java)), mock(MessagePolicyMetrics::class.java))
 
         service.requireAllowed(
             roomId = 10L,
@@ -72,7 +76,7 @@ class MessageModerationServiceTest {
     @Test
     fun `content가 비어 있으면 moderation rule 조회 없이 통과한다`() {
         val repository = mock(ModerationRuleJdbcRepository::class.java)
-        val service = MessageModerationService(repository, null)
+        val service = MessageModerationService(MessagePolicyReadAdapter(mock(UserSanctionJdbcRepository::class.java), repository, mock(RoomAdmissionPolicyReader::class.java)), mock(MessagePolicyMetrics::class.java))
 
         service.requireAllowed(
             roomId = 10L,
@@ -90,7 +94,7 @@ class MessageModerationServiceTest {
         `when`(repository.activeRulesForRoom(10L)).thenReturn(
             listOf(rule(scopeType = ModerationScopeType.ROOM, roomId = 10L, pattern = "blocked")),
         )
-        val service = MessageModerationService(repository, null)
+        val service = MessageModerationService(MessagePolicyReadAdapter(mock(UserSanctionJdbcRepository::class.java), repository, mock(RoomAdmissionPolicyReader::class.java)), mock(MessagePolicyMetrics::class.java))
 
         assertThrows(MessageModerationRejectedException::class.java) {
             service.requireAllowed(

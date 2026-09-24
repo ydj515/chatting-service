@@ -76,6 +76,14 @@ core가 소유한다. `RoomHeatClassifier`는 Spring이나 Redis에 의존하지
 현재 신호 adapter는 같은 프로세스의 Gateway 큐만 관측한다. 별도 Gateway 프로세스의 큐와
 writer/fanout lag를 결합하는 운영 기능은 이 모듈 분리로 구현됐다고 보지 않는다.
 
+메시지 전송의 제재·금칙어·발신 제한 판단도 core가 소유한다. 제재 만료 시각과 scope 우선순위,
+금칙어의 대소문자 무시 매칭, 관리자 우회 여부, 제한 결과의 오류 변환은 유스케이스의 책임이다.
+조회 adapter는 기존 캐시 레코드를 core 입력으로 변환한다. `RoomAdmissionPolicy`,
+`ModerationRuleRecord`, `UserSanctionRecord`의 저장된 캐시 타입은 이동하지 않는다.
+Redis adapter는 동일한 key·Lua 원자 연산을 유지하고 허용·제한·장애 결과를 반환한다.
+거부 사유와 scope는 core가 정하고 Micrometer adapter가 기존 metric 이름과 tag로 기록한다.
+필수 정책 포트는 모두 생성자로 주입하며 저장소나 script 실패를 허용 결과로 바꾸지 않는다.
+
 관리자 검색·정책·모더레이션 유스케이스도 core가 소유한다. 감사 메타데이터와 export 요청의
 JSON 직렬화는 adapter가 처리하고, 제재 변경·감사·내구성 있는 무효화/철회 작업 등록은
 같은 트랜잭션에 참여한다. 내보내기 상태의 조회·감사는 `AdminExportStatusReader`가

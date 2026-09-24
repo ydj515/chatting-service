@@ -2,7 +2,11 @@ package com.chat.persistence.service
 
 import com.chat.core.dto.ModerationScopeType
 import com.chat.core.dto.UserSanctionType
+import com.chat.core.message.port.MessagePolicyMetrics
+import com.chat.core.message.service.UserSanctionService
 import com.chat.domain.exception.MessageModerationRejectedException
+import com.chat.persistence.repository.MessagePolicyReadAdapter
+import com.chat.persistence.repository.ModerationRuleJdbcRepository
 import com.chat.persistence.repository.UserSanctionJdbcRepository
 import com.chat.persistence.repository.UserSanctionRecord
 import io.micrometer.core.instrument.MeterRegistry
@@ -27,7 +31,7 @@ class UserSanctionServiceTest {
         `when`(repository.activeSanctionsForUser(10L, 7L)).thenReturn(
             listOf(sanction(UserSanctionType.MUTE)),
         )
-        val service = UserSanctionService(repository, Clock.fixed(now, ZoneOffset.UTC), null)
+        val service = UserSanctionService(MessagePolicyReadAdapter(repository, mock(ModerationRuleJdbcRepository::class.java), mock(RoomAdmissionPolicyReader::class.java)), Clock.fixed(now, ZoneOffset.UTC), mock(MessagePolicyMetrics::class.java))
 
         val exception = assertThrows(MessageModerationRejectedException::class.java) {
             service.requireAllowedToSend(roomId = 10L, userId = 7L)
@@ -44,7 +48,7 @@ class UserSanctionServiceTest {
         `when`(repository.activeSanctionsForUser(10L, 7L)).thenReturn(
             listOf(sanction(UserSanctionType.BAN)),
         )
-        val service = UserSanctionService(repository, Clock.fixed(now, ZoneOffset.UTC), null)
+        val service = UserSanctionService(MessagePolicyReadAdapter(repository, mock(ModerationRuleJdbcRepository::class.java), mock(RoomAdmissionPolicyReader::class.java)), Clock.fixed(now, ZoneOffset.UTC), mock(MessagePolicyMetrics::class.java))
 
         assertThrows(MessageModerationRejectedException::class.java) {
             service.requireAllowedToSend(roomId = 10L, userId = 7L)
@@ -57,7 +61,7 @@ class UserSanctionServiceTest {
         val now = Instant.parse("2026-06-26T00:00:00Z")
         `when`(repository.activeGlobalSanctionsForUser(7L)).thenReturn(emptyList())
         `when`(repository.activeSanctionsForUser(10L, 7L)).thenReturn(emptyList())
-        val service = UserSanctionService(repository, Clock.fixed(now, ZoneOffset.UTC), null)
+        val service = UserSanctionService(MessagePolicyReadAdapter(repository, mock(ModerationRuleJdbcRepository::class.java), mock(RoomAdmissionPolicyReader::class.java)), Clock.fixed(now, ZoneOffset.UTC), mock(MessagePolicyMetrics::class.java))
 
         service.requireAllowedToSend(roomId = 10L, userId = 7L)
     }
@@ -70,7 +74,7 @@ class UserSanctionServiceTest {
         `when`(repository.activeSanctionsForUser(10L, 7L)).thenReturn(
             listOf(sanction(UserSanctionType.MUTE, expiresAt = now.minusSeconds(1))),
         )
-        val service = UserSanctionService(repository, Clock.fixed(now, ZoneOffset.UTC), null)
+        val service = UserSanctionService(MessagePolicyReadAdapter(repository, mock(ModerationRuleJdbcRepository::class.java), mock(RoomAdmissionPolicyReader::class.java)), Clock.fixed(now, ZoneOffset.UTC), mock(MessagePolicyMetrics::class.java))
 
         service.requireAllowedToSend(roomId = 10L, userId = 7L)
     }
@@ -89,7 +93,7 @@ class UserSanctionServiceTest {
             ),
         )
         `when`(repository.activeSanctionsForUser(10L, 7L)).thenReturn(emptyList())
-        val service = UserSanctionService(repository, Clock.fixed(now, ZoneOffset.UTC), null)
+        val service = UserSanctionService(MessagePolicyReadAdapter(repository, mock(ModerationRuleJdbcRepository::class.java), mock(RoomAdmissionPolicyReader::class.java)), Clock.fixed(now, ZoneOffset.UTC), mock(MessagePolicyMetrics::class.java))
 
         assertThrows(MessageModerationRejectedException::class.java) {
             service.requireAllowedToSend(roomId = 10L, userId = 7L)
@@ -112,9 +116,9 @@ class UserSanctionServiceTest {
         )
         `when`(repository.activeSanctionsForUser(10L, 7L)).thenReturn(emptyList())
         val service = UserSanctionService(
-            repository,
+            MessagePolicyReadAdapter(repository, mock(ModerationRuleJdbcRepository::class.java), mock(RoomAdmissionPolicyReader::class.java)),
             Clock.fixed(now, ZoneOffset.UTC),
-            meterRegistryProvider(meterRegistry),
+            MicrometerMessagePolicyMetrics(meterRegistryProvider(meterRegistry)),
         )
 
         assertThrows(MessageModerationRejectedException::class.java) {

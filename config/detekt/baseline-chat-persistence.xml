@@ -16,7 +16,7 @@
     <ID>TooGenericExceptionCaught:MessageStreamPublisher.kt$MessageStreamPublisher$e: RuntimeException</ID>
     <ID>TooGenericExceptionCaught:FanoutOwnerLeaseService.kt$RedisFanoutOwnerLeaseService$e: Exception</ID>
     <ID>TooGenericExceptionCaught:HotRoomFanoutWorker.kt$HotRoomFanoutWorker$e: Exception</ID>
-    <ID>TooGenericExceptionCaught:MessageAdmissionPolicyService.kt$RedisMessageAdmissionPolicyService$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:RedisMessageRateLimiter.kt$RedisMessageRateLimiter$e: Exception</ID>
     <ID>TooGenericExceptionCaught:MessageWriterWorker.kt$MessageWriterWorker$e: Exception</ID>
     <ID>TooGenericExceptionCaught:ReadReplicaLagPolicy.kt$ReadReplicaLagPolicy$e: Exception</ID>
     <ID>TooGenericExceptionCaught:RedisMessageBroker.kt$RedisMessageBroker$e: Exception</ID>

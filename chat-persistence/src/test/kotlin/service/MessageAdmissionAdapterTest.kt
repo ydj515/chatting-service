@@ -1,8 +1,12 @@
 package com.chat.persistence.service
 
+import com.chat.core.message.service.MessageAdmissionService
 import com.chat.domain.exception.MessageAdmissionRejectedException
 import com.chat.domain.model.MemberRole
 import com.chat.persistence.config.ChatRedisProperties
+import com.chat.persistence.repository.MessagePolicyReadAdapter
+import com.chat.persistence.repository.ModerationRuleJdbcRepository
+import com.chat.persistence.repository.UserSanctionJdbcRepository
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
@@ -16,6 +20,7 @@ import org.mockito.Mockito.mock
 import org.mockito.Mockito.times
 import org.mockito.Mockito.verify
 import org.springframework.beans.factory.ObjectProvider
+import org.springframework.beans.factory.support.StaticListableBeanFactory
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.data.redis.core.script.RedisScript
 import java.time.Clock
@@ -23,7 +28,7 @@ import java.time.Instant
 import java.time.ZoneOffset
 import java.util.stream.Stream
 
-class RedisMessageAdmissionPolicyServiceTest {
+class MessageAdmissionAdapterTest {
     private val clock = Clock.fixed(Instant.parse("2026-06-18T00:00:00Z"), ZoneOffset.UTC)
 
     @Suppress("UNCHECKED_CAST")
@@ -192,18 +197,25 @@ class RedisMessageAdmissionPolicyServiceTest {
         )
     }
 
+    @Test
+    fun `unrecognized script result cannot grant permission`() {
+        val redis = redisTemplate()
+        val registry = SimpleMeterRegistry()
+        redis.scriptResults["chat:admission:room:{3}:rate:room:${clock.instant().epochSecond}"] = ArrayDeque(listOf(99L))
+        val service = admissionService(redis.template, RoomAdmissionPolicy(roomRateLimitPerSecond = 1), registry)
+        assertThrows(MessageAdmissionRejectedException::class.java) { service.requireAllowed(3, 7) }
+        assertEquals(1.0, registry.find("chat.message.admission.rejected").tag("reason", "script_error").counter()?.count())
+    }
+
     private fun admissionService(
         redis: RedisTemplate<String, String>,
         policy: RoomAdmissionPolicy,
         meterRegistry: SimpleMeterRegistry? = null,
-    ): RedisMessageAdmissionPolicyService =
-        RedisMessageAdmissionPolicyService(
-            redisTemplate = redis,
-            redisProperties = ChatRedisProperties(),
-            roomAdmissionPolicyReader = StaticRoomAdmissionPolicyReader(policy),
-            clock = clock,
-            meterRegistryProvider = meterRegistry?.let { meterRegistryProvider(it) },
-        )
+    ): MessageAdmissionService = MessageAdmissionService(
+        policies = MessagePolicyReadAdapter(mock(UserSanctionJdbcRepository::class.java), mock(ModerationRuleJdbcRepository::class.java), StaticRoomAdmissionPolicyReader(policy)),
+        limiter = RedisMessageRateLimiter(redis, ChatRedisProperties(), clock),
+        metrics = MicrometerMessagePolicyMetrics(meterRegistry?.let { meterRegistryProvider(it) } ?: StaticListableBeanFactory().getBeanProvider(io.micrometer.core.instrument.MeterRegistry::class.java)),
+    )
 
     private class StaticRoomAdmissionPolicyReader(
         private val policy: RoomAdmissionPolicy,

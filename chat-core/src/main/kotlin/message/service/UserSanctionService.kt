@@ -1,21 +1,20 @@
-package com.chat.persistence.service
+package com.chat.core.message.service
 
 import com.chat.core.dto.UserSanctionType
+import com.chat.core.message.port.ActiveMessageSanctions
+import com.chat.core.message.port.MessagePolicyMetrics
+import com.chat.core.message.port.MessageSanction
+import com.chat.core.message.port.ModerationRejectionReason
 import com.chat.core.message.port.UserSanctionPolicyService
 import com.chat.domain.exception.MessageModerationRejectedException
-import com.chat.persistence.repository.UserSanctionJdbcRepository
-import com.chat.persistence.repository.UserSanctionRecord
-import io.micrometer.core.instrument.Counter
-import io.micrometer.core.instrument.MeterRegistry
-import org.springframework.beans.factory.ObjectProvider
 import org.springframework.stereotype.Service
 import java.time.Clock
 
 @Service
 class UserSanctionService(
-    private val userSanctionRepository: UserSanctionJdbcRepository,
+    private val userSanctionRepository: ActiveMessageSanctions,
     private val clock: Clock,
-    private val meterRegistryProvider: ObjectProvider<MeterRegistry>? = null,
+    private val metrics: MessagePolicyMetrics,
 ) : UserSanctionPolicyService {
     override fun requireAllowedToSend(roomId: Long, userId: Long) {
         val now = clock.instant()
@@ -35,20 +34,13 @@ class UserSanctionService(
         throw MessageModerationRejectedException("user is restricted from sending messages")
     }
 
-    private fun recordRejected(sanction: UserSanctionRecord) {
+    private fun recordRejected(sanction: MessageSanction) {
         val reason = when (sanction.type) {
-            UserSanctionType.MUTE -> "muted"
-            UserSanctionType.BAN -> "banned"
-            UserSanctionType.SUSPEND -> "suspended"
+            UserSanctionType.MUTE -> ModerationRejectionReason.MUTED
+            UserSanctionType.BAN -> ModerationRejectionReason.BANNED
+            UserSanctionType.SUSPEND -> ModerationRejectionReason.SUSPENDED
         }
 
-        meterRegistryProvider?.ifAvailable { registry ->
-            Counter.builder("chat.message.moderation.rejected")
-                .tag("reason", reason)
-                .tag("scope", sanction.scopeType.name.lowercase())
-                .tag("action", "reject")
-                .register(registry)
-                .increment()
-        }
+        metrics.moderationRejected(reason, sanction.scopeType)
     }
 }

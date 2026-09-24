@@ -73,13 +73,13 @@ class ArchitectureTest {
                 "com.chat.persistence..", "com.chat.api..", "com.chat.admin..", "com.chat.websocket..",
                 "org.springframework.data.jpa..", "org.springframework.jdbc..", "org.springframework.data.redis..",
                 "org.springframework.web..", "software.amazon.awssdk..", "jakarta.validation..",
-                "com.chat.protocol..", "com.fasterxml.jackson..",
+                "com.chat.protocol..", "com.fasterxml.jackson..", "io.micrometer..",
             ).check(classes)
     }
 
     @Test
-    fun `room heat policies are independent of Spring and adapters`() {
-        noClasses().that().resideInAPackage("com.chat.core.room.policy..")
+    fun `pure policies are independent of Spring and adapters`() {
+        noClasses().that().resideInAnyPackage("com.chat.core.room.policy..", "com.chat.core.message.policy..")
             .should().dependOnClassesThat().resideInAnyPackage("org.springframework..", "com.chat.persistence..")
             .check(classes)
     }
