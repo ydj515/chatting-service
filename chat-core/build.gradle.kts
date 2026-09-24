@@ -13,6 +13,7 @@ dependencyManagement {
 dependencies {
     implementation(project(":chat-domain"))
     implementation(libs.spring.data.commons)
+    implementation(libs.spring.tx)
     implementation(libs.spring.boot.starter.validation)
     implementation(libs.jackson.module.kotlin)
 }

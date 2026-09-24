@@ -11,6 +11,7 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories
     scanBasePackages = [
         "com.chat.admin",
         "com.chat.domain",
+        "com.chat.core",
         "com.chat.persistence",
     ],
 )

@@ -11,6 +11,7 @@ import org.springframework.scheduling.annotation.EnableScheduling
 @SpringBootApplication(
     scanBasePackages = [
         "com.chat.domain",
+        "com.chat.core",
         "com.chat.persistence",
         "com.chat.websocket",
     ],

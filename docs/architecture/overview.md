@@ -47,11 +47,17 @@ flowchart LR
 | `chat-admin` | 관리자 REST controller와 인증 경계 | core의 서비스 계약 사용 |
 | `chat-websocket` | handshake, inbound handler, heartbeat 진입점 | persistence의 세션 관리 구현과 설정에 직접 의존 |
 | `chat-domain` | JPA 통합 모델과 업무 예외 | core·delivery·infrastructure로 향하는 의존 금지 |
-| `chat-core` | 공유 서비스 계약, 입출력 타입, 메시지 저장소 포트와 커서 규칙 | concrete DB·Redis·HTTP adapter 의존 금지; 전송 전용 DTO 분리는 후속 단계 |
+| `chat-core` | 사용자 유스케이스, 공유 서비스 계약, 입출력 타입과 저장소 포트 | concrete DB·Redis·HTTP adapter 의존 금지; 전송 전용 DTO 분리는 후속 단계 |
 | `chat-persistence` | DB·Redis·S3 adapter, 유스케이스, Gateway 상태 관리 | 저장소 모듈 이름보다 책임이 넓으며 유스케이스 분리가 필요 |
 
 실행 모듈인 `chat-application`과 내부 계약 모듈인 `chat-core`는 별개다.
 `chat-core → chat-domain` 방향만 허용하며 API·관리자·Gateway와 persistence는 core를 사용한다.
+사용자 생성·로그인·조회·상태 갱신은 `chat-core/user/service`가 수행하고 트랜잭션을 소유한다.
+사용자 저장, 로그인 제재 조회, 비밀번호 검증 계약은 `chat-core/user/port`에 있으며
+persistence adapter가 JPA/JDBC와 BCrypt·기존 SHA-256 호환을 처리한다. 로그아웃은
+Redis 철회 호출 중 DB 트랜잭션을 유지하지 않도록 `NOT_SUPPORTED`를 사용한다.
+나머지 채팅·관리자 유스케이스의 persistence 분리는 아직 진행 중이다.
+
 JPA annotation·auditing은 기존 통합 모델의 의도적인 예외다. ORM 제약이 업무 API를
 왜곡하면 별도 persistence 모델로 분리한다. `Page`/`Pageable`은 기존 paging·정렬 의미와
 응답 호환성을 유지하기 위해 core 계약에 한정해 허용하고 domain 서비스 계약은 제거했다.

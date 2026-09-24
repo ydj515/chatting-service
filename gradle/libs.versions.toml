@@ -30,6 +30,9 @@ spring-boot-starter-websocket = { group = "org.springframework.boot", name = "sp
 spring-boot-starter-test = { group = "org.springframework.boot", name = "spring-boot-starter-test" }
 spring-security-crypto = { group = "org.springframework.security", name = "spring-security-crypto" }
 
+# Spring transaction API (already provided by the persistence stack)
+spring-tx = { group = "org.springframework", name = "spring-tx" }
+
 # Spring Data / Commons
 spring-data-commons = { group = "org.springframework.data", name = "spring-data-commons" }
 

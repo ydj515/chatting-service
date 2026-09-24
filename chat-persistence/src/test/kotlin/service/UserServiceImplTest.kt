@@ -6,11 +6,15 @@ import com.chat.core.dto.ModerationScopeType
 import com.chat.core.dto.SessionToken
 import com.chat.core.dto.UserSanctionType
 import com.chat.core.service.SessionTokenService
+import com.chat.core.user.service.UserServiceImpl
 import com.chat.domain.exception.ResourceConflictException
 import com.chat.domain.model.User
+import com.chat.persistence.repository.LoginSanctionAdapter
 import com.chat.persistence.repository.UserRepository
 import com.chat.persistence.repository.UserSanctionJdbcRepository
 import com.chat.persistence.repository.UserSanctionRecord
+import com.chat.persistence.repository.UserStoreAdapter
+import com.chat.persistence.security.PasswordHashingAdapter
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Assertions.assertThrows
@@ -242,11 +246,11 @@ class UserServiceImplTest {
         userSanctionRepository: UserSanctionJdbcRepository,
     ): UserServiceImpl =
         UserServiceImpl(
-            userRepository = userRepository,
+            userRepository = UserStoreAdapter(userRepository),
             sessionTokenService = sessionTokenService,
-            userSanctionRepository = userSanctionRepository,
+            userSanctionRepository = LoginSanctionAdapter(userSanctionRepository),
             clock = clock,
-            passwordEncoder = passwordEncoder,
+            passwordHashing = PasswordHashingAdapter(passwordEncoder),
         )
 
     private fun legacySha256(password: String): String {

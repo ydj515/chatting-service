@@ -8,15 +8,16 @@ import com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses
 import com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.slices
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.transaction.annotation.Transactional
 
 class ArchitectureTest {
     private val classes = ClassFileImporter().withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS).importPackages("com.chat")
 
     @Test
-    fun `transactions belong to persistence application services`() {
-        classes().that().areAnnotatedWith(Transactional::class.java).should().resideInAPackage("com.chat.persistence.service..").check(classes)
-        methods().that().areAnnotatedWith(Transactional::class.java).should().beDeclaredInClassesThat().resideInAPackage("com.chat.persistence.service..").check(classes)
+    fun `transactions belong to application services`() {
+        classes().that().areAnnotatedWith(Transactional::class.java).should().resideInAnyPackage("com.chat.persistence.service..", "com.chat.core..service..").check(classes)
+        methods().that().areAnnotatedWith(Transactional::class.java).should().beDeclaredInClassesThat().resideInAnyPackage("com.chat.persistence.service..", "com.chat.core..service..").check(classes)
     }
 
     @Test
@@ -36,6 +37,8 @@ class ArchitectureTest {
             "com.chat.worker.application.ChatWorkerApplication",
         ).forEach { name ->
             assertTrue(classes.any { it.name == name }, "Missing composition root: $name")
+            val application = Class.forName(name).getAnnotation(SpringBootApplication::class.java)
+            assertTrue("com.chat.core" in application.scanBasePackages, "Core use cases are not scanned by $name")
         }
     }
 
