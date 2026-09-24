@@ -85,6 +85,16 @@ class RedisMessageAdmissionPolicyServiceTest {
     }
 
     @Test
+    fun `large slow mode durations remain positive milliseconds for Redis`() {
+        val redis = redisTemplate()
+        val service = admissionService(redis.template, RoomAdmissionPolicy(slowModeSeconds = Int.MAX_VALUE))
+        service.requireAllowed(roomId = 3L, senderId = 7L)
+        verify(redis.template).execute(
+            anyRedisScript(), anyList<String>(), eq("2000"), eq("0"), eq("0"), eq("2147483647000"), eq("7"),
+        )
+    }
+
+    @Test
     fun `정책이 비어 있으면 Redis를 호출하지 않고 허용한다`() {
         val redis = redisTemplate()
         val service = admissionService(redis.template, RoomAdmissionPolicy())

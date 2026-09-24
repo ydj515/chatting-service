@@ -119,7 +119,7 @@ class RedisMessageAdmissionPolicyService(
     private fun MemberRole.priorityBypassesAdmission(): Boolean = this == MemberRole.OWNER || this == MemberRole.ADMIN
 
     private companion object {
-        const val MILLIS_PER_SECOND = 1_000
+        const val MILLIS_PER_SECOND = 1_000L
         const val RESULT_ALLOWED = 0L
         const val RESULT_ROOM_RATE_LIMITED = 1L
         const val RESULT_USER_RATE_LIMITED = 2L
