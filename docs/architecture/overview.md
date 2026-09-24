@@ -110,6 +110,11 @@ executor 종료 후 enqueue는 실패로 반환하고 해당 연결을 1013으�
 처리량 보장이 아니며 실제 연결 수·전송 지연·거부율에 맞춰 `outbound-executor-queue-capacity`를
 조정한다. 종료 시 Gateway가 연결·구독·큐를 정리한 뒤 executor 대기 작업을 취소한다.
 handshake의 query parameter·fallback 설정은 delivery에서 바인딩하며 기존 설정 키는 유지한다.
+Redis broker의 중복 수신 기록은 설정된 초기 지연 후 TTL 간격으로 정리한다.
+정리 전용 Spring scheduler를 사용하며 broker 종료 시 주기 작업을 취소하고 context 종료 시
+executor도 종료한다. WebSocket heartbeat는 별도 scheduler를 명시하므로 broker 정리와
+실행 thread를 공유하지 않는다. 첫 실행 이후에도 만료 기록을 제거하고, 정리 도중 같은 ID의 기록이
+갱신되면 이전 timestamp로 새 기록을 지우지 않는다.
 
 WebSocket 부모 세션의 만료·개별 철회·사용자 전체 철회 기준은 core의
 `WebSocketTicketSessionPolicy`가 소유한다. Redis 티켓 adapter와 연결 전송 adapter는
@@ -127,9 +132,11 @@ JPA annotation·auditing은 기존 통합 모델의 의도적인 예외다. ORM 
 왜곡하면 별도 persistence 모델로 분리한다. `Page`/`Pageable`은 기존 paging·정렬 의미와
 응답 호환성을 유지하기 위해 core 계약에 한정해 허용하고 domain 서비스 계약은 제거했다.
 
-현재는 실행 역할 분리가 계층 분리보다 앞서 있다. 모듈 간 순환 의존성이 없다는 사실만으로
-layered-clean 구조가 완성됐다고 평가하지 않는다. 유스케이스와 output port의 소유권,
-transport DTO, concrete adapter 의존성은 별도로 점검한다.
+현재 모듈은 실행 역할과 내부 계층을 별도로 나눈다. core가 유스케이스와 외부 의존 계약을
+소유하고 delivery·persistence가 안쪽 계약을 참조한다. domain의 JPA 통합 모델과 core의
+`Page`/`Pageable`은 위에 설명한 의도적 예외이므로 framework 독립성이 완전하다고 평가하지
+않는다. persistence 내부의 DB·Redis·S3를 더 많은 Gradle 모듈로 분리할 필요는 현재 확인된
+역방향 의존에서 나오지 않는다. 독립 교체·의존성 제외 요구가 생길 때 다시 분리한다.
 
 `chat-application:architectureTest`는 모든 실행 모듈과 코드가 있는 라이브러리를
 클래스패스에 포함한다. composition root 누락, 최상위 모듈 package 간 순환,
@@ -158,6 +165,28 @@ Gateway Redis adapter는 Boot의 `stringRedisTemplate`과 공존하므로 `redis
 DB lease를 사용하는 캐시 무효화·세션 철회 재시도는 업무 트랜잭션에 작업을 등록한 뒤
 외부 처리를 재시도하는 기술적 전달 구현이다. 이런 기술 흐름마다 동일한 포트를 추가해
 core에 재배치하지 않는다.
+
+## 점검 기준과 검증 범위
+
+`workflow/dev-standards`의 `standards/frameworks/spring.md`,
+`standards/languages/java.md`, `standards/architectures/layered-clean.md`를 기준으로
+위 표의 13개 Gradle 모듈을 점검한다. Java 문법을 Kotlin에 이식하지 않고 생성자 주입,
+필수 의존성, 오류 원인 보존, 자원 수명과 동시성 원칙을 적용한다.
+
+| 점검 항목 | 구현과 검증 근거 |
+| --- | --- |
+| 의존 방향·순환·실행 모듈 역참조 | 각 `build.gradle.kts`와 모든 코드 모듈을 포함하는 `ArchitectureTest` |
+| 유스케이스·트랜잭션 소유권 | core 서비스, 저장소 포트, after-commit·트랜잭션 회귀 테스트와 허용 목록 |
+| delivery·wire·저장소 경계 | 요청→command 변환, protocol JSON 호환 테스트, Redis 캐시 타입 호환 테스트 |
+| Spring 조립·필수 의존성 | Gateway·메시지 정책·Fanout 구성 테스트 및 다섯 실행 JAR의 독립 기동 |
+| executor·정리 작업 수명 | bounded outbound executor, 명시적 scheduler 선택, context 종료·작업 취소 테스트 |
+| Kotlin 정적 품질 | 전체 `check`의 typed Detekt·ktlint·Kover·단위/통합/아키텍처 검사 |
+| 배포 산출물의 역할 경계 | 다섯 `bootJar`의 내부 라이브러리; API·Admin·Worker에 WebSocket 구현 미포함 |
+
+전체 검증 명령은 `./gradlew clean check bootJar`다. PostgreSQL·Redis 통합 테스트는
+테스트 전용 `CHAT_TEST_POSTGRES_URL`, `CHAT_TEST_POSTGRES_PASSWORD`,
+`CHAT_TEST_REDIS_PORT`를 제공해야 실행된다. 환경 변수가 없는 실행의 성공을 실제 저장소
+통합 검증 완료로 간주하지 않는다. 이 검증은 성능 목표 달성이나 운영 환경 검증을 뜻하지 않는다.
 
 ## 보장 범위
 
