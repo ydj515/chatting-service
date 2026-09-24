@@ -5,6 +5,7 @@ import com.tngtech.archunit.core.importer.ImportOption
 import com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes
 import com.tngtech.archunit.lang.syntax.ArchRuleDefinition.methods
 import com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses
+import com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.slices
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.springframework.transaction.annotation.Transactional
@@ -20,9 +21,36 @@ class ArchitectureTest {
 
     @Test
     fun `production modules are present in the architecture test classpath`() {
-        listOf("domain", "persistence", "api", "admin", "websocket").forEach { module ->
+        listOf("domain", "persistence", "api", "admin", "websocket", "worker", "application").forEach { module ->
             assertTrue(classes.any { it.packageName.startsWith("com.chat.$module") }, "Missing production module: $module")
         }
+    }
+
+    @Test
+    fun `every executable composition root is inspected`() {
+        listOf(
+            "com.chat.application.ChatApplication",
+            "com.chat.api.application.ChatApiApplication",
+            "com.chat.admin.application.ChatAdminApplication",
+            "com.chat.websocket.application.ChatWebSocketApplication",
+            "com.chat.worker.application.ChatWorkerApplication",
+        ).forEach { name ->
+            assertTrue(classes.any { it.name == name }, "Missing composition root: $name")
+        }
+    }
+
+    @Test
+    fun `module packages have no dependency cycles`() {
+        slices().matching("com.chat.(*)..").should().beFreeOfCycles().check(classes)
+    }
+
+    @Test
+    fun `business and adapters do not depend on executable composition roots`() {
+        noClasses().that().resideOutsideOfPackages("..application..")
+            .should().dependOnClassesThat().resideInAnyPackage(
+                "com.chat.application..", "com.chat.api.application..", "com.chat.admin.application..",
+                "com.chat.websocket.application..", "com.chat.worker.application..",
+            ).check(classes)
     }
 
     @Test

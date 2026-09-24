@@ -15,6 +15,10 @@ dependencyManagement {
 dependencies {
     testImplementation(libs.archunit)
     testImplementation(project(":chat-admin"))
+    testImplementation(project(":chat-api-application"))
+    testImplementation(project(":chat-admin-application"))
+    testImplementation(project(":chat-websocket-application"))
+    testImplementation(project(":chat-worker-application"))
     // 모든 하위 모듈 포함 (조립자 역할)
     implementation(project(":chat-runtime-config"))
     implementation(project(":chat-api"))
