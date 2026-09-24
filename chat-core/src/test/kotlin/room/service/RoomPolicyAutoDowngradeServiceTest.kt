@@ -1,6 +1,11 @@
-package com.chat.persistence.service
+package com.chat.core.room.service
 
-import com.chat.persistence.config.ChatRoomPolicyProperties
+import com.chat.core.room.policy.RoomHeatClassifier
+import com.chat.core.room.policy.RoomHeatLevel
+import com.chat.core.room.policy.RoomHeatPolicy
+import com.chat.core.room.policy.RoomHeatSettings
+import com.chat.core.room.policy.RoomTrafficSnapshot
+import com.chat.core.room.port.RoomPolicyRepository
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 
@@ -9,7 +14,7 @@ class RoomPolicyAutoDowngradeServiceTest {
     fun `traffic snapshot을 heat policy로 분류한 뒤 room policy repository에 적용한다`() {
         val repository = RecordingRoomPolicyRepository()
         val service = RoomPolicyAutoDowngradeService(
-            roomHeatClassifier = RoomHeatClassifier(ChatRoomPolicyProperties()),
+            roomHeatClassifier = RoomHeatClassifier(RoomHeatSettings()),
             roomPolicyRepository = repository,
         )
 

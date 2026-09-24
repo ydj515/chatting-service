@@ -25,8 +25,7 @@
     <ID>TooGenericExceptionCaught:RedisSessionControlBroker.kt$RedisSessionControlBroker$e: Exception</ID>
     <ID>TooGenericExceptionCaught:RedisWebSocketTicketService.kt$RedisWebSocketTicketService$e: Exception</ID>
     <ID>TooGenericExceptionCaught:ReplicaLagGaugePublisher.kt$ReplicaLagGaugePublisher$e: Exception</ID>
-    <ID>TooGenericExceptionCaught:RoomPolicyWorker.kt$RoomPolicyWorker$e: Exception</ID>
     <ID>TooGenericExceptionCaught:RoomSeqGapAuditWorker.kt$RoomSeqGapAuditWorker$e: RuntimeException</ID>
-    <ID>TooGenericExceptionCaught:RoomTrafficStatsService.kt$RedisRoomTrafficStatsService$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:RedisRoomTrafficStatsService.kt$RedisRoomTrafficStatsService$e: Exception</ID>
   </CurrentIssues>
 </SmellBaseline>

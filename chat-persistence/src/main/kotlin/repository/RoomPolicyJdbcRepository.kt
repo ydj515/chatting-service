@@ -1,7 +1,7 @@
 package com.chat.persistence.repository
 
-import com.chat.persistence.service.RoomHeatPolicy
-import com.chat.persistence.service.RoomPolicyRepository
+import com.chat.core.room.policy.RoomHeatPolicy
+import com.chat.core.room.port.RoomPolicyRepository
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.cache.annotation.CacheEvict
 import org.springframework.cache.annotation.Caching

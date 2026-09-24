@@ -1,32 +1,17 @@
-package com.chat.persistence.service
+package com.chat.core.room.service
 
+import com.chat.core.room.policy.RoomTrafficSnapshot
+import com.chat.core.room.port.RoomPolicySignalProvider
+import com.chat.core.room.port.RoomPolicySignals
+import com.chat.core.room.port.RoomTrafficStatsService
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
-
-data class RoomPolicySignals(
-    val writerLagMillis: Long = 0,
-    val fanoutLagMillis: Long = 0,
-    val gatewaySendQueueDepth: Int = 0,
-)
-
-interface RoomPolicySignalProvider {
-    fun signals(roomId: Long): RoomPolicySignals
-
-    object Noop : RoomPolicySignalProvider {
-        override fun signals(roomId: Long): RoomPolicySignals = RoomPolicySignals()
-    }
-}
-
-@Service
-class NoopRoomPolicySignalProvider : RoomPolicySignalProvider {
-    override fun signals(roomId: Long): RoomPolicySignals = RoomPolicySignals()
-}
 
 @Service
 class RoomPolicyWorker(
     private val roomTrafficStatsService: RoomTrafficStatsService,
     private val roomPolicyAutoDowngradeService: RoomPolicyAutoDowngradeService,
-    private val roomPolicySignalProvider: RoomPolicySignalProvider = RoomPolicySignalProvider.Noop,
+    private val roomPolicySignalProvider: RoomPolicySignalProvider,
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
 

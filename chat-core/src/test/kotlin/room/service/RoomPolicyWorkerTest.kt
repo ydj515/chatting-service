@@ -1,5 +1,11 @@
-package com.chat.persistence.service
+package com.chat.core.room.service
 
+import com.chat.core.room.policy.RoomHeatLevel
+import com.chat.core.room.policy.RoomHeatPolicy
+import com.chat.core.room.policy.RoomTrafficSnapshot
+import com.chat.core.room.port.RoomPolicySignalProvider
+import com.chat.core.room.port.RoomPolicySignals
+import com.chat.core.room.port.RoomTrafficStatsService
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.mock
@@ -31,6 +37,7 @@ class RoomPolicyWorkerTest {
         val worker = RoomPolicyWorker(
             roomTrafficStatsService = trafficStatsService,
             roomPolicyAutoDowngradeService = autoDowngradeService,
+            roomPolicySignalProvider = RoomPolicySignalProvider.Noop,
         )
 
         val appliedCount = worker.pollAndApply()
@@ -81,6 +88,22 @@ class RoomPolicyWorkerTest {
 
         assertEquals(1, appliedCount)
         verify(autoDowngradeService).applyDowngradePolicy(expectedSnapshot)
+    }
+
+    @Test
+    fun `one room failure does not prevent subsequent policy updates`() {
+        val traffic = StaticRoomTrafficStatsService(
+            linkedMapOf(
+                10L to RoomTrafficSnapshot(10, 100, 100),
+                11L to RoomTrafficSnapshot(11, 100, 100),
+            ),
+        )
+        val apply = mock(RoomPolicyAutoDowngradeService::class.java)
+        `when`(apply.applyDowngradePolicy(traffic.snapshot(10))).thenThrow(IllegalStateException("storage unavailable"))
+        `when`(apply.applyDowngradePolicy(traffic.snapshot(11))).thenReturn(normalPolicy(11))
+        val worker = RoomPolicyWorker(traffic, apply, RoomPolicySignalProvider.Noop)
+        assertEquals(1, worker.pollAndApply())
+        verify(apply).applyDowngradePolicy(traffic.snapshot(11))
     }
 
     private class StaticRoomTrafficStatsService(

@@ -1,5 +1,6 @@
 package com.chat.persistence.config
 
+import com.chat.core.room.policy.RoomHeatSettings
 import jakarta.validation.constraints.AssertTrue
 import jakarta.validation.constraints.Min
 import org.springframework.boot.context.properties.ConfigurationProperties
@@ -8,26 +9,26 @@ import org.springframework.validation.annotation.Validated
 @Validated
 @ConfigurationProperties(prefix = "chat.room-policy")
 data class ChatRoomPolicyProperties(
-    val hotMessagesPerSecond: Long = 1_000,
-    val veryHotMessagesPerSecond: Long = 5_000,
+    val hotMessagesPerSecond: Long = DEFAULT_HEAT_SETTINGS.hotMessagesPerSecond,
+    val veryHotMessagesPerSecond: Long = DEFAULT_HEAT_SETTINGS.veryHotMessagesPerSecond,
     @field:Min(1)
-    val hotShardCount: Int = 16,
+    val hotShardCount: Int = DEFAULT_HEAT_SETTINGS.hotShardCount,
     @field:Min(1)
-    val veryHotShardCount: Int = 64,
-    val overloadWriterLagMillis: Long = 3_000,
-    val overloadFanoutLagMillis: Long = 3_000,
-    val overloadGatewayQueueDepth: Int = 128,
-    val normalLiveFeedMaxMessages: Int = 1_000,
-    val normalLiveFeedMaxAgeSeconds: Int = 60,
-    val veryHotLiveFeedMaxMessages: Int = 500,
-    val veryHotLiveFeedMaxAgeSeconds: Int = 30,
-    val overloadLiveFeedMaxMessages: Int = 300,
-    val overloadLiveFeedMaxAgeSeconds: Int = 15,
-    val veryHotRoomRateLimitPerSecond: Int = 5_000,
-    val overloadRoomRateLimitPerSecond: Int = 1_000,
-    val hotSlowModeSeconds: Int = 1,
-    val veryHotSlowModeSeconds: Int = 1,
-    val overloadSlowModeSeconds: Int = 3,
+    val veryHotShardCount: Int = DEFAULT_HEAT_SETTINGS.veryHotShardCount,
+    val overloadWriterLagMillis: Long = DEFAULT_HEAT_SETTINGS.overloadWriterLagMillis,
+    val overloadFanoutLagMillis: Long = DEFAULT_HEAT_SETTINGS.overloadFanoutLagMillis,
+    val overloadGatewayQueueDepth: Int = DEFAULT_HEAT_SETTINGS.overloadGatewayQueueDepth,
+    val normalLiveFeedMaxMessages: Int = DEFAULT_HEAT_SETTINGS.normalLiveFeedMaxMessages,
+    val normalLiveFeedMaxAgeSeconds: Int = DEFAULT_HEAT_SETTINGS.normalLiveFeedMaxAgeSeconds,
+    val veryHotLiveFeedMaxMessages: Int = DEFAULT_HEAT_SETTINGS.veryHotLiveFeedMaxMessages,
+    val veryHotLiveFeedMaxAgeSeconds: Int = DEFAULT_HEAT_SETTINGS.veryHotLiveFeedMaxAgeSeconds,
+    val overloadLiveFeedMaxMessages: Int = DEFAULT_HEAT_SETTINGS.overloadLiveFeedMaxMessages,
+    val overloadLiveFeedMaxAgeSeconds: Int = DEFAULT_HEAT_SETTINGS.overloadLiveFeedMaxAgeSeconds,
+    val veryHotRoomRateLimitPerSecond: Int = DEFAULT_HEAT_SETTINGS.veryHotRoomRateLimitPerSecond,
+    val overloadRoomRateLimitPerSecond: Int = DEFAULT_HEAT_SETTINGS.overloadRoomRateLimitPerSecond,
+    val hotSlowModeSeconds: Int = DEFAULT_HEAT_SETTINGS.hotSlowModeSeconds,
+    val veryHotSlowModeSeconds: Int = DEFAULT_HEAT_SETTINGS.veryHotSlowModeSeconds,
+    val overloadSlowModeSeconds: Int = DEFAULT_HEAT_SETTINGS.overloadSlowModeSeconds,
     val trafficKeyPrefix: String = "chat:room-traffic:",
     val activeRoomsKey: String = "chat:room-traffic:active-rooms",
     val trafficWindowSeconds: Long = 60,
@@ -37,3 +38,5 @@ data class ChatRoomPolicyProperties(
     val veryHotShardCountAtLeastHotShardCount: Boolean
         get() = veryHotShardCount >= hotShardCount
 }
+
+private val DEFAULT_HEAT_SETTINGS = RoomHeatSettings()

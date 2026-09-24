@@ -1,10 +1,10 @@
-package com.chat.persistence.service
+package com.chat.core.room.service
 
+import com.chat.core.room.policy.RoomHeatClassifier
+import com.chat.core.room.policy.RoomHeatPolicy
+import com.chat.core.room.policy.RoomTrafficSnapshot
+import com.chat.core.room.port.RoomPolicyRepository
 import org.springframework.stereotype.Service
-
-interface RoomPolicyRepository {
-    fun applyAutomaticPolicy(policy: RoomHeatPolicy)
-}
 
 @Service
 class RoomPolicyAutoDowngradeService(

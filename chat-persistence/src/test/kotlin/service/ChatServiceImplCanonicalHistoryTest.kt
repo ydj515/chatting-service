@@ -12,6 +12,7 @@ import com.chat.core.message.port.MessageReadPort
 import com.chat.core.message.port.UserSanctionPolicyService
 import com.chat.core.message.service.MessageSendPolicy
 import com.chat.core.message.service.MessageSendingService
+import com.chat.core.room.port.RoomTrafficStatsService
 import com.chat.core.room.service.ChatServiceImpl
 import com.chat.domain.model.MessageType
 import com.chat.persistence.config.ChatRedisProperties

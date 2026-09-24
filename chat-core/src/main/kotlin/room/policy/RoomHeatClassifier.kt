@@ -1,7 +1,4 @@
-package com.chat.persistence.service
-
-import com.chat.persistence.config.ChatRoomPolicyProperties
-import org.springframework.stereotype.Service
+package com.chat.core.room.policy
 
 enum class RoomHeatLevel {
     NORMAL,
@@ -30,9 +27,8 @@ data class RoomHeatPolicy(
     val fanoutShardCount: Int,
 )
 
-@Service
 class RoomHeatClassifier(
-    private val properties: ChatRoomPolicyProperties,
+    private val properties: RoomHeatSettings,
 ) {
     fun classify(snapshot: RoomTrafficSnapshot): RoomHeatPolicy =
         when {

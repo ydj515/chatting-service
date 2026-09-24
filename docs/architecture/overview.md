@@ -68,6 +68,14 @@ Redis 철회 호출 중 DB 트랜잭션을 유지하지 않도록 `NOT_SUPPORTED
 발행하는 `MembershipEvents` 계약을 사용한다. Redis Streams 수락·sequence 발급과
 broker 구현은 `MessageAcceptance` 뒤에 남는다.
 
+방 트래픽의 NORMAL·HOT·VERY_HOT·OVERLOAD 판정과 방별 자동 정책 적용 흐름은
+core가 소유한다. `RoomHeatClassifier`는 Spring이나 Redis에 의존하지 않는 정책이며,
+`RoomHeatSettings`를 통해 기준을 받는다. 기존 `chat.room-policy.*` 키는 persistence에서
+바인딩해 정책 설정으로 변환한다. Redis 통계 수집과 JDBC 정책 반영은 core 포트의 adapter다.
+정책 신호 공급자는 필수 주입이며 방 하나의 조회·적용 실패는 다음 방의 처리를 막지 않는다.
+현재 신호 adapter는 같은 프로세스의 Gateway 큐만 관측한다. 별도 Gateway 프로세스의 큐와
+writer/fanout lag를 결합하는 운영 기능은 이 모듈 분리로 구현됐다고 보지 않는다.
+
 관리자 검색·정책·모더레이션 유스케이스도 core가 소유한다. 감사 메타데이터와 export 요청의
 JSON 직렬화는 adapter가 처리하고, 제재 변경·감사·내구성 있는 무효화/철회 작업 등록은
 같은 트랜잭션에 참여한다. 내보내기 상태의 조회·감사는 `AdminExportStatusReader`가

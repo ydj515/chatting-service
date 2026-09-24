@@ -1,5 +1,7 @@
 package com.chat.persistence.service
 
+import com.chat.core.room.policy.RoomTrafficSnapshot
+import com.chat.core.room.port.RoomTrafficStatsService
 import com.chat.persistence.config.ChatRoomPolicyProperties
 import org.slf4j.LoggerFactory
 import org.springframework.data.redis.core.RedisTemplate
@@ -7,27 +9,6 @@ import org.springframework.stereotype.Service
 import java.time.Clock
 import java.time.Duration
 import kotlin.math.ceil
-
-interface RoomTrafficStatsService {
-    fun recordAccepted(roomId: Long)
-
-    fun activeRoomIds(): Set<Long>
-
-    fun snapshot(roomId: Long): RoomTrafficSnapshot
-
-    object Noop : RoomTrafficStatsService {
-        override fun recordAccepted(roomId: Long) = Unit
-
-        override fun activeRoomIds(): Set<Long> = emptySet()
-
-        override fun snapshot(roomId: Long): RoomTrafficSnapshot =
-            RoomTrafficSnapshot(
-                roomId = roomId,
-                roomMessagesPerSecond = 0,
-                roomMessagesP95PerSecond = 0,
-            )
-    }
-}
 
 @Service
 class RedisRoomTrafficStatsService(

@@ -1,7 +1,7 @@
 package com.chat.persistence.repository
 
-import com.chat.persistence.service.RoomHeatLevel
-import com.chat.persistence.service.RoomHeatPolicy
+import com.chat.core.room.policy.RoomHeatLevel
+import com.chat.core.room.policy.RoomHeatPolicy
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentCaptor

@@ -1,11 +1,11 @@
 package com.chat.worker.application
 
+import com.chat.core.room.service.RoomPolicyWorker
 import com.chat.persistence.config.ChatWorkerProperties
 import com.chat.persistence.service.AdminMessageExportWorker
 import com.chat.persistence.service.HotRoomFanoutWorker
 import com.chat.persistence.service.MessageWriterWorker
 import com.chat.persistence.service.RedisStreamLagMonitor
-import com.chat.persistence.service.RoomPolicyWorker
 import com.chat.persistence.service.RoomSeqGapAuditWorker
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.mock

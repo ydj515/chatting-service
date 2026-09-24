@@ -78,6 +78,13 @@ class ArchitectureTest {
     }
 
     @Test
+    fun `room heat policies are independent of Spring and adapters`() {
+        noClasses().that().resideInAPackage("com.chat.core.room.policy..")
+            .should().dependOnClassesThat().resideInAnyPackage("org.springframework..", "com.chat.persistence..")
+            .check(classes)
+    }
+
+    @Test
     fun `shared wire contracts do not depend on application or adapters`() {
         noClasses().that().resideInAPackage("com.chat.protocol..")
             .should().dependOnClassesThat().resideInAnyPackage(

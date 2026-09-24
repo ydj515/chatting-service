@@ -1,6 +1,6 @@
-package com.chat.persistence.service
+package com.chat.core.room.policy
 
-import com.chat.persistence.config.ChatRoomPolicyProperties
+import com.chat.core.room.policy.RoomHeatSettings
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 
@@ -130,5 +130,5 @@ class RoomHeatClassifierTest {
         assertEquals(64, policy.fanoutShardCount)
     }
 
-    private fun classifier(): RoomHeatClassifier = RoomHeatClassifier(ChatRoomPolicyProperties())
+    private fun classifier(): RoomHeatClassifier = RoomHeatClassifier(RoomHeatSettings())
 }

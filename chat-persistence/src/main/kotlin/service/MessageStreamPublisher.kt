@@ -4,6 +4,7 @@ import com.chat.core.dto.MessageDto
 import com.chat.core.mapping.toUserDto
 import com.chat.core.message.command.SendMessageCommand
 import com.chat.core.message.port.MessageAcceptance
+import com.chat.core.room.port.RoomTrafficStatsService
 import com.chat.domain.model.ChatRoom
 import com.chat.domain.model.Message
 import com.chat.domain.model.User
