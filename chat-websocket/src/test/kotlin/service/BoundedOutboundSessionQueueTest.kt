@@ -1,11 +1,33 @@
 package com.chat.websocket.service
 
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import java.util.concurrent.Executor
+import java.util.concurrent.RejectedExecutionException
 
 class BoundedOutboundSessionQueueTest {
+    @Test
+    fun `rejected drain closes queue clears payloads and reports failure once`() {
+        var failures = 0
+        val queue = BoundedOutboundSessionQueue(
+            maxPendingMessages = 2,
+            executor = Executor { throw RejectedExecutionException("saturated") },
+            sender = { error("rejected work cannot run") },
+            onOverflow = { error("executor rejection is not a slow client overflow") },
+            onFailure = { failure ->
+                assertTrue(failure is RejectedExecutionException)
+                failures += 1
+            },
+        )
+        assertFalse(queue.enqueue("private payload"))
+        assertTrue(queue.isClosed())
+        assertEquals(0, queue.pendingSize())
+        assertFalse(queue.enqueue("retry"))
+        assertEquals(1, failures)
+    }
+
     @Test
     fun `priority enqueue makes room by dropping newest normal payload and drains first`() {
         val scheduled = mutableListOf<Runnable>()

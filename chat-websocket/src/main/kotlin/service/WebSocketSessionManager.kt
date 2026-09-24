@@ -9,6 +9,7 @@ import com.chat.core.gateway.port.MembershipAction
 import com.chat.core.gateway.port.SessionControlEvents
 import com.fasterxml.jackson.databind.ObjectMapper
 import jakarta.annotation.PostConstruct
+import jakarta.annotation.PreDestroy
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.web.socket.CloseStatus
@@ -56,6 +57,11 @@ class WebSocketSessionManager(
         )
     }
 
+    @PreDestroy
+    fun shutdown() {
+        sessionIdsByUserId.keys.toList().forEach { closeSessionsForUser(it, CloseStatus.GOING_AWAY) }
+    }
+
     // RoomPolicy OVERLOAD 판정 입력으로 노출하는 현재 Gateway pending depth 합계.
     override fun currentSendQueueDepth(): Int =
         sessionsById.values.sumOf { it.outboundQueue.pendingSize() }
@@ -85,8 +91,6 @@ class WebSocketSessionManager(
     fun recordSessionActivity(session: WebSocketSession, nowMillis: Long) {
         sessionsById[session.id]?.lastActivityAtMillis?.set(nowMillis)
     }
-
-    fun pollHeartbeats() = pollHeartbeats(transport.nowMillis())
 
     fun pollHeartbeats(nowMillis: Long) {
         transport.pollHeartbeats(sessionsById.values, nowMillis, ::removeSession)

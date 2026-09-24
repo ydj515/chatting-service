@@ -16,6 +16,7 @@ import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
 import java.util.concurrent.Executor
+import java.util.concurrent.RejectedExecutionException
 
 class WebSocketSessionAuthorizationTest {
     private val now = Instant.parse("2026-09-21T00:00:00Z")
@@ -74,6 +75,21 @@ class WebSocketSessionAuthorizationTest {
         checkNotNull(task).run()
         verify(active).close(CloseStatus(4003, "Session expired or revoked"))
         org.mockito.Mockito.verify(active, org.mockito.Mockito.never()).sendMessage(org.mockito.ArgumentMatchers.any())
+    }
+
+    @Test
+    fun `executor rejection closes the socket and removes managed state`() {
+        val transport = WebSocketSessionTransport(
+            ChatWebSocketGatewayProperties(), authorization,
+            Executor { throw RejectedExecutionException("saturated") },
+        )
+        val socket = session()
+        var removed = false
+        val managed = transport.create(7, socket) { _, _ -> removed = true }
+        assertFalse(managed.outboundQueue.enqueue("payload"))
+        assertTrue(removed)
+        assertTrue(managed.outboundQueue.isClosed())
+        verify(socket).close(CloseStatus(1013, "Outbound executor unavailable"))
     }
 
     private fun session(digest: String = "digest", expiresAt: Long = now.epochSecond + 60): WebSocketSession =

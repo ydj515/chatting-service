@@ -75,6 +75,11 @@ WebSocket 연결·로컬 구독·전송 큐·executor·metrics는 `chat-websocke
 로컬 구독 상태를 기준으로 재시도한다. delivery에는 Redis template이나 repository를 노출하지 않는다.
 API·Admin·Worker 프로세스에 `LocalGateway`가 없으면 로컬 알림은 생략하고 Redis 알림은
 계속 발행한다. Gateway가 있는 프로세스에서는 commit 이후 로컬 구독도 갱신한다.
+전송 executor는 기본 32개 thread와 1,024개 대기 작업으로 제한한다. 대기 작업 하나는
+한 세션의 drain 작업이며 개별 메시지 큐의 기본 128개 제한과 별개다. 수용 한도 초과나
+executor 종료 후 enqueue는 실패로 반환하고 해당 연결을 1013으로 닫는다. 이 기본값은
+처리량 보장이 아니며 실제 연결 수·전송 지연·거부율에 맞춰 `outbound-executor-queue-capacity`를
+조정한다. 종료 시 Gateway가 연결·구독·큐를 정리한 뒤 executor 대기 작업을 취소한다.
 handshake의 query parameter·fallback 설정은 delivery에서 바인딩하며 기존 설정 키는 유지한다.
 
 WebSocket 부모 세션의 만료·개별 철회·사용자 전체 철회 기준은 core의

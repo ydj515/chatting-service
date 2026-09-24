@@ -6,6 +6,12 @@ import org.junit.jupiter.api.Test
 
 class ChatWebSocketGatewayPropertiesTest {
     @Test
+    fun `executor workers and waiting capacity must be positive`() {
+        assertThrows(IllegalArgumentException::class.java) { ChatWebSocketGatewayProperties(outboundExecutorThreads = 0) }
+        assertThrows(IllegalArgumentException::class.java) { ChatWebSocketGatewayProperties(outboundExecutorQueueCapacity = 0) }
+    }
+
+    @Test
     fun `heartbeat interval은 양수여야 한다`() {
         assertThrows(IllegalArgumentException::class.java) {
             ChatWebSocketGatewayProperties(

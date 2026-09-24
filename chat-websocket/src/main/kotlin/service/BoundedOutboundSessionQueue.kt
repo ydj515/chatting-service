@@ -2,6 +2,7 @@ package com.chat.websocket.service
 
 import java.util.ArrayDeque
 import java.util.concurrent.Executor
+import java.util.concurrent.RejectedExecutionException
 
 class BoundedOutboundSessionQueue(
     maxPendingMessages: Int,
@@ -59,7 +60,13 @@ class BoundedOutboundSessionQueue(
         }
 
         if (shouldStartDrain) {
-            executor.execute { drain() }
+            try {
+                executor.execute { drain() }
+            } catch (rejected: RejectedExecutionException) {
+                close()
+                onFailure(rejected)
+                return false
+            }
         }
 
         return true

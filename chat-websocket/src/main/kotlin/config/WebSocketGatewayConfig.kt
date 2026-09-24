@@ -2,21 +2,28 @@ package com.chat.websocket.config
 
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
+import java.util.concurrent.ThreadFactory
+import java.util.concurrent.ThreadPoolExecutor
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicLong
 
 @Configuration
 class WebSocketGatewayConfig(
     private val gatewayProperties: ChatWebSocketGatewayProperties,
 ) {
-    @Bean("webSocketOutboundExecutor", destroyMethod = "shutdown")
+    @Bean("webSocketOutboundExecutor", destroyMethod = "shutdownNow")
     fun webSocketOutboundExecutor(): ExecutorService {
-        val threads = gatewayProperties.outboundExecutorThreads.coerceAtLeast(1)
-        return Executors.newFixedThreadPool(threads) { runnable ->
-            Thread(runnable).apply {
-                name = "websocket-outbound-${System.currentTimeMillis()}"
-                isDaemon = true
-            }
+        val threads = gatewayProperties.outboundExecutorThreads
+        val sequence = AtomicLong()
+        val factory = ThreadFactory { runnable ->
+            Thread(runnable, "websocket-outbound-${sequence.incrementAndGet()}").apply { isDaemon = true }
         }
+        return ThreadPoolExecutor(
+            threads, threads, 0L, TimeUnit.MILLISECONDS,
+            ArrayBlockingQueue(gatewayProperties.outboundExecutorQueueCapacity),
+            factory, ThreadPoolExecutor.AbortPolicy(),
+        )
     }
 }

@@ -13,6 +13,7 @@ import java.nio.ByteBuffer
 import java.time.Clock
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executor
+import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.atomic.AtomicLong
 
 @Service
@@ -76,6 +77,8 @@ class WebSocketSessionTransport(
                 },
                 onFailure = { throwable ->
                     logger.error("Failed to send WebSocket message to ${session.id}", throwable)
+                    val status = if (throwable is RejectedExecutionException) OUTBOUND_EXECUTOR_FULL_STATUS else CloseStatus.SERVER_ERROR
+                    closeSession(session, status)
                     onRemove(userId, session)
                 },
             ),
@@ -133,6 +136,7 @@ class WebSocketSessionTransport(
     }
 
     private companion object {
+        val OUTBOUND_EXECUTOR_FULL_STATUS = CloseStatus(1013, "Outbound executor unavailable")
         val OUTBOUND_QUEUE_FULL_STATUS = CloseStatus(1013, "Outbound queue full")
         val HEARTBEAT_TIMEOUT_STATUS = CloseStatus(4004, "Heartbeat timeout")
     }

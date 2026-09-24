@@ -6,6 +6,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties
 data class ChatWebSocketGatewayProperties(
     val outboundQueueMaxPendingMessages: Int = 128,
     val outboundExecutorThreads: Int = 32,
+    val outboundExecutorQueueCapacity: Int = 1024,
     val outboundSendTimeLimitMillis: Int = 10_000,
     val outboundSendBufferSizeLimitBytes: Int = 512 * 1024,
     val heartbeatEnabled: Boolean = true,
@@ -16,6 +17,8 @@ data class ChatWebSocketGatewayProperties(
     val gatewayGroup: String = "default",
 ) {
     init {
+        require(outboundExecutorThreads > 0) { "chat.websocket.gateway.outbound-executor-threads must be > 0" }
+        require(outboundExecutorQueueCapacity > 0) { "chat.websocket.gateway.outbound-executor-queue-capacity must be > 0" }
         require(heartbeatIntervalMillis > 0) {
             "chat.websocket.gateway.heartbeat-interval-millis must be > 0"
         }
