@@ -1,6 +1,5 @@
 package com.chat.persistence.service
 
-import com.chat.persistence.config.ChatRedisProperties
 import com.chat.persistence.config.ChatWorkerProperties
 import com.chat.persistence.redis.MessageStreamConsumer
 import com.chat.persistence.redis.MessageStreamEnvelope
@@ -17,8 +16,8 @@ class HotRoomFanoutWorker(
     private val messageStreamConsumer: MessageStreamConsumer,
     private val redisMessageBroker: RedisMessageBroker,
     private val workerProperties: ChatWorkerProperties,
-    private val messageStreamKeyResolver: MessageStreamKeyResolver = MessageStreamKeyResolver(ChatRedisProperties()),
-    private val fanoutOwnerLeaseService: FanoutOwnerLeaseService = FanoutOwnerLeaseService.Noop,
+    private val messageStreamKeyResolver: MessageStreamKeyResolver,
+    private val fanoutOwnerLeaseService: FanoutOwnerLeaseService,
     private val messageStreamMetrics: MessageStreamMetrics = MessageStreamMetrics.Noop,
 ) {
     private val logger = LoggerFactory.getLogger(HotRoomFanoutWorker::class.java)

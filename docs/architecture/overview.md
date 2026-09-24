@@ -120,6 +120,8 @@ WebSocket 부모 세션의 만료·개별 철회·사용자 전체 철회 기준
 재시도 순서를 소유한다. 여러 저장소 변경을 하나의 업무 트랜잭션으로 묶는 요구가 생기면
 해당 경계를 core 유스케이스로 옮긴다. 다른 adapter나 controller의 트랜잭션 추가는
 아키텍처 검사가 거부하며, controller의 output port 직접 참조도 금지한다.
+Fanout의 stream key resolver와 owner lease는 필수 주입한다. 빈 누락을 기본 key 설정이나
+lease 검증 생략으로 대체하지 않으며, lease 비활성화는 `owner-lease.enabled=false` 설정으로만 결정한다.
 
 JPA annotation·auditing은 기존 통합 모델의 의도적인 예외다. ORM 제약이 업무 API를
 왜곡하면 별도 persistence 모델로 분리한다. `Page`/`Pageable`은 기존 paging·정렬 의미와

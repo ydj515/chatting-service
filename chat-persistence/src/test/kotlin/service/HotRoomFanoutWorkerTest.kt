@@ -1,9 +1,11 @@
 package com.chat.persistence.service
 
 import com.chat.domain.model.MessageType
+import com.chat.persistence.config.ChatRedisProperties
 import com.chat.persistence.config.ChatWorkerProperties
 import com.chat.persistence.redis.MessageStreamConsumer
 import com.chat.persistence.redis.MessageStreamEnvelope
+import com.chat.persistence.redis.MessageStreamKeyResolver
 import com.chat.persistence.redis.MessageStreamRecord
 import com.chat.persistence.redis.RedisMessageBroker
 import com.chat.protocol.websocket.ChatMessageBatch
@@ -29,7 +31,7 @@ class HotRoomFanoutWorkerTest {
         org.mockito.Mockito.doThrow(org.springframework.data.redis.RedisConnectionFailureException("unavailable"))
             .`when`(redis).convertAndSend(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.any())
         val broker = RedisMessageBroker(redis, mock(org.springframework.data.redis.listener.RedisMessageListenerContainer::class.java), com.chat.persistence.config.RedisConfig().distributedObjectMapper(), com.chat.persistence.config.ChatRedisProperties())
-        val worker = HotRoomFanoutWorker(consumer, broker, ChatWorkerProperties())
+        val worker = HotRoomFanoutWorker(consumer, broker, ChatWorkerProperties(), MessageStreamKeyResolver(ChatRedisProperties()), FanoutOwnerLeaseService.Noop)
         assertEquals(0, worker.pollAndFanout())
         assertEquals(emptyList<String>(), consumer.acked)
     }
@@ -44,6 +46,8 @@ class HotRoomFanoutWorkerTest {
         )
         val redisMessageBroker = mock(RedisMessageBroker::class.java)
         val worker = HotRoomFanoutWorker(
+            messageStreamKeyResolver = MessageStreamKeyResolver(ChatRedisProperties()),
+            fanoutOwnerLeaseService = FanoutOwnerLeaseService.Noop,
             messageStreamConsumer = consumer,
             redisMessageBroker = redisMessageBroker,
             workerProperties = ChatWorkerProperties(
@@ -89,6 +93,8 @@ class HotRoomFanoutWorkerTest {
         )
         val redisMessageBroker = mock(RedisMessageBroker::class.java)
         val worker = HotRoomFanoutWorker(
+            messageStreamKeyResolver = MessageStreamKeyResolver(ChatRedisProperties()),
+            fanoutOwnerLeaseService = FanoutOwnerLeaseService.Noop,
             messageStreamConsumer = consumer,
             redisMessageBroker = redisMessageBroker,
             workerProperties = ChatWorkerProperties(
@@ -115,6 +121,7 @@ class HotRoomFanoutWorkerTest {
         val redisMessageBroker = mock(RedisMessageBroker::class.java)
         val leaseService = FakeFanoutOwnerLeaseService(acquireResult = null)
         val worker = HotRoomFanoutWorker(
+            messageStreamKeyResolver = MessageStreamKeyResolver(ChatRedisProperties()),
             messageStreamConsumer = consumer,
             redisMessageBroker = redisMessageBroker,
             workerProperties = ChatWorkerProperties(
@@ -149,6 +156,7 @@ class HotRoomFanoutWorkerTest {
         val redisMessageBroker = mock(RedisMessageBroker::class.java)
         val leaseService = PerShardFanoutOwnerLeaseService()
         val worker = HotRoomFanoutWorker(
+            messageStreamKeyResolver = MessageStreamKeyResolver(ChatRedisProperties()),
             messageStreamConsumer = consumer,
             redisMessageBroker = redisMessageBroker,
             workerProperties = ChatWorkerProperties(
@@ -199,6 +207,7 @@ class HotRoomFanoutWorkerTest {
             ),
         )
         val worker = HotRoomFanoutWorker(
+            messageStreamKeyResolver = MessageStreamKeyResolver(ChatRedisProperties()),
             messageStreamConsumer = consumer,
             redisMessageBroker = redisMessageBroker,
             workerProperties = ChatWorkerProperties(
@@ -239,6 +248,7 @@ class HotRoomFanoutWorkerTest {
             ),
         )
         val worker = HotRoomFanoutWorker(
+            messageStreamKeyResolver = MessageStreamKeyResolver(ChatRedisProperties()),
             messageStreamConsumer = consumer,
             redisMessageBroker = redisMessageBroker,
             workerProperties = ChatWorkerProperties(
@@ -277,6 +287,8 @@ class HotRoomFanoutWorkerTest {
         )
         val redisMessageBroker = mock(RedisMessageBroker::class.java)
         val worker = HotRoomFanoutWorker(
+            messageStreamKeyResolver = MessageStreamKeyResolver(ChatRedisProperties()),
+            fanoutOwnerLeaseService = FanoutOwnerLeaseService.Noop,
             messageStreamConsumer = consumer,
             redisMessageBroker = redisMessageBroker,
             workerProperties = ChatWorkerProperties(
