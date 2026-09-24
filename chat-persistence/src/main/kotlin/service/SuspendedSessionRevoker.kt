@@ -1,5 +1,6 @@
 package com.chat.persistence.service
 
+import com.chat.core.admin.port.SuspendedSessions
 import com.chat.core.service.SessionControlPublisher
 import com.chat.core.service.SessionTokenRevocationStore
 import com.chat.persistence.config.SanctionCacheRetryProperties
@@ -23,13 +24,13 @@ class SuspendedSessionRevoker(
     transactionManager: PlatformTransactionManager,
     private val clock: Clock,
     private val retryProperties: SanctionCacheRetryProperties,
-) {
+) : SuspendedSessions {
     private val logger = LoggerFactory.getLogger(javaClass)
     private val transaction = TransactionTemplate(transactionManager).apply {
         propagationBehavior = TransactionDefinition.PROPAGATION_REQUIRES_NEW
     }
 
-    fun revokeAfterCommit(userId: Long) {
+    override fun revokeAfterCommit(userId: Long) {
         val id = UUID.randomUUID().toString()
         // This insert joins the sanction transaction; an insertion failure rolls it back.
         repository.enqueue(id, userId, clock.instant())

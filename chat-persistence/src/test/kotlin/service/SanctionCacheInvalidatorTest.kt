@@ -1,8 +1,11 @@
 package com.chat.persistence.service
 
+import com.chat.core.admin.service.AdminModerationServiceImpl
 import com.chat.core.dto.ModerationScopeType
 import com.chat.core.dto.UserSanctionType
 import com.chat.persistence.config.SanctionCacheRetryProperties
+import com.chat.persistence.repository.AdminSanctionStoreAdapter
+import com.chat.persistence.repository.ModerationRuleStoreAdapter
 import com.chat.persistence.repository.SanctionCacheInvalidationRepository
 import com.chat.persistence.repository.UserSanctionRecord
 import org.junit.jupiter.api.Assertions.*
@@ -167,8 +170,8 @@ class SanctionCacheInvalidatorTest {
         val tokens = org.mockito.Mockito.mock(com.chat.core.service.SessionTokenRevocationStore::class.java)
         val logout = org.mockito.Mockito.mock(com.chat.core.service.SessionControlPublisher::class.java)
         val service = AdminModerationServiceImpl(
-            org.mockito.Mockito.mock(com.chat.persistence.repository.ModerationRuleJdbcRepository::class.java),
-            com.chat.persistence.repository.UserSanctionJdbcRepository(f.jdbc),
+            ModerationRuleStoreAdapter(org.mockito.Mockito.mock(com.chat.persistence.repository.ModerationRuleJdbcRepository::class.java)),
+            AdminSanctionStoreAdapter(com.chat.persistence.repository.UserSanctionJdbcRepository(f.jdbc)),
             AdminAuditRecorder(com.chat.persistence.repository.AdminAuditLogRepository(f.jdbc), com.fasterxml.jackson.module.kotlin.jacksonObjectMapper().findAndRegisterModules()),
             SuspendedSessionRevoker(com.chat.persistence.repository.SessionRevocationJobRepository(f.jdbc), tokens, logout, f.transactionManager, f.clock, SanctionCacheRetryProperties()), f.clock, f.invalidator,
         )

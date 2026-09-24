@@ -1,5 +1,7 @@
 package com.chat.persistence.service
 
+import com.chat.core.admin.port.AdminMessageQuery
+import com.chat.core.admin.port.AdminRoomMessageQuery
 import com.chat.core.dto.AdminMessageCursor
 import com.chat.core.dto.AdminMessageCursorCodec
 import com.chat.core.dto.AdminMessageDto
@@ -10,9 +12,7 @@ import com.chat.persistence.config.ChatObjectStorageProperties
 import com.chat.persistence.config.ChatWorkerProperties
 import com.chat.persistence.repository.AdminExportJobRecord
 import com.chat.persistence.repository.AdminExportJobRepository
-import com.chat.persistence.repository.AdminMessageQuery
 import com.chat.persistence.repository.AdminMessageRepository
-import com.chat.persistence.repository.AdminRoomMessageQuery
 import com.chat.persistence.storage.ObjectStoragePort
 import com.chat.persistence.storage.ObjectUploadRequest
 import com.chat.persistence.storage.ObjectUploadResult

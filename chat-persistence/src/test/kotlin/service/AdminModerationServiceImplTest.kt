@@ -1,5 +1,6 @@
 package com.chat.persistence.service
 
+import com.chat.core.admin.service.AdminModerationServiceImpl
 import com.chat.core.dto.AdminCreateModerationRuleRequest
 import com.chat.core.dto.AdminCreateUserSanctionRequest
 import com.chat.core.dto.ModerationAction
@@ -7,8 +8,10 @@ import com.chat.core.dto.ModerationMatchType
 import com.chat.core.dto.ModerationScopeType
 import com.chat.core.dto.UserSanctionType
 import com.chat.persistence.repository.AdminAuditLogRepository
+import com.chat.persistence.repository.AdminSanctionStoreAdapter
 import com.chat.persistence.repository.ModerationRuleJdbcRepository
 import com.chat.persistence.repository.ModerationRuleRecord
+import com.chat.persistence.repository.ModerationRuleStoreAdapter
 import com.chat.persistence.repository.UserSanctionJdbcRepository
 import com.chat.persistence.repository.UserSanctionRecord
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
@@ -81,7 +84,7 @@ class AdminModerationServiceImplTest {
 
         fixture.service.createSanction("admin-local", request)
 
-        verify(fixture.invalidator).enqueue(sanctionRecord())
+        verify(fixture.invalidator).enqueue(request.scopeType, request.roomId, request.userId)
     }
 
     @Test
@@ -216,7 +219,7 @@ class AdminModerationServiceImplTest {
         `when`(fixture.sanctionRepository.create("admin-local", request)).thenReturn(record)
         `when`(fixture.sanctionRepository.revoke("admin-local", record.id)).thenReturn(record)
         if (revoke) fixture.service.revokeSanction("admin-local", record.id) else fixture.service.createSanction("admin-local", request)
-        verify(fixture.invalidator).enqueue(record)
+        verify(fixture.invalidator).enqueue(record.scopeType, record.roomId, record.userId)
     }
 
     private fun fixture(clock: java.time.Clock = java.time.Clock.systemUTC()): Fixture {
@@ -227,8 +230,8 @@ class AdminModerationServiceImplTest {
         val invalidator = mock(SanctionCacheInvalidator::class.java)
         return Fixture(
             service = AdminModerationServiceImpl(
-                ruleRepository = ruleRepository,
-                sanctionRepository = sanctionRepository,
+                ruleRepository = ModerationRuleStoreAdapter(ruleRepository),
+                sanctionRepository = AdminSanctionStoreAdapter(sanctionRepository),
                 auditRecorder = AdminAuditRecorder(auditRepository, jacksonObjectMapper()),
                 suspendedSessions = revoker,
                 clock = clock,

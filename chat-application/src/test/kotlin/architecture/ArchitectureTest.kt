@@ -3,7 +3,6 @@ package com.chat.application.architecture
 import com.tngtech.archunit.core.importer.ClassFileImporter
 import com.tngtech.archunit.core.importer.ImportOption
 import com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes
-import com.tngtech.archunit.lang.syntax.ArchRuleDefinition.methods
 import com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses
 import com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.slices
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -16,8 +15,12 @@ class ArchitectureTest {
 
     @Test
     fun `transactions belong to application services`() {
-        classes().that().areAnnotatedWith(Transactional::class.java).should().resideInAnyPackage("com.chat.persistence.service..", "com.chat.core..service..").check(classes)
-        methods().that().areAnnotatedWith(Transactional::class.java).should().beDeclaredInClassesThat().resideInAnyPackage("com.chat.persistence.service..", "com.chat.core..service..").check(classes)
+        classes().that().areAnnotatedWith(Transactional::class.java).should().resideInAPackage("com.chat.core..service..").check(classes)
+        classes.flatMap { it.methods }.filter { it.isAnnotatedWith(Transactional::class.java) }.forEach { method ->
+            // The storage port keeps one partitioned batch atomic; the worker owns ACK/retry sequencing.
+            val atomicStorageWrite = method.owner.name == "com.chat.persistence.service.PartitionedMessageWriteAdapter" && method.name == "write"
+            assertTrue(method.owner.packageName.startsWith("com.chat.core.") || atomicStorageWrite, "Unexpected transaction owner: ${method.fullName}")
+        }
     }
 
     @Test
@@ -83,7 +86,7 @@ class ArchitectureTest {
     @Test
     fun `controllers use application services instead of repositories or JPA entities`() {
         noClasses().that().resideInAPackage("..controller..")
-            .should().dependOnClassesThat().resideInAnyPackage("com.chat.persistence.repository..", "com.chat.domain.model..")
+            .should().dependOnClassesThat().resideInAnyPackage("com.chat.persistence.repository..", "com.chat.domain.model..", "com.chat.core..port..")
             .check(classes)
     }
 }

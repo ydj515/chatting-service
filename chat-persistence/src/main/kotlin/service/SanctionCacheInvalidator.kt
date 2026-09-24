@@ -1,5 +1,6 @@
 package com.chat.persistence.service
 
+import com.chat.core.admin.port.SanctionCacheInvalidation
 import com.chat.core.dto.ModerationScopeType
 import com.chat.persistence.config.SanctionCacheRetryProperties
 import com.chat.persistence.repository.SanctionCacheInvalidationRepository
@@ -23,16 +24,18 @@ class SanctionCacheInvalidator(
     transactionManager: PlatformTransactionManager,
     private val clock: Clock,
     private val properties: SanctionCacheRetryProperties,
-) {
+) : SanctionCacheInvalidation {
     private val logger = LoggerFactory.getLogger(javaClass)
     private val transaction = TransactionTemplate(transactionManager).apply {
         propagationBehavior = TransactionDefinition.PROPAGATION_REQUIRES_NEW
     }
 
-    fun enqueue(record: UserSanctionRecord) {
-        val key = when (record.scopeType) {
-            ModerationScopeType.GLOBAL -> "global:${record.userId}"
-            ModerationScopeType.ROOM -> "${requireNotNull(record.roomId)}:${record.userId}"
+    fun enqueue(record: UserSanctionRecord) = enqueue(record.scopeType, record.roomId, record.userId)
+
+    override fun enqueue(scopeType: ModerationScopeType, roomId: Long?, userId: Long) {
+        val key = when (scopeType) {
+            ModerationScopeType.GLOBAL -> "global:$userId"
+            ModerationScopeType.ROOM -> "${requireNotNull(roomId)}:$userId"
         }
         val id = UUID.randomUUID().toString()
         repository.enqueue(id, key, clock.instant())

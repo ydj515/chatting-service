@@ -1,5 +1,11 @@
-package com.chat.persistence.service
+package com.chat.core.admin.service
 
+import com.chat.core.admin.port.AdminAudit
+import com.chat.core.admin.port.AdminExportStore
+import com.chat.core.admin.port.AdminMessageQuery
+import com.chat.core.admin.port.AdminMessageStore
+import com.chat.core.admin.port.AdminRoomMessageQuery
+import com.chat.core.admin.port.ExportDownloads
 import com.chat.core.dto.AdminExportJobDto
 import com.chat.core.dto.AdminExportJobStatusDto
 import com.chat.core.dto.AdminExportMessagesRequest
@@ -15,28 +21,20 @@ import com.chat.core.dto.AdminMessageSearchResponse
 import com.chat.core.dto.AdminRoomPolicyUpdateRequest
 import com.chat.core.dto.AdminRoomStatusDto
 import com.chat.core.service.AdminChatService
-import com.chat.persistence.config.ChatObjectStorageProperties
-import com.chat.persistence.repository.AdminAuditLogRepository
-import com.chat.persistence.repository.AdminExportJobRepository
-import com.chat.persistence.repository.AdminMessageQuery
-import com.chat.persistence.repository.AdminMessageRepository
-import com.chat.persistence.repository.AdminRoomMessageQuery
-import com.chat.persistence.storage.ObjectStoragePort
-import com.fasterxml.jackson.databind.ObjectMapper
 import org.springframework.cache.annotation.CacheEvict
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
 import kotlin.system.measureNanoTime
 
 @Service
-@Transactional // 모든 admin 작업이 감사 로그(audit) 쓰기를 동반하므로 클래스 레벨로 트랜잭션 경계를 둔다.
+@Transactional // 조회도 감사 기록을 함께 저장한다. 다운로드 URL 생성은 별도 경계에서 수행한다.
 class AdminChatServiceImpl(
-    private val messageRepository: AdminMessageRepository,
-    private val auditLogRepository: AdminAuditLogRepository,
-    private val exportJobRepository: AdminExportJobRepository,
-    private val objectStoragePort: ObjectStoragePort,
-    private val objectStorageProperties: ChatObjectStorageProperties,
-    private val objectMapper: ObjectMapper,
+    private val messageRepository: AdminMessageStore,
+    private val auditRecorder: AdminAudit,
+    private val exportJobRepository: AdminExportStore,
+    private val exportStatusReader: AdminExportStatusReader,
+    private val exportDownloads: ExportDownloads,
 ) : AdminChatService {
     override fun getRoomMessages(
         actor: String,
@@ -56,12 +54,12 @@ class AdminChatServiceImpl(
             response = rows.toMessagePage(request.limit, 0)
         }
         val finalResponse = response.copy(latencyMs = elapsedNanos.toMillis())
-        auditLogRepository.record(
+        auditRecorder.record(
             actor = actor,
             action = "ADMIN_ROOM_MESSAGES",
             targetType = "ROOM",
             targetId = "room:${request.roomId}",
-            metadataJson = objectMapper.writeValueAsString(request),
+            metadata = request,
         )
         return finalResponse
     }
@@ -94,24 +92,24 @@ class AdminChatServiceImpl(
             )
         }
         val finalResponse = response.copy(latencyMs = elapsedNanos.toMillis())
-        auditLogRepository.record(
+        auditRecorder.record(
             actor = actor,
             action = "ADMIN_MESSAGE_SEARCH",
             targetType = "MESSAGE",
             targetId = request.roomId?.let { "room:$it" } ?: "global",
-            metadataJson = objectMapper.writeValueAsString(request),
+            metadata = request,
         )
         return finalResponse
     }
 
     override fun getRoomStatus(actor: String, roomId: Long): AdminRoomStatusDto {
         val status = messageRepository.findRoomStatus(roomId)
-        auditLogRepository.record(
+        auditRecorder.record(
             actor = actor,
             action = "ADMIN_ROOM_STATUS",
             targetType = "ROOM",
             targetId = "room:$roomId",
-            metadataJson = """{"roomId":$roomId}""",
+            metadata = mapOf("roomId" to roomId),
         )
         return status
     }
@@ -123,12 +121,12 @@ class AdminChatServiceImpl(
         request: AdminRoomPolicyUpdateRequest,
     ): AdminRoomStatusDto {
         val status = messageRepository.updateRoomPolicy(roomId = roomId, request = request)
-        auditLogRepository.record(
+        auditRecorder.record(
             actor = actor,
             action = "ADMIN_ROOM_POLICY_UPDATED",
             targetType = "ROOM",
             targetId = "room:$roomId",
-            metadataJson = objectMapper.writeValueAsString(request),
+            metadata = request,
         )
         return status
     }
@@ -137,62 +135,22 @@ class AdminChatServiceImpl(
         actor: String,
         request: AdminExportMessagesRequest,
     ): AdminExportJobDto {
-        val requestJson = objectMapper.writeValueAsString(request)
-        val job = exportJobRepository.create(actor = actor, requestJson = requestJson)
-        auditLogRepository.record(
+        val job = exportJobRepository.create(actor = actor, request = request)
+        auditRecorder.record(
             actor = actor,
             action = "ADMIN_MESSAGE_EXPORT_REQUESTED",
             targetType = "EXPORT_JOB",
             targetId = job.jobId,
-            metadataJson = requestJson,
+            metadata = request,
         )
         return job
     }
 
-    override fun getMessageExport(
-        actor: String,
-        jobId: String,
-    ): AdminExportJobStatusDto? {
-        val record = exportJobRepository.findById(jobId) ?: return null
-        // RUNNING 중에는 outputUri가 worker 로컬 staging(file://) 경로로 checkpoint된다.
-        // 외부에 노출하는 outputUri는 완료된 s3:// 객체 URI로만 한정한다.
-        val completedObjectUri = record.outputUri
-            ?.takeIf { record.status == "COMPLETED" && it.startsWith("s3://") }
-        // Object Storage가 비활성이거나 presign이 실패하더라도 status 조회 자체는 500이 되지 않도록
-        // enabled 게이트 + runCatching으로 downloadUrl을 graceful하게 생략한다.
-        val presigned = completedObjectUri
-            ?.takeIf { objectStorageProperties.enabled }
-            ?.let {
-                runCatching {
-                    objectStoragePort.createDownloadUrl(it, objectStorageProperties.presignedUrlTtl)
-                }.getOrNull()
-            }
-
-        auditLogRepository.record(
-            actor = actor,
-            action = "ADMIN_MESSAGE_EXPORT_VIEWED",
-            targetType = "EXPORT_JOB",
-            targetId = jobId,
-            metadataJson = objectMapper.writeValueAsString(
-                mapOf(
-                    "jobId" to jobId,
-                    "status" to record.status,
-                ),
-            ),
-        )
-
-        return AdminExportJobStatusDto(
-            jobId = record.jobId,
-            status = record.status,
-            createdAt = record.createdAt,
-            startedAt = record.startedAt,
-            completedAt = record.completedAt,
-            exportedRows = record.exportedRows,
-            outputUri = completedObjectUri,
-            downloadUrl = presigned?.url,
-            downloadUrlExpiresAt = presigned?.expiresAt,
-            errorMessage = record.errorMessage,
-        )
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    override fun getMessageExport(actor: String, jobId: String): AdminExportJobStatusDto? {
+        val status = exportStatusReader.load(actor, jobId) ?: return null
+        val download = status.outputUri?.let { exportDownloads.createDownloadUrl(it) }
+        return status.copy(downloadUrl = download?.url, downloadUrlExpiresAt = download?.expiresAt)
     }
 
     private fun List<com.chat.core.dto.AdminMessageDto>.toMessagePage(

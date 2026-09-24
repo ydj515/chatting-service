@@ -1,5 +1,7 @@
 package com.chat.persistence.repository
 
+import com.chat.core.admin.port.AdminMessageQuery
+import com.chat.core.admin.port.AdminRoomMessageQuery
 import com.chat.core.dto.AdminMessageCursor
 import com.chat.core.dto.AdminMessageDto
 import com.chat.core.dto.AdminMessageSearchCursor

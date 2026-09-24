@@ -47,7 +47,7 @@ flowchart LR
 | `chat-admin` | 관리자 REST controller와 인증 경계 | core의 서비스 계약 사용 |
 | `chat-websocket` | handshake, inbound handler, heartbeat 진입점 | persistence의 세션 관리 구현과 설정에 직접 의존 |
 | `chat-domain` | JPA 통합 모델과 업무 예외 | core·delivery·infrastructure로 향하는 의존 금지 |
-| `chat-core` | 사용자·채팅 유스케이스, 공유 서비스 계약, 입출력 타입과 저장소 포트 | concrete DB·Redis·HTTP adapter 의존 금지; 전송 전용 DTO 분리는 후속 단계 |
+| `chat-core` | 사용자·채팅·관리자 유스케이스, 공유 서비스 계약, 입출력 타입과 저장소 포트 | concrete DB·Redis·HTTP adapter 의존 금지; 전송 전용 DTO 분리는 후속 단계 |
 | `chat-persistence` | DB·Redis·S3 adapter, 유스케이스, Gateway 상태 관리 | 저장소 모듈 이름보다 책임이 넓으며 유스케이스 분리가 필요 |
 
 실행 모듈인 `chat-application`과 내부 계약 모듈인 `chat-core`는 별개다.
@@ -59,8 +59,20 @@ Redis 철회 호출 중 DB 트랜잭션을 유지하지 않도록 `NOT_SUPPORTED
 채팅방·멤버십·history 흐름과 발신 중복 확인·정책 호출 순서도 core가 소유한다.
 방 잠금과 JPA 접근은 room port의 adapter가 처리하고, 멤버십 알림은 commit 이후에만
 발행하는 `MembershipEvents` 계약을 사용한다. Redis Streams 수락·sequence 발급과
-broker 구현은 `MessageAcceptance` 뒤에 남는다. 관리자 유스케이스의 persistence 분리는
-아직 진행 중이다.
+broker 구현은 `MessageAcceptance` 뒤에 남는다.
+
+관리자 검색·정책·모더레이션 유스케이스도 core가 소유한다. 감사 메타데이터와 export 요청의
+JSON 직렬화는 adapter가 처리하고, 제재 변경·감사·내구성 있는 무효화/철회 작업 등록은
+같은 트랜잭션에 참여한다. 내보내기 상태의 조회·감사는 `AdminExportStatusReader`가
+트랜잭션으로 처리한다. 다운로드 URL 생성은 그 트랜잭션이 끝난 뒤 실행하므로 저장소
+장애나 서명 처리 중 DB 트랜잭션을 유지하지 않는다. 실행 중인 worker의 로컬 파일 경로는
+상태 응답으로 노출하지 않는다.
+
+`@Transactional`의 infrastructure 예외는 `PartitionedMessageWriteAdapter.write` 하나다.
+이 메서드는 저장소 포트의 한 batch 시도를 원자적으로 보장하며 worker는 성공 이후의 ACK와
+재시도 순서를 소유한다. 여러 저장소 변경을 하나의 업무 트랜잭션으로 묶는 요구가 생기면
+해당 경계를 core 유스케이스로 옮긴다. 다른 adapter나 controller의 트랜잭션 추가는
+아키텍처 검사가 거부하며, controller의 output port 직접 참조도 금지한다.
 
 JPA annotation·auditing은 기존 통합 모델의 의도적인 예외다. ORM 제약이 업무 API를
 왜곡하면 별도 persistence 모델로 분리한다. `Page`/`Pageable`은 기존 paging·정렬 의미와

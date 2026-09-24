@@ -1,5 +1,9 @@
 package com.chat.persistence.service
 
+import com.chat.core.admin.port.AdminMessageQuery
+import com.chat.core.admin.port.AdminRoomMessageQuery
+import com.chat.core.admin.service.AdminChatServiceImpl
+import com.chat.core.admin.service.AdminExportStatusReader
 import com.chat.core.dto.AdminExportJobDto
 import com.chat.core.dto.AdminExportMessagesRequest
 import com.chat.core.dto.AdminMessageCursor
@@ -17,9 +21,10 @@ import com.chat.persistence.config.ChatObjectStorageProperties
 import com.chat.persistence.repository.AdminAuditLogRepository
 import com.chat.persistence.repository.AdminExportJobRepository
 import com.chat.persistence.repository.AdminExportJobStatusRecord
-import com.chat.persistence.repository.AdminMessageQuery
+import com.chat.persistence.repository.AdminExportStoreAdapter
 import com.chat.persistence.repository.AdminMessageRepository
-import com.chat.persistence.repository.AdminRoomMessageQuery
+import com.chat.persistence.repository.AdminMessageStoreAdapter
+import com.chat.persistence.storage.ExportDownloadAdapter
 import com.chat.persistence.storage.ObjectStoragePort
 import com.chat.persistence.storage.ObjectUploadRequest
 import com.chat.persistence.storage.ObjectUploadResult
@@ -471,6 +476,9 @@ class AdminChatServiceImplTest {
         val auditRepository = mock(AdminAuditLogRepository::class.java)
         val exportJobRepository = mock(AdminExportJobRepository::class.java)
         val objectStoragePort = RecordingObjectStoragePort()
+        val mapper = jacksonObjectMapper().registerModule(JavaTimeModule())
+        val exports = AdminExportStoreAdapter(exportJobRepository, mapper)
+        val audit = AdminAuditRecorder(auditRepository, mapper)
         return Fixture(
             messageRepository = messageRepository,
             auditRepository = auditRepository,
@@ -478,12 +486,11 @@ class AdminChatServiceImplTest {
             objectStoragePort = objectStoragePort,
             service =
                 AdminChatServiceImpl(
-                    messageRepository = messageRepository,
-                    auditLogRepository = auditRepository,
-                    exportJobRepository = exportJobRepository,
-                    objectStoragePort = objectStoragePort,
-                    objectStorageProperties = objectStorageProperties,
-                    objectMapper = jacksonObjectMapper().registerModule(JavaTimeModule()),
+                    messageRepository = AdminMessageStoreAdapter(messageRepository),
+                    auditRecorder = audit,
+                    exportJobRepository = exports,
+                    exportStatusReader = AdminExportStatusReader(exports, audit),
+                    exportDownloads = ExportDownloadAdapter(objectStoragePort, objectStorageProperties),
                 ),
         )
     }

@@ -1,5 +1,7 @@
 package com.chat.persistence.service
 
+import com.chat.core.admin.port.AdminMessageQuery
+import com.chat.core.admin.port.AdminRoomMessageQuery
 import com.chat.core.dto.AdminExportMessagesRequest
 import com.chat.core.dto.AdminMessageCursor
 import com.chat.core.dto.AdminMessageCursorCodec
@@ -9,9 +11,7 @@ import com.chat.persistence.config.AdminExportProperties
 import com.chat.persistence.config.ChatWorkerProperties
 import com.chat.persistence.repository.AdminExportJobRecord
 import com.chat.persistence.repository.AdminExportJobRepository
-import com.chat.persistence.repository.AdminMessageQuery
 import com.chat.persistence.repository.AdminMessageRepository
-import com.chat.persistence.repository.AdminRoomMessageQuery
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import org.slf4j.LoggerFactory
