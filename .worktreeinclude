@@ -1,0 +1,13 @@
+# Ignored local setup files copied into Codex-managed worktrees.
+# Only matching Git-ignored files are copied; file contents stay untracked.
+
+# Backend and Docker Compose environment.
+/.env
+/.env.local
+/.secrets/
+# Frontend overrides for the customer and admin clients.
+/client/.env*.local
+/client-admin/.env*.local
+# Local Alertmanager integrations.
+/infra/alertmanager/secrets/alertmanager_slack_webhook_url
+/infra/alertmanager/secrets/alertmanager_pagerduty_routing_key
