@@ -47,7 +47,7 @@ jobs:
           --health-timeout 5s
           --health-retries 10
       postgres:
-        image: postgres:16-alpine
+        image: postgres:17.9-alpine
         env:
           POSTGRES_DB: chat_test
           POSTGRES_PASSWORD: ci-test-only
