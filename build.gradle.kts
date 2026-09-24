@@ -17,6 +17,7 @@ plugins {
 }
 
 val rootLibs = libs
+val kotlinModules = subprojects.filter { it.name != "chat-runtime-config" }
 
 allprojects {
     group = "com.chat"
@@ -27,7 +28,7 @@ allprojects {
     }
 }
 
-subprojects {
+configure(kotlinModules) {
     apply(plugin = "org.jetbrains.kotlin.jvm")
     apply(plugin = "org.jetbrains.kotlinx.kover")
     apply(plugin = "org.jetbrains.kotlin.plugin.spring")
@@ -61,7 +62,7 @@ allprojects {
     }
 }
 
-subprojects {
+configure(kotlinModules) {
     apply(plugin = "io.gitlab.arturbosch.detekt")
     // Register after Spring's dependency management resolution rules.
     afterEvaluate {
@@ -98,7 +99,7 @@ subprojects {
 val verifyDetekt by tasks.registering {
     group = "verification"
     description = "Checks Kotlin defects and complexity with type resolution in all modules."
-    dependsOn(subprojects.flatMap { listOf("${it.path}:detektMain", "${it.path}:detektTest") })
+    dependsOn(kotlinModules.flatMap { listOf("${it.path}:detektMain", "${it.path}:detektTest") })
 }
 
 val verifyKotlinFormat by tasks.registering {
@@ -124,7 +125,7 @@ tasks.named("check") {
 }
 
 dependencies {
-    subprojects.forEach { kover(project(it.path)) }
+    kotlinModules.forEach { kover(project(it.path)) }
 }
 
 kover {

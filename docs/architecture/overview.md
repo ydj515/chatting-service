@@ -33,6 +33,32 @@ flowchart LR
 - Redis Pub/Sub는 일반 publish/subscribe다. Redis Cluster 구성과 sharded Pub/Sub(`SPUBLISH`) 구현은 별개이며, 현재는 후자를 사용하지 않는다.
 - Docker 전체 구성은 Redis 3 master + 3 replica, PostgreSQL primary/replica, MinIO를 포함한다. 호스트 Gradle 개발은 standalone Redis를 사용한다. 실행 절차는 [인프라 가이드](../operations/infrastructure.md)에 있다.
 
+## Gradle 모듈 경계
+
+| 모듈 | 현재 책임 | 경계 평가 |
+| --- | --- | --- |
+| `chat-application` | API와 WebSocket을 묶는 개발용 실행 및 아키텍처 검사 | application 유스케이스 계층이 아니라 composition root |
+| `chat-api-application` | API 실행과 JPA·설정 조립 | 실행 역할 분리 |
+| `chat-websocket-application` | Gateway 실행과 heartbeat scheduling 활성화 | 실행 역할 분리 |
+| `chat-worker-application` | Worker 실행, 역할별 scheduler와 executor 조립 | scheduler가 persistence의 concrete worker를 호출 |
+| `chat-admin-application` | 관리자 API 실행과 JPA·설정 조립 | 실행 역할 분리 |
+| `chat-runtime-config` | 공통 Spring profile YAML 리소스 | 코드와 외부 의존성 없는 resource JAR |
+| `chat-api` | 사용자·방 REST controller와 인증 경계 | domain에 있는 서비스 계약 사용 |
+| `chat-admin` | 관리자 REST controller와 인증 경계 | domain에 있는 서비스 계약 사용 |
+| `chat-websocket` | handshake, inbound handler, heartbeat 진입점 | persistence의 세션 관리 구현과 설정에 직접 의존 |
+| `chat-domain` | JPA 통합 모델, DTO, 서비스 계약과 예외 | transport DTO와 Spring Data 계약이 섞여 있어 순수 domain 경계가 아님 |
+| `chat-persistence` | DB·Redis·S3 adapter, 유스케이스, Gateway 상태 관리 | 저장소 모듈 이름보다 책임이 넓으며 유스케이스 분리가 필요 |
+
+현재는 실행 역할 분리가 계층 분리보다 앞서 있다. 모듈 간 순환 의존성이 없다는 사실만으로
+layered-clean 구조가 완성됐다고 평가하지 않는다. 유스케이스와 output port의 소유권,
+transport DTO, concrete adapter 의존성은 별도로 점검한다.
+
+`chat-application:architectureTest`는 모든 실행 모듈과 코드가 있는 라이브러리를
+클래스패스에 포함한다. composition root 누락, 최상위 모듈 package 간 순환,
+일반 코드에서 실행 모듈로 향하는 의존성을 검사한다. 이 검사는 실제 Spring context
+기동이나 역할별 bean graph 검증을 대체하지 않는다. `chat-runtime-config`는 class가 없는
+리소스 모듈이므로 Kotlin 분석과 Kover 집계에서 제외하고 Gradle Kotlin DSL 형식 검사는 유지한다.
+
 ## 보장 범위
 
 | 주제 | 현재 계약 | 한계 |
