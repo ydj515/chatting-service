@@ -6,13 +6,14 @@ import com.chat.protocol.gateway.MembershipAction
 import com.chat.protocol.gateway.MembershipChange
 import com.chat.protocol.websocket.WebSocketMessage
 import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.core.NestedRuntimeException
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.stereotype.Component
 
 @Component
 class RedisGatewayRoomTransport(
-    private val redis: RedisTemplate<String, String>,
+    @Qualifier("redisTemplate") private val redis: RedisTemplate<String, String>,
     private val properties: ChatRedisProperties,
     private val broker: RedisMessageBroker,
 ) : GatewayRoomTransport {
