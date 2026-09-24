@@ -6,5 +6,8 @@
     <ID>SwallowedException:ChatWebSocketHandler.kt$ChatWebSocketHandler$e: Exception</ID>
     <ID>TooGenericExceptionCaught:ChatWebSocketHandler.kt$ChatWebSocketHandler$e: Exception</ID>
     <ID>TooGenericExceptionCaught:WebSocketHandshakeInterceptor.kt$WebSocketHandshakeInterceptor$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:BoundedOutboundSessionQueue.kt$BoundedOutboundSessionQueue$throwable: Throwable</ID>
+    <ID>TooGenericExceptionCaught:WebSocketSessionTransport.kt$WebSocketSessionTransport$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:WebSocketSessionTransport.kt$WebSocketSessionTransport$t: Throwable</ID>
   </CurrentIssues>
 </SmellBaseline>

@@ -4,7 +4,7 @@ import com.chat.core.dto.AuthenticatedSession
 import com.chat.core.dto.AuthenticatedWebSocketTicket
 import com.chat.core.service.SessionTokenService
 import com.chat.core.service.WebSocketTicketService
-import com.chat.persistence.config.ChatAuthProperties
+import com.chat.websocket.config.HandshakeAuthProperties
 import com.chat.websocket.config.WebSocketProperties
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
@@ -26,9 +26,8 @@ import java.time.LocalDateTime
 
 class WebSocketHandshakeInterceptorTest {
     private val webSocketProperties = WebSocketProperties(userIdAttribute = "userId")
-    private val authProperties = ChatAuthProperties(
-        session = ChatAuthProperties.Session(
-            secret = "test-secret",
+    private val authProperties = HandshakeAuthProperties(
+        session = HandshakeAuthProperties.Session(
             tokenQueryParam = "token",
         ),
     )
@@ -94,7 +93,7 @@ class WebSocketHandshakeInterceptorTest {
             sessionTokenService = sessionTokenService,
             ticketService = ticketService,
             authProperties = authProperties.copy(
-                webSocketTicket = ChatAuthProperties.WebSocketTicket(sessionFallbackEnabled = false),
+                webSocketTicket = HandshakeAuthProperties.WebSocketTicket(sessionFallbackEnabled = false),
             ),
         )
         val attributes = mutableMapOf<String?, Any?>()
@@ -134,7 +133,7 @@ class WebSocketHandshakeInterceptorTest {
     private fun interceptor(
         sessionTokenService: SessionTokenService,
         ticketService: WebSocketTicketService,
-        authProperties: ChatAuthProperties = this.authProperties,
+        authProperties: HandshakeAuthProperties = this.authProperties,
     ): WebSocketHandshakeInterceptor =
         WebSocketHandshakeInterceptor(
             webSocketProperties = webSocketProperties,

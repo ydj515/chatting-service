@@ -1,6 +1,6 @@
 package com.chat.websocket.service
 
-import com.chat.persistence.service.WebSocketSessionManager
+import com.chat.websocket.service.WebSocketSessionManager
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.mock

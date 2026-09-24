@@ -1,9 +1,13 @@
-package com.chat.persistence.service
+package com.chat.application.gateway
 
 import com.chat.persistence.config.ChatRedisProperties
-import com.chat.persistence.config.ChatWebSocketGatewayProperties
+import com.chat.persistence.redis.RedisGatewayRoomTransport
 import com.chat.persistence.redis.RedisMessageBroker
-import com.chat.persistence.repository.ChatRoomMemberRepository
+import com.chat.websocket.config.ChatWebSocketGatewayProperties
+import com.chat.websocket.service.WebSocketRoomSubscriptions
+import com.chat.websocket.service.WebSocketSessionAuthorization
+import com.chat.websocket.service.WebSocketSessionManager
+import com.chat.websocket.service.WebSocketSessionTransport
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
 import com.fasterxml.jackson.module.kotlin.KotlinModule
@@ -158,13 +162,10 @@ class WebSocketSessionManagerHeartbeatTest {
 
         return WebSocketSessionManager(
             objectMapper = objectMapper,
-            redisMessageBroker = broker,
-            chatRoomMemberRepository = mock(ChatRoomMemberRepository::class.java),
-            roomSubscriptions = WebSocketRoomSubscriptions(
-                redisTemplate = redisTemplate,
-                redisProperties = redisProperties,
-                redisMessageBroker = broker,
-            ),
+            roomTransport = RedisGatewayRoomTransport(redisTemplate, redisProperties, broker),
+            memberships = mock(com.chat.core.gateway.port.GatewayMemberships::class.java),
+            sessionControlEvents = mock(com.chat.core.gateway.port.SessionControlEvents::class.java),
+            roomSubscriptions = WebSocketRoomSubscriptions(RedisGatewayRoomTransport(redisTemplate, redisProperties, broker)),
             transport = WebSocketSessionTransport(
                 authorization = org.mockito.Mockito.mock(WebSocketSessionAuthorization::class.java),
                 gatewayProperties = properties,

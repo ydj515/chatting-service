@@ -126,8 +126,8 @@ chat-api/                      # 사용자 REST API 기능 모듈
 chat-admin/                    # 관리자 API 기능 모듈
 chat-domain/                   # JPA 통합 업무 모델과 예외
 chat-core/                     # 사용자·채팅·관리자 유스케이스/공유 계약/입출력 타입/저장소 포트
-chat-persistence/              # JPA/Redis/서비스 구현
-chat-websocket/                # WebSocket 핸들러/설정
+chat-persistence/              # DB/Redis/S3 어댑터와 Worker 구현
+chat-websocket/                # WebSocket 핸들러/세션/구독/전송/설정
 chat-api-application/          # API 실행 모듈
 chat-websocket-application/    # WebSocket Gateway 실행 모듈
 chat-worker-application/       # Worker 실행 모듈

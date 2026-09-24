@@ -1,7 +1,9 @@
 package com.chat.persistence.service
 
+import com.chat.core.gateway.port.LocalGateway
 import com.chat.core.room.port.MembershipEvents
 import com.chat.persistence.redis.RedisMessageBroker
+import org.springframework.beans.factory.ObjectProvider
 import org.springframework.stereotype.Service
 import org.springframework.transaction.support.TransactionSynchronization
 import org.springframework.transaction.support.TransactionSynchronizationManager
@@ -9,7 +11,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 @Service
 class MembershipEventPublisher(
     private val redisMessageBroker: RedisMessageBroker,
-    private val webSocketSessionManager: WebSocketSessionManager,
+    private val localGateways: ObjectProvider<LocalGateway>,
 ) : MembershipEvents {
     override fun joinedAfterCommit(userId: Long, roomId: Long) = publishAfterCommit(userId, roomId, RedisMessageBroker.MembershipAction.JOIN)
 
@@ -37,15 +39,16 @@ class MembershipEventPublisher(
         roomId: Long,
         action: RedisMessageBroker.MembershipAction,
     ) {
-        when (action) {
-            RedisMessageBroker.MembershipAction.JOIN -> {
-                if (webSocketSessionManager.isUserOnlineLocally(userId)) {
-                    webSocketSessionManager.joinRoom(userId, roomId)
+        localGateways.orderedStream().forEach { webSocketSessionManager ->
+            when (action) {
+                RedisMessageBroker.MembershipAction.JOIN -> {
+                    if (webSocketSessionManager.isUserOnlineLocally(userId)) {
+                        webSocketSessionManager.joinRoom(userId, roomId)
+                    }
                 }
+                RedisMessageBroker.MembershipAction.LEAVE -> webSocketSessionManager.leaveRoom(userId, roomId)
             }
-            RedisMessageBroker.MembershipAction.LEAVE -> webSocketSessionManager.leaveRoom(userId, roomId)
         }
-
         redisMessageBroker.publishMembershipChanged(
             userId = userId,
             roomId = roomId,

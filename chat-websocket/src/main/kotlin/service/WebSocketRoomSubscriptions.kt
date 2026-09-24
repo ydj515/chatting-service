@@ -1,20 +1,13 @@
-package com.chat.persistence.service
+package com.chat.websocket.service
 
-import com.chat.persistence.config.ChatRedisProperties
-import com.chat.persistence.redis.RedisMessageBroker
-import org.slf4j.LoggerFactory
-import org.springframework.core.NestedRuntimeException
-import org.springframework.data.redis.core.RedisTemplate
+import com.chat.core.gateway.port.GatewayRoomTransport
 import org.springframework.stereotype.Service
 import java.util.concurrent.ConcurrentHashMap
 
 @Service
 class WebSocketRoomSubscriptions(
-    private val redisTemplate: RedisTemplate<String, String>,
-    private val redisProperties: ChatRedisProperties,
-    private val redisMessageBroker: RedisMessageBroker,
+    private val roomTransport: GatewayRoomTransport,
 ) {
-    private val logger = LoggerFactory.getLogger(javaClass)
     private val pendingIndexUpdates = ConcurrentHashMap.newKeySet<Long>()
     private val sessionIdsByRoomId = ConcurrentHashMap<Long, MutableSet<String>>()
 
@@ -28,7 +21,7 @@ class WebSocketRoomSubscriptions(
             val wasEmpty = nextSessionIds.isEmpty()
             nextSessionIds.add(sessionId)
             if (wasEmpty) {
-                redisMessageBroker.subscribeToRoom(roomId)
+                roomTransport.subscribeToRoom(roomId)
                 synchronizeServerRoom(roomId, active = true)
             }
             nextSessionIds
@@ -39,7 +32,7 @@ class WebSocketRoomSubscriptions(
         sessionIdsByRoomId.computeIfPresent(roomId) { _, sessionIds ->
             sessionIds.remove(sessionId)
             if (sessionIds.isEmpty()) {
-                redisMessageBroker.unsubscribeFromRoom(roomId)
+                roomTransport.unsubscribeFromRoom(roomId)
                 synchronizeServerRoom(roomId, active = false)
                 null
             } else {
@@ -59,17 +52,9 @@ class WebSocketRoomSubscriptions(
         }
     }
 
-    private fun synchronizeServerRoom(roomId: Long, active: Boolean): Boolean = try {
-        val key = serverRoomKey(redisMessageBroker.getServerId())
-        if (active) redisTemplate.opsForSet().add(key, roomId.toString()) else redisTemplate.opsForSet().remove(key, roomId.toString())
-        pendingIndexUpdates.remove(roomId)
-        true
-    } catch (failure: NestedRuntimeException) {
-        // Redis index availability must not interrupt local registration or broker cleanup.
-        pendingIndexUpdates.add(roomId)
-        logger.warn("Unable to synchronize server room index for {}", roomId, failure)
-        false
+    private fun synchronizeServerRoom(roomId: Long, active: Boolean): Boolean {
+        val synchronized = roomTransport.synchronizeServerRoom(roomId, active)
+        if (synchronized) pendingIndexUpdates.remove(roomId) else pendingIndexUpdates.add(roomId)
+        return synchronized
     }
-
-    private fun serverRoomKey(serverId: String): String = "${redisProperties.serverRoomsKeyPrefix}$serverId"
 }

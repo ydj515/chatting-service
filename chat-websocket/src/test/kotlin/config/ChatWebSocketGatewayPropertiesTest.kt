@@ -1,4 +1,4 @@
-package com.chat.persistence.config
+package com.chat.websocket.config
 
 import org.junit.jupiter.api.Assertions.assertDoesNotThrow
 import org.junit.jupiter.api.Assertions.assertThrows

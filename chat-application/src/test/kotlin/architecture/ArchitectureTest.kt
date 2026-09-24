@@ -77,6 +77,14 @@ class ArchitectureTest {
     }
 
     @Test
+    fun `websocket transport cannot depend on concrete storage adapters`() {
+        noClasses().that().resideInAPackage("com.chat.websocket..")
+            .and().resideOutsideOfPackage("com.chat.websocket.application..")
+            .should().dependOnClassesThat().resideInAnyPackage("com.chat.persistence..", "org.springframework.data.redis..", "org.springframework.data.jpa..")
+            .check(classes)
+    }
+
+    @Test
     fun `persistence does not depend on delivery modules`() {
         noClasses().that().resideInAPackage("com.chat.persistence..")
             .should().dependOnClassesThat().resideInAnyPackage("com.chat.api..", "com.chat.admin..", "com.chat.websocket..")

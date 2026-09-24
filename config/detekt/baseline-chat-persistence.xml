@@ -13,7 +13,6 @@
     <ID>SwallowedException:JpaMessageWriteAdapter.kt$JpaMessageWriteAdapter$e: DataIntegrityViolationException</ID>
     <ID>SwallowedException:ModerationRuleJdbcRepository.kt$ModerationRuleJdbcRepository$e: EmptyResultDataAccessException</ID>
     <ID>TooGenericExceptionCaught:AdminMessageExportWorker.kt$AdminMessageExportWorker$e: Exception</ID>
-    <ID>TooGenericExceptionCaught:BoundedOutboundSessionQueue.kt$BoundedOutboundSessionQueue$throwable: Throwable</ID>
     <ID>TooGenericExceptionCaught:MessageStreamPublisher.kt$MessageStreamPublisher$e: RuntimeException</ID>
     <ID>TooGenericExceptionCaught:FanoutOwnerLeaseService.kt$RedisFanoutOwnerLeaseService$e: Exception</ID>
     <ID>TooGenericExceptionCaught:HotRoomFanoutWorker.kt$HotRoomFanoutWorker$e: Exception</ID>
@@ -29,7 +28,5 @@
     <ID>TooGenericExceptionCaught:RoomPolicyWorker.kt$RoomPolicyWorker$e: Exception</ID>
     <ID>TooGenericExceptionCaught:RoomSeqGapAuditWorker.kt$RoomSeqGapAuditWorker$e: RuntimeException</ID>
     <ID>TooGenericExceptionCaught:RoomTrafficStatsService.kt$RedisRoomTrafficStatsService$e: Exception</ID>
-    <ID>TooGenericExceptionCaught:WebSocketSessionTransport.kt$WebSocketSessionTransport$e: Exception</ID>
-    <ID>TooGenericExceptionCaught:WebSocketSessionTransport.kt$WebSocketSessionTransport$t: Throwable</ID>
   </CurrentIssues>
 </SmellBaseline>

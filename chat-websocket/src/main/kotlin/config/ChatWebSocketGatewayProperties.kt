@@ -1,4 +1,4 @@
-package com.chat.persistence.config
+package com.chat.websocket.config
 
 import org.springframework.boot.context.properties.ConfigurationProperties
 

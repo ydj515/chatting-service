@@ -16,7 +16,6 @@ import com.chat.domain.model.Message
 import com.chat.domain.model.MessageType
 import com.chat.domain.model.User
 import com.chat.persistence.config.ChatRedisProperties
-import com.chat.persistence.config.ChatWebSocketGatewayProperties
 import com.chat.persistence.redis.MessageStreamEnvelope
 import com.chat.persistence.redis.MessageStreamProducer
 import com.chat.persistence.redis.RedisMessageBroker
@@ -686,22 +685,6 @@ class ChatServiceImplMessageContractTest {
         `when`(chatRoomMemberRepository.findByChatRoomIdAndUserIdAndIsActiveTrue(10L, 7L))
             .thenReturn(member)
 
-        val webSocketSessionManager = WebSocketSessionManager(
-            objectMapper = objectMapper,
-            redisMessageBroker = redisMessageBroker,
-            chatRoomMemberRepository = chatRoomMemberRepository,
-            roomSubscriptions = WebSocketRoomSubscriptions(
-                redisTemplate = redisTemplate,
-                redisProperties = redisProperties,
-                redisMessageBroker = redisMessageBroker,
-            ),
-            transport = WebSocketSessionTransport(
-                authorization = org.mockito.Mockito.mock(WebSocketSessionAuthorization::class.java),
-                gatewayProperties = ChatWebSocketGatewayProperties(),
-                outboundExecutor = Runnable::run,
-            ),
-        )
-
         return@with Fixture(
             chatService = ChatServiceImpl(
                 chatRoomRepository = ChatRoomStoreAdapter(chatRoomRepository),
@@ -730,7 +713,7 @@ class ChatServiceImplMessageContractTest {
                 ),
                 membershipEventPublisher = MembershipEventPublisher(
                     redisMessageBroker = redisMessageBroker,
-                    webSocketSessionManager = webSocketSessionManager,
+                    localGateways = org.springframework.beans.factory.support.StaticListableBeanFactory().getBeanProvider(com.chat.core.gateway.port.LocalGateway::class.java),
                 ),
             ),
             messageRepository = messageRepository,

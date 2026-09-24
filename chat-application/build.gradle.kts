@@ -14,6 +14,11 @@ dependencyManagement {
 
 dependencies {
     testImplementation(libs.archunit)
+    testImplementation(libs.spring.boot.starter.websocket)
+    testImplementation(libs.spring.boot.starter.data.redis)
+    testImplementation(libs.jackson.module.kotlin)
+    testImplementation(libs.jackson.datatype.jsr310)
+    testImplementation(libs.micrometer.core)
     testImplementation(project(":chat-admin"))
     testImplementation(project(":chat-api-application"))
     testImplementation(project(":chat-admin-application"))

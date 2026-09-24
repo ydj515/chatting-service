@@ -1,5 +1,6 @@
 package com.chat.persistence.service
 
+import com.chat.core.auth.SessionTokenDigests
 import com.chat.core.service.SessionTokenRevocationStore
 import com.chat.persistence.config.ChatAuthProperties
 import org.junit.jupiter.api.Assertions.assertEquals

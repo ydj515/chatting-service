@@ -1,5 +1,6 @@
 package com.chat.persistence.service
 
+import com.chat.core.gateway.port.LocalGateway
 import com.chat.persistence.redis.RedisMessageBroker
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.*
@@ -10,18 +11,31 @@ import java.util.UUID
 
 class MembershipEventsTransactionTest {
     private val broker = mock(RedisMessageBroker::class.java)
-    private val sessions = mock(WebSocketSessionManager::class.java)
-    private val events = MembershipEventPublisher(broker, sessions)
+    private val sessions = mock(LocalGateway::class.java)
+    private val events = MembershipEventPublisher(broker, org.springframework.beans.factory.support.StaticListableBeanFactory(mapOf("gateway" to sessions)).getBeanProvider(LocalGateway::class.java))
     private val transaction = TransactionTemplate(DataSourceTransactionManager(DriverManagerDataSource("jdbc:h2:mem:${UUID.randomUUID()}", "sa", "")))
 
     @Test
     fun `joining notifies local and remote subscribers only after commit`() {
+        `when`(sessions.isUserOnlineLocally(7)).thenReturn(true)
+        clearInvocations(sessions)
         transaction.executeWithoutResult {
             events.joinedAfterCommit(7, 10)
             verifyNoInteractions(broker, sessions)
         }
         verify(sessions).isUserOnlineLocally(7)
+        verify(sessions).joinRoom(7, 10)
         verify(broker).publishMembershipChanged(7, 10, RedisMessageBroker.MembershipAction.JOIN)
+    }
+
+    @Test
+    fun `API process without local gateway still publishes after commit`() {
+        val publisher = MembershipEventPublisher(broker, org.springframework.beans.factory.support.StaticListableBeanFactory().getBeanProvider(LocalGateway::class.java))
+        transaction.executeWithoutResult {
+            publisher.leftAfterCommit(7, 10)
+            verifyNoInteractions(broker)
+        }
+        verify(broker).publishMembershipChanged(7, 10, RedisMessageBroker.MembershipAction.LEAVE)
     }
 
     @Test

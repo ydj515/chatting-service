@@ -1,6 +1,6 @@
 package com.chat.websocket.service
 
-import com.chat.persistence.service.WebSocketSessionManager
+import com.chat.websocket.service.WebSocketSessionManager
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
 import java.time.Clock

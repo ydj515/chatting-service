@@ -8,8 +8,8 @@ import com.chat.core.service.ChatService
 import com.chat.domain.exception.MessageAdmissionRejectedException
 import com.chat.domain.exception.MessageModerationRejectedException
 import com.chat.domain.model.MessageType
-import com.chat.persistence.service.WebSocketSessionManager
 import com.chat.websocket.config.WebSocketProperties
+import com.chat.websocket.service.WebSocketSessionManager
 import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule

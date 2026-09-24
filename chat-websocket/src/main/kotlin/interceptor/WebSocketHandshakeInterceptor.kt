@@ -2,9 +2,9 @@ package com.chat.websocket.interceptor
 
 import com.chat.core.service.SessionTokenService
 import com.chat.core.service.WebSocketTicketService
-import com.chat.persistence.config.ChatAuthProperties
-import com.chat.persistence.service.WebSocketSessionIdentity
+import com.chat.websocket.config.HandshakeAuthProperties
 import com.chat.websocket.config.WebSocketProperties
+import com.chat.websocket.service.WebSocketSessionIdentity
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
@@ -20,7 +20,7 @@ class WebSocketHandshakeInterceptor(
     private val webSocketProperties: WebSocketProperties,
     private val sessionTokenService: SessionTokenService,
     private val webSocketTicketService: WebSocketTicketService,
-    private val authProperties: ChatAuthProperties,
+    private val authProperties: HandshakeAuthProperties,
 ) : HandshakeInterceptor {
     private val logger = LoggerFactory.getLogger(WebSocketHandshakeInterceptor::class.java)
 

@@ -15,7 +15,6 @@ import com.chat.core.message.service.MessageSendingService
 import com.chat.core.room.service.ChatServiceImpl
 import com.chat.domain.model.MessageType
 import com.chat.persistence.config.ChatRedisProperties
-import com.chat.persistence.config.ChatWebSocketGatewayProperties
 import com.chat.persistence.redis.MessageStreamProducer
 import com.chat.persistence.redis.RedisMessageBroker
 import com.chat.persistence.repository.ChatMembershipStoreAdapter
@@ -156,21 +155,6 @@ class ChatServiceImplCanonicalHistoryTest {
             redisProperties = redisProperties,
         )
         val chatRoomMemberRepository = mock(ChatRoomMemberRepository::class.java)
-        val webSocketSessionManager = WebSocketSessionManager(
-            objectMapper = objectMapper,
-            redisMessageBroker = redisMessageBroker,
-            chatRoomMemberRepository = chatRoomMemberRepository,
-            roomSubscriptions = WebSocketRoomSubscriptions(
-                redisTemplate = redisTemplate,
-                redisProperties = redisProperties,
-                redisMessageBroker = redisMessageBroker,
-            ),
-            transport = WebSocketSessionTransport(
-                authorization = org.mockito.Mockito.mock(WebSocketSessionAuthorization::class.java),
-                gatewayProperties = ChatWebSocketGatewayProperties(),
-                outboundExecutor = Runnable::run,
-            ),
-        )
 
         return Fixture(
             chatService = ChatServiceImpl(
@@ -200,7 +184,7 @@ class ChatServiceImplCanonicalHistoryTest {
                 ),
                 membershipEventPublisher = MembershipEventPublisher(
                     redisMessageBroker = redisMessageBroker,
-                    webSocketSessionManager = webSocketSessionManager,
+                    localGateways = org.springframework.beans.factory.support.StaticListableBeanFactory().getBeanProvider(com.chat.core.gateway.port.LocalGateway::class.java),
                 ),
             ),
             chatRoomMemberRepository = chatRoomMemberRepository,

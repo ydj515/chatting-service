@@ -1,5 +1,6 @@
 package com.chat.persistence.service
 
+import com.chat.core.gateway.port.SessionControlEvents
 import com.chat.core.service.SessionControlPublisher
 import com.chat.persistence.config.ChatAuthProperties
 import com.chat.persistence.config.ChatRedisProperties
@@ -24,7 +25,7 @@ class RedisSessionControlBroker(
     private val objectMapper: ObjectMapper,
     private val authProperties: ChatAuthProperties,
     redisProperties: ChatRedisProperties,
-) : SessionControlPublisher, MessageListener {
+) : SessionControlPublisher, SessionControlEvents, MessageListener {
     private val logger = LoggerFactory.getLogger(javaClass)
     private val serverId = redisProperties.broker.serverId
         ?.takeIf { it.isNotBlank() }
@@ -43,7 +44,7 @@ class RedisSessionControlBroker(
         messageListenerContainer.removeMessageListener(this, ChannelTopic(authProperties.session.controlTopic))
     }
 
-    fun setLocalForceLogoutHandler(handler: (Long, String) -> Unit) {
+    override fun setLocalForceLogoutHandler(handler: (Long, String) -> Unit) {
         localForceLogoutHandler = handler
     }
 

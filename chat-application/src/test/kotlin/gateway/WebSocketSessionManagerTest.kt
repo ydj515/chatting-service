@@ -1,11 +1,17 @@
-package com.chat.persistence.service
+package com.chat.application.gateway
 
 import com.chat.core.dto.ChatMessage
 import com.chat.domain.model.MessageType
 import com.chat.persistence.config.ChatRedisProperties
-import com.chat.persistence.config.ChatWebSocketGatewayProperties
+import com.chat.persistence.redis.RedisGatewayRoomTransport
 import com.chat.persistence.redis.RedisMessageBroker
 import com.chat.persistence.repository.ChatRoomMemberRepository
+import com.chat.persistence.repository.GatewayMembershipsAdapter
+import com.chat.websocket.config.ChatWebSocketGatewayProperties
+import com.chat.websocket.service.WebSocketRoomSubscriptions
+import com.chat.websocket.service.WebSocketSessionAuthorization
+import com.chat.websocket.service.WebSocketSessionManager
+import com.chat.websocket.service.WebSocketSessionTransport
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
 import com.fasterxml.jackson.module.kotlin.KotlinModule
@@ -225,13 +231,10 @@ class WebSocketSessionManagerTest {
 
         val manager = WebSocketSessionManager(
             objectMapper = objectMapper,
-            redisMessageBroker = redisMessageBroker,
-            chatRoomMemberRepository = chatRoomMemberRepository,
-            roomSubscriptions = WebSocketRoomSubscriptions(
-                redisTemplate = redisTemplate,
-                redisProperties = redisProperties,
-                redisMessageBroker = redisMessageBroker,
-            ),
+            roomTransport = RedisGatewayRoomTransport(redisTemplate, redisProperties, redisMessageBroker),
+            memberships = GatewayMembershipsAdapter(chatRoomMemberRepository),
+            sessionControlEvents = mock(com.chat.core.gateway.port.SessionControlEvents::class.java),
+            roomSubscriptions = WebSocketRoomSubscriptions(RedisGatewayRoomTransport(redisTemplate, redisProperties, redisMessageBroker)),
             transport = WebSocketSessionTransport(
                 authorization = org.mockito.Mockito.mock(WebSocketSessionAuthorization::class.java),
                 gatewayProperties = ChatWebSocketGatewayProperties(outboundQueueMaxPendingMessages = 128),

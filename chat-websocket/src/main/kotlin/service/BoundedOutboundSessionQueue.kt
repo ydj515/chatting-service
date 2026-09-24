@@ -1,4 +1,4 @@
-package com.chat.persistence.service
+package com.chat.websocket.service
 
 import java.util.ArrayDeque
 import java.util.concurrent.Executor

@@ -1,7 +1,9 @@
-package com.chat.persistence.service
+package com.chat.application.gateway
 
 import com.chat.persistence.config.ChatRedisProperties
+import com.chat.persistence.redis.RedisGatewayRoomTransport
 import com.chat.persistence.redis.RedisMessageBroker
+import com.chat.websocket.service.WebSocketRoomSubscriptions
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.*
@@ -20,7 +22,7 @@ class WebSocketRoomSubscriptionsTest {
         `when`(redis.opsForSet()).thenReturn(sets)
         val broker = mock(RedisMessageBroker::class.java)
         `when`(broker.getServerId()).thenReturn("server")
-        val subscriptions = WebSocketRoomSubscriptions(redis, ChatRedisProperties(), broker)
+        val subscriptions = WebSocketRoomSubscriptions(RedisGatewayRoomTransport(redis, ChatRedisProperties(), broker))
         subscriptions.addSessionIdToRoom(10, "old")
         doThrow(RedisConnectionFailureException("unavailable")).doReturn(1L).`when`(sets).remove("chat:server:rooms:server", "10")
         subscriptions.removeSessionIdFromRoom(10, "old")

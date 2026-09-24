@@ -1,4 +1,4 @@
-package com.chat.persistence.service
+package com.chat.websocket.service
 
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue

@@ -1,4 +1,4 @@
-package com.chat.persistence.service
+package com.chat.websocket.service
 
 import io.micrometer.core.instrument.MeterRegistry
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry

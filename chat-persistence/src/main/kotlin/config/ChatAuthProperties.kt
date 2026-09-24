@@ -11,7 +11,6 @@ data class ChatAuthProperties(
     data class Session(
         val secret: String = "",
         val ttl: Duration = Duration.ofHours(12),
-        val tokenQueryParam: String = "token",
         val revocationKeyPrefix: String = "chat:auth:session:revoked:",
         val userRevocationGraceTtl: Duration = Duration.ofHours(1),
         val controlTopic: String = "chat.session.control",
@@ -19,12 +18,10 @@ data class ChatAuthProperties(
 
     data class WebSocketTicket(
         val ttl: Duration = Duration.ofSeconds(30),
-        val ticketQueryParam: String = "ticket",
         val keyPrefix: String = "chat:ws-ticket:",
         val rateLimitKeyPrefix: String = "chat:ws-ticket:rate:",
         val issueRateLimitWindow: Duration = Duration.ofMinutes(1),
         val issueRateLimitPerUser: Long = 10,
         val issueRateLimitPerIp: Long = 60,
-        val sessionFallbackEnabled: Boolean = true,
     )
 }

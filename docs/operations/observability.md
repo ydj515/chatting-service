@@ -17,7 +17,7 @@ Metric 등록, 실제 scrape, threshold 충족, notification 수신은 서로 �
 | Admission/정책 | `chat.message.admission.rejected`, `chat.message.moderation.rejected` | 제한·Redis 오류·콘텐츠/제재 거부 사유 |
 | Gap audit | `chat.room_seq.gap.rooms`, `chat.room_seq.gap.missing_sequences`, `chat.room_seq.gap.max_width`, `chat.room_seq.gap.scanned_rooms` | canonical sequence gap aggregate; 유실 확정 지표 아님 |
 
-구현: [Gateway metrics](../../chat-persistence/src/main/kotlin/service/WebSocketGatewayMetrics.kt), [Stream metrics](../../chat-persistence/src/main/kotlin/service/MessageStreamMetrics.kt), [Lease service](../../chat-persistence/src/main/kotlin/service/FanoutOwnerLeaseService.kt).
+구현: [Gateway metrics](../../chat-websocket/src/main/kotlin/service/WebSocketGatewayMetrics.kt), [Stream metrics](../../chat-persistence/src/main/kotlin/service/MessageStreamMetrics.kt), [Lease service](../../chat-persistence/src/main/kotlin/service/FanoutOwnerLeaseService.kt).
 
 ## 경보와 release gate
 

@@ -21,6 +21,8 @@
 48개는 Java 연동·JPA 초기화·오류 격리 계약에 대한 기존 예외다.
 Export 업로드·설정, worker 역할별 스케줄러, WebSocket 방 구독·전송 책임을 분리해
 남아 있던 구조 부채 4개를 제거했다. WebSocket 오류 격리 예외 2개는 전송 책임과 함께 이동했다.
+Gateway 모듈 분리 시 큐·전송 클래스의 기존 예외 ID 3개를 persistence baseline에서
+websocket baseline으로 이동했다. 예외 범위와 수는 늘리지 않았다.
 Baseline은 자동 재생성하지 않으며 제거된 항목을 다시 추가하지 않는다.
 
 | 규칙 | 위치 | 유지 사유와 재검토 조건 |
@@ -49,7 +51,7 @@ Baseline은 자동 재생성하지 않으며 제거된 항목을 다시 추가�
 | `SwallowedException` | [chat-persistence/JpaMessageWriteAdapter.kt](../../chat-persistence/src/main/kotlin/service/JpaMessageWriteAdapter.kt) | 동시 중복 삽입 후 기존 메시지를 재조회해 멱등 결과를 반환한다. 중복 처리 저장 계약을 바꿀 때 원인 예외 처리도 검토한다. |
 | `SwallowedException` | [chat-persistence/ModerationRuleJdbcRepository.kt](../../chat-persistence/src/main/kotlin/repository/ModerationRuleJdbcRepository.kt) | UPDATE RETURNING의 0행을 명시적인 not-found 오류로 변환한다. nullable 조회 계약으로 전환할 때 제거한다. |
 | `TooGenericExceptionCaught` | [chat-persistence/AdminMessageExportWorker.kt](../../chat-persistence/src/main/kotlin/service/AdminMessageExportWorker.kt) | 실패한 export를 FAILED로 기록하고 다음 스케줄 작업을 계속한다. 포트의 오류 타입 계약과 해당 장애 테스트가 고정될 때 catch 범위를 축소한다. |
-| `TooGenericExceptionCaught` | [chat-persistence/BoundedOutboundSessionQueue.kt](../../chat-persistence/src/main/kotlin/service/BoundedOutboundSessionQueue.kt) | sender 실패 시 큐를 닫고 onFailure를 호출해 멈춘 큐와 세션 자원 누수를 방지한다. 포트의 오류 타입 계약과 해당 장애 테스트가 고정될 때 catch 범위를 축소한다. |
+| `TooGenericExceptionCaught` | [chat-websocket/BoundedOutboundSessionQueue.kt](../../chat-websocket/src/main/kotlin/service/BoundedOutboundSessionQueue.kt) | sender 실패 시 큐를 닫고 onFailure를 호출해 멈춘 큐와 세션 자원 누수를 방지한다. 포트의 오류 타입 계약과 해당 장애 테스트가 고정될 때 catch 범위를 축소한다. |
 | `TooGenericExceptionCaught` | [chat-persistence/MessageStreamPublisher.kt](../../chat-persistence/src/main/kotlin/service/MessageStreamPublisher.kt) | 스트림 발행에 성공한 뒤 통계 갱신 실패로 응답이 실패하지 않게 한다. 기존 ChatServiceImpl의 경계를 이동했다. 포트의 오류 타입 계약과 해당 장애 테스트가 고정될 때 catch 범위를 축소한다. |
 | `TooGenericExceptionCaught` | [chat-persistence/FanoutOwnerLeaseService.kt](../../chat-persistence/src/main/kotlin/service/FanoutOwnerLeaseService.kt) | Redis 오류 시 소유권을 획득/유지한 것으로 판단하지 않는다. 포트의 오류 타입 계약과 해당 장애 테스트가 고정될 때 catch 범위를 축소한다. |
 | `TooGenericExceptionCaught` | [chat-persistence/HotRoomFanoutWorker.kt](../../chat-persistence/src/main/kotlin/service/HotRoomFanoutWorker.kt) | 레코드 실패를 pending/dead-letter 처리하며 소유권 상실 후 ACK하지 않는다. 포트의 오류 타입 계약과 해당 장애 테스트가 고정될 때 catch 범위를 축소한다. |
@@ -65,8 +67,8 @@ Baseline은 자동 재생성하지 않으며 제거된 항목을 다시 추가�
 | `TooGenericExceptionCaught` | [chat-persistence/RoomPolicyWorker.kt](../../chat-persistence/src/main/kotlin/service/RoomPolicyWorker.kt) | 한 방의 정책 적용 실패를 격리해 다른 방 처리를 계속한다. 포트의 오류 타입 계약과 해당 장애 테스트가 고정될 때 catch 범위를 축소한다. |
 | `TooGenericExceptionCaught` | [chat-persistence/RoomSeqGapAuditWorker.kt](../../chat-persistence/src/main/kotlin/service/RoomSeqGapAuditWorker.kt) | 감사 조회 실패를 기록하고 스케줄러의 다음 실행을 유지한다. 포트의 오류 타입 계약과 해당 장애 테스트가 고정될 때 catch 범위를 축소한다. |
 | `TooGenericExceptionCaught` | [chat-persistence/RoomTrafficStatsService.kt](../../chat-persistence/src/main/kotlin/service/RoomTrafficStatsService.kt) | 관측용 통계 실패가 메시지 처리 자체를 실패시키지 않도록 한다. 포트의 오류 타입 계약과 해당 장애 테스트가 고정될 때 catch 범위를 축소한다. |
-| `TooGenericExceptionCaught` | [chat-persistence/WebSocketSessionTransport.kt](../../chat-persistence/src/main/kotlin/service/WebSocketSessionTransport.kt) | 한 세션의 전송·ping·종료 실패를 격리하고 등록된 세션 자원을 정리한다. 포트의 오류 타입 계약과 해당 장애 테스트가 고정될 때 catch 범위를 축소한다. |
-| `TooGenericExceptionCaught` | [chat-persistence/WebSocketSessionTransport.kt](../../chat-persistence/src/main/kotlin/service/WebSocketSessionTransport.kt) | 한 세션의 전송·ping·종료 실패를 격리하고 등록된 세션 자원을 정리한다. 포트의 오류 타입 계약과 해당 장애 테스트가 고정될 때 catch 범위를 축소한다. |
+| `TooGenericExceptionCaught` | [chat-websocket/WebSocketSessionTransport.kt](../../chat-websocket/src/main/kotlin/service/WebSocketSessionTransport.kt) | 한 세션의 전송·ping·종료 실패를 격리하고 등록된 세션 자원을 정리한다. 포트의 오류 타입 계약과 해당 장애 테스트가 고정될 때 catch 범위를 축소한다. |
+| `TooGenericExceptionCaught` | [chat-websocket/WebSocketSessionTransport.kt](../../chat-websocket/src/main/kotlin/service/WebSocketSessionTransport.kt) | 한 세션의 전송·ping·종료 실패를 격리하고 등록된 세션 자원을 정리한다. 포트의 오류 타입 계약과 해당 장애 테스트가 고정될 때 catch 범위를 축소한다. |
 | `SpreadOperator` | [chat-websocket-application/ChatWebSocketApplication.kt](../../chat-websocket-application/src/main/kotlin/com/chat/websocket/application/ChatWebSocketApplication.kt) | 기존 Java vararg API에 동적 배열을 전달한다. 동일 동작의 컬렉션 API가 있거나 배열 복사가 측정된 병목일 때 변경한다. 숫자를 줄이기 위한 Java wrapper는 만들지 않는다. |
 | `SpreadOperator` | [chat-websocket/WebSocketConfig.kt](../../chat-websocket/src/main/kotlin/config/WebSocketConfig.kt) | 기존 Java vararg API에 동적 배열을 전달한다. 동일 동작의 컬렉션 API가 있거나 배열 복사가 측정된 병목일 때 변경한다. 숫자를 줄이기 위한 Java wrapper는 만들지 않는다. |
 | `SwallowedException` | [chat-websocket/ChatWebSocketHandler.kt](../../chat-websocket/src/main/kotlin/handler/ChatWebSocketHandler.kt) | 알 수 없거나 손상된 JSON의 메시지 타입 추출을 null로 처리한다. 파서 오류 응답 계약을 분리할 때 좁힌다. |

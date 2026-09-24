@@ -1,6 +1,6 @@
-package com.chat.persistence.service
+package com.chat.websocket.service
 
-import com.chat.persistence.config.ChatWebSocketGatewayProperties
+import com.chat.websocket.config.ChatWebSocketGatewayProperties
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.stereotype.Service

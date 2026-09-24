@@ -1,4 +1,4 @@
-package com.chat.persistence.service
+package com.chat.websocket.service
 
 import io.micrometer.core.instrument.Counter
 import io.micrometer.core.instrument.Gauge

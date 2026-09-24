@@ -45,10 +45,10 @@ flowchart LR
 | `chat-runtime-config` | 공통 Spring profile YAML 리소스 | 코드와 외부 의존성 없는 resource JAR |
 | `chat-api` | 사용자·방 REST controller와 인증 경계 | core의 서비스 계약 사용 |
 | `chat-admin` | 관리자 REST controller와 인증 경계 | core의 서비스 계약 사용 |
-| `chat-websocket` | handshake, inbound handler, heartbeat 진입점 | persistence의 세션 관리 구현과 설정에 직접 의존 |
+| `chat-websocket` | handshake, inbound handler, 연결·구독·전송 큐·heartbeat·Gateway metrics | core 포트 사용; persistence·JPA·Redis 직접 의존 금지 |
 | `chat-domain` | JPA 통합 모델과 업무 예외 | core·delivery·infrastructure로 향하는 의존 금지 |
 | `chat-core` | 사용자·채팅·관리자 유스케이스, 공유 서비스 계약, 입출력 타입과 저장소 포트 | concrete DB·Redis·HTTP adapter 의존 금지; 전송 전용 DTO 분리는 후속 단계 |
-| `chat-persistence` | DB·Redis·S3 adapter, 유스케이스, Gateway 상태 관리 | 저장소 모듈 이름보다 책임이 넓으며 유스케이스 분리가 필요 |
+| `chat-persistence` | DB·Redis·S3 adapter, Worker·정책 구현 | Gateway 상태·전송 책임은 제거; Worker·정책 책임 분리는 추가 점검 |
 
 실행 모듈인 `chat-application`과 내부 계약 모듈인 `chat-core`는 별개다.
 `chat-core → chat-domain` 방향만 허용하며 API·관리자·Gateway와 persistence는 core를 사용한다.
@@ -67,6 +67,15 @@ JSON 직렬화는 adapter가 처리하고, 제재 변경·감사·내구성 있�
 트랜잭션으로 처리한다. 다운로드 URL 생성은 그 트랜잭션이 끝난 뒤 실행하므로 저장소
 장애나 서명 처리 중 DB 트랜잭션을 유지하지 않는다. 실행 중인 worker의 로컬 파일 경로는
 상태 응답으로 노출하지 않는다.
+
+WebSocket 연결·로컬 구독·전송 큐·executor·metrics는 `chat-websocket`이 소유한다.
+`GatewayMemberships`는 primary DB를 통한 전달 권한 확인, `GatewayRoomTransport`는
+서버 간 이벤트 수신·방 구독·advisory index 갱신, `SessionControlEvents`는 세션 철회
+알림을 담당한다. 저장소 장애는 adapter가 index 갱신 실패로 변환하고 Gateway가 현재
+로컬 구독 상태를 기준으로 재시도한다. delivery에는 Redis template이나 repository를 노출하지 않는다.
+API·Admin·Worker 프로세스에 `LocalGateway`가 없으면 로컬 알림은 생략하고 Redis 알림은
+계속 발행한다. Gateway가 있는 프로세스에서는 commit 이후 로컬 구독도 갱신한다.
+handshake의 query parameter·fallback 설정은 delivery에서 바인딩하며 기존 설정 키는 유지한다.
 
 WebSocket 부모 세션의 만료·개별 철회·사용자 전체 철회 기준은 core의
 `WebSocketTicketSessionPolicy`가 소유한다. Redis 티켓 adapter와 연결 전송 adapter는

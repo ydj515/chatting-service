@@ -1,9 +1,12 @@
-package com.chat.persistence.service
+package com.chat.websocket.service
 
 import com.chat.core.dto.ChatMessageBatch
 import com.chat.core.dto.WebSocketMessage
-import com.chat.persistence.redis.RedisMessageBroker
-import com.chat.persistence.repository.ChatRoomMemberRepository
+import com.chat.core.gateway.port.GatewayMemberships
+import com.chat.core.gateway.port.GatewayRoomTransport
+import com.chat.core.gateway.port.LocalGateway
+import com.chat.core.gateway.port.MembershipAction
+import com.chat.core.gateway.port.SessionControlEvents
 import com.fasterxml.jackson.databind.ObjectMapper
 import jakarta.annotation.PostConstruct
 import org.slf4j.LoggerFactory
@@ -15,12 +18,12 @@ import java.util.concurrent.ConcurrentHashMap
 @Service
 class WebSocketSessionManager(
     private val objectMapper: ObjectMapper,
-    private val redisMessageBroker: RedisMessageBroker,
-    private val chatRoomMemberRepository: ChatRoomMemberRepository,
+    private val roomTransport: GatewayRoomTransport,
+    private val memberships: GatewayMemberships,
     private val roomSubscriptions: WebSocketRoomSubscriptions,
     private val transport: WebSocketSessionTransport,
-    private val sessionControlBroker: RedisSessionControlBroker? = null,
-) {
+    private val sessionControlEvents: SessionControlEvents,
+) : LocalGateway {
     private val logger = LoggerFactory.getLogger(WebSocketSessionManager::class.java)
 
     private val sessionsById = ConcurrentHashMap<String, ManagedWebSocketSession>()
@@ -28,20 +31,20 @@ class WebSocketSessionManager(
 
     @PostConstruct
     fun initialize() {
-        redisMessageBroker.setLocalMessageHandler { roomId, msg ->
+        roomTransport.setLocalMessageHandler { roomId, msg ->
             sendMessageToLocalRoom(roomId, msg)
         }
-        redisMessageBroker.setLocalMembershipHandler { event ->
+        roomTransport.setLocalMembershipHandler { event ->
             when (event.action) {
-                RedisMessageBroker.MembershipAction.JOIN -> {
+                MembershipAction.JOIN -> {
                     if (isUserOnlineLocally(event.userId)) {
                         joinRoom(event.userId, event.roomId)
                     }
                 }
-                RedisMessageBroker.MembershipAction.LEAVE -> leaveRoom(event.userId, event.roomId)
+                MembershipAction.LEAVE -> leaveRoom(event.userId, event.roomId)
             }
         }
-        sessionControlBroker?.setLocalForceLogoutHandler { userId, _ ->
+        sessionControlEvents.setLocalForceLogoutHandler { userId, _ ->
             closeSessionsForUser(userId)
         }
 
@@ -54,7 +57,7 @@ class WebSocketSessionManager(
     }
 
     // RoomPolicy OVERLOAD 판정 입력으로 노출하는 현재 Gateway pending depth 합계.
-    fun currentSendQueueDepth(): Int =
+    override fun currentSendQueueDepth(): Int =
         sessionsById.values.sumOf { it.outboundQueue.pendingSize() }
 
     fun addSession(userId: Long, session: WebSocketSession) {
@@ -100,13 +103,13 @@ class WebSocketSessionManager(
         }
     }
 
-    fun joinRoom(userId: Long, roomId: Long) {
+    override fun joinRoom(userId: Long, roomId: Long) {
         val sessionRefs = openManagedWebSocketSessionsForUser(userId)
         if (sessionRefs.isEmpty()) {
             return
         }
 
-        val isMember = chatRoomMemberRepository.existsByChatRoomIdAndUserIdAndIsActiveTrue(roomId, userId)
+        val isMember = memberships.isMember(roomId, userId)
         if (!isMember) {
             logger.debug("not member of $roomId for $userId")
             return
@@ -117,7 +120,7 @@ class WebSocketSessionManager(
         }
     }
 
-    fun leaveRoom(userId: Long, roomId: Long) {
+    override fun leaveRoom(userId: Long, roomId: Long) {
         openManagedWebSocketSessionsForUser(userId).forEach { sessionRef ->
             removeSessionFromRoom(sessionRef, roomId)
         }
@@ -130,7 +133,7 @@ class WebSocketSessionManager(
         if (userIds.isEmpty()) return
         // Use the primary membership store, never the pub/sub index, as delivery authorization.
         // A lookup failure propagates before anything is enqueued (fail closed).
-        val activeUsers = chatRoomMemberRepository.findActiveUserIds(roomId, userIds).toSet()
+        val activeUsers = memberships.activeUserIds(roomId, userIds).toSet()
         (userIds - activeUsers).forEach { leaveRoom(it, roomId) }
         // payload 크기는 루프 내내 동일하므로 1회만 계산해 세션 수만큼의 byte array 할당을 피한다.
         val outboundBytes = json.toByteArray(Charsets.UTF_8).size.toLong()
@@ -167,7 +170,7 @@ class WebSocketSessionManager(
         return sessionRef.outboundQueue.enqueue(payload, priority = priority)
     }
 
-    fun isUserOnlineLocally(userId: Long): Boolean = openManagedWebSocketSessionsForUser(userId).isNotEmpty()
+    override fun isUserOnlineLocally(userId: Long): Boolean = openManagedWebSocketSessionsForUser(userId).isNotEmpty()
 
     fun closeSessionsForUser(userId: Long, closeStatus: CloseStatus = SESSION_REVOKED_STATUS) {
         openManagedWebSocketSessionsForUser(userId).forEach { sessionRef ->
@@ -198,7 +201,7 @@ class WebSocketSessionManager(
         if (sessionRef.roomIds.add(roomId)) {
             roomSubscriptions.addSessionIdToRoom(roomId, sessionRef.session.id)
 
-            logger.info("Joined $roomId for ${sessionRef.userId} ${redisMessageBroker.getServerId()}")
+            logger.info("Joined $roomId for ${sessionRef.userId} ${roomTransport.getServerId()}")
         }
     }
 

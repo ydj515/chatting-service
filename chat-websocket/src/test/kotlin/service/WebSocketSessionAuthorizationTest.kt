@@ -1,9 +1,9 @@
-package com.chat.persistence.service
+package com.chat.websocket.service
 
 import com.chat.core.auth.service.WebSocketTicketSessionPolicy
 import com.chat.core.service.SessionTokenRevocationStore
 import com.chat.core.service.SessionTokenService
-import com.chat.persistence.config.ChatWebSocketGatewayProperties
+import com.chat.websocket.config.ChatWebSocketGatewayProperties
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test

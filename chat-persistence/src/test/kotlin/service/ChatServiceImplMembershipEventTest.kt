@@ -9,7 +9,6 @@ import com.chat.core.room.service.ChatServiceImpl
 import com.chat.domain.model.ChatRoom
 import com.chat.domain.model.User
 import com.chat.persistence.config.ChatRedisProperties
-import com.chat.persistence.config.ChatWebSocketGatewayProperties
 import com.chat.persistence.redis.MessageStreamProducer
 import com.chat.persistence.redis.RedisMessageBroker
 import com.chat.persistence.repository.ChatMembershipStoreAdapter
@@ -90,21 +89,6 @@ class ChatServiceImplMembershipEventTest {
             objectMapper = objectMapper,
             redisProperties = redisProperties,
         )
-        val webSocketSessionManager = WebSocketSessionManager(
-            objectMapper = objectMapper,
-            redisMessageBroker = redisMessageBroker,
-            chatRoomMemberRepository = chatRoomMemberRepository,
-            roomSubscriptions = WebSocketRoomSubscriptions(
-                redisTemplate = redisTemplate,
-                redisProperties = redisProperties,
-                redisMessageBroker = redisMessageBroker,
-            ),
-            transport = WebSocketSessionTransport(
-                authorization = org.mockito.Mockito.mock(WebSocketSessionAuthorization::class.java),
-                gatewayProperties = ChatWebSocketGatewayProperties(),
-                outboundExecutor = Runnable::run,
-            ),
-        )
 
         val messageRepository = mock(MessageRepository::class.java)
 
@@ -135,7 +119,7 @@ class ChatServiceImplMembershipEventTest {
             ),
             membershipEventPublisher = MembershipEventPublisher(
                 redisMessageBroker = redisMessageBroker,
-                webSocketSessionManager = webSocketSessionManager,
+                localGateways = org.springframework.beans.factory.support.StaticListableBeanFactory().getBeanProvider(com.chat.core.gateway.port.LocalGateway::class.java),
             ),
         )
     }

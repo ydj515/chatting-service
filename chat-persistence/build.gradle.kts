@@ -25,9 +25,6 @@ dependencies {
     implementation(libs.spring.boot.starter.validation)
     implementation(libs.spring.security.crypto)
 
-    // WebSocket (WebSocketSessionManager에서 사용)
-    implementation(libs.spring.boot.starter.websocket)
-
     // Jackson (Redis 직렬화 및 WebSocket 메시지 처리용)
     implementation(libs.jackson.module.kotlin)
     implementation(libs.jackson.datatype.jsr310)
