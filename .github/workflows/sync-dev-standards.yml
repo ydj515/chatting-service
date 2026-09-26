@@ -1,0 +1,25 @@
+name: Sync Development Standards
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.dev-standards/config.yml'
+  schedule:
+    # Every Monday at 09:15 KST.
+    - cron: "15 0 * * 1"
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync-guide:
+    uses: ydj515/ci-workflows/.github/workflows/sync-dev-standards.yml@v1.3.1
+    with:
+      standards_owner: ydj515
+      standards_repo: dev-standards
+      standards_ref: latest-release
+      delivery_mode: pull-request
+      bootstrap_templates: false
+      bootstrap_agent_files: false

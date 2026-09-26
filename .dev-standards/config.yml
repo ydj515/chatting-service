@@ -1,0 +1,17 @@
+version: 1
+base: true
+languages:
+  - kotlin
+  - typescript
+frameworks:
+  - spring
+  - react-ts
+builds:
+  - gradle
+tools:
+  - archunit
+  - detekt
+  - kover
+  - ktlint
+runtimes:
+  - mise

@@ -14,8 +14,10 @@
             <option value="$PROJECT_DIR$/chat-api" />
             <option value="$PROJECT_DIR$/chat-api-application" />
             <option value="$PROJECT_DIR$/chat-application" />
+            <option value="$PROJECT_DIR$/chat-core" />
             <option value="$PROJECT_DIR$/chat-domain" />
             <option value="$PROJECT_DIR$/chat-persistence" />
+            <option value="$PROJECT_DIR$/chat-protocol" />
             <option value="$PROJECT_DIR$/chat-runtime-config" />
             <option value="$PROJECT_DIR$/chat-websocket" />
             <option value="$PROJECT_DIR$/chat-websocket-application" />
