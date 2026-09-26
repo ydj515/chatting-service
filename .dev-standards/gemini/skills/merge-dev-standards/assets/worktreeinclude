@@ -1,0 +1,6 @@
+# Local setup files for supported agent-managed worktrees.
+# Only files ignored by Git and matched here are copied by supporting clients.
+# Git CLI worktrees do not process this file automatically.
+# Add only explicit project-relative paths needed for local development.
+# Do not list tracked files, broad wildcards, build output, or dependency caches.
+# No files are selected by default. Preserve project-specific entries.

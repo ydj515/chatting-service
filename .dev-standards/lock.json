@@ -1,0 +1,177 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "repository": "ydj515/dev-standards",
+    "requestedRef": "latest-release",
+    "resolvedRef": "v1.3.0",
+    "commit": "549f49628fbd83e0d32ca4124025db74daa4e219"
+  },
+  "config": {
+    "path": ".dev-standards/config.yml",
+    "sha256": "94cc7868dd54503c78658f18dbbc8f90c365eb57f4388d5fd7a79be059b73d88"
+  },
+  "files": {
+    ".dev-standards/claude/skills/merge-dev-standards/SKILL.md": {
+      "ownership": "managed",
+      "sha256": "c6e54eda998ff050e122c1c02fcaa283458f6c9f2241db09f2822811bea10bd5"
+    },
+    ".dev-standards/claude/skills/merge-dev-standards/assets/AGENTS.md": {
+      "ownership": "managed",
+      "sha256": "47523b27f5bf6da9901c6ef04db10028f7e13e9f4d64437d0e52c78c7c2287ac"
+    },
+    ".dev-standards/claude/skills/merge-dev-standards/assets/worktreeinclude": {
+      "ownership": "managed",
+      "sha256": "e7b10751bf861174133310080e4639bef6a3d0c445059369b720343f1cf04341"
+    },
+    ".dev-standards/claude/skills/merge-dev-standards/references/claude.md": {
+      "ownership": "managed",
+      "sha256": "c89e134ffa07bea44084ae18089477074b0ec8aa4a6ad3802bee51e13172055e"
+    },
+    ".dev-standards/claude/skills/merge-dev-standards/references/codex.md": {
+      "ownership": "managed",
+      "sha256": "fed2928afdf9087edee5fb655b27fe481f77fb869e5c84ce781936b20840e8b8"
+    },
+    ".dev-standards/claude/skills/merge-dev-standards/references/gemini.md": {
+      "ownership": "managed",
+      "sha256": "31789c1c16f30a4d728700962e1ce1a3115e3de92bca0999159de07086a7bbe0"
+    },
+    ".dev-standards/claude/skills/merge-dev-standards/references/merge-rules.md": {
+      "ownership": "managed",
+      "sha256": "bb7840a5b660a860b0dbee02867dbb4d2f47464c9ee21f215d97483fa7597614"
+    },
+    ".dev-standards/codex/skills/merge-dev-standards/SKILL.md": {
+      "ownership": "managed",
+      "sha256": "c6e54eda998ff050e122c1c02fcaa283458f6c9f2241db09f2822811bea10bd5"
+    },
+    ".dev-standards/codex/skills/merge-dev-standards/assets/AGENTS.md": {
+      "ownership": "managed",
+      "sha256": "47523b27f5bf6da9901c6ef04db10028f7e13e9f4d64437d0e52c78c7c2287ac"
+    },
+    ".dev-standards/codex/skills/merge-dev-standards/assets/worktreeinclude": {
+      "ownership": "managed",
+      "sha256": "e7b10751bf861174133310080e4639bef6a3d0c445059369b720343f1cf04341"
+    },
+    ".dev-standards/codex/skills/merge-dev-standards/references/claude.md": {
+      "ownership": "managed",
+      "sha256": "c89e134ffa07bea44084ae18089477074b0ec8aa4a6ad3802bee51e13172055e"
+    },
+    ".dev-standards/codex/skills/merge-dev-standards/references/codex.md": {
+      "ownership": "managed",
+      "sha256": "fed2928afdf9087edee5fb655b27fe481f77fb869e5c84ce781936b20840e8b8"
+    },
+    ".dev-standards/codex/skills/merge-dev-standards/references/gemini.md": {
+      "ownership": "managed",
+      "sha256": "31789c1c16f30a4d728700962e1ce1a3115e3de92bca0999159de07086a7bbe0"
+    },
+    ".dev-standards/codex/skills/merge-dev-standards/references/merge-rules.md": {
+      "ownership": "managed",
+      "sha256": "bb7840a5b660a860b0dbee02867dbb4d2f47464c9ee21f215d97483fa7597614"
+    },
+    ".dev-standards/config.yml": {
+      "ownership": "project-owned"
+    },
+    ".dev-standards/gemini/skills/merge-dev-standards/SKILL.md": {
+      "ownership": "managed",
+      "sha256": "c6e54eda998ff050e122c1c02fcaa283458f6c9f2241db09f2822811bea10bd5"
+    },
+    ".dev-standards/gemini/skills/merge-dev-standards/assets/AGENTS.md": {
+      "ownership": "managed",
+      "sha256": "47523b27f5bf6da9901c6ef04db10028f7e13e9f4d64437d0e52c78c7c2287ac"
+    },
+    ".dev-standards/gemini/skills/merge-dev-standards/assets/worktreeinclude": {
+      "ownership": "managed",
+      "sha256": "e7b10751bf861174133310080e4639bef6a3d0c445059369b720343f1cf04341"
+    },
+    ".dev-standards/gemini/skills/merge-dev-standards/references/claude.md": {
+      "ownership": "managed",
+      "sha256": "c89e134ffa07bea44084ae18089477074b0ec8aa4a6ad3802bee51e13172055e"
+    },
+    ".dev-standards/gemini/skills/merge-dev-standards/references/codex.md": {
+      "ownership": "managed",
+      "sha256": "fed2928afdf9087edee5fb655b27fe481f77fb869e5c84ce781936b20840e8b8"
+    },
+    ".dev-standards/gemini/skills/merge-dev-standards/references/gemini.md": {
+      "ownership": "managed",
+      "sha256": "31789c1c16f30a4d728700962e1ce1a3115e3de92bca0999159de07086a7bbe0"
+    },
+    ".dev-standards/gemini/skills/merge-dev-standards/references/merge-rules.md": {
+      "ownership": "managed",
+      "sha256": "bb7840a5b660a860b0dbee02867dbb4d2f47464c9ee21f215d97483fa7597614"
+    },
+    ".dev-standards/standards/architectures/feature-sliced.md": {
+      "ownership": "managed",
+      "sha256": "403f6de9b8f278cb81e4b0edbaebfe41da83b76294d31e7b54c2b52768203c24"
+    },
+    ".dev-standards/standards/architectures/layered-clean.md": {
+      "ownership": "managed",
+      "sha256": "3b74ff86dac47093a2f7ef85a8644c695b23b970ed6d7c23c14ecfc02b465a1f"
+    },
+    ".dev-standards/standards/base.md": {
+      "ownership": "managed",
+      "sha256": "3345a97ccaf51f10e4ea6aafb7b806450fd911990409473424b8bddab38fded6"
+    },
+    ".dev-standards/standards/build-tools/gradle.md": {
+      "ownership": "managed",
+      "sha256": "d7021598c82fd1891921b67b6a273ef2de9e974d7b909591a234e3706ec4bca8"
+    },
+    ".dev-standards/standards/frameworks/react-ts.md": {
+      "ownership": "managed",
+      "sha256": "5b234eb93cc86792f54d63dd0735810fa1936703b3d177f1a3c8c9452e01a078"
+    },
+    ".dev-standards/standards/frameworks/spring.md": {
+      "ownership": "managed",
+      "sha256": "77e32faceb765f75400c3631a9e3f62fd1f22f98ae82156764d7204e5dc096f7"
+    },
+    ".dev-standards/standards/languages/kotlin.md": {
+      "ownership": "managed",
+      "sha256": "40dbe63e8c16eb525e2819f051304e6044b0a4b99f76bcf7402525dd04989fd2"
+    },
+    ".dev-standards/standards/languages/typescript.md": {
+      "ownership": "managed",
+      "sha256": "44fe111e56e5bef8ac11a6e2cc676bbe3bc90f921a184c039fec17b2cfd9fe74"
+    },
+    ".dev-standards/standards/runtime/mise.md": {
+      "ownership": "managed",
+      "sha256": "fd66a8ed4ffa1f28ef5537e90cb6c0fdc033e9890bc71935a2a27417eec164f9"
+    },
+    ".dev-standards/standards/tools/languages/java/archunit.md": {
+      "ownership": "managed",
+      "sha256": "ed01903357b8837dbf4a5d1a5afc145fd3edbe3d03f916f99071e3bb88539932"
+    },
+    ".dev-standards/standards/tools/languages/kotlin/detekt.md": {
+      "ownership": "managed",
+      "sha256": "f7fc62244754323f89f74e39a442ff9106259e5deaf0813ccf90798730825bd0"
+    },
+    ".dev-standards/standards/tools/languages/kotlin/kover.md": {
+      "ownership": "managed",
+      "sha256": "84797e9dccd1a687788904485461d44c044e9017b578d1b0c0dd1718a7f5ad6a"
+    },
+    ".dev-standards/standards/tools/languages/kotlin/ktlint.md": {
+      "ownership": "managed",
+      "sha256": "927e9a1088a51ff29d8edd87a82cfa3927c7b8d500c559fd30f3f85286bb8f03"
+    },
+    ".dev-standards/standards/workflows/branch.md": {
+      "ownership": "managed",
+      "sha256": "453a4e9afb7e0672ff53d585b65365429b818ba51f10d09b55887ab387da6a2d"
+    },
+    ".dev-standards/standards/workflows/commit.md": {
+      "ownership": "managed",
+      "sha256": "6c195ff5b1f5479352c5c3f8f4395d6f4cbf088a5ab7e10b09c522f26c11ed1e"
+    },
+    ".dev-standards/standards/workflows/pr.md": {
+      "ownership": "managed",
+      "sha256": "c478510b2b930e1b3e5c2cd39fdba09292171295acc73be19769565fb88f42c1"
+    },
+    ".dev-standards/standards/workflows/worktree.md": {
+      "ownership": "managed",
+      "sha256": "2a07d0c959f4725746e426d91505a262982b4d8a9727a4c67692ae975d60a644"
+    },
+    ".dev-standards/styleguide.md": {
+      "ownership": "managed",
+      "sha256": "34a192e9407a55bbc36ab52fb5ffb5476e62eb780d81b713846a7f6a35511887"
+    },
+    ".worktreeinclude": {
+      "ownership": "project-owned"
+    }
+  }
+}
